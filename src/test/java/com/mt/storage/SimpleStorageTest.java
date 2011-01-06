@@ -1,10 +1,10 @@
 package com.mt.storage;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertArrayEquals;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -14,6 +14,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.mt.storage.conversion.ConversionTools;
 import com.mt.storage.memory.Memory;
 
 public class SimpleStorageTest {
@@ -24,18 +25,19 @@ public class SimpleStorageTest {
 		@Key(order = 1)
 		private final String key1;
 		@Key(order = 2)
-		public final String key2;
+		public final String[] key2;
 		public String prop1;
 		public boolean prop2;
 		public String nullProp;
 		private String privProp;
+		public byte[] bytesProp; 
+		public int[] intsProp; 
 
-		public SimpleElement(String key1, String key2) {
+		public SimpleElement(String key1, String[] key2) {
 			super();
 			this.key1 = key1;
 			this.key2 = key2;
-			// Uncommenting the next two lines should trigger an error.
-			// this.prop1 = "";
+			this.prop1 = "";
 			// this.prop2 = false;
 		}
 
@@ -43,7 +45,7 @@ public class SimpleStorageTest {
 //			return key1;
 //		}
 
-		public String getKey2() {
+		public String[] getKey2() {
 			return key2;
 		}
 
@@ -60,7 +62,7 @@ public class SimpleStorageTest {
 
 	@Before
 	public void createElements() throws DatabaseNotReachedException {
-		this.sut1 = new SimpleElement("KEY1", "KEY2");
+		this.sut1 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
 		this.sut1.prop1 = "pro1value";
 		this.sut1.prop2 = true;
 		this.sut1.store();
@@ -102,14 +104,14 @@ public class SimpleStorageTest {
 		assertEquals("KEY1", Bytes.toString(Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key1")));
-		assertEquals("KEY2", Bytes.toString(Memory.INSTANCE.get(
+		assertArrayEquals(new String [] {"KE", "Y2"}, ConversionTools.convert(String[].class, Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key2")));
 	}
 
 	@Test
 	public void retreive() throws DatabaseNotReachedException {
-		SimpleElement sut2 = new SimpleElement("KEY1", "KEY2");
+		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
 		assertTrue(Memory.INSTANCE.hadNoQuery());
 		sut2.activateSimpleProperties();
 		assertTrue(Memory.INSTANCE.hadAQuery());
@@ -139,7 +141,7 @@ public class SimpleStorageTest {
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).containsKey(
 				"prop1"));
 		Memory.INSTANCE.resetQueries();
-		SimpleElement sut2 = new SimpleElement("KEY1", "KEY2");
+		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
 		assertTrue(Memory.INSTANCE.hadNoQuery());
 		sut2.activateSimpleProperties();
 		assertTrue(Memory.INSTANCE.hadAQuery());
@@ -156,12 +158,38 @@ public class SimpleStorageTest {
 	}
 
 	@Test
+	public void retreiveArrayProperty() throws DatabaseNotReachedException {
+		this.sut1.intsProp = new int [] {1,2,3};
+		assertTrue(Memory.INSTANCE.hadNoQuery());
+		this.sut1.store();
+		assertTrue(Memory.INSTANCE.hadAQuery());
+		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut2.activateSimpleProperties();
+		assertTrue(Memory.INSTANCE.hadAQuery());
+		assertArrayEquals(this.sut1.intsProp, sut2.intsProp);
+		assertTrue(Memory.INSTANCE.hadNoQuery());
+	}
+
+	@Test
+	public void retreiveByteArrayProperty() throws DatabaseNotReachedException {
+		this.sut1.bytesProp = new byte [] {1,2,3};
+		assertTrue(Memory.INSTANCE.hadNoQuery());
+		this.sut1.store();
+		assertTrue(Memory.INSTANCE.hadAQuery());
+		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut2.activateSimpleProperties();
+		assertTrue(Memory.INSTANCE.hadAQuery());
+		assertArrayEquals(this.sut1.bytesProp, sut2.bytesProp);
+		assertTrue(Memory.INSTANCE.hadNoQuery());
+	}
+
+	@Test
 	public void retreivePrivateProperty() throws DatabaseNotReachedException {
 		this.sut1.setPrivProp("privatevalue");
 		assertTrue(Memory.INSTANCE.hadNoQuery());
 		this.sut1.store();
 		assertTrue(Memory.INSTANCE.hadAQuery());
-		SimpleElement sut2 = new SimpleElement("KEY1", "KEY2");
+		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
 		sut2.activateSimpleProperties();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertEquals("privatevalue", sut2.getPrivProp());
@@ -244,6 +272,16 @@ public class SimpleStorageTest {
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertEquals(250, elt.lval);
 		assertTrue(Memory.INSTANCE.hadNoQuery());
+		
+		elt.lval += 51;
+		elt.store();
+		assertTrue(Memory.INSTANCE.hadAQuery());
+		elt = new IncrementingElement("elt");
+		elt.activateSimpleProperties();
+		assertTrue(Memory.INSTANCE.hadAQuery());
+		assertEquals(301, elt.lval);
+		assertTrue(Memory.INSTANCE.hadNoQuery());
+		
 	}
 	@Test
 	public void incrementingInt() throws DatabaseNotReachedException {

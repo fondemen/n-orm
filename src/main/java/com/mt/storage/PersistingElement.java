@@ -7,9 +7,9 @@ import java.util.List;
 public interface PersistingElement {
 	static final Class<?>[] PossiblePropertyTypes = new Class[] { Date.class,
 			String.class, Boolean.class, int.class, byte.class, short.class,
-			long.class, float.class, double.class, long.class, boolean.class,
+			long.class, float.class, double.class, boolean.class,
 			char.class, Integer.class, Byte.class, Short.class, Long.class,
-			Float.class, Double.class, Long.class, Boolean.class,
+			Float.class, Double.class, Boolean.class,
 			Character.class };
 
 	Store getStore();

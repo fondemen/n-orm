@@ -1,7 +1,5 @@
 package com.mt.storage.conversion;
 
-import java.util.Date;
-
 import com.mt.storage.KeyManagement;
 
 class KeyedElementConverter extends Converter<Object> {

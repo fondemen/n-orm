@@ -1,16 +1,13 @@
 package com.mt.storage;
 
-import com.mt.storage.Persisting;
-import com.mt.storage.PersistingElement;
-import java.util.Collection;
 
 
 public privileged aspect PersistingMixin {
 	
 	declare parents: (@Persisting *) implements PersistingElement;
 
-	//If set within the constructor, we can't know whether the correct value is within the database, or that one that was set within the constructor.
-	declare error: set(!@Key !transient !static (!Collection+) (PersistingElement+).*) && withincode((@Persisting *).new(..)) : "Only key attribute should be set within a persisting constructor.";
+	////If set within the constructor, we can't know whether the correct value is within the database, or that one that was set within the constructor.
+	//declare error: set(!@Key !transient !static (!Collection+) (PersistingElement+).*) && withincode((@Persisting *).new(..)) : "Only key attribute should be set within a persisting constructor.";
 
 	declare error : set(static !transient !final * PersistingElement+.*) : "Static fields can only be transient in persisting classes";
 	

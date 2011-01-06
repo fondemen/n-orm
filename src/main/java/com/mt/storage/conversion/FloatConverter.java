@@ -8,12 +8,12 @@ class FloatConverter extends PrimitiveConverter<Float> {
 
 	@Override
 	public Float fromString(String rep, Class<?> expected) {
-		throw new IllegalArgumentException("Cannot convert double to string.");
+		throw new IllegalArgumentException("Cannot convert float from string.");
 	}
 
 	@Override
 	public String toString(Float obj) {
-		throw new IllegalArgumentException("Cannot convert double to string.");
+		throw new IllegalArgumentException("Cannot convert float to string.");
 	}
 
 	@Override

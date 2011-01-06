@@ -8,6 +8,12 @@ abstract class NaturalConverter<T extends Number> extends PrimitiveConverter<T> 
 
 	public long parseString(String rep) {
 		byte digits = (byte) (rep.length() / 2);
+		if (rep.length() % 2 == 1) {
+			digits++;
+			rep = "0" + rep;
+		}
+		if (digits == 0)
+			return 0;
 		byte[] ret = new byte[digits];
 		for (int i = 0; i < digits; ++i) {
 			char br = rep.charAt(2 * i);
