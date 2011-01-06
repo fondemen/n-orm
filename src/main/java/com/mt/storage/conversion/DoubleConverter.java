@@ -9,7 +9,7 @@ class DoubleConverter extends PrimitiveConverter<Double> {
 
 	@Override
 	public Double fromString(String rep, Class<?> expected) {
-		throw new IllegalArgumentException("Cannot convert double to string.");
+		throw new IllegalArgumentException("Cannot convert double from string.");
 	}
 
 	@Override

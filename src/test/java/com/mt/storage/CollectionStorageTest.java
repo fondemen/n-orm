@@ -43,7 +43,7 @@ public class CollectionStorageTest extends StoreTestLauncher {
 	@Persisting(table="TestContainer")
 	public static class Container {
 		@Key public final String key;
-		@Indexed(field="key") public final Collection<Element> elements = null;
+		@Indexed(field="key") @ImplicitActivation public final Collection<Element> elements = null;
 		@Indexed(field="key") @Incrementing public final Collection<Element> elementsInc = null;
 
 		public Container(String key) {
@@ -96,6 +96,12 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		new ContainerNotIndexed();
 	}
 	
+	@Test
+	public void autoActivation() throws DatabaseNotReachedException {
+		Container copy = new Container(sut.key);
+		copy.activateSimpleProperties();
+		assertTrue(((ColumnFamily<Element>)copy.elements).wasActivated());
+	}
 	@Test
 	public void storeRetrieveElements() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);

@@ -1,7 +1,5 @@
 package com.mt.storage.conversion;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -30,7 +28,7 @@ public class ConversionTools {
 				new CharacterConverter(), new ByteConverter(),
 				new ShortConverter(), new IntegerConverter(),
 				new LongConverter(), new FloatConverter(),
-				new DoubleConverter(), new KeyedElementConverter() };
+				new DoubleConverter(), new ArrayConverter(), new KeyedElementConverter() };
 	}
 
 	private static boolean test(Converter<?> conv, Object o, Class<?> type,
@@ -69,6 +67,23 @@ public class ConversionTools {
 					+ kind.name());
 		}
 	}
+	
+	public static boolean canConvert(Class<?> clazz) {
+		if (clazz == null)
+			return false;
+		
+		if (knownConverters.containsKey(clazz))
+			return true;
+		
+		for (Converter<?> conv : converters) {
+			if (conv.canConvert(clazz)) {
+				registerConverter(clazz, conv);
+				return true;
+			}
+		}
+		
+		return false;
+	}
 
 	private static Object convertInternal(Object o, Class<?> type,
 			ConversionKind kind, String errorMessage) {
@@ -83,17 +98,19 @@ public class ConversionTools {
 		for (Converter<?> conv : converters)
 			if (test(conv, o, type, kind)) {
 				Object ret = convert(conv, o, type, kind);
-
-				Set<Converter<?>> cachedConverters = knownConverters.get(clazz);
-				if (cachedConverters == null) {
-					cachedConverters = new HashSet<Converter<?>>();
-					knownConverters.put(clazz, cachedConverters);
-				}
-				cachedConverters.add(conv);
-
+				registerConverter(clazz, conv);
 				return ret;
 			}
 		throw new IllegalArgumentException(errorMessage);
+	}
+
+	private static void registerConverter(Class<?> clazz, Converter<?> conv) {
+		Set<Converter<?>> cachedConverters = knownConverters.get(clazz);
+		if (cachedConverters == null) {
+			cachedConverters = new HashSet<Converter<?>>();
+			knownConverters.put(clazz, cachedConverters);
+		}
+		cachedConverters.add(conv);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -132,7 +149,7 @@ public class ConversionTools {
 			return null;
 
 		return (byte[]) convertInternal(o, null, ConversionKind.ToBytes,
-				"Cannot create a bynary representation for " + o);
+				"Cannot create a binary representation for " + o);
 	}
 
 	public static String convertToString(Object o) {

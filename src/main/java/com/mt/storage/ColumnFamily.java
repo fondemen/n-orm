@@ -14,6 +14,7 @@ public class ColumnFamily<T> implements Collection<T> {
 	public static enum ChangeKind {SET, DELETE};
 	
 	private final Class<T> clazz;
+	private final Field property;
 	private final String name;
 	private final PersistingElement owner;
 	private final String ownerTable;
@@ -28,13 +29,14 @@ public class ColumnFamily<T> implements Collection<T> {
 	private final Map<String, ChangeKind> changes;
 	private final Map<String, Number> increments;
 
-	public ColumnFamily(Class<T> clazz, String name, PersistingElement owner, String index, boolean addOnly, boolean incremental) throws SecurityException, NoSuchFieldException {
-		this(clazz, name, owner, clazz.getField(index), addOnly, incremental);
+	public ColumnFamily(Class<T> clazz, Field property, PersistingElement owner, String index, boolean addOnly, boolean incremental) throws SecurityException, NoSuchFieldException {
+		this(clazz, property, property.getName(), owner, PropertyManagement.aspectOf().getProperty(clazz, index), addOnly, incremental);
 	}
 
-	public ColumnFamily(Class<T> clazz, String name, PersistingElement owner, Field index, boolean addOnly, boolean incremental) {
+	public ColumnFamily(Class<T> clazz, Field property, String name, PersistingElement owner, Field index, boolean addOnly, boolean incremental) {
 		super();
 		this.clazz = clazz;
+		this.property = property;
 		this.name = name;
 		this.owner = owner;
 		this.index = index;
@@ -66,6 +68,13 @@ public class ColumnFamily<T> implements Collection<T> {
 	
 	public String getName() {
 		return name;
+	}
+	
+	/**
+	 * @return the property corresponding to that column family ; may be null, e.g. for the properties or increments column families
+	 */
+	public Field getProperty() {
+		return property;
 	}
 
 	public PersistingElement getOwner() {

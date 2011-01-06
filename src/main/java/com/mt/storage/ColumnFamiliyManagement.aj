@@ -4,6 +4,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,6 +13,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.aspectj.lang.reflect.FieldSignature;
+
+import com.mt.storage.PropertyManagement.PropertyFamily;
 
 public aspect ColumnFamiliyManagement {
 
@@ -20,6 +24,9 @@ public aspect ColumnFamiliyManagement {
 	declare soft : InvocationTargetException : within(ColumnFamiliyManagement) && adviceexecution();
 	
 	declare error: set(!transient !static !final Collection+ PersistingElement+.*) : "A persisting column family must be final";
+
+	declare warning: get(@ImplicitActivation transient * PersistingElement+.*)
+		|| get(@ImplicitActivation static * PersistingElement+.*) : "This field is not persitent, thus cannot be auto-activated";
 	
 	private transient Map<String, ColumnFamily<?>> PersistingElement.columnFamilies = new HashMap<String, ColumnFamily<?>>();
 	
@@ -42,8 +49,6 @@ public aspect ColumnFamiliyManagement {
 		}
 		return false;
 	}
-	
-	
 
 	public void PersistingElement.activate(String name, Object startIndex, Object endIndex) throws DatabaseNotReachedException {
 		ColumnFamily<?> cf = this.getColumnFamily(name);
@@ -92,10 +97,22 @@ public aspect ColumnFamiliyManagement {
 		if (coll != null)
 			throw new IllegalArgumentException("Can only set null value to persisting collection " + field);
 		Incrementing incr = field.getAnnotation(Incrementing.class);
-		proceed(self, new ColumnFamily(elementClass, field.getName(), self, index.field(), field.isAnnotationPresent(AddOnly.class), field.isAnnotationPresent(Incrementing.class)));
+		proceed(self, new ColumnFamily(elementClass, field, self, index.field(), field.isAnnotationPresent(AddOnly.class), field.isAnnotationPresent(Incrementing.class)));
 	}
 	
 	after(ColumnFamily cf) returning : execution(ColumnFamily.new(..)) && target(cf) {
 		cf.getOwner().addColumnFamily(cf);
+	}
+	
+	after(PropertyFamily pf) returning throws DatabaseNotReachedException: execution(void PropertyFamily.activate()) && target(pf) {
+		PersistingElement self = pf.getOwner();
+		for (ColumnFamily<?> cf : self.getColumnFamilies()) {
+			Field f = cf.getProperty();
+			if (f != null && f.isAnnotationPresent(ImplicitActivation.class)) {
+				ImplicitActivation act = f.getAnnotation(ImplicitActivation.class);
+				String start = act.startIndex(), stop = act.stopIndex();
+				cf.activate("".equals(start) ? null : start, "".equals(stop) ? null : stop);
+			}
+		}
 	}
 }

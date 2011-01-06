@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.beanutils.PropertyUtils;
+import org.aspectj.lang.SoftException;
 import org.aspectj.lang.reflect.FieldSignature;
 
 import com.mt.storage.conversion.ConversionTools;
@@ -132,7 +133,7 @@ public aspect PropertyManagement {
 
 		private PropertyFamily(PersistingElement owner)
 				throws SecurityException, NoSuchFieldException {
-			super(Property.class, PROPERTY_COLUMNFAMILY_NAME, owner,
+			super(Property.class, null, PROPERTY_COLUMNFAMILY_NAME, owner,
 					Property.class.getDeclaredField("name"), false, false);
 		}
 
@@ -178,14 +179,18 @@ public aspect PropertyManagement {
 		if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) != 0)
 			return;
 
-		if (!this.isPropertyType(f.getType()))
+		Class<?> type = f.getType();
+		if (type.isArray())
+			type = type.getComponentType();
+		if (!this.isPropertyType(type))
 			throw new IllegalStateException(
 					"The "
 							+ f
 							+ " key should be of a type that must be a primitive, a String, an enumeration, a class annotated with "
 							+ Persisting.class
-							+ " or a class whose properties are all annotated with "
-							+ Key.class);
+							+ ", a class whose properties are all annotated with "
+							+ Key.class
+							+ " or an array of such types.");
 	}
 
 	public boolean isProperty(Field prop) {
@@ -255,8 +260,9 @@ public aspect PropertyManagement {
 	private transient volatile boolean PersistingElement.checkingProperty = false;
 
 	pointcut attUpdated(PersistingElement self, Object val): set(!transient !static (!Collection+) PersistingElement+.*) && target(self) && args(val);
+	pointcut nonIncrementingAttUpdated(PersistingElement self, Object val): !set(@Incrementing * *.*) && attUpdated(self, val);
 
-	after(PersistingElement self, Object val) returning: attUpdated(self, val) {
+	after(PersistingElement self, Object val) returning: nonIncrementingAttUpdated(self, val) && !execution(PersistingElement+.new(..)) {
 		assert this.isProperty(((FieldSignature) thisJoinPointStaticPart
 				.getSignature()).getField());
 		Field field = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
@@ -266,7 +272,7 @@ public aspect PropertyManagement {
 			self.getProperties().add(new Property(field, val));
 	}
 
-	before(PersistingElement self) : get(!transient !static (!Collection+) PersistingElement+.*) && !execution(PersistingElement+.new(..)) && target(self) && !if(self.checkingProperty) {
+	before(PersistingElement self) : get(!@Incrementing !transient !static (!Collection+) PersistingElement+.*) && !execution(PersistingElement+.new(..)) && target(self) && !if(self.checkingProperty) {
 		self.checkingProperty = true;
 		
 		try {
@@ -298,8 +304,8 @@ public aspect PropertyManagement {
 				if (self.getProperties().wasActivated())
 					prop.activate();
 				val = prop.getValue();
-			} else { //Property is seen for the first time: neither initialized nor set beforehead
-				return;
+			} else {
+				val = null;
 			}
 			
 			if (PersistingElement.class.isAssignableFrom(f.getType()) && val != null && oldVal != null && val != oldVal && ((PersistingElement)val).getIdentifier().equals(((PersistingElement)oldVal).getIdentifier())) {
@@ -324,7 +330,17 @@ public aspect PropertyManagement {
 	}
 
 	after(PersistingElement self) returning : PersistingMixin.creation(self) {
-		self.getProperties().clearChanges();
+		PropertyFamily pf = self.getProperties();
+		for (Field f : this.getProperties(self.getClass())) {
+			if (!f.isAnnotationPresent(Incrementing.class)) {
+				Object val = this.candideReadValue(self, f);
+				if (val == null)
+					pf.removeKey(f.getName());
+				else
+					pf.add(new Property(f, val));
+			}
+			
+		}
 	}
 
 	public Object candideReadValue(Object self, Field property) {
@@ -363,7 +379,11 @@ public aspect PropertyManagement {
 		try {
 			property.set(self, value);
 		} catch (Exception x) {
-			PropertyUtils.setProperty(self, property.getName(), value);
+			try {
+				PropertyUtils.setProperty(self, property.getName(), value);
+			} catch (Exception y) {
+				throw new SoftException(x);
+			}
 		}
 	}
 	

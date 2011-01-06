@@ -15,20 +15,10 @@ abstract class Converter<T> implements
 	public abstract T fromString(String rep, Class<?> expected);
 
 	public abstract String toString(T obj);
-	
-	@SuppressWarnings("unchecked")
-	public String objectToString(Object obj) {
-		return this.toString((T) obj);
-	}
 
 	public abstract T fromBytes(byte[] rep, Class<?> type);
 
 	public abstract byte[] toBytes(T obj);
-	
-	@SuppressWarnings("unchecked")
-	public byte [] objectToBytes(Object obj) {
-		return this.toBytes((T) obj);
-	}
 
 	public boolean canConvertToBytes(Object obj) {
 		return this.canConvert(obj.getClass());

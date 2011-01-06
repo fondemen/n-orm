@@ -7,6 +7,9 @@ import java.util.Map;
 
 import org.aspectj.lang.reflect.FieldSignature;
 
+import com.mt.storage.PropertyManagement.Property;
+import com.mt.storage.PropertyManagement.PropertyFamily;
+
 public aspect IncrementManagement {
 
 
@@ -21,6 +24,31 @@ public aspect IncrementManagement {
 	
 	Map<String, Number> PersistingElement.getIncrements() {
 		return this.increments;
+	}
+
+//	after(PersistingElement self) returning : PersistingMixin.creation(self) {
+//		PropertyFamily pf = self.getProperties();
+//		for (Field f : PropertyManagement.aspectOf().getProperties(self.getClass())) {
+//			if (f.isAnnotationPresent(Incrementing.class) && !self.getIncrements().containsKey(f.getName())) {
+//				self.getIncrements().put(f.getName(), 0);
+//			}
+//			
+//		}
+//	}
+	
+	after(PropertyFamily pf) returning: execution(void PropertyFamily.activate()) && target(pf) {
+		PersistingElement owner = pf.getOwner();
+		for (Field f : PropertyManagement.aspectOf().getProperties(owner.getClass())) {
+			if (f.isAnnotationPresent(Incrementing.class)) {
+				Property prop = pf.get(f.getName());
+				if (prop != null) {
+					if (prop.getField() == null)
+						prop.setField(f);
+					assert f.equals(prop.getField());
+					PropertyManagement.aspectOf().candideSetValue(owner, f, prop.getValue());
+				}
+			}
+		}
 	}
 	
 	before(PersistingElement self, Object val): PropertyManagement.attUpdated(self, val) && set(@Incrementing * *.*) {
@@ -84,13 +112,5 @@ public aspect IncrementManagement {
 	
 	after(PersistingElement self) returning: execution(void PersistingElement+.store()) && target(self) {
 		self.getIncrements().clear();
-	}
-	
-	boolean around(PropertyManagement.PropertyFamily properties, PropertyManagement.Property property) : call(boolean Collection+.add(Object)) && within(PropertyManagement) &&  target(properties) && args(property) {
-		Field f = property.getField();
-		if (f != null && f.isAnnotationPresent(Incrementing.class))
-			return false;
-		else
-			return proceed(properties, property);
 	}
 }

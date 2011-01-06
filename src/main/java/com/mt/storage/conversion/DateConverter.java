@@ -6,14 +6,6 @@ class DateConverter extends Converter<Date> {
 	public DateConverter() {
 		super(Date.class);
 	}
-	
-	protected <U> U getEnumerated(String searched, Class<U> enumeration) {
-		for (U enumerated : enumeration.getEnumConstants()) {
-			if (enumerated.toString().equals(searched))
-				return enumerated;
-		}
-		return null;
-	}
 
 	@Override
 	public Date fromString(String rep, Class<?> expected) {
