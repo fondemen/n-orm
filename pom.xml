@@ -68,6 +68,18 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<artifactId>maven-clean-plugin</artifactId>
+				<version>2.4.1</version>
+				<configuration>
+					<filesets>
+						<fileset>
+							<directory>build</directory>
+							<followSymlinks>false</followSymlinks>
+						</fileset>
+					</filesets>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 	<dependencies>
@@ -136,6 +148,11 @@
 		</dependency>
 	</dependencies>
 	<repositories>
+		<repository>
+			<id>maven.springframework.org</id>
+			<name>SpringSource snapshots</name>
+			<url>http://maven.springframework.org/snapshot</url>
+		</repository>
 		<repository>
 			<id>com.mt.xtraxion</id>
 			<name>MT repository</name>
