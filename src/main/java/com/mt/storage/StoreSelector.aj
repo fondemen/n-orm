@@ -71,7 +71,7 @@ public aspect StoreSelector {
 				String accessorName = properties.getProperty(STORE_DRIVERCLASS_STATIC_ACCESSOR);
 				Method accessor = null;
 				for (Method m : storeClass.getMethods()) {
-					if (m.getName().equals(accessorName) && (m.getModifiers() & Modifier.STATIC) != 0 && m.getParameterTypes().length == properties.size()-1) {
+					if (m.getName().equals(accessorName) && (m.getModifiers() & Modifier.STATIC) != 0 && m.getParameterTypes().length == properties.size()-2) {
 						accessor = m;
 						break;
 					}
