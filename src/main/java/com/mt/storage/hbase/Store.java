@@ -126,7 +126,6 @@ public class Store implements com.mt.storage.GenericStore {
 	public synchronized void start() throws DatabaseNotReachedException {
 		if (this.wasStarted)
 			return;
-		this.wasStarted = true;
 
 		Configuration properties = new Configuration(true);
 
@@ -164,6 +163,8 @@ public class Store implements com.mt.storage.GenericStore {
 		} catch (MasterNotRunningException e) {
 			throw new DatabaseNotReachedException(e);
 		}
+		
+		this.wasStarted = true;
 	}
 
 	@Override
