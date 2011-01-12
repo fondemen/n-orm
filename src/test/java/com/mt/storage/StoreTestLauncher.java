@@ -28,19 +28,24 @@ public class StoreTestLauncher {
 		p = new Properties();
 		p.setProperty(StoreSelector.STORE_DRIVERCLASS_PROPERTY, com.mt.storage.hbase.Store.class.getName());
 		p.setProperty(StoreSelector.STORE_DRIVERCLASS_STATIC_ACCESSOR, "getStore");
-		p.setProperty("1", "localhost");
-		p.setProperty("2", "9000");
+		String hbaseHost = "localhost";
+		int hbasePort = 9000;
+		int hbaseMaxRetries = 1;
+		p.setProperty("1", hbaseHost);
+		p.setProperty("2", Integer.toString(hbasePort));
+		p.setProperty("3", Integer.toString(hbaseMaxRetries));
 		testedStores.add(new Object[]{p});
 		
 		//Starting HBase server if necessary
-		com.mt.storage.hbase.Store hbaseStore = com.mt.storage.hbase.Store.getStore(p.getProperty("1"), Integer.valueOf(p.getProperty("2")));
+		com.mt.storage.hbase.Store hbaseStore = com.mt.storage.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
 		try {
 			hbaseStore.start();
-			if (! hbaseStore.isStarted()) {
+		} catch (DatabaseNotReachedException x) {
+			try {
 				new HBaseTestingUtility().startMiniCluster(1);
+			} catch (Exception e) {
+				throw new RuntimeException(e);
 			}
-		} catch (Exception e) {
-			fail(e.getMessage());
 		}
 		assertTrue("Could not start HBase test server.", hbaseStore.isStarted());
 	}
