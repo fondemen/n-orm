@@ -44,10 +44,8 @@ public class StoreTestLauncher {
 			try {
 				new HBaseTestingUtility().startMiniCluster(1);
 			} catch (Exception e) {
-				throw new RuntimeException(e);
 			}
 		}
-		assertTrue("Could not start HBase test server.", hbaseStore.isStarted());
 	}
 	
 	public static Collection<Object[]> getTestedStores() {
