@@ -17,6 +17,7 @@ import java.util.TreeSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
@@ -83,15 +84,23 @@ public class Store implements com.mt.storage.GenericStore {
 	protected static Map<Properties, Store> knownStores = new HashMap<Properties, Store>();
 
 	public static Store getStore(String host, int port) {
+		return getStore(host, port, null);
+	}
+
+	public static Store getStore(String host, int port, Integer maxRetries) {
 		synchronized (Store.class) {
 			Properties p = new Properties();
 			p.setProperty("host", host);
 			p.setProperty("port", Integer.toString(port));
+			if (maxRetries != null)
+				p.setProperty("maxRetries", maxRetries.toString());
 			Store ret = knownStores.get(p);
 			if (ret == null) {
 				ret = new Store();
 				ret.setHost(host);
 				ret.setPort(port);
+				if (maxRetries != null)
+					ret.setMaxRetries(maxRetries);
 				knownStores.put(p, ret);
 			}
 			return ret;
@@ -100,6 +109,7 @@ public class Store implements com.mt.storage.GenericStore {
 
 	private String host = null;
 	private int port = -1;
+	private Integer maxRetries = null;
 	private boolean wasStarted = false;
 	private HBaseConfiguration config;
 	private HBaseAdmin admin;
@@ -110,7 +120,7 @@ public class Store implements com.mt.storage.GenericStore {
 	}
 	
 	public boolean isStarted() {
-		return this.admin.isMasterRunning();
+		return this.wasStarted && this.admin.isMasterRunning();
 	}
 
 	public synchronized void start() throws DatabaseNotReachedException {
@@ -145,6 +155,9 @@ public class Store implements com.mt.storage.GenericStore {
 
 		properties.set("hbase.host", pshost);
 
+		if (this.maxRetries != null)
+			properties.set(HConstants.HBASE_CLIENT_RETRIES_NUMBER_KEY, this.maxRetries.toString());
+
 		this.config = new HBaseConfiguration(properties);
 		try {
 			this.admin = new HBaseAdmin(config);
@@ -161,6 +174,10 @@ public class Store implements com.mt.storage.GenericStore {
 	@Override
 	public void setPort(int port) {
 		this.port = port;
+	}
+	
+	public void setMaxRetries(int maxRetries) {
+		this.maxRetries = Integer.valueOf(maxRetries);
 	}
 
 	protected boolean hasTable(String name) throws DatabaseNotReachedException {
