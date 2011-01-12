@@ -7,23 +7,14 @@ import java.util.Collection;
 import java.util.Properties;
 
 import org.apache.hadoop.hbase.HBaseTestingUtility;
-import org.junit.Assert;
+import static org.junit.Assert.*;
 
 import com.mt.storage.memory.Memory;
 
 public class StoreTestLauncher {
 	private static final Collection<Object[]> testedStores;
 	
-	private static final HBaseTestingUtility hbase;
-	
 	static {
-		hbase = new HBaseTestingUtility();
-		try {
-			hbase.startMiniCluster(1);
-		} catch (Exception e) {
-			Assert.fail(e.getMessage());
-		}
-		
 		testedStores = new ArrayList<Object[]>();
 		Properties p;
 		
@@ -40,6 +31,18 @@ public class StoreTestLauncher {
 		p.setProperty("1", "localhost");
 		p.setProperty("2", "9000");
 		testedStores.add(new Object[]{p});
+		
+		//Starting HBase server if necessary
+		com.mt.storage.hbase.Store hbaseStore = com.mt.storage.hbase.Store.getStore(p.getProperty("1"), Integer.valueOf(p.getProperty("2")));
+		try {
+			hbaseStore.start();
+			if (! hbaseStore.isStarted()) {
+				new HBaseTestingUtility().startMiniCluster(1);
+			}
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
+		assertTrue("Could not start HBase test server.", hbaseStore.isStarted());
 	}
 	
 	public static Collection<Object[]> getTestedStores() {

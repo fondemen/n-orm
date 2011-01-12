@@ -108,6 +108,10 @@ public class Store implements com.mt.storage.GenericStore {
 
 	protected Store() {
 	}
+	
+	public boolean isStarted() {
+		return this.admin.isMasterRunning();
+	}
 
 	public synchronized void start() throws DatabaseNotReachedException {
 		if (this.wasStarted)
