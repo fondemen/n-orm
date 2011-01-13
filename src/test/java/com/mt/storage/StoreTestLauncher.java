@@ -2,11 +2,15 @@ package com.mt.storage;
 
 import static org.junit.Assert.assertTrue;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Properties;
 
 import org.apache.hadoop.hbase.HBaseTestingUtility;
+import org.apache.hadoop.hbase.HConstants;
+
 import static org.junit.Assert.*;
 
 import com.mt.storage.memory.Memory;
@@ -30,21 +34,28 @@ public class StoreTestLauncher {
 		p.setProperty(StoreSelector.STORE_DRIVERCLASS_STATIC_ACCESSOR, "getStore");
 		String hbaseHost = "localhost";
 		int hbasePort = 9000;
-		int hbaseMaxRetries = 1;
+		int hbaseMaxRetries = 2;
 		p.setProperty("1", hbaseHost);
 		p.setProperty("2", Integer.toString(hbasePort));
 		p.setProperty("3", Integer.toString(hbaseMaxRetries));
 		testedStores.add(new Object[]{p});
 		
-		//Starting HBase server if necessary
-		com.mt.storage.hbase.Store hbaseStore = com.mt.storage.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
+		//Starting HBase server
 		try {
-			hbaseStore.start();
-		} catch (DatabaseNotReachedException x) {
-			try {
-				new HBaseTestingUtility().startMiniCluster(1);
-			} catch (Exception e) {
+			HBaseTestingUtility hBaseTestingUtility = new HBaseTestingUtility();
+			hBaseTestingUtility.startMiniCluster(1);
+			
+			URI phost = null;
+			String pshost = hBaseTestingUtility.getConfiguration().get("hbase.host");
+			if (pshost != null) {
+				try {
+					phost = new URI(pshost);
+					p.setProperty("1", phost.getHost());
+					p.setProperty("2", Integer.toString(phost.getPort()));
+				} catch (URISyntaxException e) {
+				}
 			}
+		} catch (Exception e) {
 		}
 	}
 	

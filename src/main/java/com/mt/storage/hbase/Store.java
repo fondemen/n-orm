@@ -164,6 +164,9 @@ public class Store implements com.mt.storage.GenericStore {
 			throw new DatabaseNotReachedException(e);
 		}
 		
+		if (!this.admin.isMasterRunning())
+			throw new DatabaseNotReachedException(new Exception(("HBase master not running.")));
+		
 		this.wasStarted = true;
 	}
 
