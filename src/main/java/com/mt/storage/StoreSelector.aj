@@ -12,7 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import com.mt.storage.conversion.ConversionTools;
+import org.apache.commons.beanutils.ConvertUtils;
+
 import com.mt.storage.memory.Memory;
 
 public aspect StoreSelector {
@@ -65,26 +66,29 @@ public aspect StoreSelector {
 			@SuppressWarnings("unchecked")
 			Class<Store> storeClass = (Class<Store>) Class.forName(properties.getProperty(STORE_DRIVERCLASS_PROPERTY));
 			Store ret;
-			boolean setProperties = true;
 			if (properties.containsKey(STORE_DRIVERCLASS_STATIC_ACCESSOR)) {
-				setProperties = false;
 				String accessorName = properties.getProperty(STORE_DRIVERCLASS_STATIC_ACCESSOR);
 				Method accessor = null;
+				//Detecting parameters number
+				int pmnr = 0;
+				while (properties.getProperty(Integer.toString(pmnr+1)) != null)
+					pmnr++;
+				//Finding static method to invoke
 				for (Method m : storeClass.getMethods()) {
-					if (m.getName().equals(accessorName) && (m.getModifiers() & Modifier.STATIC) != 0 && m.getParameterTypes().length == properties.size()-2) {
+					if (m.getName().equals(accessorName) && (m.getModifiers() & Modifier.STATIC) != 0 && m.getParameterTypes().length == pmnr) {
 						accessor = m;
 						break;
 					}
 				}
 				if (accessor == null)
 					throw new IllegalArgumentException("Could not find static accessor method " + accessorName + " in class " + storeClass);
-				List<Object> args = new ArrayList<Object>(accessor.getParameterTypes().length);
+				List<Object> args = new ArrayList<Object>(pmnr);
 				int i = 1;
 				for (Class<?> c : accessor.getParameterTypes()) {
 					String valAsString = properties.getProperty(Integer.toString(i));
 					if (valAsString == null)
 						throw new IllegalArgumentException("Missing required value " + Integer.toString(i));
-					Object val = ConversionTools.convertFromString(c, valAsString);
+					Object val = ConvertUtils.convert(valAsString, c);
 					args.add(val);
 					i++;
 				}
@@ -94,12 +98,11 @@ public aspect StoreSelector {
 			else
 				ret = storeClass.newInstance();
 			
-			if (setProperties)
-				for (Field property : PropertyManagement.aspectOf().getProperties(storeClass)) {
-					if (properties.containsKey(property.getName())) {
-						PropertyManagement.aspectOf().setValue(ret, property, ConversionTools.convertFromString(property.getType(), properties.getProperty(property.getName())));
-					}
+			for (Field property : PropertyManagement.aspectOf().getProperties(storeClass)) {
+				if (properties.containsKey(property.getName())) {
+					PropertyManagement.aspectOf().setValue(ret, property, ConvertUtils.convert(properties.getProperty(property.getName()), property.getType()));
 				}
+			}
 			
 			ret.start();
 			
