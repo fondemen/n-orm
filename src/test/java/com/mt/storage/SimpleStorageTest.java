@@ -153,6 +153,7 @@ public class SimpleStorageTest {
 	public void changedObject() {
 		assertFalse(this.sut1.hasChanged());
 		this.sut1.prop2 = false;
+		this.sut1.storeProperties();
 		assertTrue(this.sut1.hasChanged());
 		assertTrue(Memory.INSTANCE.hadNoQuery());
 	}
@@ -216,6 +217,7 @@ public class SimpleStorageTest {
 	public void partialChange() {
 		this.sut1.nullProp = "not null!";
 		this.sut1.setPrivProp("null");
+		this.sut1.storeProperties();
 		assertEquals(
 				new HashSet<String>(Arrays.asList(new String[] { "privProp",
 						"nullProp" })), this.sut1.getProperties()
@@ -227,6 +229,7 @@ public class SimpleStorageTest {
 		this.sut1.prop2 = true; // was already true
 		this.sut1.nullProp = "not null!";
 		this.sut1.setPrivProp("null");
+		this.sut1.storeProperties();
 		assertEquals(
 				new HashSet<String>(Arrays.asList(new String[] { "privProp",
 						"nullProp" })), this.sut1.getProperties()

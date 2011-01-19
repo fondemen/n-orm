@@ -13,7 +13,6 @@ import java.util.Set;
 
 import org.apache.commons.beanutils.PropertyUtils;
 import org.aspectj.lang.SoftException;
-import org.aspectj.lang.reflect.FieldSignature;
 
 import com.mt.storage.conversion.ConversionTools;
 
@@ -144,6 +143,7 @@ public aspect PropertyManagement {
 		
 		protected synchronized void activate() throws DatabaseNotReachedException {
 			super.activate(null);
+			this.getOwner().upgradeProperties();
 		}
 
 	}
@@ -257,42 +257,43 @@ public aspect PropertyManagement {
 		}
 	}
 	
-	private transient volatile boolean PersistingElement.checkingProperty = false;
-
-	pointcut attUpdated(PersistingElement self, Object val): set(!transient !static (!Collection+) PersistingElement+.*) && target(self) && args(val);
-	pointcut nonIncrementingAttUpdated(PersistingElement self, Object val): !set(@Incrementing * *.*) && attUpdated(self, val);
-
-	after(PersistingElement self, Object val) returning: nonIncrementingAttUpdated(self, val) && !execution(PersistingElement+.new(..)) {
-		assert this.isProperty(((FieldSignature) thisJoinPointStaticPart
-				.getSignature()).getField());
-		Field field = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
-		if (val == null)
-			self.getProperties().removeKey(field.getName());
-		else
-			self.getProperties().add(new Property(field, val));
+	private transient Map<Field, byte []> PersistingElement.lastState = new HashMap<Field, byte []>();
+	
+	void PersistingElement.storeProperties() {
+		for (Field f : PropertyManagement.aspectOf().getProperties(this.getClass())) {
+			if (f.isAnnotationPresent(Incrementing.class))
+				continue;
+			Object val = PropertyManagement.aspectOf().candideReadValue(this, f);
+			if (val == null) {
+				if (!this.lastState.containsKey(f) || this.lastState.get(f) != null) {
+					this.getProperties().removeKey(f.getName());
+					this.lastState.put(f, null);
+				}
+			} else {
+				byte [] valB = ConversionTools.convert(val);
+				if (!this.lastState.containsKey(f) || !Arrays.equals(valB, this.lastState.get(f))) {
+					this.getProperties().add(new Property(f, val));
+					this.lastState.put(f, valB);
+				}
+			}
+		}
 	}
-
-	before(PersistingElement self) : get(!@Incrementing !transient !static (!Collection+) PersistingElement+.*) && !execution(PersistingElement+.new(..)) && target(self) && !if(self.checkingProperty) {
-		self.checkingProperty = true;
-		
-		try {
-		
-			Field f = ((FieldSignature) thisJoinPointStaticPart.getSignature())
-					.getField();
-			assert this.isProperty(f);
-			
-			// Checking that value has actually changed
+	
+	void PersistingElement.upgradeProperties() throws DatabaseNotReachedException {
+		for (Field f : PropertyManagement.aspectOf().getProperties(this.getClass())) {
+			if (f.isAnnotationPresent(Incrementing.class))
+				continue;
 			Object oldVal = null;
 			boolean oldValRead = false;
 			try {
-				oldVal = this.readValue(self, f);
+				oldVal = PropertyManagement.aspectOf().readValue(this, f);
 				oldValRead = true;
 			} catch (Exception x) {
 			}
 			
 			Object val;
 			
-			Property prop = (Property) self.getProperties().get(f.getName());
+			Property prop = (Property) this.getProperties().get(f.getName());
 			if (prop != null) {
 				val = prop.getValue();
 				if (oldVal != null && val != null && (oldVal instanceof PersistingElement) && (val instanceof byte []) && ConversionTools.convert(String.class, (byte[])val).equals(((PersistingElement)oldVal).getIdentifier())) {
@@ -301,7 +302,7 @@ public aspect PropertyManagement {
 				if (prop.getField() == null)
 					prop.setField(f);
 				assert prop.getField().equals(f);
-				if (self.getProperties().wasActivated())
+				if (this.getProperties().wasActivated())
 					prop.activate();
 				val = prop.getValue();
 			} else {
@@ -311,37 +312,28 @@ public aspect PropertyManagement {
 			if (PersistingElement.class.isAssignableFrom(f.getType()) && val != null && oldVal != null && val != oldVal && ((PersistingElement)val).getIdentifier().equals(((PersistingElement)oldVal).getIdentifier())) {
 				prop.setValue(oldVal);
 				prop.setField(f);
-				if (self.getProperties().wasActivated())
+				if (this.getProperties().wasActivated())
 					prop.reactivate();
-				return;
+				continue;
 			}
+
+			byte [] oldValB = oldVal == null ? null : ConversionTools.convert(oldVal);
+			byte [] valB = val == null ? null : ConversionTools.convert(val);
 	
-			if (oldValRead && (oldVal == null ? val == null : oldVal.equals(val))) {
-				return;
+			if (oldValRead && (oldVal == null ? val == null : Arrays.equals(oldValB, valB))) {
+				this.lastState.put(f, valB);
+				continue;
 			}
 	
 			if ((f.getModifiers() & Modifier.FINAL) == 0) {
 				// Setting proper value in property
-				this.candideSetValue(self, f, val);
+				PropertyManagement.aspectOf().candideSetValue(this, f, val);
+				this.lastState.put(f, valB);
 			}
-		} finally {
-			self.checkingProperty = false;
 		}
 	}
 
-	after(PersistingElement self) returning : PersistingMixin.creation(self) {
-		PropertyFamily pf = self.getProperties();
-		for (Field f : this.getProperties(self.getClass())) {
-			if (!f.isAnnotationPresent(Incrementing.class)) {
-				Object val = this.candideReadValue(self, f);
-				if (val == null)
-					pf.removeKey(f.getName());
-				else
-					pf.add(new Property(f, val));
-			}
-			
-		}
-	}
+	pointcut attUpdated(PersistingElement self, Object val): set(!transient !static (!Collection+) PersistingElement+.*) && target(self) && args(val);
 
 	public Object candideReadValue(Object self, Field property) {
 		try {
