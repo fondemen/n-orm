@@ -23,6 +23,7 @@ public aspect StorageManagement {
 			isStoring = true;
 		}
 		try {
+			this.storeProperties();
 			Map<String, Map<String, byte[]>> changed = new TreeMap<String, Map<String,byte[]>>();
 			Map<String, Set<String>> deleted = new TreeMap<String, Set<String>>();
 			Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String,Number>>();
