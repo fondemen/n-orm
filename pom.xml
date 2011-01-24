@@ -134,7 +134,7 @@
 		<repository>
 			<id>com.mt.xtraxion</id>
 			<name>MT repository</name>
-			<url>http://mtjazz.univ-mulhouse.fr:8081/nexus/content/groups/public</url>
+			<url>http://sitemeter.univ-mulhouse.fr/mvn</url>
 		</repository>
 	</repositories>
 </project>
