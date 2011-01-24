@@ -3,6 +3,13 @@ package com.mt.storage;
 
 
 public privileged aspect PersistingMixin {
+	private static PersistingMixin INSTANCE;
+	
+	public static PersistingMixin getInstance() {
+		if (INSTANCE == null)
+			INSTANCE = aspectOf();
+		return INSTANCE;
+	}
 	
 	declare parents: (@Persisting *) implements PersistingElement;
 

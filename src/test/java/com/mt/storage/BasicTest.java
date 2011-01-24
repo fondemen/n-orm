@@ -25,8 +25,8 @@ public class BasicTest extends StoreTestLauncher {
 
 	public BasicTest(Properties props) {
 		super(props);
-		StoreSelector.aspectOf().setPropertiesFor(BookStore.class, props);
-		StoreSelector.aspectOf().setPropertiesFor(Book.class, props);
+		StoreSelector.getInstance().setPropertiesFor(BookStore.class, props);
+		StoreSelector.getInstance().setPropertiesFor(Book.class, props);
 	}
 	
 	private BookStore bssut = null;

@@ -17,6 +17,14 @@ import java.util.Properties;
 import org.apache.commons.beanutils.ConvertUtils;
 
 public aspect StoreSelector {
+	private static StoreSelector INSTANCE;
+	
+	public static StoreSelector getInstance() {
+		if (INSTANCE == null)
+			INSTANCE = aspectOf();
+		return INSTANCE;
+	}
+	
 	public static final String PROPERTY_FILE = "store.properties";
 	public static final String STORE_DRIVERCLASS_PROPERTY = "class";
 	public static final String STORE_DRIVERCLASS_SINGLETON_PROPERTY = "singleton";

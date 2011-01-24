@@ -14,7 +14,7 @@ public class Constraint {
 			return null;
 		
 		Map<String, Field> fields = new HashMap<String, Field>();
-		for (Field f : PropertyManagement.aspectOf().getProperties(clazz)) {
+		for (Field f : PropertyManagement.getInstance().getProperties(clazz)) {
 			fields.put(f.getName(), f);
 		}
 		
@@ -50,12 +50,12 @@ public class Constraint {
 		
 		Class<?> clazz = searchedKey.getDeclaringClass();
 		
-		List<Field> keys = KeyManagement.aspectOf().detectKeys(clazz);
+		List<Field> keys = KeyManagement.getInstance().detectKeys(clazz);
 		int length = values == null ? 0 : values.size();
 		if (keys.size() < length)
 			throw new IllegalArgumentException("Too many constrained values compared to the number of keys ; only key values may be constrained.");
 		StringBuffer fixedPartb = new StringBuffer();
-		String sep = KeyManagement.aspectOf().getSeparator(clazz);
+		String sep = KeyManagement.getInstance().getSeparator(clazz);
 		Field f; Object val;
 		values = values == null ? new HashMap<Field, Object>() : new HashMap<Field, Object>(values);
 		for(int i = 0; i < length; ++i) {
@@ -101,7 +101,7 @@ public class Constraint {
 	 * startValue are endValue both inclusive.
 	 */
 	public Constraint(Class<?> type, Map<String, Object> values, String field, Object startValue, Object endValue) {
-		this(toMapOfFields(type, values), PropertyManagement.aspectOf().getProperty(type, field), startValue, endValue, true);
+		this(toMapOfFields(type, values), PropertyManagement.getInstance().getProperty(type, field), startValue, endValue, true);
 	}
 
 	public String getStartKey() {

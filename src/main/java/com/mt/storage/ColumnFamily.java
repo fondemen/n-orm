@@ -30,7 +30,7 @@ public class ColumnFamily<T> implements Collection<T> {
 	private final Map<String, Number> increments;
 
 	public ColumnFamily(Class<T> clazz, Field property, PersistingElement owner, String index, boolean addOnly, boolean incremental) throws SecurityException, NoSuchFieldException {
-		this(clazz, property, property.getName(), owner, PropertyManagement.aspectOf().getProperty(clazz, index), addOnly, incremental);
+		this(clazz, property, property.getName(), owner, PropertyManagement.getInstance().getProperty(clazz, index), addOnly, incremental);
 	}
 
 	public ColumnFamily(Class<T> clazz, Field property, String name, PersistingElement owner, Field index, boolean addOnly, boolean incremental) {
@@ -49,7 +49,7 @@ public class ColumnFamily<T> implements Collection<T> {
 			this.increments = new TreeMap<String, Number>();
 			this.changes = null;
 			Field incf = null;
-			for (Field field : PropertyManagement.aspectOf().getProperties(clazz)) {
+			for (Field field : PropertyManagement.getInstance().getProperties(clazz)) {
 				if (!field.equals(index)) {
 					if (incf == null)
 						incf = field;
@@ -57,7 +57,7 @@ public class ColumnFamily<T> implements Collection<T> {
 						throw new IllegalArgumentException("An incrementing collection must contain elements of only two fields: an index and a value, whic is not the case of " + clazz);
 				}
 			}
-			IncrementManagement.aspectOf().checkIncrementable(incf.getType());
+			IncrementManagement.getInstance().checkIncrementable(incf.getType());
 			this.incrementingField = incf;
 		} else {
 			this.changes = new TreeMap<String, ChangeKind>();
@@ -86,7 +86,7 @@ public class ColumnFamily<T> implements Collection<T> {
 	}
 
 	protected String getIndex(T object) {
-		return PropertyManagement.aspectOf().candideReadValue(object, this.index).toString();
+		return PropertyManagement.getInstance().candideReadValue(object, this.index).toString();
 	}
 	
 	protected boolean wasActivated() {
@@ -116,11 +116,11 @@ public class ColumnFamily<T> implements Collection<T> {
 				String eltRep = ConversionTools.convertToString(eltVal);
 				if (this.index.getAnnotation(Key.class).order() == 1) {
 					assert this.incrementingField.getAnnotation(Key.class).order() == 2;
-					eltRep = key + KeyManagement.aspectOf().getSeparator(this.clazz) + eltRep;
+					eltRep = key + KeyManagement.getInstance().getSeparator(this.clazz) + eltRep;
 				} else {
 					assert this.incrementingField.getAnnotation(Key.class).order() == 1;
 					assert this.index.getAnnotation(Key.class).order() == 2;
-					eltRep = eltRep + KeyManagement.aspectOf().getSeparator(this.clazz) + key;
+					eltRep = eltRep + KeyManagement.getInstance().getSeparator(this.clazz) + key;
 				}
 				this.collection.put(key, this.convert(key, ConversionTools.convert(eltRep)));
 			} else {
@@ -240,10 +240,10 @@ public class ColumnFamily<T> implements Collection<T> {
 		String index = this.getIndex(o);
 		T old = this.collection.put(index, o);
 		if (this.incrementingField != null) {
-			Number oVal = (Number) (old == null ? null : PropertyManagement.aspectOf().candideReadValue(old, incrementingField));
-			Number nVal = (Number) PropertyManagement.aspectOf().candideReadValue(o, incrementingField);
+			Number oVal = (Number) (old == null ? null : PropertyManagement.getInstance().candideReadValue(old, incrementingField));
+			Number nVal = (Number) PropertyManagement.getInstance().candideReadValue(o, incrementingField);
 			try {
-				this.increments.put(index, IncrementManagement.aspectOf().getActualIncrement(nVal, oVal, this.getIncrement(index), incrementingField));
+				this.increments.put(index, IncrementManagement.getInstance().getActualIncrement(nVal, oVal, this.getIncrement(index), incrementingField));
 			} catch (Exception x) {
 				return false;
 			}
