@@ -14,8 +14,6 @@ import java.util.Properties;
 
 import org.apache.commons.beanutils.ConvertUtils;
 
-import com.mt.storage.memory.Memory;
-
 public aspect StoreSelector {
 	public static final String PROPERTY_FILE = "store.properties";
 	public static final String STORE_DRIVERCLASS_PROPERTY = "class";
@@ -29,7 +27,11 @@ public aspect StoreSelector {
 	
 	public Store PersistingElement.getStore() {
 		if (this.store == null)
-			this.store = StoreSelector.aspectOf().getStoreFor(this.getClass());
+			try {
+				this.store = StoreSelector.aspectOf().getStoreFor(this.getClass());
+			} catch (DatabaseNotReachedException x) {
+				throw new IllegalStateException(x);
+			}
 		return this.store;
 	}
 	
@@ -43,7 +45,7 @@ public aspect StoreSelector {
     	File f = new File(clazz.getClassLoader().getResource(clazz.getName().replace('.', '/') + ".class").getFile()), dir = f;
     	do {
     		dir = dir.getParentFile();
-    		if (!dir.isDirectory())
+    		if (dir == null || !dir.isDirectory())
     			throw new IOException("No property file found for class " + clazz);
     		f = new File(dir, PROPERTY_FILE);
     	} while (!f.exists() || !f.isFile());
@@ -55,7 +57,7 @@ public aspect StoreSelector {
     	this.properties.put(clazz, properties);
     }
 	
-	public Store getStoreFor(Class<? extends PersistingElement> clazz) {
+	public Store getStoreFor(Class<? extends PersistingElement> clazz) throws DatabaseNotReachedException {
 		Properties properties = this.properties.get(clazz);
 		try {
 			if (properties == null) {
@@ -108,8 +110,7 @@ public aspect StoreSelector {
 			
 			return ret;
 		} catch (Exception x) {
+			throw new DatabaseNotReachedException(x);
 		}
-		
-		return Memory.INSTANCE;
 	}
 }

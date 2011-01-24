@@ -1,8 +1,6 @@
 package com.mt.storage.hbase;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -21,6 +19,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -83,22 +82,20 @@ public class Store implements com.mt.storage.GenericStore {
 
 	protected static Map<Properties, Store> knownStores = new HashMap<Properties, Store>();
 
-	public static Store getStore(String host, int port) {
-		return getStore(host, port, null);
+	public static Store getStore(String url) {
+		return getStore(url, null);
 	}
 
-	public static Store getStore(String host, int port, Integer maxRetries) {
+	public static Store getStore(String url, Integer maxRetries) {
 		synchronized (Store.class) {
 			Properties p = new Properties();
-			p.setProperty("host", host);
-			p.setProperty("port", Integer.toString(port));
+			p.setProperty("url", url);
 			if (maxRetries != null)
 				p.setProperty("maxRetries", maxRetries.toString());
 			Store ret = knownStores.get(p);
 			if (ret == null) {
 				ret = new Store();
-				ret.setHost(host);
-				ret.setPort(port);
+				ret.setUrl(url);
 				if (maxRetries != null)
 					ret.setMaxRetries(maxRetries);
 				knownStores.put(p, ret);
@@ -107,79 +104,62 @@ public class Store implements com.mt.storage.GenericStore {
 		}
 	}
 
-	private String host = null;
-	private int port = -1;
+	private String url = null;
 	private Integer maxRetries = null;
 	private boolean wasStarted = false;
-	private HBaseConfiguration config;
+	private Configuration config;
 	private HBaseAdmin admin;
 	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
 	public Map<String, HTable> tablesC = new TreeMap<String, HTable>();
 
 	protected Store() {
 	}
-	
-	public boolean isStarted() {
-		return this.wasStarted && this.admin.isMasterRunning();
-	}
 
 	public synchronized void start() throws DatabaseNotReachedException {
 		if (this.wasStarted)
 			return;
 
-		Configuration properties = new Configuration(true);
-
-		URI phost = null;
-		String pshost = properties.get("hbase.host");
-		if (pshost != null) {
-			try {
-				phost = new URI(pshost);
-			} catch (URISyntaxException e) {
-			}
-		}
-		if (phost == null) {
-			try {
-				phost = new URI("hdfs://localhost:9000/hbase");
-			} catch (URISyntaxException e) {
-				e.printStackTrace();
-			}
+		if (this.config == null) {
+			Configuration properties = HBaseConfiguration.create();
+			
+			properties.set(HConstants.HBASE_DIR, this.getUrl());
+	
+			if (this.maxRetries != null)
+				properties.set("hbase.client.retries.number", this.maxRetries.toString());
+	
+			this.config = properties;
 		}
 
-		pshost = phost.getScheme()
-				+ "://"
-				+ (this.host != null ? this.host : phost.getAuthority())
-				+ ':'
-				+ Integer.toString(this.port != -1 ? this.port : phost
-						.getPort()) + phost.getPath();
-
-		properties.set("hbase.host", pshost);
-
-		if (this.maxRetries != null)
-			properties.set(HConstants.HBASE_CLIENT_RETRIES_NUMBER_KEY, this.maxRetries.toString());
-
-		this.config = new HBaseConfiguration(properties);
 		try {
-			this.admin = new HBaseAdmin(config);
+			this.admin = new HBaseAdmin(this.config);
+			if (!this.admin.isMasterRunning())
+				throw new DatabaseNotReachedException(new MasterNotRunningException());
 		} catch (MasterNotRunningException e) {
 			throw new DatabaseNotReachedException(e);
+		} catch (ZooKeeperConnectionException e) {
+			throw new DatabaseNotReachedException(e);
 		}
-		
-		if (!this.admin.isMasterRunning())
-			throw new DatabaseNotReachedException(new Exception(("HBase master not running.")));
-		
+
 		this.wasStarted = true;
 	}
 
-	@Override
-	public void setHost(String host) {
-		this.host = host;
+	public String getUrl() {
+		return url;
 	}
 
 	@Override
-	public void setPort(int port) {
-		this.port = port;
+	public void setUrl(String url) {
+		this.url = url;
 	}
-	
+
+//	public Configuration getConfig() {
+//		return config;
+//	}
+//
+//	public void setConfig(Configuration config) {
+//		this.config = config;
+//	}
+
 	public void setMaxRetries(int maxRetries) {
 		this.maxRetries = Integer.valueOf(maxRetries);
 	}
@@ -191,6 +171,8 @@ public class Store implements com.mt.storage.GenericStore {
 		try {
 			return this.admin.tableExists(name);
 		} catch (MasterNotRunningException e) {
+			throw new DatabaseNotReachedException(e);
+		} catch (IOException e) {
 			throw new DatabaseNotReachedException(e);
 		}
 	}
@@ -420,12 +402,13 @@ public class Store implements com.mt.storage.GenericStore {
 			if (problem == null)
 				problem = e;
 		}
-		
+
 		try {
 			for (String fam : increments.keySet()) {
 				Map<String, Number> incr = increments.get(fam);
 				for (String key : incr.keySet()) {
-					t.incrementColumnValue(row, Bytes.toBytes(fam), Bytes.toBytes(key), incr.get(key).longValue());
+					t.incrementColumnValue(row, Bytes.toBytes(fam),
+							Bytes.toBytes(key), incr.get(key).longValue());
 				}
 			}
 		} catch (IOException e) {
@@ -581,7 +564,10 @@ public class Store implements com.mt.storage.GenericStore {
 				Bytes.toBytes(key));
 
 		try {
-			return t.get(g).value();
+			Result result = t.get(g);
+			if (result.isEmpty())
+				return null;
+			return result.value();
 		} catch (IOException e) {
 			throw new DatabaseNotReachedException(e);
 		}
@@ -632,6 +618,14 @@ public class Store implements com.mt.storage.GenericStore {
 			throw new DatabaseNotReachedException(e);
 		}
 		return new CloseableIterator(r);
+	}
+
+	public Configuration getConf() {
+		return this.config;
+	}
+
+	public void setConf(Configuration configuration) {
+		this.config = configuration;
 	}
 
 }
