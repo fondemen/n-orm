@@ -2,24 +2,20 @@ package com.mt.storage;
 
 import static org.junit.Assert.assertTrue;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Properties;
 
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.MasterNotRunningException;
-import org.apache.hadoop.hbase.ZooKeeperConnectionException;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 
 import com.mt.storage.memory.Memory;
 
 public class StoreTestLauncher {
 	private static Collection<Object[]> testedStores = null;
 
-	private static String hbaseUrl;
+	private static String hbaseHost;
+	private static String hbasePort;
 	private static int hbaseMaxRetries = 3;
 
 	private static HBaseTestingUtility hBaseServer = null;
@@ -60,17 +56,16 @@ public class StoreTestLauncher {
 			//hBaseServer.getConfiguration().set(HConstants.HBASE_DIR, hbaseUrl);
 			
 			hBaseServer.startMiniCluster(1);
-			hbaseUrl = hBaseServer.getConfiguration().get(HConstants.HBASE_DIR, hbaseUrl);
-			p.setProperty("1", hbaseUrl);
+			hbaseHost = hBaseServer.getConfiguration().get(HConstants.ZOOKEEPER_QUORUM);
+			hbasePort = hBaseServer.getConfiguration().get("hbase.zookeeper.property.clientPort", Integer.toString(HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT));
 			
-			com.mt.storage.hbase.Store hStore = com.mt.storage.hbase.Store.getStore(hbaseUrl, hbaseMaxRetries);
-			hStore.setConf(hBaseServer.getConfiguration());
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 
-		p.setProperty("1", hbaseUrl);
-		p.setProperty("2", Integer.toString(hbaseMaxRetries));
+		p.setProperty("1", hbaseHost);
+		p.setProperty("2", hbasePort);
+		p.setProperty("3", Integer.toString(hbaseMaxRetries));
 			
 		return p;
 	}
