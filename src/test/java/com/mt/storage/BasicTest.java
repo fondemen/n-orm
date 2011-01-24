@@ -1,6 +1,7 @@
 package com.mt.storage;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
@@ -28,56 +29,63 @@ public class BasicTest extends StoreTestLauncher {
 		StoreSelector.aspectOf().setPropertiesFor(Book.class, props);
 	}
 	
-	private BookStore psut = null;
-	private Book vsut = null;
+	private BookStore bssut = null;
+	private Book bsut = null;
 	
 	@Before
 	public void storeSUTs() throws DatabaseNotReachedException {
 		boolean changed = false;
 		
-		if (psut == null) {
-			 psut = new BookStore("testbookstore");
-			 psut.setName("book name");
+		if (bssut == null) {
+			 bssut = new BookStore("testbookstore");
+			 bssut.setName("book name");
 			 changed = true;
 		}
 		
-		if (changed || vsut == null) {
-			vsut = new Book(psut, new Date(1234567890), new Date(1234567890));
-			vsut.setNumber((short)12);
-			vsut.store();
+		if (changed || bsut == null) {
+			bsut = new Book(bssut, new Date(1234567890), new Date(1234567890));
+			bsut.setNumber((short)12);
+			bsut.store();
 		}
 	}
 	
-	public void deleteProject() throws DatabaseNotReachedException {
-		if (psut != null) {
-			psut.delete();
-			psut = null;
+	public void deleteBookstore() throws DatabaseNotReachedException {
+		if (bssut != null) {
+			bssut.delete();
+			bssut = null;
 		}
 	}
 	 
-	 @Test public void hbaseProjectRetrieve() throws DatabaseNotReachedException {
+	 @Test public void hbaseBookStoreRetrieve() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
 		 p.activateSimpleProperties();
 		 assertEquals("book name", p.getName());
 	 }
 	 
-	 @Test public void hbaseProjectSetNull() throws DatabaseNotReachedException {
-		 psut.setName(null);
-		 psut.store();
+	 @Test public void hbaseUnknownBookStoreRetrieve() throws DatabaseNotReachedException {
+		 BookStore p = new BookStore("gdcfknueghficlnehfuci");
+		 p.activateSimpleProperties();
+		 assertNull(p.getName());
+		 assertFalse( p.existsInStore());
+	 }
+	 
+	 @Test public void hbaseBookStoreSetNull() throws DatabaseNotReachedException {
+		 bssut.setName(null);
+		 bssut.store();
 		 BookStore p = new BookStore("testbookstore");
 		 p.activateSimpleProperties();
 		 assertNull(p.getName());
-		 deleteProject();
+		 deleteBookstore();
 	 }
 	
-	 @Test public void hbaseProjectDeletion() throws DatabaseNotReachedException {
-		 deleteProject();
+	 @Test public void hbaseBookStoreDeletion() throws DatabaseNotReachedException {
+		 deleteBookstore();
 		 BookStore p = new BookStore("testbookstore");
 		 p.activateSimpleProperties();
 		 assertNull(p.getName());
 	 }
 	
-	 @Test public void hbaseProjectAccessFromVisit() throws DatabaseNotReachedException {
+	 @Test public void hbaseBookStoreAccessFromBook() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 v.activateSimpleProperties();
@@ -86,11 +94,11 @@ public class BasicTest extends StoreTestLauncher {
 		 assertEquals("book name", p.getName());
 	 }
 	 
-	 @Test(expected=IllegalStateException.class) public void hbaseVisitWithNoProject() {
+	 @Test(expected=IllegalStateException.class) public void hbaseBookWithNoBookStore() {
 		 new Book(null, new Date(1234567890), new Date(1234567890));
 	 }
 	
-	 @Test public void hbaseUnactivatedProjectAccessFromVisit() throws DatabaseNotReachedException {
+	 @Test public void hbaseUnactivatedBookStoreAccessFromBook() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 assertSame(p, v.getBookStore());
@@ -98,8 +106,8 @@ public class BasicTest extends StoreTestLauncher {
 		 assertNull(p.getName());
 	 }
 	
-	 @Test public void hbaseProjectDeletionAndthenAccess() throws DatabaseNotReachedException {
-		 deleteProject();
+	 @Test public void hbaseBookStoreDeletionAndthenAccess() throws DatabaseNotReachedException {
+		 deleteBookstore();
 		 this.storeSUTs();
 		 BookStore p = new BookStore("testbookstore");
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));

@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import com.mt.storage.CloseableKeyIterator;
@@ -35,7 +36,7 @@ public class Memory implements Store {
 	}
 
 	@SuppressWarnings("serial")
-	public class Table extends LazyHash<Table.Row> {
+	public class Table extends HashMap<String, Table.Row> {
 		public class Row extends LazyHash<Row.ColumnFamily> {
 			public class ColumnFamily extends LazyHash<byte[]> {
 
@@ -77,21 +78,20 @@ public class Memory implements Store {
 		return this.tables.get(table);
 	}
 
-	public void add(String table, String id, String family, String key,
-			byte[] value) {
-		this.getTable(table).get(id).get(family).put(key, value);
-	}
-
-	public void remove(String table, String id, String family, String key) {
-		this.getTable(table).get(id).get(family).remove(key);
-	}
-
+	@Override
 	public byte[] get(String table, String id, String family, String key) {
+		Table t = this.getTable(table);
+		if (!t.containsKey(id))
+			return null;
 		Table.Row.ColumnFamily fam = this.getTable(table).get(id).get(family);
 		return fam.containsKey(key) ? fam.get(key) : null;
 	}
 
+	@Override
 	public Map<String, byte[]> get(String table, String id, String family) {
+		Table t = this.getTable(table);
+		if (!t.containsKey(id))
+			return new TreeMap<String, byte[]>();
 		return this.getTable(table).get(id).get(family);
 	}
 
@@ -101,6 +101,10 @@ public class Memory implements Store {
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> incremented) {
 		Row r = this.getTable(table).get(id);
+		if (r == null) {
+			r = this.getTable(table).new Row();
+			this.getTable(table).put(id, r);
+		}
 		for (String family : changed.keySet()) {
 			ColumnFamily f = r.get(family);
 			Map<String, byte[]> values = changed.get(family);
@@ -151,6 +155,9 @@ public class Memory implements Store {
 	}
 
 	public int count(String table, String row, String family) {
+		Table t = this.getTable(table);
+		if (!t.containsKey(row))
+			return 0;
 		return this.getTable(table).get(row).get(family).size();
 	}
 	
@@ -160,6 +167,9 @@ public class Memory implements Store {
 
 	public int count(String ownerTable, String identifier, String name,
 			Constraint c) throws DatabaseNotReachedException {
+		Table t = this.getTable(ownerTable);
+		if (!t.containsKey(identifier))
+			return 0;
 		return this.get(ownerTable, identifier, name, c).size();
 	}
 
@@ -214,6 +224,9 @@ public class Memory implements Store {
 	@Override
 	public Map<String, byte[]> get(String table, String id, String family,
 			Constraint c) throws DatabaseNotReachedException {
+		Table t = this.getTable(table);
+		if (!t.containsKey(id))
+			return new TreeMap<String, byte[]>();
 		ColumnFamily cf = this.getTable(table).get(id).get(family);
 		
 		Map<String, byte[]> ret = new HashMap<String, byte[]>();

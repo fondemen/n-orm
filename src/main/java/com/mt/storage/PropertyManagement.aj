@@ -327,8 +327,12 @@ public aspect PropertyManagement {
 	
 			if ((f.getModifiers() & Modifier.FINAL) == 0) {
 				// Setting proper value in property
-				PropertyManagement.aspectOf().candideSetValue(this, f, val);
-				this.lastState.put(f, valB);
+				try {
+					PropertyManagement.aspectOf().setValue(this, f, val);
+					this.lastState.put(f, valB);
+				} catch (Exception x) { //May happen in case f is of simple type (e.g. boolean and not Boolean) and value is unknown from the base (i.e. null)
+					this.lastState.put(f, oldValB);
+				}
 			}
 		}
 	}

@@ -14,10 +14,9 @@ public class StoreTest {
 		assertSame(Memory.INSTANCE, s);
 	}
 	
-	@Test public void testDummyPropertyFile() {
+	@Test(expected=IllegalStateException.class) public void testDummyPropertyFile() {
 		com.mt.storage.dummystoragefile.Element p = new com.mt.storage.dummystoragefile.Element();
 		Store s = p.getStore();
-		assertSame(Memory.INSTANCE, s);
 	}
 	
 	@Test public void testInstanciationPropertyFile() {

@@ -73,6 +73,18 @@ public class SimpleStorageTest {
 	public void vacuumDb() {
 		Memory.INSTANCE.reset();
 	}
+	
+	@Test
+	public void inexisting() throws DatabaseNotReachedException {
+		SimpleElement unknown = new SimpleElement("guhkguilnu", new String [] {"gbuyikgnui", "yuihju"});
+		assertTrue(Memory.INSTANCE.hadNoQuery());
+		assertFalse(unknown.existsInStore());
+		assertTrue(Memory.INSTANCE.hadAQuery());
+		unknown.activateSimpleProperties();
+		assertTrue(Memory.INSTANCE.hadAQuery());
+		assertFalse(unknown.existsInStore());
+		assertTrue(Memory.INSTANCE.hadAQuery());
+	}
 
 	@Test
 	public void getSutTable() {
