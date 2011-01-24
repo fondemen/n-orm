@@ -1,7 +1,9 @@
 package com.mt.storage;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -41,15 +43,20 @@ public aspect StoreSelector {
 		this.store = store;
 	}
     
-    public File findProperties(Class<?> clazz) throws IOException {
+    public Properties findProperties(Class<?> clazz) throws IOException {
     	File f = new File(clazz.getClassLoader().getResource(clazz.getName().replace('.', '/') + ".class").getFile()), dir = f;
+    	Properties ret = new Properties();
     	do {
     		dir = dir.getParentFile();
-    		if (dir == null || !dir.isDirectory())
-    			throw new IOException("No property file found for class " + clazz);
+    		if (dir == null)
+    			throw new IOException("Cannot find storage properties for class " + clazz);
     		f = new File(dir, PROPERTY_FILE);
-    	} while (!f.exists() || !f.isFile());
-    	return f;
+    		try {
+    			ret.load(new BufferedReader(new FileReader(f)));
+    			return ret;
+    		} catch (IOException x) {
+    		}
+    	} while (true);
     }
     
     //For test purpose.
@@ -61,8 +68,7 @@ public aspect StoreSelector {
 		Properties properties = this.properties.get(clazz);
 		try {
 			if (properties == null) {
-				properties = new Properties();
-				properties.load(new FileInputStream(findProperties(clazz)));
+				properties = findProperties(clazz);
 				this.setPropertiesFor(clazz, properties);
 			}
 			@SuppressWarnings("unchecked")

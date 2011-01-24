@@ -16,7 +16,7 @@ public class StoreTest {
 	
 	@Test(expected=IllegalStateException.class) public void testDummyPropertyFile() {
 		com.mt.storage.dummystoragefile.Element p = new com.mt.storage.dummystoragefile.Element();
-		Store s = p.getStore();
+		p.getStore();
 	}
 	
 	@Test public void testInstanciationPropertyFile() {

@@ -82,20 +82,22 @@ public class Store implements com.mt.storage.GenericStore {
 
 	protected static Map<Properties, Store> knownStores = new HashMap<Properties, Store>();
 
-	public static Store getStore(String url) {
-		return getStore(url, null);
+	public static Store getStore(String host, int port) {
+		return getStore(host, port, null);
 	}
 
-	public static Store getStore(String url, Integer maxRetries) {
+	public static Store getStore(String host, int port, Integer maxRetries) {
 		synchronized (Store.class) {
 			Properties p = new Properties();
-			p.setProperty("url", url);
+			p.setProperty("host", host);
+			p.setProperty("port", Integer.toString(port));
 			if (maxRetries != null)
 				p.setProperty("maxRetries", maxRetries.toString());
 			Store ret = knownStores.get(p);
 			if (ret == null) {
 				ret = new Store();
-				ret.setUrl(url);
+				ret.setHost(host);
+				ret.setPort(port);
 				if (maxRetries != null)
 					ret.setMaxRetries(maxRetries);
 				knownStores.put(p, ret);
@@ -104,7 +106,8 @@ public class Store implements com.mt.storage.GenericStore {
 		}
 	}
 
-	private String url = null;
+	private String host = "localhost";
+	private int port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
 	private Integer maxRetries = null;
 	private boolean wasStarted = false;
 	private Configuration config;
@@ -121,8 +124,10 @@ public class Store implements com.mt.storage.GenericStore {
 
 		if (this.config == null) {
 			Configuration properties = HBaseConfiguration.create();
+			properties.clear();
 			
-			properties.set(HConstants.HBASE_DIR, this.getUrl());
+			properties.set(HConstants.ZOOKEEPER_QUORUM, this.getHost());
+			properties.setInt("hbase.zookeeper.property.clientPort", this.getPort());
 	
 			if (this.maxRetries != null)
 				properties.set("hbase.client.retries.number", this.maxRetries.toString());
@@ -143,22 +148,22 @@ public class Store implements com.mt.storage.GenericStore {
 		this.wasStarted = true;
 	}
 
-	public String getUrl() {
-		return url;
+	public String getHost() {
+		return host;
 	}
 
 	@Override
-	public void setUrl(String url) {
-		this.url = url;
+	public void setHost(String url) {
+		this.host = url;
+	}//	}
+
+	public int getPort() {
+		return port;
 	}
 
-//	public Configuration getConfig() {
-//		return config;
-//	}
-//
-//	public void setConfig(Configuration config) {
-//		this.config = config;
-//	}
+	public void setPort(int port) {
+		this.port = port;
+	}
 
 	public void setMaxRetries(int maxRetries) {
 		this.maxRetries = Integer.valueOf(maxRetries);
