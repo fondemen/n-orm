@@ -9,16 +9,17 @@ import java.util.Properties;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HConstants;
 
+import com.mt.storage.hbase.Store;
 import com.mt.storage.memory.Memory;
 
 public class StoreTestLauncher {
 	private static Collection<Object[]> testedStores = null;
 
-	private static String hbaseHost;
-	private static String hbasePort;
-	private static int hbaseMaxRetries = 3;
+	public static String hbaseHost = null;
+	public static String hbasePort = null;
+	public static int hbaseMaxRetries = 3;
 
-	private static HBaseTestingUtility hBaseServer = null;
+	public static HBaseTestingUtility hBaseServer = null;
 
 	public static void prepareStores() {
 		testedStores = new ArrayList<Object[]>();
@@ -29,7 +30,7 @@ public class StoreTestLauncher {
 		
 	}
 
-	protected static Properties prepareMemory() {
+	public static Properties prepareMemory() {
 		Properties p = new Properties();
 		p.setProperty(StoreSelector.STORE_DRIVERCLASS_PROPERTY,
 				Memory.class.getName());
@@ -38,7 +39,7 @@ public class StoreTestLauncher {
 		return p;
 	}
 
-	protected static Properties prepareHBase() {
+	public static Properties prepareHBase() {
 		Properties p = new Properties();
 		p.setProperty(StoreSelector.STORE_DRIVERCLASS_PROPERTY,
 				com.mt.storage.hbase.Store.class.getName());
@@ -53,7 +54,10 @@ public class StoreTestLauncher {
 			hBaseServer.getConfiguration().setInt("hbase.regionserver.msginterval", 100);
 			hBaseServer.getConfiguration().setInt("hbase.client.pause", 250);
 			hBaseServer.getConfiguration().setInt("hbase.client.retries.number", hbaseMaxRetries);
-			//hBaseServer.getConfiguration().set(HConstants.HBASE_DIR, hbaseUrl);
+			if (hbaseHost != null)
+				hBaseServer.getConfiguration().set(HConstants.ZOOKEEPER_QUORUM, hbaseHost);
+			if (hbasePort != null)
+				hBaseServer.getConfiguration().setInt("hbase.zookeeper.property.clientPort", Integer.parseInt(hbasePort));
 			
 			hBaseServer.startMiniCluster(1);
 			hbaseHost = hBaseServer.getConfiguration().get(HConstants.ZOOKEEPER_QUORUM);
@@ -68,6 +72,10 @@ public class StoreTestLauncher {
 		p.setProperty("3", Integer.toString(hbaseMaxRetries));
 			
 		return p;
+	}
+
+	public static void setConf(Store store) {
+		store.setConf(hBaseServer.getConfiguration());
 	}
 
 //	@AfterClass
