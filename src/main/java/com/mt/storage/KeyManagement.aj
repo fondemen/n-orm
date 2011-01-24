@@ -11,6 +11,13 @@ import java.util.Map;
 import com.mt.storage.conversion.ConversionTools;
 
 public aspect KeyManagement {
+	private static KeyManagement INSTANCE;
+	
+	public static KeyManagement getInstance() {
+		if (INSTANCE == null)
+			INSTANCE = aspectOf();
+		return INSTANCE;
+	}
 
 	declare error: set(@Key double PersistingElement+.*) : "Floating values not supported in keys...";
 	declare error: set(@Key java.lang.Double PersistingElement+.*) : "Floating values not supported in keys...";

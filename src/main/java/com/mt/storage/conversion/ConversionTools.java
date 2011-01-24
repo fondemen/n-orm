@@ -167,7 +167,7 @@ public class ConversionTools {
 		StringTokenizer tkn = new StringTokenizer(id, separator);
 		int i = 0;
 		while (tkn.hasMoreTokens()) {
-			int keys = KeyManagement.aspectOf().detectKeys(types[i]).size();
+			int keys = KeyManagement.getInstance().detectKeys(types[i]).size();
 			String next = tkn.nextToken();
 			while (keys > 1) {
 				keys--;

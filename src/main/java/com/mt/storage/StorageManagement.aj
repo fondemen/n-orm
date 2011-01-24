@@ -66,7 +66,7 @@ public aspect StorageManagement {
 			
 			for (Field key : this.getKeys()) {
 				try {
-					changedProperties.put(key.getName(), ConversionTools.convert(PropertyManagement.aspectOf().readValue(this, key)));
+					changedProperties.put(key.getName(), ConversionTools.convert(PropertyManagement.getInstance().readValue(this, key)));
 				} catch (RuntimeException e) {
 					throw e;
 				} catch (Exception e) {
@@ -79,9 +79,9 @@ public aspect StorageManagement {
 			}
 			
 			//Store depending properties
-			for (Field prop : PropertyManagement.aspectOf().getProperties(this.getClass())) {
-				if (PropertyManagement.aspectOf().isPersistingPropertyType(prop.getType()) && !prop.isAnnotationPresent(ExplicitActivation.class)) {
-					Object kVal = PropertyManagement.aspectOf().candideReadValue(this, prop);
+			for (Field prop : PropertyManagement.getInstance().getProperties(this.getClass())) {
+				if (PropertyManagement.getInstance().isPersistingPropertyType(prop.getType()) && !prop.isAnnotationPresent(ExplicitActivation.class)) {
+					Object kVal = PropertyManagement.getInstance().candideReadValue(this, prop);
 					((PersistingElement)kVal).store();
 				}
 			}
@@ -97,10 +97,10 @@ public aspect StorageManagement {
 	}
 	
 	public static <T extends PersistingElement> Set<T> findElement(Class<T> clazz, Constraint c, int limit) throws DatabaseNotReachedException {
-		Store store = StoreSelector.aspectOf().getStoreFor(clazz);
+		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		CloseableKeyIterator keys = null;
 		try {
-			keys = store.get(PersistingMixin.aspectOf().getTable(clazz), c, limit);
+			keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit);
 			Set<T> ret = new HashSet<T>();
 			int count = 0;
 			while(keys.hasNext()) {

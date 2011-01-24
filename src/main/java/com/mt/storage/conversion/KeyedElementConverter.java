@@ -9,26 +9,26 @@ class KeyedElementConverter extends Converter<Object> {
 
 	@Override
 	public Object fromString(String rep, Class<?> expected) {
-		return KeyManagement.aspectOf().createElement(expected, rep);
+		return KeyManagement.getInstance().createElement(expected, rep);
 	}
 
 	@Override
 	public String toString(Object obj) {
-		return KeyManagement.aspectOf().createIdentifier(obj);
+		return KeyManagement.getInstance().createIdentifier(obj);
 	}
 
 	@Override
 	public Object fromBytes(byte[] rep, Class<? extends Object> expected) {
-		return KeyManagement.aspectOf().createElement(expected, ConversionTools.stringConverter.fromBytes(rep, String.class));
+		return KeyManagement.getInstance().createElement(expected, ConversionTools.stringConverter.fromBytes(rep, String.class));
 	}
 
 	@Override
 	public byte[] toBytes(Object obj) {
-		return ConversionTools.convert(KeyManagement.aspectOf().createIdentifier(obj));
+		return ConversionTools.convert(KeyManagement.getInstance().createIdentifier(obj));
 	}
 
 	@Override
 	public boolean canConvert(Class<?> type) {
-		return KeyManagement.aspectOf().canCreateFromKeys(type);
+		return KeyManagement.getInstance().canCreateFromKeys(type);
 	}
 }

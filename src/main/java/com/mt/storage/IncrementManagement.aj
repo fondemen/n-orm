@@ -11,7 +11,13 @@ import com.mt.storage.PropertyManagement.Property;
 import com.mt.storage.PropertyManagement.PropertyFamily;
 
 public aspect IncrementManagement {
-
+	private static IncrementManagement INSTANCE;
+	
+	public static IncrementManagement getInstance() {
+		if (INSTANCE == null)
+			INSTANCE = aspectOf();
+		return INSTANCE;
+	}
 
 	declare error: set(@Incrementing (!long && !int && !short && !byte
 										&& !Collection
@@ -38,14 +44,14 @@ public aspect IncrementManagement {
 	
 	after(PropertyFamily pf) returning: execution(void PropertyFamily.activate()) && target(pf) {
 		PersistingElement owner = pf.getOwner();
-		for (Field f : PropertyManagement.aspectOf().getProperties(owner.getClass())) {
+		for (Field f : PropertyManagement.getInstance().getProperties(owner.getClass())) {
 			if (f.isAnnotationPresent(Incrementing.class)) {
 				Property prop = pf.get(f.getName());
 				if (prop != null) {
 					if (prop.getField() == null)
 						prop.setField(f);
 					assert f.equals(prop.getField());
-					PropertyManagement.aspectOf().candideSetValue(owner, f, prop.getValue());
+					PropertyManagement.getInstance().candideSetValue(owner, f, prop.getValue());
 				}
 			}
 		}

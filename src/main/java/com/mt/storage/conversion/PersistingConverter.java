@@ -10,7 +10,7 @@ class PersistingConverter extends Converter<PersistingElement> {
 
 	@Override
 	public PersistingElement fromString(String rep, Class<?> expected) {
-		return (PersistingElement) KeyManagement.aspectOf().createElement(expected, rep);
+		return (PersistingElement) KeyManagement.getInstance().createElement(expected, rep);
 	}
 
 	@Override

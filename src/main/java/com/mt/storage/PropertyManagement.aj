@@ -16,7 +16,15 @@ import org.aspectj.lang.SoftException;
 
 import com.mt.storage.conversion.ConversionTools;
 
+
 public aspect PropertyManagement {
+	private static PropertyManagement INSTANCE;
+	
+	public static PropertyManagement getInstance() {
+		if (INSTANCE == null)
+			INSTANCE = aspectOf();
+		return INSTANCE;
+	}
 
 	declare soft : DatabaseNotReachedException : within(PropertyManagement) && adviceexecution();
 
