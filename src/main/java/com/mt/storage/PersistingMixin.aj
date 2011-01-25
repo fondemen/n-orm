@@ -24,7 +24,7 @@ public privileged aspect PersistingMixin {
 		if (! self.getClass().isAnnotationPresent(Persisting.class))
 			throw new IllegalStateException("Class " + self.getClass() + " implements " + PersistingElement.class +" instead of declaring annotation " + Persisting.class);
 		
-		KeyManagement.aspectOf().detectKeys(self.getClass());
+		KeyManagement.getInstance().detectKeys(self.getClass());
 	}
 	
 	public String getTable(Class<? extends PersistingElement> clazz) {
@@ -36,7 +36,7 @@ public privileged aspect PersistingMixin {
 	}
 	
 	public String PersistingElement.getTable() {
-		return PersistingMixin.aspectOf().getTable(this.getClass());
+		return PersistingMixin.getInstance().getTable(this.getClass());
 	}
 	
 }

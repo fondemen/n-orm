@@ -61,8 +61,8 @@ public aspect KeyManagement {
 
 	public boolean canCreateFromKeys(Class<?> type) {
 		if (!PersistingElement.class.isAssignableFrom(type)) {
-			for (Field property : PropertyManagement.aspectOf().getProperties(type)) {
-				if (PropertyManagement.aspectOf().isProperty(property) && ! this.isKey(property))
+			for (Field property : PropertyManagement.getInstance().getProperties(type)) {
+				if (PropertyManagement.getInstance().isProperty(property) && ! this.isKey(property))
 					return false;
 			}
 		}
@@ -74,18 +74,18 @@ public aspect KeyManagement {
 	}
 	
 	public List<Field> PersistingElement.getKeys() {
-		return new ArrayList<Field>(KeyManagement.aspectOf().typeKeys.get(this.getClass()));
+		return new ArrayList<Field>(KeyManagement.getInstance().typeKeys.get(this.getClass()));
 	}
 
 	public List<Field> detectKeys(Class<?> clazz) {
 		if (! typeKeys.containsKey(clazz)) {
-			if (PropertyManagement.aspectOf().isSimplePropertyType(clazz))
+			if (PropertyManagement.getInstance().isSimplePropertyType(clazz))
 				return new ArrayList<Field>(0);
 			ArrayList<Field> foundKeys = new ArrayList<Field>();
 			int maxKeyOrder = -1;
 			boolean isPersisting = PersistingElement.class.isAssignableFrom(clazz);
 			
-			for (Field f : PropertyManagement.aspectOf().getProperties(clazz)) {
+			for (Field f : PropertyManagement.getInstance().getProperties(clazz)) {
 				if (f.isAnnotationPresent(Key.class)) {
 					this.checkKey(f);
 					
@@ -98,7 +98,7 @@ public aspect KeyManagement {
 					maxKeyOrder = Math.max(maxKeyOrder, order);
 				} else {
 					if (isPersisting)
-						PropertyManagement.aspectOf().checkProperty(f);
+						PropertyManagement.getInstance().checkProperty(f);
 					else
 						throw new IllegalStateException("The non persisting " + clazz + " should have either only or no property annotated with " + Key.class + " unlike property " + f );
 				}
@@ -120,7 +120,7 @@ public aspect KeyManagement {
 	}
 	
 	public void checkKey(Field f) {
-		PropertyManagement.aspectOf().checkProperty(f);
+		PropertyManagement.getInstance().checkProperty(f);
 		
 		if (f.getAnnotation(Key.class).order() <= 0)
 			throw new IllegalArgumentException("A key should declare an order which must bhe at least 1.");
@@ -146,7 +146,7 @@ public aspect KeyManagement {
 			boolean fst = true;
 			for (Field key : this.detectKeys(element.getClass())) {
 				if (fst) fst = false; else ret.append(sep);
-				Object o = PropertyManagement.aspectOf().readValue(element, key);
+				Object o = PropertyManagement.getInstance().readValue(element, key);
 				if (o == null)
 					throw new IllegalStateException("A key cannot be null.");
 				ret.append(ConversionTools.convertToString(o));
