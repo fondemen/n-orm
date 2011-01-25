@@ -38,7 +38,7 @@ public aspect StoreSelector {
 	public Store PersistingElement.getStore() {
 		if (this.store == null)
 			try {
-				this.store = StoreSelector.aspectOf().getStoreFor(this.getClass());
+				this.store = StoreSelector.getInstance().getStoreFor(this.getClass());
 			} catch (DatabaseNotReachedException x) {
 				throw new IllegalStateException(x);
 			}
@@ -110,13 +110,13 @@ public aspect StoreSelector {
 				}
 				ret = (Store) accessor.invoke(null, args.toArray());
 			} else if (properties.containsKey(STORE_DRIVERCLASS_SINGLETON_PROPERTY))
-				ret = (Store) PropertyManagement.aspectOf().readValue(null, storeClass.getField(properties.getProperty(STORE_DRIVERCLASS_SINGLETON_PROPERTY)));
+				ret = (Store) PropertyManagement.getInstance().readValue(null, storeClass.getField(properties.getProperty(STORE_DRIVERCLASS_SINGLETON_PROPERTY)));
 			else
 				ret = storeClass.newInstance();
 			
-			for (Field property : PropertyManagement.aspectOf().getProperties(storeClass)) {
+			for (Field property : PropertyManagement.getInstance().getProperties(storeClass)) {
 				if (properties.containsKey(property.getName())) {
-					PropertyManagement.aspectOf().setValue(ret, property, ConvertUtils.convert(properties.getProperty(property.getName()), property.getType()));
+					PropertyManagement.getInstance().setValue(ret, property, ConvertUtils.convert(properties.getProperty(property.getName()), property.getType()));
 				}
 			}
 			

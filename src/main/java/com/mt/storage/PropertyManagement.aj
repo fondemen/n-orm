@@ -120,7 +120,7 @@ public aspect PropertyManagement {
 		private void reactivate() throws DatabaseNotReachedException {
 			if (this.getField() != null) {
 				if (this.getValue() != null
-						&& PropertyManagement.aspectOf().isPropertyType(this.getField().getType())
+						&& PropertyManagement.getInstance().isPropertyType(this.getField().getType())
 						&& !this.getField().isAnnotationPresent(ExplicitActivation.class)) {
 					Object val = this.getValue();
 					if (val instanceof PersistingElement)
@@ -223,7 +223,7 @@ public aspect PropertyManagement {
 		if (this.isSimplePropertyType(type))
 			return true;
 		for (Field prop : this.getProperties(type)) {
-			if (!KeyManagement.aspectOf().isKey(prop))
+			if (!KeyManagement.getInstance().isKey(prop))
 				return false;
 			return true;
 		}
@@ -268,10 +268,10 @@ public aspect PropertyManagement {
 	private transient Map<Field, byte []> PersistingElement.lastState = new HashMap<Field, byte []>();
 	
 	void PersistingElement.storeProperties() {
-		for (Field f : PropertyManagement.aspectOf().getProperties(this.getClass())) {
+		for (Field f : PropertyManagement.getInstance().getProperties(this.getClass())) {
 			if (f.isAnnotationPresent(Incrementing.class))
 				continue;
-			Object val = PropertyManagement.aspectOf().candideReadValue(this, f);
+			Object val = PropertyManagement.getInstance().candideReadValue(this, f);
 			if (val == null) {
 				if (!this.lastState.containsKey(f) || this.lastState.get(f) != null) {
 					this.getProperties().removeKey(f.getName());
@@ -288,13 +288,13 @@ public aspect PropertyManagement {
 	}
 	
 	void PersistingElement.upgradeProperties() throws DatabaseNotReachedException {
-		for (Field f : PropertyManagement.aspectOf().getProperties(this.getClass())) {
+		for (Field f : PropertyManagement.getInstance().getProperties(this.getClass())) {
 			if (f.isAnnotationPresent(Incrementing.class))
 				continue;
 			Object oldVal = null;
 			boolean oldValRead = false;
 			try {
-				oldVal = PropertyManagement.aspectOf().readValue(this, f);
+				oldVal = PropertyManagement.getInstance().readValue(this, f);
 				oldValRead = true;
 			} catch (Exception x) {
 			}
@@ -336,7 +336,7 @@ public aspect PropertyManagement {
 			if ((f.getModifiers() & Modifier.FINAL) == 0) {
 				// Setting proper value in property
 				try {
-					PropertyManagement.aspectOf().setValue(this, f, val);
+					PropertyManagement.getInstance().setValue(this, f, val);
 					this.lastState.put(f, valB);
 				} catch (Exception x) { //May happen in case f is of simple type (e.g. boolean and not Boolean) and value is unknown from the base (i.e. null)
 					this.lastState.put(f, oldValB);

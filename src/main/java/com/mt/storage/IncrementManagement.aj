@@ -59,7 +59,7 @@ public aspect IncrementManagement {
 	
 	before(PersistingElement self, Object val): PropertyManagement.attUpdated(self, val) && set(@Incrementing * *.*) {
 		Field prop = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
-		Number oldVal = (Number) PropertyManagement.aspectOf().candideReadValue(self, prop);
+		Number oldVal = (Number) PropertyManagement.getInstance().candideReadValue(self, prop);
 		self.getIncrements().put(prop.getName(), getActualIncrement((Number)val, oldVal, self.getIncrements().get(prop.getName()), prop));
 	}
 
