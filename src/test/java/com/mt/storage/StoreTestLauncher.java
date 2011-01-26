@@ -44,10 +44,10 @@ public class StoreTestLauncher {
 		p.setProperty(StoreSelector.STORE_DRIVERCLASS_PROPERTY, com.mt.storage.hbase.Store.class.getName());
 		p.setProperty(StoreSelector.STORE_DRIVERCLASS_STATIC_ACCESSOR, "getStore");
 
-		if (hBaseServer == null) {
-			com.mt.storage.hbase.Store hStore = com.mt.storage.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
+		if (hbaseStore == null && hBaseServer == null) {
+			hbaseStore = com.mt.storage.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
 			try {
-				hStore.start();
+				hbaseStore.start();
 			} catch (DatabaseNotReachedException x) {
 				// Starting HBase server
 				try {
@@ -106,6 +106,8 @@ public class StoreTestLauncher {
 	}
 
 	private boolean isMemory;
+
+	public static com.mt.storage.hbase.Store hbaseStore;
 
 	protected StoreTestLauncher(Properties props) {
 		StoreTestLauncher.registerStorePropertiesForInnerClasses(
