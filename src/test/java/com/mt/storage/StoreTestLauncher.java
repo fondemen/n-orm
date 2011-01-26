@@ -15,9 +15,9 @@ import com.mt.storage.memory.Memory;
 public class StoreTestLauncher {
 	private static Collection<Object[]> testedStores = null;
 
-	public static String hbaseHost = null;
-	public static String hbasePort = null;
-	public static int hbaseMaxRetries = 3;
+	public static String hbaseHost = "localhost";
+	public static Integer hbasePort = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
+	public static Integer hbaseMaxRetries = 3;
 
 	public static HBaseTestingUtility hBaseServer = null;
 
@@ -41,34 +41,37 @@ public class StoreTestLauncher {
 
 	public static Properties prepareHBase() {
 		Properties p = new Properties();
-		p.setProperty(StoreSelector.STORE_DRIVERCLASS_PROPERTY,
-				com.mt.storage.hbase.Store.class.getName());
-		p.setProperty(StoreSelector.STORE_DRIVERCLASS_STATIC_ACCESSOR,
-				"getStore");
+		p.setProperty(StoreSelector.STORE_DRIVERCLASS_PROPERTY, com.mt.storage.hbase.Store.class.getName());
+		p.setProperty(StoreSelector.STORE_DRIVERCLASS_STATIC_ACCESSOR, "getStore");
 
-		
-		if (hBaseServer == null)
-		// Starting HBase server
-		try {
-			hBaseServer = new HBaseTestingUtility();
-			hBaseServer.getConfiguration().setInt("hbase.regionserver.msginterval", 100);
-			hBaseServer.getConfiguration().setInt("hbase.client.pause", 250);
-			hBaseServer.getConfiguration().setInt("hbase.client.retries.number", hbaseMaxRetries);
-			if (hbaseHost != null)
-				hBaseServer.getConfiguration().set(HConstants.ZOOKEEPER_QUORUM, hbaseHost);
-			if (hbasePort != null)
-				hBaseServer.getConfiguration().setInt("hbase.zookeeper.property.clientPort", Integer.parseInt(hbasePort));
-			
-			hBaseServer.startMiniCluster(1);
-			hbaseHost = hBaseServer.getConfiguration().get(HConstants.ZOOKEEPER_QUORUM);
-			hbasePort = hBaseServer.getConfiguration().get("hbase.zookeeper.property.clientPort", Integer.toString(HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT));
-			
-		} catch (Exception e) {
-			throw new RuntimeException(e);
+		if (hBaseServer == null) {
+			com.mt.storage.hbase.Store hStore = com.mt.storage.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
+			try {
+				hStore.start();
+			} catch (DatabaseNotReachedException x) {
+				// Starting HBase server
+				try {
+					hBaseServer = new HBaseTestingUtility();
+					hBaseServer.getConfiguration().setInt("hbase.regionserver.msginterval", 100);
+					hBaseServer.getConfiguration().setInt("hbase.client.pause", 250);
+					hBaseServer.getConfiguration().setInt("hbase.client.retries.number", hbaseMaxRetries);
+					if (hbaseHost != null)
+						hBaseServer.getConfiguration().set(HConstants.ZOOKEEPER_QUORUM, hbaseHost);
+					if (hbasePort != null)
+						hBaseServer.getConfiguration().setInt("hbase.zookeeper.property.clientPort", hbasePort);
+					
+					hBaseServer.startMiniCluster(1);
+					hbaseHost = hBaseServer.getConfiguration().get(HConstants.ZOOKEEPER_QUORUM);
+					hbasePort = hBaseServer.getConfiguration().getInt("hbase.zookeeper.property.clientPort", HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT);
+					
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
 		}
 
 		p.setProperty("1", hbaseHost);
-		p.setProperty("2", hbasePort);
+		p.setProperty("2", hbasePort.toString());
 		p.setProperty("3", Integer.toString(hbaseMaxRetries));
 			
 		return p;
