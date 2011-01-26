@@ -28,7 +28,7 @@ public aspect KeyManagement {
 	
 	private transient String PersistingElement.identifier;
 	
-	after(PersistingElement self): PersistingMixin.creation(self) {
+	after(PersistingElement self) returning: PersistingMixin.creation(self) {
 		self.identifier = this.createIdentifier(self);
 	}
 	
