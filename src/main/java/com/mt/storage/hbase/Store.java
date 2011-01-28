@@ -19,7 +19,6 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
-import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -139,9 +138,7 @@ public class Store implements com.mt.storage.GenericStore {
 			this.admin = new HBaseAdmin(this.config);
 			if (!this.admin.isMasterRunning())
 				throw new DatabaseNotReachedException(new MasterNotRunningException());
-		} catch (MasterNotRunningException e) {
-			throw new DatabaseNotReachedException(e);
-		} catch (ZooKeeperConnectionException e) {
+		} catch (Exception e) {
 			throw new DatabaseNotReachedException(e);
 		}
 
