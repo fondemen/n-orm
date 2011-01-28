@@ -55,14 +55,17 @@ public class StoreTestLauncher {
 					hBaseServer.getConfiguration().setInt("hbase.regionserver.msginterval", 100);
 					hBaseServer.getConfiguration().setInt("hbase.client.pause", 250);
 					hBaseServer.getConfiguration().setInt("hbase.client.retries.number", hbaseMaxRetries);
-					if (hbaseHost != null)
-						hBaseServer.getConfiguration().set(HConstants.ZOOKEEPER_QUORUM, hbaseHost);
-					if (hbasePort != null)
-						hBaseServer.getConfiguration().setInt("hbase.zookeeper.property.clientPort", hbasePort);
+//					if (hbaseHost != null)
+//						hBaseServer.getConfiguration().set(HConstants.ZOOKEEPER_QUORUM, hbaseHost);
+//					if (hbasePort != null)
+//						hBaseServer.getConfiguration().setInt("hbase.zookeeper.property.clientPort", hbasePort);
 					
 					hBaseServer.startMiniCluster(1);
 					hbaseHost = hBaseServer.getConfiguration().get(HConstants.ZOOKEEPER_QUORUM);
 					hbasePort = hBaseServer.getConfiguration().getInt("hbase.zookeeper.property.clientPort", HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT);
+					
+					hbaseStore = com.mt.storage.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
+					hbaseStore.start();
 					
 				} catch (Exception e) {
 					throw new RuntimeException(e);
