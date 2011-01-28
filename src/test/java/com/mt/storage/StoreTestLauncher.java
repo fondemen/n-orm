@@ -65,6 +65,7 @@ public class StoreTestLauncher {
 					hbasePort = hBaseServer.getConfiguration().getInt("hbase.zookeeper.property.clientPort", HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT);
 					
 					hbaseStore = com.mt.storage.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
+					hbaseStore.setConf(hBaseServer.getConfiguration());
 					hbaseStore.start();
 					
 				} catch (Exception e) {
