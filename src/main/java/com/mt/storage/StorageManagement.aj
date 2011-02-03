@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import com.mt.storage.conversion.ConversionTools;
+import com.mt.storage.query.ConstraintBuilder;
 
 public aspect StorageManagement {
 	
@@ -96,6 +97,10 @@ public aspect StorageManagement {
 		return this.getStore().exists(this.getTable(), this.getIdentifier());
 	}
 	
+	public static <T> T getElement(Class<T> clazz, String identifier) {
+		return KeyManagement.getInstance().createElement(clazz, identifier);
+	}
+	
 	public static <T extends PersistingElement> Set<T> findElement(Class<T> clazz, Constraint c, int limit) throws DatabaseNotReachedException {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		CloseableKeyIterator keys = null;
@@ -114,5 +119,9 @@ public aspect StorageManagement {
 			if (keys != null)
 				keys.close();
 		}
+	}
+	
+	public static ConstraintBuilder findElements() {
+		return new ConstraintBuilder();
 	}
 }
