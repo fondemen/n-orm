@@ -34,6 +34,11 @@ public class Constraint {
 		this.startKey = startKey;
 		this.endKey = endKey;
 	}
+
+	@SuppressWarnings("unchecked")
+	public Constraint(Map<Field, Object> values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {
+		this((Class<? extends PersistingElement>)searchedKey.getDeclaringClass(), values, searchedKey, startValue, endValue, checkKeys);
+	}
 	
 	/**
 	 * Describes a search for a particular key.
@@ -41,17 +46,21 @@ public class Constraint {
 	 * startValue are endValue both inclusive.
 	 * @param checkKeys to check whether all keys with a lower category is given a value
 	 */
-	Constraint(Map<Field, Object> values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {
-		if (startValue == null && endValue == null)
-			throw new IllegalArgumentException("A search requires at least a start or an end value.");
-		
-		if (searchedKey == null)
+	public Constraint(Class<? extends PersistingElement> clazz, Map<Field, Object> values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {
+
+		if (searchedKey == null && values.isEmpty())
 			throw new IllegalArgumentException("A search can only happen on a key ; please, supply one.");
+
+		int length = values == null ? 0 : values.size();
+		if (checkKeys && searchedKey != null) {
+			int index = searchedKey.getAnnotation(Key.class).order();
+			if (length != index-1)
+				throw new IllegalArgumentException("In order to search depending on key " + searchedKey + " of order " + index + ", you must supply values for keys of previous orders.");
+		}
 		
-		Class<?> clazz = searchedKey.getDeclaringClass();
+		//Class<?> clazz = searchedKey.getDeclaringClass();
 		
 		List<Field> keys = KeyManagement.getInstance().detectKeys(clazz);
-		int length = values == null ? 0 : values.size();
 		if (keys.size() < length)
 			throw new IllegalArgumentException("Too many constrained values compared to the number of keys ; only key values may be constrained.");
 		StringBuffer fixedPartb = new StringBuffer();
@@ -89,7 +98,7 @@ public class Constraint {
 			if (fixedPart == null) {
 				this.endKey = null;
 			} else {
-				this.endKey = fixedPart + sep;
+				this.endKey = fixedPart.substring(0, fixedPart.length()-1) + sep;
 			}
 		} else
 			this.endKey = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(endValue) + sep;
