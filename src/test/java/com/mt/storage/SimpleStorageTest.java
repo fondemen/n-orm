@@ -80,7 +80,7 @@ public class SimpleStorageTest {
 		assertTrue(Memory.INSTANCE.hadNoQuery());
 		assertFalse(unknown.existsInStore());
 		assertTrue(Memory.INSTANCE.hadAQuery());
-		unknown.activateSimpleProperties();
+		unknown.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertFalse(unknown.existsInStore());
 		assertTrue(Memory.INSTANCE.hadAQuery());
@@ -125,7 +125,7 @@ public class SimpleStorageTest {
 	public void retreive() throws DatabaseNotReachedException {
 		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
 		assertTrue(Memory.INSTANCE.hadNoQuery());
-		sut2.activateSimpleProperties();
+		sut2.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertFalse(sut2.hasChanged());
 		assertEquals("pro1value", sut2.prop1);
@@ -155,7 +155,7 @@ public class SimpleStorageTest {
 		Memory.INSTANCE.resetQueries();
 		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
 		assertTrue(Memory.INSTANCE.hadNoQuery());
-		sut2.activateSimpleProperties();
+		sut2.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertEquals(null, sut2.prop1);
 		assertTrue(Memory.INSTANCE.hadNoQuery());
@@ -177,7 +177,7 @@ public class SimpleStorageTest {
 		this.sut1.store();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
-		sut2.activateSimpleProperties();
+		sut2.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertArrayEquals(this.sut1.intsProp, sut2.intsProp);
 		assertTrue(Memory.INSTANCE.hadNoQuery());
@@ -190,7 +190,7 @@ public class SimpleStorageTest {
 		this.sut1.store();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
-		sut2.activateSimpleProperties();
+		sut2.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertArrayEquals(this.sut1.bytesProp, sut2.bytesProp);
 		assertTrue(Memory.INSTANCE.hadNoQuery());
@@ -203,7 +203,7 @@ public class SimpleStorageTest {
 		this.sut1.store();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
-		sut2.activateSimpleProperties();
+		sut2.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertEquals("privatevalue", sut2.getPrivProp());
 		assertTrue(Memory.INSTANCE.hadNoQuery());
@@ -213,7 +213,7 @@ public class SimpleStorageTest {
 	public void changePrivateProperty() throws DatabaseNotReachedException {
 		this.sut1.setPrivProp("privatevalue");
 		this.sut1.store();
-		this.sut1.activateSimpleProperties();
+		this.sut1.activate();
 		assertEquals("privatevalue", Bytes.toString(Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "privProp")));
@@ -283,7 +283,7 @@ public class SimpleStorageTest {
 		elt.store();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		elt = new IncrementingElement("elt");
-		elt.activateSimpleProperties();
+		elt.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertEquals(250, elt.lval);
 		assertTrue(Memory.INSTANCE.hadNoQuery());
@@ -292,7 +292,7 @@ public class SimpleStorageTest {
 		elt.store();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		elt = new IncrementingElement("elt");
-		elt.activateSimpleProperties();
+		elt.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertEquals(301, elt.lval);
 		assertTrue(Memory.INSTANCE.hadNoQuery());
@@ -309,7 +309,7 @@ public class SimpleStorageTest {
 		elt.store();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		elt = new IncrementingElement("elt");
-		elt.activateSimpleProperties();
+		elt.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertEquals(250, elt.ival);
 		assertTrue(Memory.INSTANCE.hadNoQuery());
@@ -325,7 +325,7 @@ public class SimpleStorageTest {
 		elt.store();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		elt = new IncrementingElement("elt");
-		elt.activateSimpleProperties();
+		elt.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertEquals(250, elt.sval);
 		assertTrue(Memory.INSTANCE.hadNoQuery());
@@ -341,7 +341,7 @@ public class SimpleStorageTest {
 		elt.store();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		elt = new IncrementingElement("elt");
-		elt.activateSimpleProperties();
+		elt.activate();
 		assertTrue(Memory.INSTANCE.hadAQuery());
 		assertEquals(22, elt.bval);
 		assertTrue(Memory.INSTANCE.hadNoQuery());

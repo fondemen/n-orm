@@ -19,15 +19,15 @@ public class ColumnFamily<T> implements Collection<T> {
 	private final PersistingElement owner;
 	private final String ownerTable;
 	private final Field index;
-	private final Store store;
 	private final boolean addOnly;
 	private final Field incrementingField;
-	private boolean activated = false;
 
 	private final Map<String, T> collection = new TreeMap<String, T>();
 
 	private final Map<String, ChangeKind> changes;
 	private final Map<String, Number> increments;
+	
+	private boolean activated = false;
 
 	public ColumnFamily(Class<T> clazz, Field property, PersistingElement owner, String index, boolean addOnly, boolean incremental) throws SecurityException, NoSuchFieldException {
 		this(clazz, property, property.getName(), owner, PropertyManagement.getInstance().getProperty(clazz, index), addOnly, incremental);
@@ -41,7 +41,6 @@ public class ColumnFamily<T> implements Collection<T> {
 		this.owner = owner;
 		this.index = index;
 		this.addOnly = addOnly;
-		this.store = this.owner.getStore();
 		this.ownerTable = this.owner.getTable();
 		if (incremental) {
 			if (PersistingElement.class.isAssignableFrom(clazz))
@@ -88,31 +87,20 @@ public class ColumnFamily<T> implements Collection<T> {
 	protected String getIndex(T object) {
 		return PropertyManagement.getInstance().candideReadValue(object, this.index).toString();
 	}
-	
-	protected boolean wasActivated() {
-		return this.activated;
-	}
-	
-	public void activate(Object startIndex, Object endIndex) throws DatabaseNotReachedException {
-		this.activate(startIndex == null && endIndex == null ? null : new Constraint(null, this.index, startIndex, endIndex, false));
-	}
-	
-	public void activate(Constraint c) throws DatabaseNotReachedException {
-		if (!this.activated) {
-			reactivate(c);
-		}
+
+	public boolean isActivated() {
+		return activated;
 	}
 
-	public void reactivate(Constraint c) throws DatabaseNotReachedException {
+	void rebuild(Map<String, byte[]> rawData) throws DatabaseNotReachedException {
 		this.collection.clear();
 		this.clearChanges();
 		String id = this.owner.getIdentifier();
 		assert id != null;
-		Map<String, byte[]> elements = c == null ? this.store.get(this.ownerTable, id, this.name) : this.store.get(this.ownerTable, id, this.name, c);
-		for (String key : elements.keySet()) {
+		for (String key : rawData.keySet()) {
 			if (this.incrementingField != null) { //Then we must have two keys: identifier (key) and number (in elements)
 				//Value is in byte ; to get the actual value with ConversionTools.convert, we need to create the expected ID
-				Number eltVal = (Number) ConversionTools.convert(this.incrementingField.getType(), elements.get(key));
+				Number eltVal = (Number) ConversionTools.convert(this.incrementingField.getType(), rawData.get(key));
 				String eltRep = ConversionTools.convertToString(eltVal);
 				if (this.index.getAnnotation(Key.class).order() == 1) {
 					assert this.incrementingField.getAnnotation(Key.class).order() == 2;
@@ -124,7 +112,7 @@ public class ColumnFamily<T> implements Collection<T> {
 				}
 				this.collection.put(key, this.convert(key, ConversionTools.convert(eltRep)));
 			} else {
-				this.collection.put(key, this.convert(key, elements.get(key)));
+				this.collection.put(key, this.convert(key, rawData.get(key)));
 			}
 		}
 		this.activated = true;

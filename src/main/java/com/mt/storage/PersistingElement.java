@@ -26,6 +26,5 @@ public interface PersistingElement {
 	void delete() throws DatabaseNotReachedException;
 	boolean existsInStore() throws DatabaseNotReachedException;
 
-	void activateSimpleProperties();
-	void activate(String property, Object startIndex, Object endIndex);
+	void activate(String... families) throws DatabaseNotReachedException;
 }

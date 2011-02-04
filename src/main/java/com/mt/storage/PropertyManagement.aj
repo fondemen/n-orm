@@ -124,7 +124,7 @@ public aspect PropertyManagement {
 						&& !this.getField().isAnnotationPresent(ExplicitActivation.class)) {
 					Object val = this.getValue();
 					if (val instanceof PersistingElement)
-						((PersistingElement) this.getValue()).activateSimpleProperties();
+						((PersistingElement) this.getValue()).activate();
 				}
 				this.wasActivated = true;
 			}
@@ -147,11 +147,6 @@ public aspect PropertyManagement {
 		@Override
 		protected Property convert(String key, byte[] rep) {
 			return new Property(key, rep);
-		}
-		
-		protected synchronized void activate() throws DatabaseNotReachedException {
-			super.activate(null);
-			this.getOwner().upgradeProperties();
 		}
 
 	}
@@ -257,13 +252,6 @@ public aspect PropertyManagement {
 			}
 		return this.properties;
 	}
-
-	public void PersistingElement.activateSimpleProperties() throws DatabaseNotReachedException {
-		PropertyFamily pf = this.getProperties();
-		if (pf != null) {
-			pf.activate();
-		}
-	}
 	
 	private transient Map<Field, byte []> PersistingElement.lastState = new HashMap<Field, byte []>();
 	
@@ -310,8 +298,7 @@ public aspect PropertyManagement {
 				if (prop.getField() == null)
 					prop.setField(f);
 				assert prop.getField().equals(f);
-				if (this.getProperties().wasActivated())
-					prop.activate();
+				prop.activate();
 				val = prop.getValue();
 			} else {
 				val = null;
@@ -320,8 +307,7 @@ public aspect PropertyManagement {
 			if (PersistingElement.class.isAssignableFrom(f.getType()) && val != null && oldVal != null && val != oldVal && ((PersistingElement)val).getIdentifier().equals(((PersistingElement)oldVal).getIdentifier())) {
 				prop.setValue(oldVal);
 				prop.setField(f);
-				if (this.getProperties().wasActivated())
-					prop.reactivate();
+				prop.reactivate();
 				continue;
 			}
 

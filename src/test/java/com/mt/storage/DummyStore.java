@@ -56,20 +56,6 @@ public class DummyStore implements Store {
 	}
 
 	@Override
-	public Map<String, byte[]> get(String table, String id, String family)
-			throws DatabaseNotReachedException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Map<String, byte[]> get(String table, String id, String family,
-			Constraint c) throws DatabaseNotReachedException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
 	public boolean exists(String table, String row)
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
@@ -91,6 +77,13 @@ public class DummyStore implements Store {
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
 		
+	}
+
+	@Override
+	public Map<String, Map<String, byte[]>> get(String table, String id,
+			Set<String> families) throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }

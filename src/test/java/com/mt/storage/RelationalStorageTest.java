@@ -118,7 +118,7 @@ public class RelationalStorageTest {
 		sut.store();
 		assertEquals("1:2:3:4", Bytes.toString(Memory.INSTANCE.get("PC", "key", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "value")));
 		PersistingComposed sut2 = new PersistingComposed("key");
-		sut2.activateSimpleProperties();
+		sut2.activate();
 		assertEquals("1", sut2.value.key1.key1.prop1);
 		assertEquals("2", sut2.value.key1.key2.key.prop1);
 		assertEquals("3", sut2.value.key2.key1.prop1);
@@ -154,7 +154,7 @@ public class RelationalStorageTest {
 		assertEquals("value", Bytes.toString(Memory.INSTANCE.get("Inside", "inside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
 		
 		PersistingOutside out2 = new PersistingOutside("outside");
-		out2.activateSimpleProperties();
+		out2.activate();
 		assertNotNull(out2.val);
 		assertEquals("inside", out2.val.key);
 		assertEquals("value", out2.val.val);
@@ -194,11 +194,11 @@ public class RelationalStorageTest {
 		assertTrue(Memory.INSTANCE.getTable("Inside").containsKey("inside"));
 		
 		PersistingOutsideExplicit out2 = new PersistingOutsideExplicit("outside");
-		out2.activateSimpleProperties();
+		out2.activate();
 		assertEquals("inside", out2.val.key);
 		assertNull(out2.val.val);
 		
-		out2.val.activateSimpleProperties();
+		out2.val.activate();
 		assertEquals("value", out2.val.val);
 	}
 }

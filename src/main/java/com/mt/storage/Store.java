@@ -35,17 +35,17 @@ public interface Store {
 	 */
 	byte [] get(String table, String row, String family, String key) throws DatabaseNotReachedException;
 	
-	/**
-	 * Returns all elements in a family ; no side-effect.
-	 * In case one element is missing, null is returned.
-	 */
-	Map<String, byte[]> get(String table, String id, String family) throws DatabaseNotReachedException;
+//	/**
+//	 * Returns all elements in a family ; no side-effect.
+//	 * In case one element is missing, null is returned.
+//	 */
+//	Map<String, byte[]> get(String table, String id, Set<String> family) throws DatabaseNotReachedException;
 	
 	/**
-	 * Returns all elements in a family according to a constraint ; no side-effect.
+	 * Returns all elements in families ; no side-effect.
 	 * In case one element is missing, null is returned.
 	 */
-	Map<String, byte[]> get(String table, String id, String family, Constraint c) throws DatabaseNotReachedException;
+	Map<String, Map<String, byte[]>> get(String table, String id, Set<String> families) throws DatabaseNotReachedException;
 	
 	/**
 	 * Stores given piece of information.

@@ -1,6 +1,5 @@
 package com.mt.storage.memory;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -19,7 +18,7 @@ public class Memory implements Store {
 	public static final Memory INSTANCE = new Memory();
 	
 	@SuppressWarnings("serial")
-	private abstract class LazyHash<T> extends HashMap<String, T> {
+	private abstract class LazyHash<T> extends TreeMap<String, T> {
 		protected abstract T newElement(String key);
 
 		@Override
@@ -36,7 +35,7 @@ public class Memory implements Store {
 	}
 
 	@SuppressWarnings("serial")
-	public class Table extends HashMap<String, Table.Row> {
+	public class Table extends TreeMap<String, Table.Row> {
 		public class Row extends LazyHash<Row.ColumnFamily> {
 			public class ColumnFamily extends LazyHash<byte[]> {
 
@@ -87,7 +86,6 @@ public class Memory implements Store {
 		return fam.containsKey(key) ? fam.get(key) : null;
 	}
 
-	@Override
 	public Map<String, byte[]> get(String table, String id, String family) {
 		Table t = this.getTable(table);
 		if (!t.containsKey(id))
@@ -165,13 +163,13 @@ public class Memory implements Store {
 		this.tables.clear();
 	}
 
-	public int count(String ownerTable, String identifier, String name,
-			Constraint c) throws DatabaseNotReachedException {
-		Table t = this.getTable(ownerTable);
-		if (!t.containsKey(identifier))
-			return 0;
-		return this.get(ownerTable, identifier, name, c).size();
-	}
+//	public int count(String ownerTable, String identifier, String name,
+//			Constraint c) throws DatabaseNotReachedException {
+//		Table t = this.getTable(ownerTable);
+//		if (!t.containsKey(identifier))
+//			return 0;
+//		return this.get(ownerTable, identifier, name, c).size();
+//	}
 
 	@Override
 	public void delete(String table, String id) {
@@ -222,17 +220,19 @@ public class Memory implements Store {
 	}
 
 	@Override
-	public Map<String, byte[]> get(String table, String id, String family,
-			Constraint c) throws DatabaseNotReachedException {
+	public Map<String, Map<String, byte[]>> get(String table, String id, Set<String> families) throws DatabaseNotReachedException {
+
 		Table t = this.getTable(table);
-		if (!t.containsKey(id))
-			return new TreeMap<String, byte[]>();
-		ColumnFamily cf = this.getTable(table).get(id).get(family);
+		if (t == null || !t.containsKey(id))
+			return new TreeMap<String, Map<String, byte[]>>();
+		Row row = t.get(id);
 		
-		Map<String, byte[]> ret = new HashMap<String, byte[]>();
+		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String,byte[]>>();
 		
-		for (String key : matchingKeys(cf.keySet(), c, null)) {
-			ret.put(key, cf.get(key));
+		for (String family : families) {
+			if (row.containsKey(family)) {
+				ret.put(family, new TreeMap<String, byte[]>(row.get(family)));
+			}
 		}
 		
 		return ret;
