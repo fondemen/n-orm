@@ -5,9 +5,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import com.mt.storage.conversion.ConversionTools;
 import com.mt.storage.query.ConstraintBuilder;
+import com.sun.xml.txw2.IllegalAnnotationException;
 
 public aspect StorageManagement {
 	
@@ -91,6 +93,35 @@ public aspect StorageManagement {
 				isStoring = false;
 			}
 		}
+	}
+
+	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
+		Set<String> toBeActivated = new TreeSet<String>();
+		if (families != null) {
+			for (String family : families) {
+				if (this.getColumnFamily(family) == null)
+					throw new IllegalAnnotationException("Unknown column family " + family + " in class " + this.getClass());
+				toBeActivated.add(family);
+			}
+		}
+
+		this.getProperties();
+		for (ColumnFamily<?> cf : this.getColumnFamilies()) {
+			if (! toBeActivated.contains(cf.getName())) {
+				Field f = cf.getProperty();
+				ImplicitActivation ia = f == null ? null : f.getAnnotation(ImplicitActivation.class);
+				if (f == null || ia != null) {
+					toBeActivated.add(cf.getName());
+				}
+			}
+		}
+		
+		Map<String, Map<String, byte[]>> rawData = this.getStore().get(this.getTable(), this.getIdentifier(), toBeActivated);
+		for (String family : rawData.keySet()) {
+			this.getColumnFamily(family).rebuild(rawData.get(family));
+		}
+		
+		this.upgradeProperties();
 	}
 	
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {

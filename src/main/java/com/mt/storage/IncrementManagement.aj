@@ -42,11 +42,10 @@ public aspect IncrementManagement {
 //		}
 //	}
 	
-	after(PropertyFamily pf) returning: execution(void PropertyFamily.activate()) && target(pf) {
-		PersistingElement owner = pf.getOwner();
+	after(PersistingElement owner) returning: execution(void PersistingElement+.upgradeProperties()) && target(owner) {
 		for (Field f : PropertyManagement.getInstance().getProperties(owner.getClass())) {
 			if (f.isAnnotationPresent(Incrementing.class)) {
-				Property prop = pf.get(f.getName());
+				Property prop = owner.getProperties().get(f.getName());
 				if (prop != null) {
 					if (prop.getField() == null)
 						prop.setField(f);

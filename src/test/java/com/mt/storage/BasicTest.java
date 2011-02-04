@@ -1,8 +1,8 @@
 package com.mt.storage;
 
-import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
@@ -61,13 +61,13 @@ public class BasicTest extends StoreTestLauncher {
 	 
 	 @Test public void hbaseBookStoreRetrieve() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
-		 p.activateSimpleProperties();
+		 p.activate();
 		 assertEquals("book name", p.getName());
 	 }
 	 
 	 @Test public void hbaseUnknownBookStoreRetrieve() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("gdcfknueghficlnehfuci");
-		 p.activateSimpleProperties();
+		 p.activate();
 		 assertNull(p.getName());
 		 assertFalse( p.existsInStore());
 	 }
@@ -76,7 +76,7 @@ public class BasicTest extends StoreTestLauncher {
 		 bssut.setName(null);
 		 bssut.store();
 		 BookStore p = new BookStore("testbookstore");
-		 p.activateSimpleProperties();
+		 p.activate();
 		 assertNull(p.getName());
 		 deleteBookstore();
 	 }
@@ -84,14 +84,14 @@ public class BasicTest extends StoreTestLauncher {
 	 @Test public void hbaseBookStoreDeletion() throws DatabaseNotReachedException {
 		 deleteBookstore();
 		 BookStore p = new BookStore("testbookstore");
-		 p.activateSimpleProperties();
+		 p.activate();
 		 assertNull(p.getName());
 	 }
 	
 	 @Test public void hbaseBookStoreAccessFromBook() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
-		 v.activateSimpleProperties();
+		 v.activate();
 		 assertSame(p, v.getBookStore());
 		 assertEquals("book name", v.getBookStore().getName());
 		 assertEquals("book name", p.getName());
@@ -114,7 +114,7 @@ public class BasicTest extends StoreTestLauncher {
 		 this.storeSUTs();
 		 BookStore p = new BookStore("testbookstore");
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
-		 v.activateSimpleProperties();
+		 v.activate();
 		 assertSame(p, v.getBookStore());
 		 assertEquals("book name", v.getBookStore().getName());
 		 assertEquals("book name", p.getName());

@@ -289,22 +289,12 @@ public class Store implements com.mt.storage.GenericStore {
 	}
 
 	@Override
-	public Map<String, byte[]> get(String table, String id, String family)
-			throws DatabaseNotReachedException {
-		return this.get(table, id, family, (Constraint) null);
-	}
-
-	@Override
-	public Map<String, byte[]> get(String table, String id, String family,
-			Constraint c) throws DatabaseNotReachedException {
-		Set<String> families = new TreeSet<String>();
-		families.add(family);
+	public Map<String, Map<String, byte[]>> get(String table, String id, Set<String> families) throws DatabaseNotReachedException {
 		HTable t = this.getTable(table, families);
 
-		Get g = new Get(Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
-
-		if (c != null) {
-			g.setFilter(createFamilyConstraint(c, false));
+		Get g = new Get(Bytes.toBytes(id));
+		for (String family : families) {
+			g.addFamily(Bytes.toBytes(family));
 		}
 
 		Result r;
@@ -313,16 +303,19 @@ public class Store implements com.mt.storage.GenericStore {
 		} catch (IOException e) {
 			throw new DatabaseNotReachedException(e);
 		}
-		Map<String, byte[]> ret = new HashMap<String, byte[]>();
+		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String, byte[]>>();
 		if (!r.isEmpty()) {
 			for (KeyValue kv : r.list()) {
-				ret.put(Bytes.toString(kv.getQualifier()), kv.getValue());
+				String family = Bytes.toString(kv.getFamily());
+				if (! ret.containsKey(family))
+					ret.put(family, new TreeMap<String, byte[]>());
+				ret.get(family).put(Bytes.toString(kv.getQualifier()), kv.getValue());
 			}
 		}
 		return ret;
 	}
 
-	protected Filter createFamilyConstraint(Constraint c, boolean firstKeyOnly) {
+	protected Filter createFamilyConstraint(String family, Constraint c, boolean firstKeyOnly) {
 		Filter f = null;
 		if (c.getStartKey() != null)
 			f = new QualifierFilter(CompareOp.GREATER_OR_EQUAL,

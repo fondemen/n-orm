@@ -54,15 +54,6 @@ public aspect ColumnFamiliyManagement {
 		}
 		return false;
 	}
-
-	public void PersistingElement.activate(String name, Object startIndex, Object endIndex) throws DatabaseNotReachedException {
-		ColumnFamily<?> cf = this.getColumnFamily(name);
-		if (cf == null) {
-			throw new IllegalArgumentException(name + " unknown column family.");
-		} else {
-			cf.activate(startIndex, endIndex);
-		}
-	}
 	
 	public boolean isCollectionFamily(Field f) {
 		try {
@@ -107,17 +98,5 @@ public aspect ColumnFamiliyManagement {
 	
 	after(ColumnFamily cf) returning : execution(ColumnFamily.new(..)) && target(cf) {
 		cf.getOwner().addColumnFamily(cf);
-	}
-	
-	after(PropertyFamily pf) returning throws DatabaseNotReachedException: execution(void PropertyFamily.activate()) && target(pf) {
-		PersistingElement self = pf.getOwner();
-		for (ColumnFamily<?> cf : self.getColumnFamilies()) {
-			Field f = cf.getProperty();
-			if (f != null && f.isAnnotationPresent(ImplicitActivation.class)) {
-				ImplicitActivation act = f.getAnnotation(ImplicitActivation.class);
-				String start = act.startIndex(), stop = act.stopIndex();
-				cf.activate("".equals(start) ? null : start, "".equals(stop) ? null : stop);
-			}
-		}
 	}
 }
