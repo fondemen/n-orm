@@ -58,6 +58,9 @@ public aspect StoreSelector {
     			throw new IOException("Cannot find storage properties for class " + clazz);
     		f = new File(dir, PROPERTY_FILE);
     		String path = f.getPath();
+    		//Evil windows states that \ is a separator while / is expected by getResourceAsStream
+    		if (File.separatorChar == '\\')
+    			path = path.replace('\\', '/');
     		InputStream in = clazz.getClassLoader().getResourceAsStream(path);
     		if (in != null)
 	    		try {
