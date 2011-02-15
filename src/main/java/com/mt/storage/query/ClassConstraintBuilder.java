@@ -68,7 +68,7 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 	}
 	
 	public Constraint getConstraint() {
-		return new Constraint(this.clazz, this.keyValues, this.searchedKey, this.searchFrom, this.searchTo, true);
+		return this.keyValues.isEmpty() && this.searchedKey == null ? null : new Constraint(this.clazz, this.keyValues, this.searchedKey, this.searchFrom, this.searchTo, true);
 	}
 	
 	public Set<T> go() throws DatabaseNotReachedException {
