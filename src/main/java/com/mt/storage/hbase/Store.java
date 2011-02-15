@@ -124,20 +124,23 @@ public class Store implements com.mt.storage.GenericStore {
 		if (this.config == null) {
 			Configuration properties = HBaseConfiguration.create();
 			properties.clear();
-			
+
 			properties.set(HConstants.ZOOKEEPER_QUORUM, this.getHost());
-			properties.setInt("hbase.zookeeper.property.clientPort", this.getPort());
-	
+			properties.setInt("hbase.zookeeper.property.clientPort",
+					this.getPort());
+
 			if (this.maxRetries != null)
-				properties.set("hbase.client.retries.number", this.maxRetries.toString());
-	
+				properties.set("hbase.client.retries.number",
+						this.maxRetries.toString());
+
 			this.config = properties;
 		}
 
 		try {
 			this.admin = new HBaseAdmin(this.config);
 			if (!this.admin.isMasterRunning())
-				throw new DatabaseNotReachedException(new MasterNotRunningException());
+				throw new DatabaseNotReachedException(
+						new MasterNotRunningException());
 		} catch (Exception e) {
 			throw new DatabaseNotReachedException(e);
 		}
@@ -152,7 +155,7 @@ public class Store implements com.mt.storage.GenericStore {
 	@Override
 	public void setHost(String url) {
 		this.host = url;
-	}//	}
+	}// }
 
 	public int getPort() {
 		return port;
@@ -173,8 +176,6 @@ public class Store implements com.mt.storage.GenericStore {
 		try {
 			return this.admin.tableExists(name);
 		} catch (MasterNotRunningException e) {
-			throw new DatabaseNotReachedException(e);
-		} catch (IOException e) {
 			throw new DatabaseNotReachedException(e);
 		}
 	}
@@ -289,7 +290,8 @@ public class Store implements com.mt.storage.GenericStore {
 	}
 
 	@Override
-	public Map<String, Map<String, byte[]>> get(String table, String id, Set<String> families) throws DatabaseNotReachedException {
+	public Map<String, Map<String, byte[]>> get(String table, String id,
+			Set<String> families) throws DatabaseNotReachedException {
 		HTable t = this.getTable(table, families);
 
 		Get g = new Get(Bytes.toBytes(id));
@@ -307,15 +309,17 @@ public class Store implements com.mt.storage.GenericStore {
 		if (!r.isEmpty()) {
 			for (KeyValue kv : r.list()) {
 				String family = Bytes.toString(kv.getFamily());
-				if (! ret.containsKey(family))
+				if (!ret.containsKey(family))
 					ret.put(family, new TreeMap<String, byte[]>());
-				ret.get(family).put(Bytes.toString(kv.getQualifier()), kv.getValue());
+				ret.get(family).put(Bytes.toString(kv.getQualifier()),
+						kv.getValue());
 			}
 		}
 		return ret;
 	}
 
-	protected Filter createFamilyConstraint(String family, Constraint c, boolean firstKeyOnly) {
+	protected Filter createFamilyConstraint(Constraint c,
+			boolean firstKeyOnly) {
 		Filter f = null;
 		if (c.getStartKey() != null)
 			f = new QualifierFilter(CompareOp.GREATER_OR_EQUAL,
@@ -474,7 +478,7 @@ public class Store implements com.mt.storage.GenericStore {
 
 	// @Override
 	// public int count(String table, String row, String family,
-	// Constraint c) throws DatabaseNotReachedException {
+	// Constraint c) throws DatabaseNotReachedException {String family, 
 	// if (!this.hasTable(table))
 	// return 0;
 	//
@@ -500,7 +504,7 @@ public class Store implements com.mt.storage.GenericStore {
 	// public boolean exists(String table, String row, String family, String
 	// key)
 	// throws DatabaseNotReachedException {
-	// HashSet<String> fam = new HashSet<String>();
+	// HashSet<String> fam = new HashSet<String>();String family, 
 	// fam.add(family);
 	// HTable t = this.getTable(table, fam);
 	// Get g = new
@@ -566,6 +570,40 @@ public class Store implements com.mt.storage.GenericStore {
 		} catch (IOException e) {
 			throw new DatabaseNotReachedException(e);
 		}
+	}
+
+	@Override
+	public Map<String, byte[]> get(String table, String id, String family)
+			throws DatabaseNotReachedException {
+		return this.get(table, id, family, (Constraint) null);
+	}
+
+	@Override
+	public Map<String, byte[]> get(String table, String id, String family,
+			Constraint c) throws DatabaseNotReachedException {
+		Set<String> families = new TreeSet<String>();
+		families.add(family);
+		HTable t = this.getTable(table, families);
+
+		Get g = new Get(Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
+
+		if (c != null) {
+			g.setFilter(createFamilyConstraint(c, false));
+		}
+
+		Result r;
+		try {
+			r = t.get(g);
+		} catch (IOException e) {
+			throw new DatabaseNotReachedException(e);
+		}
+		Map<String, byte[]> ret = new HashMap<String, byte[]>();
+		if (!r.isEmpty()) {
+			for (KeyValue kv : r.list()) {
+				ret.put(Bytes.toString(kv.getQualifier()), kv.getValue());
+			}
+		}
+		return ret;
 	}
 
 	@Override

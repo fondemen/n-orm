@@ -13,6 +13,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
+
 @RunWith(Parameterized.class)
 public class CollectionStorageTest extends StoreTestLauncher {
 	@Parameters
@@ -116,46 +117,45 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		this.assertHadNoQuery();
 	}
 	
-//	Partial activation abandoned :(
-//	@Test
-//	public void storeRetrieveElementsFrom3To65() throws DatabaseNotReachedException {
-//		Container copy = new Container(sut.key);
-//		copy.activate("elements", "E3", "E65");
-//		this.assertHadAQuery();
-//		assertEquals(4, copy.elements.size());
-//		this.assertHadNoQuery();
-//		for(int i = 3; i <= 6; ++i) {
-//			assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
-//		}
-//		this.assertHadNoQuery();
-//	}
-//	
-//	@Test
-//	public void storeRetrieveElementsFrom7ToEnd() throws DatabaseNotReachedException {
-//		Container copy = new Container(sut.key);
-//		copy.activate("elements", "E7", null);
-//		this.assertHadAQuery();
-//		assertEquals(3, copy.elements.size());
-//		this.assertHadNoQuery();
-//		for(int i = 7; i <= 9; ++i) {
-//			assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
-//		}
-//		this.assertHadNoQuery();
-//	}
-//	
-//	@Test
-//	public void storeRetrieveElementsUpTo4() throws DatabaseNotReachedException {
-//		Container copy = new Container(sut.key);
-//		copy.activate("elements", null, "E4");
-//		this.assertHadAQuery();
-//		assertEquals(5, copy.elements.size());
-//		this.assertHadNoQuery();
-//		for(int i = 1; i <= 4; ++i) {
-//			assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
-//		}
-//		assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E10")));
-//		this.assertHadNoQuery();
-//	}
+	@Test
+	public void storeRetrieveElementsFrom3To65() throws DatabaseNotReachedException {
+		Container copy = new Container(sut.key);
+		((ColumnFamily<Element>)copy.elements).activate("E3", "E65");
+		this.assertHadAQuery();
+		assertEquals(4, copy.elements.size());
+		this.assertHadNoQuery();
+		for(int i = 3; i <= 6; ++i) {
+			assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+		}
+		this.assertHadNoQuery();
+	}
+	
+	@Test
+	public void storeRetrieveElementsFrom7ToEnd() throws DatabaseNotReachedException {
+		Container copy = new Container(sut.key);
+		((ColumnFamily<Element>)copy.elements).activate("E7", null);
+		this.assertHadAQuery();
+		assertEquals(3, copy.elements.size());
+		this.assertHadNoQuery();
+		for(int i = 7; i <= 9; ++i) {
+			assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+		}
+		this.assertHadNoQuery();
+	}
+	
+	@Test
+	public void storeRetrieveElementsUpTo4() throws DatabaseNotReachedException {
+		Container copy = new Container(sut.key);
+		((ColumnFamily<Element>)copy.elements).activate(null, "E4");
+		this.assertHadAQuery();
+		assertEquals(5, copy.elements.size());
+		this.assertHadNoQuery();
+		for(int i = 1; i <= 4; ++i) {
+			assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+		}
+		assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E10")));
+		this.assertHadNoQuery();
+	}
 	
 	@Test
 	public void change() throws DatabaseNotReachedException {
