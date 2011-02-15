@@ -66,6 +66,7 @@ public class StoreTestLauncher {
 					
 					hbaseStore = com.mt.storage.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
 					hbaseStore.setConf(hBaseServer.getConfiguration());
+					hbaseStore.setAdmin(hBaseServer.getHBaseAdmin());
 					hbaseStore.start();
 					
 				} catch (Exception e) {
