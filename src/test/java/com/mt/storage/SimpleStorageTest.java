@@ -9,7 +9,6 @@ import static org.junit.Assert.assertArrayEquals;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -94,26 +93,26 @@ public class SimpleStorageTest {
 
 	@Test
 	public void storeProperty() throws DatabaseNotReachedException {
-		assertEquals("pro1value", Bytes.toString(Memory.INSTANCE.get(
+		assertEquals("pro1value", ConversionTools.convert(String.class, Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "prop1")));
 		Memory.INSTANCE.resetQueries();
 		this.sut1.prop1 = "another prop1 value";
 		assertTrue(Memory.INSTANCE.hadNoQuery());
-		assertEquals("pro1value", Bytes.toString(Memory.INSTANCE.get(
+		assertEquals("pro1value", ConversionTools.convert(String.class, Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "prop1")));
 		Memory.INSTANCE.resetQueries();
 		this.sut1.store();
 		assertTrue(Memory.INSTANCE.hadAQuery());
-		assertEquals("another prop1 value", Bytes.toString(Memory.INSTANCE.get(
+		assertEquals("another prop1 value", ConversionTools.convert(String.class, Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "prop1")));
 	}
 
 	@Test
 	public void soreKeyInProperties() {
-		assertEquals("KEY1", Bytes.toString(Memory.INSTANCE.get(
+		assertEquals("KEY1", ConversionTools.convert(String.class, Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key1")));
 		assertArrayEquals(new String [] {"KE", "Y2"}, ConversionTools.convert(String[].class, Memory.INSTANCE.get(
@@ -214,7 +213,7 @@ public class SimpleStorageTest {
 		this.sut1.setPrivProp("privatevalue");
 		this.sut1.store();
 		this.sut1.activate();
-		assertEquals("privatevalue", Bytes.toString(Memory.INSTANCE.get(
+		assertEquals("privatevalue", ConversionTools.convert(String.class, Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "privProp")));
 	}

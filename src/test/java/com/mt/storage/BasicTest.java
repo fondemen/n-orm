@@ -7,7 +7,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Properties;
@@ -15,20 +14,11 @@ import java.util.Set;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
+public class BasicTest {
 
-@RunWith(Parameterized.class)
-public class BasicTest extends StoreTestLauncher {
-	@Parameters
-	public static Collection<Object[]> testedStores() throws Exception {
-		return StoreTestLauncher.getTestedStores();
-	}
-
-	public BasicTest(Properties props) {
-		super(props);
+	public BasicTest() {
+		Properties props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
 		StoreSelector.getInstance().setPropertiesFor(BookStore.class, props);
 		StoreSelector.getInstance().setPropertiesFor(Book.class, props);
 	}
@@ -60,20 +50,20 @@ public class BasicTest extends StoreTestLauncher {
 		}
 	}
 	 
-	 @Test public void hbaseBookStoreRetrieve() throws DatabaseNotReachedException {
+	 @Test public void bookStoreRetrieve() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
 		 assertEquals("book name", p.getName());
 	 }
 	 
-	 @Test public void hbaseUnknownBookStoreRetrieve() throws DatabaseNotReachedException {
+	 @Test public void unknownBookStoreRetrieve() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("gdcfknueghficlnehfuci");
 		 p.activate();
 		 assertNull(p.getName());
 		 assertFalse( p.existsInStore());
 	 }
 	 
-	 @Test public void hbaseBookStoreSetNull() throws DatabaseNotReachedException {
+	 @Test public void bookStoreSetNull() throws DatabaseNotReachedException {
 		 bssut.setName(null);
 		 bssut.store();
 		 BookStore p = new BookStore("testbookstore");
@@ -82,14 +72,14 @@ public class BasicTest extends StoreTestLauncher {
 		 deleteBookstore();
 	 }
 	
-	 @Test public void hbaseBookStoreDeletion() throws DatabaseNotReachedException {
+	 @Test public void bookStoreDeletion() throws DatabaseNotReachedException {
 		 deleteBookstore();
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
 		 assertNull(p.getName());
 	 }
 	
-	 @Test public void hbaseBookStoreAccessFromBook() throws DatabaseNotReachedException {
+	 @Test public void bookStoreAccessFromBook() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 v.activate();
@@ -98,11 +88,11 @@ public class BasicTest extends StoreTestLauncher {
 		 assertEquals("book name", p.getName());
 	 }
 	 
-	 @Test(expected=IllegalStateException.class) public void hbaseBookWithNoBookStore() {
+	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStore() {
 		 new Book(null, new Date(1234567890), new Date(1234567890));
 	 }
 	
-	 @Test public void hbaseUnactivatedBookStoreAccessFromBook() throws DatabaseNotReachedException {
+	 @Test public void unactivatedBookStoreAccessFromBook() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 assertSame(p, v.getBookStore());
@@ -110,7 +100,7 @@ public class BasicTest extends StoreTestLauncher {
 		 assertNull(p.getName());
 	 }
 	
-	 @Test public void hbaseBookStoreDeletionAndthenAccess() throws DatabaseNotReachedException {
+	 @Test public void bookStoreDeletionAndthenAccess() throws DatabaseNotReachedException {
 		 deleteBookstore();
 		 this.storeSUTs();
 		 BookStore p = new BookStore("testbookstore");

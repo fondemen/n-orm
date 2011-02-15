@@ -4,32 +4,19 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
 
-@RunWith(Parameterized.class)
-public class PersistableSearchTest extends StoreTestLauncher {
-	@Parameters
-	public static Collection<Object[]> testedStores() throws Exception {
-		return StoreTestLauncher.getTestedStores();
-	}
+public class PersistableSearchTest {
 	
-	public boolean isMemory;
-	
-	public PersistableSearchTest(Properties props) throws Exception {
-		super(props);
-		
+	public PersistableSearchTest() throws Exception {
+		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
 	}
 	
 	@Persisting(table="PersistableSearch")
