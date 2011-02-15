@@ -86,4 +86,18 @@ public class DummyStore implements Store {
 		return null;
 	}
 
+	@Override
+	public Map<String, byte[]> get(String table, String id, String family)
+			throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Map<String, byte[]> get(String table, String id, String family,
+			Constraint c) throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 }

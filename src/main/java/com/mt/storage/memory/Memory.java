@@ -86,11 +86,29 @@ public class Memory implements Store {
 		return fam.containsKey(key) ? fam.get(key) : null;
 	}
 
+	@Override
 	public Map<String, byte[]> get(String table, String id, String family) {
 		Table t = this.getTable(table);
 		if (!t.containsKey(id))
 			return new TreeMap<String, byte[]>();
 		return this.getTable(table).get(id).get(family);
+	}
+	
+	@Override
+	public Map<String, byte[]> get(String table, String id, String family,
+			Constraint c) throws DatabaseNotReachedException {
+		Table t = this.getTable(table);
+		if (!t.containsKey(id))
+			return new TreeMap<String, byte[]>();
+		ColumnFamily cf = this.getTable(table).get(id).get(family);
+		
+		Map<String, byte[]> ret = new TreeMap<String, byte[]>();
+		
+		for (String key : matchingKeys(cf.keySet(), c, null)) {
+			ret.put(key, cf.get(key));
+		}
+		
+		return ret;
 	}
 
 	@Override

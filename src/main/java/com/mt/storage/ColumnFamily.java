@@ -91,6 +91,21 @@ public class ColumnFamily<T> implements Collection<T> {
 	public boolean isActivated() {
 		return activated;
 	}
+	
+	public void activate() throws DatabaseNotReachedException {
+		this.activate(null);
+	}
+	
+	public void activate(String fromIndex, String toIndex) throws DatabaseNotReachedException {
+		this.activate(new Constraint(fromIndex, toIndex));
+	}
+	
+	public void activate(Constraint c) throws DatabaseNotReachedException {
+		String id = this.owner.getIdentifier();
+		assert id != null;
+		Map<String, byte[]> elements = c == null ? this.owner.getStore().get(this.ownerTable, id, this.name) : this.owner.getStore().get(this.ownerTable, id, this.name, c);
+		this.rebuild(elements);
+	}
 
 	void rebuild(Map<String, byte[]> rawData) throws DatabaseNotReachedException {
 		this.collection.clear();

@@ -12,7 +12,6 @@ import java.util.Set;
 
 import org.aspectj.lang.reflect.FieldSignature;
 
-import com.mt.storage.PropertyManagement.PropertyFamily;
 
 public aspect ColumnFamiliyManagement {
 	private static ColumnFamiliyManagement INSTANCE;
