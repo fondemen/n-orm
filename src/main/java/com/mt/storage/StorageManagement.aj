@@ -10,7 +10,6 @@ import java.util.TreeSet;
 import com.mt.storage.cf.ColumnFamily;
 import com.mt.storage.conversion.ConversionTools;
 import com.mt.storage.query.ConstraintBuilder;
-import com.sun.xml.txw2.IllegalAnnotationException;
 
 public aspect StorageManagement {
 	
@@ -101,7 +100,7 @@ public aspect StorageManagement {
 		if (families != null) {
 			for (String family : families) {
 				if (this.getColumnFamily(family) == null)
-					throw new IllegalAnnotationException("Unknown column family " + family + " in class " + this.getClass());
+					throw new IllegalArgumentException("Unknown column family " + family + " in class " + this.getClass());
 				toBeActivated.add(family);
 			}
 		}
