@@ -136,14 +136,15 @@ public class Store implements com.mt.storage.GenericStore {
 			this.config = properties;
 		}
 
-		try {
-			this.admin = new HBaseAdmin(this.config);
-			if (!this.admin.isMasterRunning())
-				throw new DatabaseNotReachedException(
-						new MasterNotRunningException());
-		} catch (Exception e) {
-			throw new DatabaseNotReachedException(e);
-		}
+		if (this.admin == null)
+			try {
+				this.admin = new HBaseAdmin(this.config);
+				if (!this.admin.isMasterRunning())
+					throw new DatabaseNotReachedException(
+							new MasterNotRunningException());
+			} catch (Exception e) {
+				throw new DatabaseNotReachedException(e);
+			}
 
 		this.wasStarted = true;
 	}
@@ -167,6 +168,22 @@ public class Store implements com.mt.storage.GenericStore {
 
 	public void setMaxRetries(int maxRetries) {
 		this.maxRetries = Integer.valueOf(maxRetries);
+	}
+
+	public Configuration getConf() {
+		return this.config;
+	}
+
+	public void setConf(Configuration configuration) {
+		this.config = configuration;
+	}
+	
+	public HBaseAdmin getAdmin() {
+		return this.admin;
+	}
+
+	public void setAdmin(HBaseAdmin admin) {
+		this.admin = admin;
 	}
 
 	protected boolean hasTable(String name) throws DatabaseNotReachedException {
@@ -651,14 +668,6 @@ public class Store implements com.mt.storage.GenericStore {
 			throw new DatabaseNotReachedException(e);
 		}
 		return new CloseableIterator(r);
-	}
-
-	public Configuration getConf() {
-		return this.config;
-	}
-
-	public void setConf(Configuration configuration) {
-		this.config = configuration;
 	}
 
 }
