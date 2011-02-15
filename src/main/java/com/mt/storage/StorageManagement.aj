@@ -138,7 +138,7 @@ public aspect StorageManagement {
 		CloseableKeyIterator keys = null;
 		try {
 			keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit);
-			Set<T> ret = new HashSet<T>();
+			Set<T> ret = new PESet<T>();
 			int count = 0;
 			while(keys.hasNext()) {
 				ret.add(ConversionTools.convertFromString(clazz, keys.next()));

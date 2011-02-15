@@ -652,9 +652,9 @@ public class Store implements com.mt.storage.GenericStore {
 		HTable ht = this.getTable(table, null);
 
 		Scan s = new Scan();
-		if (c.getStartKey() != null)
+		if (c != null && c.getStartKey() != null)
 			s.setStartRow(Bytes.toBytes(c.getStartKey()));
-		if (c.getEndKey() != null) {
+		if (c != null && c.getEndKey() != null) {
 			byte[] endb = Bytes.toBytes(c.getEndKey());
 			endb = Bytes.add(endb, new byte[] { 0 });
 			s.setStopRow(endb);

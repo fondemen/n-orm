@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Collection;
 import java.util.Date;
@@ -120,28 +121,36 @@ public class BasicTest extends StoreTestLauncher {
 		 assertEquals("book name", p.getName());
 	 }
 	 
+	 @Test public void searchAllBooks() throws DatabaseNotReachedException {
+		 Book b2 = new Book(bssut, new Date(123456789), new Date());
+		 b2.store();
+		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
+		 b3.store();
+		 
+		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go();		 
+		 b2.delete();
+		 b3.delete();
+		 
+		 assertEquals(3, storeBooks.size());
+		 assertTrue(storeBooks.contains(bsut));
+		 assertTrue(storeBooks.contains(b2));
+		 assertTrue(storeBooks.contains(b3));
+	 }
+	 
 	 @Test public void searchBook() throws DatabaseNotReachedException {
 		 Book b2 = new Book(bssut, new Date(123456789), new Date());
 		 b2.store();
+		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
+		 b3.store();
 		 
 		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().go();		 
 		 b2.delete();
+		 b3.delete();
 		 
 		 assertEquals(2, storeBooks.size());
-		 //assertTrue(storeBooks.contains(bsut));
-		 //assertTrue(storeBooks.contains(b2));
-		 
-		 Iterator<Book> ib = storeBooks.iterator();
-		 Book fb1 = ib.next(), fb2 = ib.next();
-		 if (!fb1.equals(bsut)) {
-			 Book tmp = fb1; fb1 = fb2; fb2 = tmp;
-		 }
-		 assertEquals(bsut, fb1);
-		 assertEquals(b2, fb2);
-		 
-		 //Unfortunately
-		 assertNotSame(bsut, fb1);
-		 assertNotSame(b2, fb2);
+		 assertTrue(storeBooks.contains(bsut));
+		 assertTrue(storeBooks.contains(b2));
+		 assertFalse(storeBooks.contains(b3));
 	 }
 	 
 	 @Test public void searchBookWithMinSellerDate() throws DatabaseNotReachedException {
@@ -152,8 +161,8 @@ public class BasicTest extends StoreTestLauncher {
 		 b2.delete();
 		 
 		 assertEquals(1, storeBooks.size());
-		 //assertTrue(storeBooks.contains(bsut));
-		 //assertTrue(storeBooks.contains(b2));
+		 assertTrue(storeBooks.contains(bsut));
+		 assertFalse(storeBooks.contains(b2));
 		 
 		 Iterator<Book> ib = storeBooks.iterator();
 		 Book fb = ib.next();
