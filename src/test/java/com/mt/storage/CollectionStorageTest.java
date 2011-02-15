@@ -1,34 +1,45 @@
 package com.mt.storage;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Properties;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
 import com.mt.storage.cf.CollectionColumnFamily;
 import com.mt.storage.cf.ColumnFamily;
 import com.mt.storage.cf.MapColumnFamily;
 
 
-@RunWith(Parameterized.class)
-public class CollectionStorageTest extends StoreTestLauncher {
-	@Parameters
-	public static Collection<Object[]> testedStores() throws Exception {
-		return StoreTestLauncher.getTestedStores();
+public class CollectionStorageTest {
+	private MemoryStoreTestLauncher mstl;
+	
+	public CollectionStorageTest() throws Exception {
+		StoreTestLauncher stl = StoreTestLauncher.INSTANCE;
+		if (stl instanceof MemoryStoreTestLauncher)
+			this.mstl = (MemoryStoreTestLauncher)stl;
+		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
 	}
 	
-	public CollectionStorageTest(Properties props) throws Exception {
-		super(props);
-		
+	private void assertHadAQuery() {
+		if (this.mstl != null)
+			this.mstl.assertHadAQuery();
+	}
+	
+	private void assertHadNoQuery() {
+		if (this.mstl != null)
+			this.mstl.assertHadNoQuery();
+	}
+
+	private void resetQueryCount() {
+		if (this.mstl != null)
+			this.mstl.resetQueryCount();
 	}
 	
 	public static class Element {
@@ -72,7 +83,7 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		sut.store();
 		this.assertHadAQuery();
 	}
-	
+
 	@After public void deleteSut() throws DatabaseNotReachedException {
 		sut.delete();
 	}
@@ -103,6 +114,7 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		new ContainerNotIndexed();
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Test
 	public void autoActivation() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
@@ -122,7 +134,7 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		assertTrue(copy.elements.containsAll(sut.elements));
 		this.assertHadNoQuery();
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	@Test
 	public void storeRetrieveElementsFrom3To65() throws DatabaseNotReachedException {
@@ -166,6 +178,7 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		this.assertHadNoQuery();
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Test
 	public void change() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);

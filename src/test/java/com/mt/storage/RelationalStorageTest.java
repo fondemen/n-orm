@@ -2,7 +2,6 @@ package com.mt.storage;
 
 import static org.junit.Assert.*;
 
-import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.Test;
 
@@ -116,7 +115,7 @@ public class RelationalStorageTest {
 		PersistingComposed sut = new PersistingComposed("key");
 		sut.value = val;
 		sut.store();
-		assertEquals("1:2:3:4", Bytes.toString(Memory.INSTANCE.get("PC", "key", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "value")));
+		assertEquals("1:2:3:4", ConversionTools.convert(String.class, Memory.INSTANCE.get("PC", "key", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "value")));
 		PersistingComposed sut2 = new PersistingComposed("key");
 		sut2.activate();
 		assertEquals("1", sut2.value.key1.key1.prop1);
@@ -148,10 +147,10 @@ public class RelationalStorageTest {
 		PersistingOutside out = new PersistingOutside("outside");
 		out.val = in;
 		out.store(); //No need to store in ; should be triggered automatically.
-		assertEquals("outside", Bytes.toString(Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
-		assertEquals("inside", Bytes.toString(Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
-		assertEquals("inside", Bytes.toString(Memory.INSTANCE.get("Inside", "inside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
-		assertEquals("value", Bytes.toString(Memory.INSTANCE.get("Inside", "inside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
+		assertEquals("outside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
+		assertEquals("inside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
+		assertEquals("inside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Inside", "inside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
+		assertEquals("value", ConversionTools.convert(String.class, Memory.INSTANCE.get("Inside", "inside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
 		
 		PersistingOutside out2 = new PersistingOutside("outside");
 		out2.activate();
@@ -168,8 +167,8 @@ public class RelationalStorageTest {
 		PersistingOutside out = new PersistingOutside("outside");
 		out.val = in;
 		out.store(); //Should store keys
-		assertEquals("outside", Bytes.toString(Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
-		assertEquals("inside", Bytes.toString(Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
+		assertEquals("outside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
+		assertEquals("inside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
 		assertTrue(Memory.INSTANCE.getTable("Inside").containsKey("inside"));
 	}
 	

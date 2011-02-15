@@ -1,14 +1,13 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>com.mt.xtraxion</groupId>
+	<groupId>com.mt.storage</groupId>
 	<artifactId>storage</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 
 	<properties>
 		<endorsed.dir>${project.build.directory}/endorsed</endorsed.dir>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<hbase.version>0.89.CDH3.b3</hbase.version>
 	</properties>
 	<build>
 		<plugins>
@@ -78,18 +77,6 @@
 	</build>
 	<dependencies>
 		<dependency>
-			<groupId>org.apache.hbase</groupId>
-			<artifactId>hbase</artifactId>
-			<version>${hbase.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.hbase</groupId>
-			<artifactId>hbase</artifactId>
-			<version>${hbase.version}</version>
-			<classifier>tests</classifier>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<version>4.8.2</version>
@@ -110,20 +97,8 @@
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
-		<dependency>
-			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-core</artifactId>
-			<version>0.20.CDH3.b3</version>
-			<classifier>test</classifier>
-			<scope>test</scope>
-		</dependency>
 	</dependencies>
 	<repositories>
-		<repository>
-			<id>maven.springframework.org</id>
-			<name>SpringSource snapshots</name>
-			<url>http://maven.springframework.org/snapshot</url>
-		</repository>
 		<repository>
 			<id>com.mt.xtraxion</id>
 			<name>MT repository</name>
