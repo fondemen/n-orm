@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import com.mt.storage.cf.ColumnFamily;
 import com.mt.storage.conversion.ConversionTools;
 import com.mt.storage.query.ConstraintBuilder;
 import com.sun.xml.txw2.IllegalAnnotationException;
@@ -44,7 +45,7 @@ public aspect StorageManagement {
 							familyDeleted.add(key);
 						else {
 							//No need for auto-loading for it is a changed value
-							familyChanges.put(key, ConversionTools.convert(family.get(key)));
+							familyChanges.put(key, ConversionTools.convert(family.getElement(key)));
 						}
 					}
 					if (!familyChanges.isEmpty())
