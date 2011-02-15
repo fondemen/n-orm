@@ -42,7 +42,7 @@ import com.mt.storage.DatabaseNotReachedException;
 
 public class Store implements com.mt.storage.GenericStore {
 
-	private final class CloseableIterator implements Iterator<String>,
+	private static final class CloseableIterator implements Iterator<String>,
 			CloseableKeyIterator {
 		private final ResultScanner result;
 		private final Iterator<Result> iterator;
@@ -66,6 +66,12 @@ public class Store implements com.mt.storage.GenericStore {
 		public void remove() {
 			throw new IllegalStateException(
 					"Cannot remove key from a result set.");
+		}
+
+		@Override
+		protected void finalize() throws Throwable {
+			this.close();
+			super.finalize();
 		}
 
 		/*
