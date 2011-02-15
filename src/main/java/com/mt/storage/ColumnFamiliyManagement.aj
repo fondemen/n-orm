@@ -12,6 +12,11 @@ import java.util.Set;
 
 import org.aspectj.lang.reflect.FieldSignature;
 
+import com.mt.storage.cf.CollectionColumnFamily;
+import com.mt.storage.cf.ColumnFamily;
+import com.mt.storage.cf.MapColumnFamily;
+import com.mt.storage.conversion.ConversionTools;
+
 
 public aspect ColumnFamiliyManagement {
 	private static ColumnFamiliyManagement INSTANCE;
@@ -26,8 +31,11 @@ public aspect ColumnFamiliyManagement {
 	declare soft : IllegalAccessException : within(ColumnFamiliyManagement) && adviceexecution();
 	declare soft : NoSuchMethodException : within(ColumnFamiliyManagement) && adviceexecution();
 	declare soft : InvocationTargetException : within(ColumnFamiliyManagement) && adviceexecution();
-	
+
 	declare error: set(!transient !static !final Collection+ PersistingElement+.*) : "A persisting column family must be final";
+	declare error: set(!transient !static !final Map+ PersistingElement+.*) : "A persisting column family must be final";
+	declare error: set(!transient !static !final ColumnFamily+ PersistingElement+.*) : "A persisting column family must be final";
+	declare error: set(static ColumnFamily+ PersistingElement+.*) : "Column families must not be static";
 
 	declare warning: get(@ImplicitActivation transient * PersistingElement+.*)
 		|| get(@ImplicitActivation static * PersistingElement+.*) : "This field is not persitent, thus cannot be auto-activated";
@@ -74,25 +82,35 @@ public aspect ColumnFamiliyManagement {
 	}
 
 	public boolean isCollectionType(Class<?> type) {
-		return Collection.class.equals(type) || ColumnFamily.class.equals(type);
+		return Collection.class.equals(type) || Map.class.equals(type) || ColumnFamily.class.isAssignableFrom(type);
 	}
 	
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	void around(PersistingElement self, Collection<?> coll): set(!transient !static final Collection+ PersistingElement+.*) && target(self) && args(coll) {
-		if (coll != null && (coll instanceof ColumnFamily<?>))
-			proceed(self, coll);
+	void around(PersistingElement self, Object cf): (set(!transient !static final Collection+ PersistingElement+.*) || set(!transient !static final Map+ PersistingElement+.*)) && target(self) && args(cf) {
+		if (cf != null && (cf instanceof ColumnFamily<?>)) {
+			proceed(self, cf);
+			return;
+		}
+		
 		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();
 		Field field = sign.getField();
 		assert isCollectionFamily(field);
-		ParameterizedType collType = (ParameterizedType) field.getGenericType();
-		Class<?> elementClass = (Class)collType.getActualTypeArguments()[0];
 		Indexed index = field.getAnnotation(Indexed.class);
-		if (index == null)
-			throw new IllegalArgumentException("Field " + field + " must declare annotation " + Indexed.class);
-		if (coll != null)
+		if (cf != null)
 			throw new IllegalArgumentException("Can only set null value to persisting collection " + field);
-		Incrementing incr = field.getAnnotation(Incrementing.class);
-		proceed(self, new ColumnFamily(elementClass, field, self, index.field(), field.isAnnotationPresent(AddOnly.class), field.isAnnotationPresent(Incrementing.class)));
+		ColumnFamily<?> acf;
+		ParameterizedType collType = (ParameterizedType) field.getGenericType();
+		if (Map.class.isAssignableFrom(field.getType())) {
+			if (index != null)
+				throw new IllegalArgumentException("Map " + field + " cannot declare annotation " + Indexed.class);
+			Class<?> keyClass = (Class<?>)collType.getActualTypeArguments()[0], valueClass = (Class<?>)collType.getActualTypeArguments()[1];
+			acf = new MapColumnFamily(keyClass, valueClass, field, field.getName(), self, field.isAnnotationPresent(AddOnly.class), field.isAnnotationPresent(Incrementing.class));
+		} else {
+			if (index == null)
+				throw new IllegalArgumentException("Field " + field + " must declare annotation " + Indexed.class);
+			Class<?> elementClass = (Class<?>)collType.getActualTypeArguments()[0];
+			acf = new CollectionColumnFamily(elementClass, field, self, index.field(), field.isAnnotationPresent(AddOnly.class));
+		}
+		proceed(self, acf);
 	}
 	
 	after(ColumnFamily cf) returning : execution(ColumnFamily.new(..)) && target(cf) {

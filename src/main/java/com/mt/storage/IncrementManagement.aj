@@ -1,14 +1,14 @@
 package com.mt.storage;
 
 import java.lang.reflect.Field;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+
+import com.mt.storage.cf.MapColumnFamily;
 
 import org.aspectj.lang.reflect.FieldSignature;
 
 import com.mt.storage.PropertyManagement.Property;
-import com.mt.storage.PropertyManagement.PropertyFamily;
 
 public aspect IncrementManagement {
 	private static IncrementManagement INSTANCE;
@@ -20,9 +20,8 @@ public aspect IncrementManagement {
 	}
 
 	declare error: set(@Incrementing (!long && !int && !short && !byte
-										&& !Collection
-										&& !ColumnFamily) *.*)
-			: "Only naturals or collection of naturals may be incremented";
+										&& !MapColumnFamily && !Map) *.*)
+			: "Only naturals or maps of naturals may be incremented";
 	declare error: set(@Incrementing @Key * *.*): "Keys (that must be final) cannot be incremented";
 	declare error: set(@Incrementing * (!PersistingElement+).*) : "Incrementing properties must appear in persisting classes";
 	
@@ -45,7 +44,7 @@ public aspect IncrementManagement {
 	after(PersistingElement owner) returning: execution(void PersistingElement+.upgradeProperties()) && target(owner) {
 		for (Field f : PropertyManagement.getInstance().getProperties(owner.getClass())) {
 			if (f.isAnnotationPresent(Incrementing.class)) {
-				Property prop = owner.getProperties().get(f.getName());
+				Property prop = owner.getProperties().getElement(f.getName());
 				if (prop != null) {
 					if (prop.getField() == null)
 						prop.setField(f);
@@ -62,12 +61,12 @@ public aspect IncrementManagement {
 		self.getIncrements().put(prop.getName(), getActualIncrement((Number)val, oldVal, self.getIncrements().get(prop.getName()), prop));
 	}
 
-	protected Number getActualIncrement(Number val,
-			Number oldVal, Number previousIncrement, Field prop) {
+	public Number getActualIncrement(Number val,
+			Number oldVal, Number previousIncrement, Field prop) throws DecrementException {
 		long value = toLong(val, prop);
 		long oldValue = toLong(oldVal, prop);
 		if (oldValue > value)
-			throw new IllegalArgumentException("Property " + prop + " can only increase with time.");
+			throw new DecrementException("Property " + prop + " can only increase with time ; trying to decrement it of " + (oldValue-value));
 		Number increment = previousIncrement;
 		if (increment == null)
 			increment = 0l;

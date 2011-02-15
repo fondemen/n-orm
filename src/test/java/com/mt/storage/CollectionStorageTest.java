@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Properties;
 
 import org.junit.After;
@@ -12,6 +13,10 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+
+import com.mt.storage.cf.CollectionColumnFamily;
+import com.mt.storage.cf.ColumnFamily;
+import com.mt.storage.cf.MapColumnFamily;
 
 
 @RunWith(Parameterized.class)
@@ -45,7 +50,7 @@ public class CollectionStorageTest extends StoreTestLauncher {
 	public static class Container {
 		@Key public final String key;
 		@Indexed(field="key") @ImplicitActivation public final Collection<Element> elements = null;
-		@Indexed(field="key") @Incrementing public final Collection<Element> elementsInc = null;
+		@Incrementing public final Map<String, Integer> elementsInc = null;
 
 		public Container(String key) {
 			this.key = key;
@@ -62,7 +67,7 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		this.assertHadAQuery();
 		for(int i = 1 ; i <= 10; ++i) {
 			sut.elements.add(new Element("E" + i));
-			sut.elementsInc.add(new Element(i, "E" + i));
+			sut.elementsInc.put("E" + i, i);
 		}
 		sut.store();
 		this.assertHadAQuery();
@@ -74,7 +79,8 @@ public class CollectionStorageTest extends StoreTestLauncher {
 	
 	@Test
 	public void hasFamily() {
-		assertEquals(ColumnFamily.class, sut.elements.getClass());
+		assertEquals(CollectionColumnFamily.class, sut.elements.getClass());
+		assertEquals(MapColumnFamily.class, sut.elementsInc.getClass());
 	}
 	
 	@Persisting
@@ -111,12 +117,13 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		assertEquals(sut.elements.size(), copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 1; i <= sut.elements.size(); ++i) {
-			assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(((CollectionColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
 		}
 		assertTrue(copy.elements.containsAll(sut.elements));
 		this.assertHadNoQuery();
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Test
 	public void storeRetrieveElementsFrom3To65() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
@@ -125,11 +132,12 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		assertEquals(4, copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 3; i <= 6; ++i) {
-			assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(((CollectionColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
 		}
 		this.assertHadNoQuery();
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Test
 	public void storeRetrieveElementsFrom7ToEnd() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
@@ -138,11 +146,12 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		assertEquals(3, copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 7; i <= 9; ++i) {
-			assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(((CollectionColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
 		}
 		this.assertHadNoQuery();
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Test
 	public void storeRetrieveElementsUpTo4() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
@@ -151,9 +160,9 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		assertEquals(5, copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 1; i <= 4; ++i) {
-			assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(((CollectionColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
 		}
-		assertTrue(((ColumnFamily<Element>)copy.elements).contains(new Element("E10")));
+		assertTrue(((CollectionColumnFamily<Element>)copy.elements).contains(new Element("E10")));
 		this.assertHadNoQuery();
 	}
 	
@@ -196,12 +205,12 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		this.assertHadNoQuery();
 		assertTrue(!copy.elements.contains(new Element("GFYUBY")));
 		this.assertHadNoQuery();
-		assertTrue(!((ColumnFamily<Element>)copy.elements).containsInStore(new Element("GFYUBY")));
+		assertFalse(((CollectionColumnFamily<Element>)copy.elements).containsInStore(new Element("GFYUBY")));
 		assertTrue(copy.elements.isEmpty());
 		this.assertHadAQuery();
-		assertTrue(!copy.elements.contains(new Element("E6")));
+		assertFalse(copy.elements.contains(new Element("E6")));
 		this.assertHadNoQuery();
-		assertTrue(((ColumnFamily<Element>)copy.elements).containsInStore(new Element("E6")));
+		assertTrue(((CollectionColumnFamily<Element>)copy.elements).containsInStore(new Element("E6")));
 		assertEquals(1, copy.elements.size());
 		this.assertHadAQuery();
 		assertTrue(copy.elements.contains(new Element("E6")));
@@ -218,12 +227,13 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		this.assertHadAQuery();
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Test
 	public void increment() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
 		copy.activate("elementsInc");
 		this.assertHadAQuery();
-		assertTrue(copy.elementsInc.add(new Element(9,"E4")));
+		copy.elementsInc.put("E4", 9);
 		assertFalse(((ColumnFamily<Element>)copy.elementsInc).wasDeleted("E4"));
 		assertTrue(((ColumnFamily<Element>)copy.elementsInc).wasChanged("E4"));
 		assertEquals(5, ((ColumnFamily<Element>)copy.elementsInc).getIncrement("E4"));
@@ -231,6 +241,6 @@ public class CollectionStorageTest extends StoreTestLauncher {
 		copy.store();
 		copy = new Container(sut.key);
 		copy.activate("elementsInc");
-		assertEquals(9, ((ColumnFamily<Element>)copy.elementsInc).get("E4").anint);
+		assertEquals(9, (int)copy.elementsInc.get("E4"));
 	}
 }

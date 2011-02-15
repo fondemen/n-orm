@@ -14,6 +14,8 @@ import java.util.Set;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.aspectj.lang.SoftException;
 
+import com.mt.storage.cf.ColumnFamily;
+import com.mt.storage.cf.MapColumnFamily;
 import com.mt.storage.conversion.ConversionTools;
 
 
@@ -136,16 +138,15 @@ public aspect PropertyManagement {
 	 * Stores non-transient non-null properties for persisting objects.
 	 * 
 	 */
-	public static class PropertyFamily extends ColumnFamily<Property> {
+	public static class PropertyFamily extends MapColumnFamily<String, Property> {
 
 		private PropertyFamily(PersistingElement owner)
 				throws SecurityException, NoSuchFieldException {
-			super(Property.class, null, PROPERTY_COLUMNFAMILY_NAME, owner,
-					Property.class.getDeclaredField("name"), false, false);
+			super(String.class, Property.class, null, PROPERTY_COLUMNFAMILY_NAME, owner, false, false);
 		}
 
 		@Override
-		protected Property convert(String key, byte[] rep) {
+		protected Property preparePut(String key, byte[] rep) {
 			return new Property(key, rep);
 		}
 
@@ -161,8 +162,11 @@ public aspect PropertyManagement {
 			if (supertype != null)
 				ret.addAll(this.getProperties(supertype));
 			for (Field f : new ArrayList<Field>(ret)) {
+				Class<?> ft = f.getType();
 				if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) != 0
-						|| Collection.class.isAssignableFrom(f.getType()))
+						|| Collection.class.isAssignableFrom(ft)
+						|| Map.class.isAssignableFrom(ft)
+						|| ColumnFamily.class.isAssignableFrom(ft))
 					ret.remove(f);
 			}
 			this.typeProperties.put(type, ret);
@@ -268,7 +272,7 @@ public aspect PropertyManagement {
 			} else {
 				byte [] valB = ConversionTools.convert(val);
 				if (!this.lastState.containsKey(f) || !Arrays.equals(valB, this.lastState.get(f))) {
-					this.getProperties().add(new Property(f, val));
+					this.getProperties().put(f.getName(), new Property(f, val));
 					this.lastState.put(f, valB);
 				}
 			}
@@ -289,7 +293,7 @@ public aspect PropertyManagement {
 			
 			Object val;
 			
-			Property prop = (Property) this.getProperties().get(f.getName());
+			Property prop = (Property) this.getProperties().getElement(f.getName());
 			if (prop != null) {
 				val = prop.getValue();
 				if (oldVal != null && val != null && (oldVal instanceof PersistingElement) && (val instanceof byte []) && ConversionTools.convert(String.class, (byte[])val).equals(((PersistingElement)oldVal).getIdentifier())) {
@@ -331,7 +335,7 @@ public aspect PropertyManagement {
 		}
 	}
 
-	pointcut attUpdated(PersistingElement self, Object val): set(!transient !static (!Collection+) PersistingElement+.*) && target(self) && args(val);
+	pointcut attUpdated(PersistingElement self, Object val): set(!transient !static !(Collection+ || Map+ || ColumnFamily+) PersistingElement+.*) && target(self) && args(val);
 
 	public Object candideReadValue(Object self, Field property) {
 		try {
