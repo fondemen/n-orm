@@ -74,6 +74,13 @@
 				</executions>
 			</plugin>
 		</plugins>
+		<extensions>
+			<extension>
+				<groupId>org.apache.maven.wagon</groupId>
+				<artifactId>wagon-ssh-external</artifactId>
+				<version>1.0-beta-6</version>
+			</extension>
+		</extensions>
 	</build>
 	<dependencies>
 		<dependency>
@@ -105,4 +112,16 @@
 			<url>http://sitemeter.univ-mulhouse.fr/mvn</url>
 		</repository>
 	</repositories>
+	<distributionManagement>
+		<repository>
+			<id>actionside</id>
+			<name>AcionSide</name>
+			<url>scpexe://mtjazz.univ-mulhouse.fr/opt/nexus/./../sonatype-work/nexus/storage/actionside</url>
+		</repository>
+		<snapshotRepository>
+			<id>actionside</id>
+			<name>AcionSide</name>
+			<url>scpexe://mtjazz.univ-mulhouse.fr/opt/nexus/./../sonatype-work/nexus/storage/actionside</url>
+		</snapshotRepository>
+	</distributionManagement>
 </project>
