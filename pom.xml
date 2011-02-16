@@ -116,12 +116,12 @@
 		<repository>
 			<id>actionside</id>
 			<name>AcionSide</name>
-			<url>scpexe://mtjazz.univ-mulhouse.fr/opt/nexus/./../sonatype-work/nexus/storage/actionside</url>
+			<url>file:/opt/nexus/./../sonatype-work/nexus/storage/actionside</url>
 		</repository>
 		<snapshotRepository>
 			<id>actionside</id>
 			<name>AcionSide</name>
-			<url>scpexe://mtjazz.univ-mulhouse.fr/opt/nexus/./../sonatype-work/nexus/storage/actionside</url>
+			<url>file:/opt/nexus/./../sonatype-work/nexus/storage/actionside</url>
 		</snapshotRepository>
 	</distributionManagement>
 </project>
