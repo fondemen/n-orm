@@ -7,7 +7,7 @@ import org.apache.hadoop.hbase.HConstants;
 
 import com.mt.storage.hbase.Store;
 
-public class HbaseLaucher extends StoreTestLauncher {
+public class HBaseLauncher extends StoreTestLauncher {
 	private static Properties hbaseProperties = null;
 
 	public static String hbaseHost = "localhost";

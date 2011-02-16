@@ -10,6 +10,6 @@ import org.junit.runners.Suite.SuiteClasses;
 public class HBaseGenericTest {
 	
 	@BeforeClass public static void setupStore() {
-		StoreTestLauncher.INSTANCE = new HbaseLaucher();
+		StoreTestLauncher.INSTANCE = new HBaseLauncher();
 	}
 }
