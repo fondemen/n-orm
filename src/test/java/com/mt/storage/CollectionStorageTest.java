@@ -272,4 +272,12 @@ public class CollectionStorageTest {
 		copy.activate("elements");
 		((ColumnFamily<Element>)copy.elements).assertIsActivated("testing illegalActivityCheck");
 	}
+	
+	@Test
+	public void unknownActivated() throws DatabaseNotReachedException {
+		Container copy = new Container("gyujgynugyiul,huohuo,");
+		copy.activate("elements", "elementsInc");
+		assertTrue(((ColumnFamily<?>)copy.elements).isActivated());
+		assertTrue(((ColumnFamily<?>)copy.elementsInc).isActivated());
+	}
 }
