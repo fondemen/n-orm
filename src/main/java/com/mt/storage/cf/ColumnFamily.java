@@ -72,6 +72,11 @@ public class ColumnFamily<T> {
 		return activated;
 	}
 	
+	public void assertIsActivated(String messageToDescribeTheContextOfTheCheck) throws IllegalStateException {
+		if (! this.isActivated())
+			throw new IllegalStateException("Column family " + this.getName() + " should be activated on " + this.getOwner() + " while " + messageToDescribeTheContextOfTheCheck);
+	}
+	
 	public void activate() throws DatabaseNotReachedException {
 		this.activate(null);
 	}
@@ -95,6 +100,10 @@ public class ColumnFamily<T> {
 		for (String key : rawData.keySet()) {
 			this.collection.put(key, this.preparePut(key, rawData.get(key)));
 		}
+		markActivated();
+	}
+
+	private void markActivated() {
 		this.activated = true;
 	}
 	

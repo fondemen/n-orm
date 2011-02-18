@@ -256,4 +256,20 @@ public class CollectionStorageTest {
 		copy.activate("elementsInc");
 		assertEquals(9, (int)copy.elementsInc.get("E4"));
 	}
+	
+	@SuppressWarnings("unchecked")
+	@Test
+	public void legalActivityCheck() throws DatabaseNotReachedException {
+		Container copy = new Container(sut.key);
+		copy.activate("elements");
+		((ColumnFamily<Element>)copy.elements).assertIsActivated(" testing legalActivityCheck");
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Test
+	public void illegalActivityCheck() throws DatabaseNotReachedException {
+		Container copy = new Container(sut.key);
+		copy.activate("elements");
+		((ColumnFamily<Element>)copy.elements).assertIsActivated("testing illegalActivityCheck");
+	}
 }

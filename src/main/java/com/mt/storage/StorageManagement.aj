@@ -119,6 +119,15 @@ public aspect StorageManagement {
 		Map<String, Map<String, byte[]>> rawData = this.getStore().get(this.getTable(), this.getIdentifier(), toBeActivated);
 		for (String family : rawData.keySet()) {
 			this.getColumnFamily(family).rebuild(rawData.get(family));
+			boolean removed = toBeActivated.remove(family);
+			assert removed;
+		}
+		
+		if (!toBeActivated.isEmpty()) {
+			Map<String, byte[]> emptyTree = new TreeMap<String, byte[]>();
+			for (String tba : toBeActivated) {
+				this.getColumnFamily(tba).rebuild(emptyTree);
+			}
 		}
 		
 		this.upgradeProperties();
