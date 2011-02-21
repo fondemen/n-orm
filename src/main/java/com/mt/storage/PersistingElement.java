@@ -3,8 +3,12 @@ package com.mt.storage;
 import java.lang.reflect.Field;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
-public interface PersistingElement {
+import com.mt.storage.PropertyManagement.PropertyFamily;
+import com.mt.storage.cf.ColumnFamily;
+
+public interface PersistingElement extends Comparable<PersistingElement> {
 	static final Class<?>[] PossiblePropertyTypes = new Class[] { Date.class,
 			String.class, Boolean.class, int.class, byte.class, short.class,
 			long.class, float.class, double.class, boolean.class,
@@ -17,6 +21,9 @@ public interface PersistingElement {
 	String getTable();
 
 	List<Field> getKeys();
+	PropertyFamily getProperties();
+	Set<ColumnFamily<?>> getColumnFamilies();
+	ColumnFamily<?> getColumnFamily(String columnFailyName);
 
 	String getIdentifier();
 
