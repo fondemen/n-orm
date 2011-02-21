@@ -233,6 +233,8 @@ public aspect PropertyManagement {
 		if (type.isEnum()) {
 			return true;
 		}
+		if (type.isArray())
+			type = type.getComponentType();
 		for (Class<?> possibleSupertype : PersistingElement.PossiblePropertyTypes) {
 			if (possibleSupertype.isAssignableFrom(type))
 				return true;

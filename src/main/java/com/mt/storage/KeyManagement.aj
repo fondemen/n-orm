@@ -105,7 +105,7 @@ public aspect KeyManagement {
 			}
 			
 			if (maxKeyOrder < 0)
-				throw new IllegalStateException("A persisting class should declare at least a field annotated with " + Key.class);
+				throw new IllegalStateException("A persisting class should declare at least a field annotated with " + Key.class + " unlike " + clazz);
 			
 			for (int i = 1; i < maxKeyOrder; i++) {
 				if (foundKeys.get(i) == null)

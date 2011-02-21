@@ -1,6 +1,7 @@
 package com.mt.storage.cf;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -162,9 +163,18 @@ public class ColumnFamily<T> {
 			Number nVal = (Number) element;
 			this.increments.put(key, IncrementManagement.getInstance().getActualIncrement(nVal, oVal, this.getIncrement(key), this.getProperty()));
 		} else {
-			if (old == null || !old.equals(element))
+			if (element == null)
+				this.removeKey(key);
+			else if (old == null || ! this.hasChanged(old, element))
 				this.changes.put(key, ChangeKind.SET);
 		}
+	}
+	
+	protected boolean hasChanged(T lhs, T rhs) {
+		if(lhs == rhs)
+			return false;
+		
+		return Arrays.equals(ConversionTools.convert(lhs), ConversionTools.convert(rhs));
 	}
 	
 	/**

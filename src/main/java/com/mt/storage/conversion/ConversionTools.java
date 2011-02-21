@@ -1,7 +1,10 @@
 package com.mt.storage.conversion;
 
+import java.lang.reflect.Array;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
@@ -164,18 +167,100 @@ public class ConversionTools {
 	public static Object[] decompose(String id, String separator,
 			Class<?>[] types) {
 		Object[] ret = new Object[types.length];
-		StringTokenizer tkn = new StringTokenizer(id, separator);
+		DecomposableString tkn = new DecomposableString(id);
 		int i = 0;
-		while (tkn.hasMoreTokens()) {
-			int keys = KeyManagement.getInstance().detectKeys(types[i]).size();
-			String next = tkn.nextToken();
-			while (keys > 1) {
-				keys--;
-				next += separator + tkn.nextToken();
+		KeyManagement km = KeyManagement.getInstance();
+		while (!tkn.isEmpty()) {
+			if (i > 0) {
+				tkn.detect(separator);
 			}
-			ret[i] = convertFromString(types[i], next);
+			Class<?> type = types[i];
+			if (type.isArray()) {
+				type = type.getComponentType();
+				int keys = km.detectKeys(type).size();
+				String innerSep = km.getSeparator(type);
+				String [] reps = tkn.detectArray(keys, separator, innerSep);
+				Object[] objs = (Object[]) Array.newInstance(type, reps.length);
+				for(int ri = 0; ri < reps.length; ++ri) {
+					objs[ri] = convertFromString(type, reps[ri]);
+				}
+				ret[i] = objs;
+			} else {
+				int keys = km.detectKeys(type).size();
+				String rep = tkn.detectKey(keys, separator);
+				ret[i] = convertFromString(type, rep);
+			}
 			i++;
 		}
 		return ret;
+	}
+	
+	private static class DecomposableString {
+		private static final KeyManagement km = KeyManagement.getInstance();
+		private static final String arraySeparator = ArrayConverter.StringSeparator;
+		private final String ident;
+		private String rest;
+		
+		public DecomposableString(String ident) {
+			this.ident = ident;
+			this.rest = ident;
+		}
+		
+		public boolean isEmpty() {
+			return this.rest.isEmpty();
+		}
+		
+		public int getKeySize(Class<?> clazz) {
+			return km.detectKeys(clazz).size();
+		}
+		
+		public String getSeparator(Class<?> clazz) {
+			return km.getSeparator(clazz);
+		}
+		
+		public void detect(String start) {
+			if (this.rest.startsWith(start)) {
+				this.rest = this.rest.substring(start.length());
+			} else
+				throw new IllegalArgumentException("Expecting " + start + " before " + this.rest + " on identifier " + this.ident);
+		}
+		
+		public String detectKey(int keySize, String keySeparator) {
+			if (keySize == 0) keySize = 1;
+			StringTokenizer st = new StringTokenizer(rest, keySeparator);
+			StringBuffer ret = new StringBuffer();
+			for(;keySize > 0; keySize--) {
+				String nextToken = st.nextToken();
+				if (keySize > 1) {
+					ret.append(nextToken);
+					ret.append(keySeparator);
+				} else { //last part of the key ; in case we are in an array, the key should be shortened up to the array separator
+					int arraySep = nextToken.indexOf(arraySeparator);
+					if (arraySep > 0) {
+						nextToken = nextToken.substring(0, arraySep);
+					}
+					ret.append(nextToken);
+				}
+			}
+			String res = ret.toString();
+			this.rest = this.rest.substring(res.length());
+			return res;
+		}
+		
+		public String[] detectArray(int keySize, String outerKeySeparator, String innerKeySeparator) {
+			List<String> ret = new LinkedList<String>();
+			boolean first = true;
+			while (! this.rest.isEmpty() && ! this.rest.startsWith(outerKeySeparator)) {
+				if (first) {
+					assert !this.rest.startsWith(arraySeparator);
+					first = false;
+				} else {
+					this.detect(arraySeparator);
+				}
+				String elementString = this.detectKey(keySize, innerKeySeparator);
+				ret.add(elementString);
+			}
+			return ret.toArray(new String[ret.size()]);
+		}
 	}
 }

@@ -4,7 +4,7 @@ import java.lang.reflect.Array;
 import java.util.StringTokenizer;
 
 public class ArrayConverter extends Converter<Object> {
-	public static final String StringSeparator = "§";
+	public static final String StringSeparator = "\u00A7";
 	private static int IntBytesLength = -1;
 	
 	public static int getIntBytesLength() {

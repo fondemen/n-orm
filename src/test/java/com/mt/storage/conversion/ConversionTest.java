@@ -216,4 +216,39 @@ public class ConversionTest {
 		assertArrayEquals(array, ConversionTools.convert(array));
 		assertArrayEquals(array, ConversionTools.convert(byte[].class, array));
 	}
+	
+	public static class Inner {
+		@Key(order = 1) public final String k1;
+		@Key(order = 2) public final String k2;
+		public Inner(String k1, String k2) {
+			this.k1 = k1;
+			this.k2 = k2;
+		}
+		@Override public boolean equals(Object rhs) {
+			return (rhs instanceof Inner) && this.k1.equals(((Inner)rhs).k1) && this.k2.equals(((Inner)rhs).k2);
+		}
+	}
+	public static class Outer {
+		@Key(order=1) public final Inner[] k1;
+		@Key(order=2) public final Inner[] k2;
+		public Outer(Inner[] k1, Inner[] k2) {
+			this.k1 = k1;
+			this.k2 = k2;
+		}
+		
+	}
+	@Test public void arrayKeys() {
+		Inner i11 = new Inner("i111", "i112");
+		Inner i12 = new Inner("i121", "i122");
+		Inner i13 = new Inner("i131", "i132");
+		Inner i21 = new Inner("i211", "i212");
+		Inner i22 = new Inner("i221", "i222");
+		Inner[] i1 = new Inner[]{i11, i12, i13};
+		Inner[] i2 = new Inner[]{i21, i22};
+		Outer sut = new Outer(i1, i2);
+		String sutAsString = ConversionTools.convertToString(sut);
+		Outer sutBack = ConversionTools.convertFromString(Outer.class, sutAsString);
+		assertArrayEquals(i1, sutBack.k1);
+		assertArrayEquals(i2, sutBack.k2);
+	}
 }
