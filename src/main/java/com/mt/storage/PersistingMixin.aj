@@ -1,6 +1,5 @@
 package com.mt.storage;
 
-import java.lang.reflect.Field;
 
 
 
@@ -47,13 +46,21 @@ public privileged aspect PersistingMixin {
 		if (!this.getClass().equals(rhs.getClass()))
 			return false;
 		
-		PropertyManagement pm = PropertyManagement.getInstance();
-		for (Field key : KeyManagement.getInstance().detectKeys(this.getClass())) {
-			if (! pm.candideReadValue(this, key).equals(pm.candideReadValue(rhs, key)))
-				return false;
-		}
+		return this.getIdentifier().equals(((PersistingElement)rhs).getIdentifier());
+	}
+	
+	public int PersistingElement.hashCode() {
+		return (this.getClass().getName() + ':' + this.getIdentifier()).hashCode();
+	}
+	
+	public int PersistingElement.compareTo(PersistingElement rhs) {
+		if (rhs == null)
+			return 1;
+		int clsCmp = this.getClass().getName().compareTo(rhs.getClass().getName());
+		if (clsCmp != 0)
+			return clsCmp;
 		
-		return true;
+		return this.getIdentifier().compareTo(((PersistingElement)rhs).getIdentifier());
 	}
 	
 }
