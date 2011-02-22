@@ -67,9 +67,10 @@ public aspect StorageManagement {
 				changed.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changedProperties);
 			}
 			
+			PropertyManagement pm = PropertyManagement.getInstance();
 			for (Field key : this.getKeys()) {
 				try {
-					changedProperties.put(key.getName(), ConversionTools.convert(PropertyManagement.getInstance().readValue(this, key)));
+					changedProperties.put(key.getName(), ConversionTools.convert(pm.readValue(this, key)));
 				} catch (RuntimeException e) {
 					throw e;
 				} catch (Exception e) {
@@ -82,10 +83,11 @@ public aspect StorageManagement {
 			}
 			
 			//Store depending properties
-			for (Field prop : PropertyManagement.getInstance().getProperties(this.getClass())) {
-				if (PropertyManagement.getInstance().isPersistingPropertyType(prop.getType()) && !prop.isAnnotationPresent(ExplicitActivation.class)) {
-					Object kVal = PropertyManagement.getInstance().candideReadValue(this, prop);
-					((PersistingElement)kVal).store();
+			for (Field prop : pm.getProperties(this.getClass())) {
+				if (pm.isPersistingPropertyType(prop.getType()) && !prop.isAnnotationPresent(ExplicitActivation.class)) {
+					Object kVal = pm.candideReadValue(this, prop);
+					if (kVal != null)
+						((PersistingElement)kVal).store();
 				}
 			}
 		} finally {
