@@ -79,7 +79,7 @@
 		</repository>
 	</repositories>
 	<pluginRepositories>
-		<repository>
+		<pluginRepository>
 			<id>codehaus-nexus</id>
 			<name>Mojo Maven Repository</name>
 			<url>https://nexus.codehaus.org/content/groups/public/</url>
@@ -89,6 +89,6 @@
 			<snapshots>
 				<enabled>true</enabled>
 			</snapshots>
-		</repository>
+		</pluginRepository>
 	</pluginRepositories>
 </project>
