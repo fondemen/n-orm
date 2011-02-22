@@ -10,6 +10,7 @@
 		<endorsed.dir>${project.build.directory}/endorsed</endorsed.dir>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<java.version>1.6</java.version>
+		<hbase.version>0.89.CDH3.b3</hbase.version>
 	</properties>
 	
 	<build>
