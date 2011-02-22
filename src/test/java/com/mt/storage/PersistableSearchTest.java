@@ -57,6 +57,14 @@ public class PersistableSearchTest {
 			}
 		}
 	}
+
+	public void checkOrder(Set<? extends PersistingElement> elements) {
+		PersistingElement last = null;
+		 for (PersistingElement elt : elements) {
+			if (last != null) assertTrue(last.compareTo(elt) <= 0);
+			last = elt;
+		}
+	}
 	
 	@Test public void searchInexistingSutsWithNegativeFirstKey() throws DatabaseNotReachedException {
 		Set<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, null, "key1", -10, -5), 50);
@@ -74,11 +82,13 @@ public class PersistableSearchTest {
 		for (SUTClass sutClass : res) {
 			assertTrue(49 <= sutClass.key1 && sutClass.key1 <= 55);
 		}
+		checkOrder(res);
 	}
 	
 	@Test public void search50SutsWithFirstKey() throws DatabaseNotReachedException {
 		Set<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 49, 55), 50);
 		assertEquals(50, res.size());
+		checkOrder(res);
 	}
 	
 	@Test public void search1SutWithFirstKey() throws DatabaseNotReachedException {
@@ -105,6 +115,7 @@ public class PersistableSearchTest {
 			assertEquals(35, ret.key1);
 			assertTrue(toBeFound.contains(ret.key2));
 		}
+		checkOrder(res);
 	}
 	
 	@Test public void searchSutsWithSecondKeyNoUpper() throws DatabaseNotReachedException {
@@ -117,6 +128,7 @@ public class PersistableSearchTest {
 			assertEquals(35, ret.key1);
 			assertTrue(toBeFound.contains(ret.key2));
 		}
+		checkOrder(res);
 	}
 	
 	@Test public void searchSutsWithSecondKeyNoLower() throws DatabaseNotReachedException {
@@ -129,5 +141,6 @@ public class PersistableSearchTest {
 			assertEquals(35, ret.key1);
 			assertTrue(toBeFound.contains(ret.key2));
 		}
+		checkOrder(res);
 	}
 }

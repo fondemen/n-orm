@@ -26,7 +26,7 @@ public interface Store {
 //	boolean exists(String table, String row, String family, String key) throws DatabaseNotReachedException;
 	
 	/**
-	 * Rows matching constraint.
+	 * Rows matching constraint sorted according to their key in ascending order.
 	 */
 	CloseableKeyIterator get(String table, Constraint c, int limit) throws DatabaseNotReachedException;
 	

@@ -125,7 +125,17 @@ public class BasicTest {
 		 assertTrue(storeBooks.contains(bsut));
 		 assertTrue(storeBooks.contains(b2));
 		 assertTrue(storeBooks.contains(b3));
+		 
+		 checkOrder(storeBooks);
 	 }
+
+	public void checkOrder(Set<? extends PersistingElement> elements) {
+		PersistingElement last = null;
+		 for (PersistingElement elt : elements) {
+			if (last != null) assertTrue(last.compareTo(elt) <= 0);
+			last = elt;
+		}
+	}
 	 
 	 @Test public void searchBook() throws DatabaseNotReachedException {
 		 Book b2 = new Book(bssut, new Date(123456789), new Date());
@@ -141,6 +151,8 @@ public class BasicTest {
 		 assertTrue(storeBooks.contains(bsut));
 		 assertTrue(storeBooks.contains(b2));
 		 assertFalse(storeBooks.contains(b3));
+		 
+		 checkOrder(storeBooks);
 	 }
 	 
 	 @Test public void searchBookWithMinSellerDate() throws DatabaseNotReachedException {
