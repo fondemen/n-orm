@@ -198,7 +198,7 @@ public class Store implements com.mt.storage.GenericStore {
 
 		try {
 			return this.admin.tableExists(name);
-		} catch (MasterNotRunningException e) {
+		} catch (Exception e) {
 			throw new DatabaseNotReachedException(e);
 		}
 	}
