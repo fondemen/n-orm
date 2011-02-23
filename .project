@@ -3,7 +3,6 @@
 	<name>storage</name>
 	<comment>NO_M2ECLIPSE_SUPPORT: Project files created with the maven-eclipse-plugin are not supported in M2Eclipse.</comment>
 	<projects>
-		<project>hbase-0.90.0</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
