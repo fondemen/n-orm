@@ -190,6 +190,7 @@ public class Store implements com.mt.storage.GenericStore {
 
 	public void setAdmin(HBaseAdmin admin) {
 		this.admin = admin;
+		this.setConf(admin.getConfiguration());
 	}
 
 	protected boolean hasTable(String name) throws DatabaseNotReachedException {
