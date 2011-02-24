@@ -19,12 +19,12 @@ class DoubleConverter extends PrimitiveConverter<Double> {
 
 	@Override
 	public Double fromBytes(byte[] rep, Class<?> expected) {
-	    return Double.longBitsToDouble(ConversionTools.convert(Long.class, rep).longValue());
+	    return Double.longBitsToDouble(ConversionTools.longConverter.parseBytes(rep));
 	}
 
 	@Override
 	public byte[] toBytes(Double obj) {
-	    return ConversionTools.convert(Double.doubleToRawLongBits(obj));
+	    return ConversionTools.longConverter.unparseBytes(Double.doubleToRawLongBits(obj));
 	}
 
 }

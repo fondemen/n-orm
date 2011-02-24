@@ -18,12 +18,12 @@ class FloatConverter extends PrimitiveConverter<Float> {
 
 	@Override
 	public Float fromBytes(byte[] rep, Class<?> expected) {
-	    return Float.intBitsToFloat(ConversionTools.convert(Integer.class, rep).intValue());
+	    return Float.intBitsToFloat(ConversionTools.intConverter.fromBytes(rep, int.class).intValue());
 	}
 
 	@Override
 	public byte[] toBytes(Float obj) {
-	    return ConversionTools.convert(Float.floatToRawIntBits(obj));
+	    return ConversionTools.intConverter.toBytes(Float.floatToRawIntBits(obj));
 	}
 
 }

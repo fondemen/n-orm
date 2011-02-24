@@ -20,12 +20,12 @@ class PersistingConverter extends Converter<PersistingElement> {
 
 	@Override
 	public PersistingElement fromBytes(byte[] rep, Class<?> expected) {
-		return this.fromString(ConversionTools.convert(String.class, rep), expected);
+		return this.fromString(ConversionTools.stringConverter.fromBytes(rep, String.class), expected);
 	}
 
 	@Override
 	public byte[] toBytes(PersistingElement obj) {
-		return ConversionTools.convert(this.toString(obj));
+		return ConversionTools.stringConverter.toBytes(this.toString(obj));
 	}
 
 	@Override
