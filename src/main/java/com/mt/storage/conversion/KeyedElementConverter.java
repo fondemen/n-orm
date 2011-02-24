@@ -3,28 +3,30 @@ package com.mt.storage.conversion;
 import com.mt.storage.KeyManagement;
 
 class KeyedElementConverter extends Converter<Object> {
+	private final KeyManagement keyManager = KeyManagement.getInstance();
+	
 	public KeyedElementConverter() {
 		super(Object.class);
 	}
 
 	@Override
 	public Object fromString(String rep, Class<?> expected) {
-		return KeyManagement.getInstance().createElement(expected, rep);
+		return keyManager.createElement(expected, rep);
 	}
 
 	@Override
-	public String toString(Object obj) {
-		return KeyManagement.getInstance().createIdentifier(obj);
+	public String toString(Object obj, Class<?> expected) {
+		return keyManager.createIdentifier(obj, expected);
 	}
 
 	@Override
 	public Object fromBytes(byte[] rep, Class<? extends Object> expected) {
-		return KeyManagement.getInstance().createElement(expected, ConversionTools.stringConverter.fromBytes(rep, String.class));
+		return keyManager.createElement(expected, ConversionTools.stringConverter.fromBytes(rep, String.class));
 	}
 
 	@Override
-	public byte[] toBytes(Object obj) {
-		return ConversionTools.convert(KeyManagement.getInstance().createIdentifier(obj));
+	public byte[] toBytes(Object obj, Class<?> expected) {
+		return ConversionTools.stringConverter.toBytes(this.toString(obj, expected));
 	}
 
 	@Override

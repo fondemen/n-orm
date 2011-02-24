@@ -21,6 +21,7 @@ public class BasicTest {
 		Properties props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
 		StoreSelector.getInstance().setPropertiesFor(BookStore.class, props);
 		StoreSelector.getInstance().setPropertiesFor(Book.class, props);
+		StoreSelector.getInstance().setPropertiesFor(Novel.class, props);
 	}
 	
 	private BookStore bssut = null;
@@ -191,6 +192,18 @@ public class BasicTest {
 		 
 		 //Unfortunately
 		 assertNotSame(b2, fb);
+	 }
+	 
+	 @Test public void getSubClass() throws DatabaseNotReachedException {
+		 Novel n = new Novel(bssut, new Date(123456799), new Date());
+		 n.store();
+
+		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go();		 
+		 n.delete();
+		 
+		 assertEquals(2, storeBooks.size());
+		 assertTrue(storeBooks.contains(bsut));
+		 assertTrue(storeBooks.contains(n));
 	 }
 
 }

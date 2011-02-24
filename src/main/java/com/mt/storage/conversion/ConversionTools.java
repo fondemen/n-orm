@@ -65,12 +65,11 @@ public class ConversionTools {
 		case FromBytes:
 			return conv.fromBytes((byte[]) o, type);
 		case ToBytes:
-			return conv.toBytes((T) o);
+			return conv.toBytes((T) o, (Class<? extends T>) type);
 		case FromString:
 			return conv.fromString((String) o, type);
 		case ToString:
-			return conv.toString((T) o);
-
+			return conv.toString((T) o, (Class<? extends T>) type);
 		default:
 			throw new IllegalArgumentException("Unknown conversion kind: "
 					+ kind.name());
@@ -149,24 +148,32 @@ public class ConversionTools {
 				ConversionKind.FromString, "Cannot create a " + type
 						+ " from string " + representation);
 	}
+	
+	public static  byte[] convert(Object o) {
+		return convert(o, o == null ? Object.class : o.getClass());
+	}
 
-	public static byte[] convert(Object o) {
+	public static  byte[] convert(Object o, Class<?> expected) {
 		if (o instanceof PropertyManagement.Property)
 			o = ((PropertyManagement.Property) o).getValue();
 
 		if (o == null)
 			return null;
-
-		return (byte[]) convertInternal(o, null, ConversionKind.ToBytes,
+		
+		return (byte[]) convertInternal(o, expected, ConversionKind.ToBytes,
 				"Cannot create a binary representation for " + o);
 	}
-
+	
 	public static String convertToString(Object o) {
+		return convertToString(o, o == null ? Object.class : o.getClass());
+	}
+
+	public static String convertToString(Object o, Class<?> expected) {
 
 		if (o == null)
 			return null;
 
-		return (String) convertInternal(o, null, ConversionKind.ToString,
+		return (String) convertInternal(o, expected, ConversionKind.ToString,
 				"Cannot create a string representation for " + o);
 	}
 

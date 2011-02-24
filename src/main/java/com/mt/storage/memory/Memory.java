@@ -144,19 +144,19 @@ public class Memory implements Store {
 				Number increment = incrs.get(key);
 				switch (val.length) {
 				case 0:
-					val = ConversionTools.convert(increment);
+					val = ConversionTools.convert(increment, Number.class);
 					break;
 				case Byte.SIZE/Byte.SIZE:
-					val = ConversionTools.convert((byte)(ConversionTools.convert(byte.class, val)+increment.byteValue()));
+					val = ConversionTools.convert((byte)(ConversionTools.convert(byte.class, val)+increment.byteValue()), byte.class);
 					break;
 				case Short.SIZE/Byte.SIZE:
-					val = ConversionTools.convert((short)(ConversionTools.convert(short.class, val)+increment.shortValue()));
+					val = ConversionTools.convert((short)(ConversionTools.convert(short.class, val)+increment.shortValue()), short.class);
 					break;
 				case Integer.SIZE/Byte.SIZE:
-					val = ConversionTools.convert((int)(ConversionTools.convert(int.class, val)+increment.intValue()));
+					val = ConversionTools.convert((int)(ConversionTools.convert(int.class, val)+increment.intValue()), int.class);
 					break;
 				case Long.SIZE/Byte.SIZE:
-					val = ConversionTools.convert((long)(ConversionTools.convert(long.class, val)+increment.longValue()));
+					val = ConversionTools.convert((long)(ConversionTools.convert(long.class, val)+increment.longValue()), long.class);
 					break;
 				default:
 					assert false : "Unknown natural format: " + val.length*8 + " bytes.";	

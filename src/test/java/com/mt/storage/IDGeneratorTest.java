@@ -32,7 +32,7 @@ public class IDGeneratorTest {
 	
 	@Test public void nominal3Keys() {
 		Nominal po = new Nominal("k1val", -3, ExampleEnum.e2);
-		Assert.assertEquals("e2:" + ConversionTools.convertToString(-3) + ":k1val", po.getIdentifier());
+		Assert.assertEquals("e2:" + ConversionTools.convertToString(-3, int.class) + ":k1val", po.getIdentifier());
 	}
 	
 	private static class InheritingNominal extends Nominal {
@@ -44,7 +44,7 @@ public class IDGeneratorTest {
 	
 	@Test public void simpleInheritance() {
 		InheritingNominal po = new InheritingNominal("k1val", -3, ExampleEnum.e2);
-		Assert.assertEquals("e2:" + ConversionTools.convertToString(-3) + ":k1val", po.getIdentifier());
+		Assert.assertEquals("e2:" + ConversionTools.convertToString(-3, int.class) + ":k1val", po.getIdentifier());
 	}
 	
 	private static class InheritingNominalWithOneMoreKey extends Nominal {
@@ -58,7 +58,7 @@ public class IDGeneratorTest {
 	
 	@Test public void inheritanceAdditionalKey() {
 		InheritingNominalWithOneMoreKey po = new InheritingNominalWithOneMoreKey("k1val", -3, ExampleEnum.e2, "k4val");
-		Assert.assertEquals("e2:" + ConversionTools.convertToString(-3) + ":k1val:k4val", po.getIdentifier());
+		Assert.assertEquals("e2:" + ConversionTools.convertToString(-3, int.class) + ":k1val:k4val", po.getIdentifier());
 	}
 	
 	private static class InheritingNominalWithMissingKey extends Nominal {
@@ -145,7 +145,7 @@ public class IDGeneratorTest {
 	
 	@Test public void persistinOwningPersisting() {
 		PersitingOwingPersisting po = new PersitingOwingPersisting("k1val", -3, ExampleEnum.e2);
-		Assert.assertEquals("e2:" + ConversionTools.convertToString(-3) + ":k1val", po.getIdentifier());
+		Assert.assertEquals("e2:" + ConversionTools.convertToString(-3, int.class) + ":k1val", po.getIdentifier());
 	}
 	
 	@Persisting private static class PersistingClassWithNonFinalKey {
@@ -187,15 +187,15 @@ public class IDGeneratorTest {
 		Calendar cal = Calendar.getInstance();
 		cal.set(1917, 12, 27);
 		String id = 
-				ConversionTools.convertToString(cal.getTime()) + ":" +
+				ConversionTools.convertToString(cal.getTime(), Date.class) + ":" +
 				"a string with an ï¿½:" +
 				"1:" +
-				ConversionTools.convertToString(-3678) + ":" +
-				ConversionTools.convertToString((byte)126) + ":" +
-				ConversionTools.convertToString((short)356) + ":" +
-				ConversionTools.convertToString(326783627l) + ":" +
-				"Ã:" +
-				ConversionTools.convertToString(467);
+				ConversionTools.convertToString(-3678, int.class) + ":" +
+				ConversionTools.convertToString((byte)126, byte.class) + ":" +
+				ConversionTools.convertToString((short)356, short.class) + ":" +
+				ConversionTools.convertToString(326783627l, long.class) + ":" +
+				"\ua123:" +
+				ConversionTools.convertToString(467, int.class);
 		AllTypesPersister sut = ConversionTools
 				.convertFromString(
 						AllTypesPersister.class,
@@ -207,11 +207,11 @@ public class IDGeneratorTest {
 		assertEquals((byte)126, sut.k5);
 		assertEquals((short)356, sut.k6);
 		assertEquals(326783627l, sut.k7);
-		assertEquals('Ã', sut.k10);
+		assertEquals('\ua123', sut.k10);
 		assertEquals(new Integer(467), sut.k11);
 		
 		sut.store();
-		AllTypesPersister sut2 = ConversionTools.convertFromString(AllTypesPersister.class, ConversionTools.convertToString(sut));
+		AllTypesPersister sut2 = ConversionTools.convertFromString(AllTypesPersister.class, ConversionTools.convertToString(sut, AllTypesPersister.class));
 		assertEquals(sut.k1, sut2.k1);
 		assertEquals(sut.k2, sut2.k2);
 		assertEquals(sut.k3, sut2.k3);
@@ -222,7 +222,7 @@ public class IDGeneratorTest {
 		assertEquals(sut.k10, sut2.k10);
 		assertEquals(sut.k11, sut2.k11);
 		
-		sut2 = ConversionTools.convert(AllTypesPersister.class, ConversionTools.convert(sut));
+		sut2 = ConversionTools.convert(AllTypesPersister.class, ConversionTools.convert(sut, AllTypesPersister.class));
 		assertEquals(sut.k1, sut2.k1);
 		assertEquals(sut.k2, sut2.k2);
 		assertEquals(sut.k3, sut2.k3);

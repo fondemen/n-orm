@@ -13,12 +13,12 @@ abstract class Converter<T> implements
 	}
 
 	public abstract T fromString(String rep, Class<?> expected);
-
-	public abstract String toString(T obj);
+	
+	public abstract String toString(T obj, Class<? extends T> expected);
 
 	public abstract T fromBytes(byte[] rep, Class<?> type);
 
-	public abstract byte[] toBytes(T obj);
+	public abstract byte[] toBytes(T obj, Class<? extends T> expected);
 
 	public boolean canConvertToBytes(Object obj) {
 		return this.canConvert(obj.getClass());

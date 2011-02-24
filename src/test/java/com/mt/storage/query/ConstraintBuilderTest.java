@@ -71,7 +71,7 @@ public class ConstraintBuilderTest {
 		assertEquals("key1", key.getName());
 		assertEquals(1, keyValues.get(key));
 		Constraint cs = c.getConstraint();
-		assertEquals(ConversionTools.convertToString(1)+KeyManagement.getInstance().getSeparator(SUTClass.class), cs.getStartKey());
+		assertEquals(ConversionTools.convertToString(1, int.class)+KeyManagement.getInstance().getSeparator(SUTClass.class), cs.getStartKey());
 	}
 	
 	@Test

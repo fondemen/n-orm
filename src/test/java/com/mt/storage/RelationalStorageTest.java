@@ -26,7 +26,7 @@ public class RelationalStorageTest {
 	@Test public void getFromId() {
 		SimpleElement sut = ConversionTools.convert(SimpleElement.class, "prop1val".getBytes());
 		assertEquals("prop1val", sut.prop1);
-		assertEquals("prop1val", ConversionTools.convertToString(sut));
+		assertEquals("prop1val", ConversionTools.convertToString(sut, SimpleElement.class));
 	}
 	
 	public static class NotOnlyKeysElement {
@@ -55,7 +55,7 @@ public class RelationalStorageTest {
 	@Test public void composition() {
 		Composed1Element sut = ConversionTools.convert(Composed1Element.class, "prop1val".getBytes());
 		assertEquals("prop1val", sut.key.prop1);
-		assertEquals("prop1val", ConversionTools.convertToString(sut));
+		assertEquals("prop1val", ConversionTools.convertToString(sut, Composed1Element.class));
 	}
 	
 	public static class Composed2Elements {
@@ -76,7 +76,7 @@ public class RelationalStorageTest {
 		Composed2Elements sut = ConversionTools.convert(Composed2Elements.class, "1prop1val:2prop1val".getBytes());
 		assertEquals("1prop1val", sut.key1.prop1);
 		assertEquals("2prop1val", sut.key2.key.prop1);
-		assertEquals("1prop1val:2prop1val", ConversionTools.convertToString(sut));
+		assertEquals("1prop1val:2prop1val", ConversionTools.convertToString(sut, Composed2Elements.class));
 	}
 	
 	public static class Composed3Elements {
@@ -99,7 +99,7 @@ public class RelationalStorageTest {
 		assertEquals("12prop1val", sut.key1.key2.key.prop1);
 		assertEquals("21prop1val", sut.key2.key1.prop1);
 		assertEquals("22prop1val", sut.key2.key2.key.prop1);
-		assertEquals("11prop1val:12prop1val:21prop1val:22prop1val", ConversionTools.convertToString(sut));
+		assertEquals("11prop1val:12prop1val:21prop1val:22prop1val", ConversionTools.convertToString(sut, Composed3Elements.class));
 	}
 	
 	@Persisting(table="PC") public static class PersistingComposed {

@@ -1,7 +1,8 @@
 package com.mt.storage;
 
 import java.lang.reflect.Field;
-import java.util.HashSet;
+import java.util.Collection;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -12,11 +13,23 @@ import com.mt.storage.conversion.ConversionTools;
 import com.mt.storage.query.ConstraintBuilder;
 
 public aspect StorageManagement {
+	public static final String CLASS_COLUMN_FAMILY = "class";
+	public static final String CLASS_COLUMN = "";
+	public static final String INDENTIFIER_CLASS_SEPARATOR = ":::";
 	
+	private transient Boolean PersistingElement.exists = null;
 	private transient boolean PersistingElement.isStoring = false;
+	private transient Collection<Class<? extends PersistingElement>> PersistingElement.persistingSuperClasses = null;
 	
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
 		this.getStore().delete(this.getTable(), this.getIdentifier());
+		Collection<Class<? extends PersistingElement>> psc = this.getPersistingSuperClasses();
+		if (!psc.isEmpty()) {
+			PersistingMixin px = PersistingMixin.getInstance();
+			for (Class<? extends PersistingElement> cls : psc) {
+				this.getStore().delete(px.getTable(cls), this.getFullIdentifier());
+			}
+		}
 	}
 	
 	public void PersistingElement.store() throws DatabaseNotReachedException {
@@ -26,6 +39,7 @@ public aspect StorageManagement {
 			isStoring = true;
 		}
 		try {
+			PropertyManagement pm = PropertyManagement.getInstance();
 			this.storeProperties();
 			Map<String, Map<String, byte[]>> changed = new TreeMap<String, Map<String,byte[]>>();
 			Map<String, Set<String>> deleted = new TreeMap<String, Set<String>>();
@@ -38,13 +52,26 @@ public aspect StorageManagement {
 				Set<String> changedKeys = family.changedKeySet();
 				if (!changedKeys.isEmpty()) {
 					Map<String, byte[]> familyChanges = new TreeMap<String, byte[]>();
-					Set<String> familyDeleted = new HashSet<String>();
+					Set<String> familyDeleted = new TreeSet<String>();
+					Field cfField = family.getProperty();
 					for (String key : changedKeys) {
 						if (family.wasDeleted(key))
 							familyDeleted.add(key);
 						else {
 							//No need for auto-loading for it is a changed value
-							familyChanges.put(key, ConversionTools.convert(family.getElement(key)));
+							Object element = family.getElement(key);
+							Class<?> expected;
+							if (cfField != null) {
+								expected = family.getClazz();
+							} else if (element instanceof PropertyManagement.Property) {
+								Field propField = ((PropertyManagement.Property)element).getField();
+								assert propField != null;
+								expected = propField.getType();
+							} else {
+								assert false;
+								expected = element.getClass();
+							}
+							familyChanges.put(key, ConversionTools.convert(element, expected));
 						}
 					}
 					if (!familyChanges.isEmpty())
@@ -61,23 +88,28 @@ public aspect StorageManagement {
 					}
 				}
 			}
-			Map<String, byte[]> changedProperties = changed.get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
-			if (changedProperties == null) {
-				changedProperties = new TreeMap<String, byte[]>();
-				changed.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changedProperties);
-			}
 			
-			PropertyManagement pm = PropertyManagement.getInstance();
-			for (Field key : this.getKeys()) {
-				try {
-					changedProperties.put(key.getName(), ConversionTools.convert(pm.readValue(this, key)));
-				} catch (RuntimeException e) {
-					throw e;
-				} catch (Exception e) {
-					throw new IllegalStateException("Cannot save object ; problem reading property : " + e.getMessage(), e);
+			//Storing keys into properties. As keys are final, there is no need to store them again if we know that the object already exists within the base
+			if (this.exists == null || this.exists.equals(Boolean.FALSE)) {
+				Map<String, byte[]> changedProperties = changed.get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+				if (changedProperties == null) {
+					changedProperties = new TreeMap<String, byte[]>();
+					changed.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changedProperties);
+				}
+				for (Field key : this.getKeys()) {
+					try {
+						changedProperties.put(key.getName(), ConversionTools.convert(pm.readValue(this, key), key.getType()));
+					} catch (RuntimeException e) {
+						throw e;
+					} catch (Exception e) {
+						throw new IllegalStateException("Cannot save object ; problem reading property : " + e.getMessage(), e);
+					}
 				}
 			}
+			
 			this.getStore().storeChanges(this.getTable(), this.getIdentifier(), changed, deleted, increments);
+
+			propsIncrs.clear();
 			for(ColumnFamily<?> family : families) {
 				family.clearChanges();
 			}
@@ -90,11 +122,45 @@ public aspect StorageManagement {
 						((PersistingElement)kVal).store();
 				}
 			}
+			
+			//Storing in persisting superclasses
+			Collection<Class<? extends PersistingElement>> persistingSuperClasses = this.getPersistingSuperClasses();
+			if (!persistingSuperClasses.isEmpty()) {
+				PersistingMixin px = PersistingMixin.getInstance();
+				Map<String, byte[]> classColumn = new TreeMap<String, byte[]>();
+				String clsName = this.getClass().getName();
+				classColumn.put(CLASS_COLUMN, ConversionTools.convert(clsName, String.class));
+				changed.put(CLASS_COLUMN_FAMILY, classColumn);
+				String ident = this.getFullIdentifier();
+				for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
+					this.getStore().storeChanges(px.getTable(sc), ident, changed, deleted, increments);
+				}
+			}
+			
+			this.exists= Boolean.TRUE;
 		} finally {
 			synchronized(this) {
 				isStoring = false;
 			}
 		}
+	}
+
+	@SuppressWarnings("unchecked")
+	public Collection<Class<? extends PersistingElement>> PersistingElement.getPersistingSuperClasses() {
+		if (this.persistingSuperClasses != null)
+			return this.persistingSuperClasses;
+		
+		this.persistingSuperClasses = new LinkedList<Class<? extends PersistingElement>>();
+		Class<?> sp = this.getClass().getSuperclass();
+		Class<? extends PersistingElement> spPers;
+		while (sp != null) {
+			if (sp.isAnnotationPresent(Persisting.class)) {
+				spPers = (Class<? extends PersistingElement>) sp;
+				this.persistingSuperClasses.add(spPers);
+			}
+			sp = sp.getSuperclass();
+		}
+		return this.persistingSuperClasses;
 	}
 
 	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
@@ -136,7 +202,9 @@ public aspect StorageManagement {
 	}
 	
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {
-		return this.getStore().exists(this.getTable(), this.getIdentifier());
+		boolean ret = this.getStore().exists(this.getTable(), this.getIdentifier());
+		this.exists = ret ? Boolean.TRUE : Boolean.FALSE;
+		return ret;
 	}
 	
 	public static <T> T getElement(Class<T> clazz, String identifier) {
@@ -148,7 +216,7 @@ public aspect StorageManagement {
 		CloseableKeyIterator keys = null;
 		try {
 			keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit);
-			Set<T> ret = new PESet<T>();
+			Set<T> ret = new TreeSet<T>();
 			int count = 0;
 			while(keys.hasNext()) {
 				ret.add(ConversionTools.convertFromString(clazz, keys.next()));

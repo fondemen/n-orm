@@ -25,22 +25,45 @@ public aspect KeyManagement {
 	declare error: set(@Key java.lang.Float PersistingElement+.*) : "Floating values not supported in keys...";
 	
 	private Map<Class<?>, List<Field>> typeKeys = new HashMap<Class<?>, List<Field>>();
-	
+
 	private transient String PersistingElement.identifier;
+	private transient String PersistingElement.fullIdentifier;
 	
 	after(PersistingElement self) returning: PersistingMixin.creation(self) {
-		self.identifier = this.createIdentifier(self);
+		self.identifier = this.createIdentifier(self, self.getClass());
 	}
 	
-	public <T> T createElement(Class<T> type, String id) {
-		if(!canCreateFromKeys(type))
-			throw new IllegalArgumentException("Non-persisting " + type + " should have either no or only properties annotated with " + Key.class);
+	@SuppressWarnings("unchecked")
+	public <T> T createElement(Class<T> expectedType, String id) {
+		Class<? extends T> actualType = expectedType;
+		{//Detecting whether this identifier contains the class of the element to be created
+			int clsSep = id.lastIndexOf(StorageManagement.INDENTIFIER_CLASS_SEPARATOR);
+			if (clsSep > 0) {
+				String className = id.substring(clsSep + StorageManagement.INDENTIFIER_CLASS_SEPARATOR.length());
+				if (!className.contains(this.getSeparator(expectedType))) {
+					Class<?> detectedClass;
+					try {
+						detectedClass = Class.forName(className);
+					} catch (ClassNotFoundException e) {
+						throw new IllegalArgumentException("Cannot find class " + className + " as designated by id " + id, e);
+					}
+					if (! expectedType.isAssignableFrom(detectedClass)) {
+						throw new IllegalArgumentException("Cannot create a " + expectedType + " with an id designating a non-compatible class " + detectedClass + " (id is " + id + ')');
+					}
+					actualType = (Class <? extends T>)detectedClass;
+					id = id.substring(0, clsSep);
+				}
+			}
+		}
+		
+		if(!canCreateFromKeys(actualType))
+			throw new IllegalArgumentException("Non-persisting " + actualType + " should have either no or only properties annotated with " + Key.class);
 		
 		try {
-			List<Field> tkeys = typeKeys.get(type);
+			List<Field> tkeys = typeKeys.get(actualType);
 			if (tkeys == null) {
-				this.detectKeys(type);
-				tkeys = typeKeys.get(type);
+				this.detectKeys(actualType);
+				tkeys = typeKeys.get(actualType);
 			}
 			Class<?>[] tkeyTypes = new Class<?>[tkeys.size()];
 			int i = 0;
@@ -48,14 +71,14 @@ public aspect KeyManagement {
 				tkeyTypes[i] = key.getType();
 				i++;
 			}
-			Constructor<T> constr = type.getConstructor(tkeyTypes);
+			Constructor<? extends T> constr = actualType.getConstructor(tkeyTypes);
 			
-			String separator = this.getSeparator(type);
+			String separator = this.getSeparator(actualType);
 			Object[] keyValues = ConversionTools.decompose(id, separator, tkeyTypes);
 			
 			return constr.newInstance(keyValues);
 		} catch (Exception x) {
-			throw new RuntimeException("Cannot build new instance of " + type + " with key " + id, x);
+			throw new RuntimeException("Cannot build new instance of " + actualType + " with key " + id, x);
 		}
 	}
 
@@ -138,19 +161,31 @@ public aspect KeyManagement {
 		}
 	}
 	
-	public String createIdentifier(Object element) {
+	public String createIdentifier(Object element, Class<?> expected) {
+		if (! expected.isInstance(element))
+			throw new ClassCastException("Element " + element + " of class " + element.getClass() + " is not compatible with " + expected);
 		try {
-			String sep = this.getSeparator(element.getClass());
-			
 			StringBuffer ret = new StringBuffer();
-			boolean fst = true;
-			for (Field key : this.detectKeys(element.getClass())) {
-				if (fst) fst = false; else ret.append(sep);
-				Object o = PropertyManagement.getInstance().readValue(element, key);
-				if (o == null)
-					throw new IllegalStateException("A key cannot be null.");
-				ret.append(ConversionTools.convertToString(o));
+			
+			if ((element instanceof PersistingElement) && ((PersistingElement)element).identifier != null) {
+				ret.append(((PersistingElement)element).identifier);
+			} else {
+				String sep = this.getSeparator(element.getClass());
+				boolean fst = true;
+				for (Field key : this.detectKeys(element.getClass())) {
+					if (fst) fst = false; else ret.append(sep);
+					Object o = PropertyManagement.getInstance().readValue(element, key);
+					if (o == null)
+						throw new IllegalStateException("A key cannot be null.");
+					ret.append(ConversionTools.convertToString(o, key.getType()));
+				}
 			}
+			
+			if (!element.getClass().equals(expected)) {
+				ret.append(StorageManagement.INDENTIFIER_CLASS_SEPARATOR);
+				ret.append(element.getClass().getName());
+			}
+			
 			return ret.toString();
 		} catch (RuntimeException x) {
 			throw x;
@@ -162,5 +197,12 @@ public aspect KeyManagement {
 
 	public String PersistingElement.getIdentifier() {
 		return this.identifier;
+	}
+
+
+	public String PersistingElement.getFullIdentifier() {
+		if (this.fullIdentifier == null)
+			this.fullIdentifier = KeyManagement.getInstance().createIdentifier(this, PersistingElement.class);
+		return this.fullIdentifier;
 	}
 }
