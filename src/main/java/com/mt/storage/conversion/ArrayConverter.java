@@ -5,6 +5,7 @@ import java.util.StringTokenizer;
 
 public class ArrayConverter extends Converter<Object> {
 	public static final String StringSeparator = "\u00A7";
+	public static final String StringEndSeparator = "]";
 	private static int IntBytesLength = -1;
 	
 	public static int getIntBytesLength() {
@@ -19,7 +20,12 @@ public class ArrayConverter extends Converter<Object> {
 
 	@Override
 	public Object fromString(String rep, Class<?> expected) {
+		if (rep.endsWith(StringEndSeparator)) {
+			rep = rep.substring(0, rep.length()-StringEndSeparator.length());
+		}
 		Class<?> clazz = expected.getComponentType();
+		if (clazz.isArray())
+			throw new IllegalArgumentException("Cannot convert to string a multidimensional array as " + expected);
 		StringTokenizer t = new StringTokenizer(rep, StringSeparator);
 		int length = t.countTokens();
 		Object ret = Array.newInstance(clazz, length);
@@ -34,6 +40,8 @@ public class ArrayConverter extends Converter<Object> {
 		StringBuffer sb = new StringBuffer();
 		boolean first = true;
 		Class<?> expectedComponent = expected.getComponentType();
+		if (expectedComponent.isArray())
+			throw new IllegalArgumentException("Cannot convert to string a multidimensional array as " + expected);
 		for (int i = 0; i < Array.getLength(obj); i++) {
 			if (first)
 				first = false;
@@ -41,6 +49,7 @@ public class ArrayConverter extends Converter<Object> {
 				sb.append(StringSeparator);
 			sb.append(ConversionTools.convertToString(Array.get(obj, i), expectedComponent));
 		}
+		sb.append(StringEndSeparator);
 		return sb.toString();
 	}
 
@@ -109,6 +118,11 @@ public class ArrayConverter extends Converter<Object> {
 	@Override
 	public boolean canConvert(Class<?> type) {
 		return type.isArray() && ConversionTools.canConvert(type.getComponentType());
+	}
+
+	@Override
+	public boolean canConvertToString(Object obj) {
+		return super.canConvertToString(obj) && !obj.getClass().getComponentType().isArray();
 	}
 
 }
