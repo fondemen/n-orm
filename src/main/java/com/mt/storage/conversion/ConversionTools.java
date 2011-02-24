@@ -20,17 +20,23 @@ public class ConversionTools {
 
 	private static final Converter<?>[] converters;
 	static final StringConverter stringConverter;
+	static final LongConverter longConverter;
+	static final IntegerConverter intConverter;
+	static final ByteConverter byteConverter;
 
 	private static final Map<Class<?>, Set<Converter<?>>> knownConverters = new HashMap<Class<?>, Set<Converter<?>>>();
 
 	static {
 		stringConverter = new StringConverter();
+		longConverter = new LongConverter();
+		intConverter = new IntegerConverter();
+		byteConverter = new ByteConverter();
 		converters = new Converter<?>[] { stringConverter,
 				new PersistingConverter(), new EnumConverter(),
 				new DateConverter(), new BooleanConverter(),
-				new CharacterConverter(), new ByteConverter(),
-				new ShortConverter(), new IntegerConverter(),
-				new LongConverter(), new FloatConverter(),
+				new CharacterConverter(), byteConverter,
+				new ShortConverter(), intConverter,
+				longConverter, new FloatConverter(),
 				new DoubleConverter(), new ArrayConverter(), new KeyedElementConverter() };
 	}
 

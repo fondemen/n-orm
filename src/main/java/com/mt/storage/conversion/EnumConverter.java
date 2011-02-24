@@ -15,22 +15,22 @@ class EnumConverter extends Converter<Object> {
 
 	@Override
 	public Object fromString(String rep, Class<?> expected) {
-		return getEnumerated(ConversionTools.convertFromString(String.class, rep), expected);
+		return getEnumerated(ConversionTools.stringConverter.fromString(rep, String.class), expected);
 	}
 
 	@Override
 	public String toString(Object obj) {
-		return ConversionTools.convertToString(obj.toString());
+		return ConversionTools.stringConverter.toString(obj.toString());
 	}
 
 	@Override
 	public Object fromBytes(byte[] rep, Class<? extends Object> expected) {
-		return getEnumerated(ConversionTools.convert(String.class, rep), expected);
+		return getEnumerated(ConversionTools.stringConverter.fromBytes(rep, String.class), expected);
 	}
 
 	@Override
 	public byte[] toBytes(Object obj) {
-		return ConversionTools.convert(obj.toString());
+		return ConversionTools.stringConverter.toBytes(obj.toString());
 	}
 
 	@Override

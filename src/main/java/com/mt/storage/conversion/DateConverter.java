@@ -9,21 +9,21 @@ class DateConverter extends Converter<Date> {
 
 	@Override
 	public Date fromString(String rep, Class<?> expected) {
-		return new Date(ConversionTools.convertFromString(Long.class, rep));
+		return new Date(ConversionTools.longConverter.parseString(rep));
 	}
 
 	@Override
 	public String toString(Date obj) {
-		return ConversionTools.convertToString(obj.getTime());
+		return ConversionTools.longConverter.unparseString(obj.getTime());
 	}
 
 	@Override
 	public Date fromBytes(byte[] rep, Class<? extends Object> expected) {
-		return new Date(ConversionTools.convert(Long.class, rep));
+		return new Date(ConversionTools.longConverter.parseBytes(rep));
 	}
 
 	@Override
 	public byte[] toBytes(Date obj) {
-		return ConversionTools.convert(obj.getTime());
+		return ConversionTools.longConverter.unparseBytes(obj.getTime());
 	}
 }
