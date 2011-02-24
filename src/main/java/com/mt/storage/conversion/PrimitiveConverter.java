@@ -1,6 +1,6 @@
 package com.mt.storage.conversion;
 
-abstract class PrimitiveConverter<T> extends Converter<T> {
+abstract class PrimitiveConverter<T> extends SimpleConverter<T> {
 	private final Class<?> primitiveClazz;
 	private final int minByteSize; 
 	private final int maxByteSize; 
@@ -52,6 +52,13 @@ abstract class PrimitiveConverter<T> extends Converter<T> {
 	@Override
 	public boolean canConvert(Class<?> type) {
 		return super.canConvert(type) || this.getPrimitiveClazz().equals(type);
+	}
+
+	@Override
+	public void checkInstance(T obj, Class<? extends T> expected) {
+		if (this.getPrimitiveClazz().equals(expected))
+			expected = this.getClazz();
+		super.checkInstance(obj, expected);
 	}
 	
 }

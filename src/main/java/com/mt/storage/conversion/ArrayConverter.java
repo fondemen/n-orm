@@ -30,15 +30,16 @@ public class ArrayConverter extends Converter<Object> {
 	}
 
 	@Override
-	public String toString(Object obj) {
+	public String toString(Object obj, Class<?> expected) {
 		StringBuffer sb = new StringBuffer();
 		boolean first = true;
+		Class<?> expectedComponent = expected.getComponentType();
 		for (int i = 0; i < Array.getLength(obj); i++) {
 			if (first)
 				first = false;
 			else
 				sb.append(StringSeparator);
-			sb.append(ConversionTools.convertToString(Array.get(obj, i)));
+			sb.append(ConversionTools.convertToString(Array.get(obj, i), expectedComponent));
 		}
 		return sb.toString();
 	}
@@ -72,7 +73,7 @@ public class ArrayConverter extends Converter<Object> {
 	}
 
 	@Override
-	public byte[] toBytes(Object object) {
+	public byte[] toBytes(Object object, Class<?> expected) {
 		if (object == null)
 			return new byte [0];
 		
@@ -87,8 +88,9 @@ public class ArrayConverter extends Converter<Object> {
 		int bytes = 0;
 		elements[0] = ConversionTools.intConverter.toBytes(objLength);
 		bytes += elements[0].length;
+		Class<?> expectedComponent = expected.getComponentType();
 		for (int i = 0, eltI = 1; i < objLength; i++, eltI+=2) {
-			elements[eltI+1] = ConversionTools.convert(Array.get(object, i));
+			elements[eltI+1] = ConversionTools.convert(Array.get(object, i), expectedComponent);
 			elements[eltI] = ConversionTools.intConverter.toBytes(elements[eltI+1].length);
 			assert elements[eltI].length == getIntBytesLength();
 			bytes += getIntBytesLength() + elements[eltI+1].length;

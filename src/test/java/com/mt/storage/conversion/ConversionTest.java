@@ -24,12 +24,12 @@ public class ConversionTest {
 			if (testNumber) {
 				@SuppressWarnings("unchecked")
 				NUMBER i = (NUMBER) objectClass.getMethod(numberClass.getName() + "Value").invoke(io);
-				nrBytes = ConversionTools.convert(i);
+				nrBytes = ConversionTools.convert(i, numberClass);
 				assertEquals(i, (NUMBER)ConversionTools.convert(numberClass, nrBytes));
 				assertEquals(io, ConversionTools.convert(objectClass, nrBytes));
 			}
 			
-			bytes = ConversionTools.convert(io);
+			bytes = ConversionTools.convert(io, objectClass);
 			if (testNumber) {
 				assertNotNull(nrBytes);
 				assertArrayEquals(nrBytes, bytes);
@@ -37,17 +37,17 @@ public class ConversionTest {
 			assertEquals(io, ConversionTools.convert(objectClass, bytes));
 			
 			if (checkString) {
-				res[p] = ConversionTools.convertToString(io);
+				res[p] = ConversionTools.convertToString(io, objectClass);
 				assertEquals(io, ConversionTools.convertFromString(objectClass, res[p]));
 				if (testNumber) {
 					@SuppressWarnings("unchecked")
 					NUMBER i = (NUMBER) objectClass.getMethod(numberClass.getName() + "Value").invoke(io);
-					assertEquals(res[p], ConversionTools.convertToString(i));
+					assertEquals(res[p], ConversionTools.convertToString(i, numberClass));
 					assertEquals(i, (NUMBER)ConversionTools.convertFromString(numberClass, res[p]));
 				}
 			} else {
 				try {
-					ConversionTools.convertToString(io);
+					ConversionTools.convertToString(io, objectClass);
 					fail("Was expecting exception");
 				} catch (IllegalArgumentException x) {}
 			}
@@ -60,13 +60,13 @@ public class ConversionTest {
 			}
 		}
 		
-		byte [] arrayBytes = ConversionTools.convert(values);
+		byte [] arrayBytes = ConversionTools.convert(values, values.getClass());
 		@SuppressWarnings("unchecked")
 		Class<? extends Object[]> arrayClass = (Class<? extends Object[]>) Array.newInstance(objectClass, 0).getClass();
 		assertArrayEquals(values, ConversionTools.convert(arrayClass, arrayBytes));
 		
 		if (checkString) {
-			String arrayString = ConversionTools.convertToString(values);
+			String arrayString = ConversionTools.convertToString(values, values.getClass());
 			assertArrayEquals(values, ConversionTools.convertFromString(arrayClass, arrayString));
 		}
 	}
@@ -192,28 +192,28 @@ public class ConversionTest {
 	@Test
 	public void emptyArray() {
 		int[] array = new int[0];
-		byte [] rep = ConversionTools.convert(array);
+		byte [] rep = ConversionTools.convert(array, int[].class);
 		assertEquals(0, ConversionTools.convert(int[].class, rep).length);
 	}
 	
 	@Test
 	public void notEmptyArray() {
 		int[] array = {1, 2, 9, -12, 0};
-		byte [] rep = ConversionTools.convert(array);
+		byte [] rep = ConversionTools.convert(array, int[].class);
 		assertArrayEquals(array, ConversionTools.convert(int[].class, rep));
 	}
 	
 	@Test
 	public void nullArray() {
 		int[] array = null;
-		byte [] rep = ConversionTools.convert(array);
+		byte [] rep = ConversionTools.convert(array, int[].class);
 		assertNull(ConversionTools.convert(int[].class, rep));
 	}
 	
 	@Test
 	public void bytesArray() {
 		byte[] array = new byte[] {1,2,-3};
-		assertArrayEquals(array, ConversionTools.convert(array));
+		assertArrayEquals(array, ConversionTools.convert(array, byte[].class));
 		assertArrayEquals(array, ConversionTools.convert(byte[].class, array));
 	}
 	
@@ -246,7 +246,7 @@ public class ConversionTest {
 		Inner[] i1 = new Inner[]{i11, i12, i13};
 		Inner[] i2 = new Inner[]{i21, i22};
 		Outer sut = new Outer(i1, i2);
-		String sutAsString = ConversionTools.convertToString(sut);
+		String sutAsString = ConversionTools.convertToString(sut, Outer.class);
 		Outer sutBack = ConversionTools.convertFromString(Outer.class, sutAsString);
 		assertArrayEquals(i1, sutBack.k1);
 		assertArrayEquals(i2, sutBack.k2);

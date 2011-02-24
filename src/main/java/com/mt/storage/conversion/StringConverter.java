@@ -2,7 +2,7 @@ package com.mt.storage.conversion;
 
 import java.io.UnsupportedEncodingException;
 
-class StringConverter extends Converter<String> {
+class StringConverter extends SimpleConverter<String> {
 	public StringConverter() {
 		super(String.class);
 	}

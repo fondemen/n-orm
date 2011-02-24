@@ -9,6 +9,7 @@ import com.mt.storage.cf.MapColumnFamily;
 import org.aspectj.lang.reflect.FieldSignature;
 
 import com.mt.storage.PropertyManagement.Property;
+import com.mt.storage.PropertyManagement.PropertyFamily;
 
 public aspect IncrementManagement {
 	private static IncrementManagement INSTANCE;
@@ -18,6 +19,8 @@ public aspect IncrementManagement {
 			INSTANCE = aspectOf();
 		return INSTANCE;
 	}
+	
+	private final PropertyManagement propertyManager = PropertyManagement.getInstance();
 
 	declare error: set(@Incrementing (!long && !int && !short && !byte
 										&& !MapColumnFamily && !Map) *.*)
@@ -42,14 +45,15 @@ public aspect IncrementManagement {
 //	}
 	
 	after(PersistingElement owner) returning: execution(void PersistingElement+.upgradeProperties()) && target(owner) {
-		for (Field f : PropertyManagement.getInstance().getProperties(owner.getClass())) {
+		PropertyFamily propertyFam = owner.getProperties();
+		for (Field f : propertyManager.getProperties(owner.getClass())) {
 			if (f.isAnnotationPresent(Incrementing.class)) {
-				Property prop = owner.getProperties().getElement(f.getName());
+				Property prop = propertyFam.getElement(f.getName());
 				if (prop != null) {
 					if (prop.getField() == null)
 						prop.setField(f);
 					assert f.equals(prop.getField());
-					PropertyManagement.getInstance().candideSetValue(owner, f, prop.getValue());
+					propertyManager.candideSetValue(owner, f, prop.getValue());
 				}
 			}
 		}
@@ -57,7 +61,7 @@ public aspect IncrementManagement {
 	
 	before(PersistingElement self, Object val): PropertyManagement.attUpdated(self, val) && set(@Incrementing * *.*) {
 		Field prop = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
-		Number oldVal = (Number) PropertyManagement.getInstance().candideReadValue(self, prop);
+		Number oldVal = (Number) propertyManager.candideReadValue(self, prop);
 		self.getIncrements().put(prop.getName(), getActualIncrement((Number)val, oldVal, self.getIncrements().get(prop.getName()), prop));
 	}
 
@@ -104,17 +108,15 @@ public aspect IncrementManagement {
 			return l;
 	}
 	
-	public void checkIncrementable(Class<?> clazz) {
-		if (! (long.class.equals(clazz) || int.class.equals(clazz) || short.class.equals(clazz) || byte.class.equals(clazz) 
-			|| Long.class.equals(clazz) || Integer.class.equals(clazz) || Short.class.equals(clazz) || Byte.class.equals(clazz)))
-			throw new IllegalArgumentException(clazz + " is not a natural type such as int.");
-	}
+//	public void checkIncrementable(Class<?> clazz) {
+//		if (! (long.class.equals(clazz) || int.class.equals(clazz) || short.class.equals(clazz) || byte.class.equals(clazz) 
+//			|| Long.class.equals(clazz) || Integer.class.equals(clazz) || Short.class.equals(clazz) || Byte.class.equals(clazz)))
+//			throw new IllegalArgumentException(clazz + " is not a natural type such as int.");
+//	}
 	
-	after(PropertyManagement.PropertyFamily pf) returning : execution(protected void PropertyManagement.PropertyFamily.activate()) && target(pf) {
-		pf.getOwner().getIncrements().clear();
-	}
-	
-	after(PersistingElement self) returning: execution(void PersistingElement+.store()) && target(self) {
-		self.getIncrements().clear();
+	//@Override
+	public void PropertyFamily.clearChanges() {
+		super.clearChanges();
+		this.getOwner().getIncrements().clear();
 	}
 }

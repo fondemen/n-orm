@@ -1,6 +1,6 @@
 package com.mt.storage.conversion;
 
-class EnumConverter extends Converter<Object> {
+class EnumConverter extends SimpleConverter<Object> {
 	public EnumConverter() {
 		super(Object.class);
 	}

@@ -2,7 +2,7 @@ package com.mt.storage.conversion;
 
 import java.util.Date;
 
-class DateConverter extends Converter<Date> {
+class DateConverter extends SimpleConverter<Date> {
 	public DateConverter() {
 		super(Date.class);
 	}

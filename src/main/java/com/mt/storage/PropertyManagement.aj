@@ -150,6 +150,18 @@ public aspect PropertyManagement {
 			return new Property(key, rep);
 		}
 
+		@Override
+		protected boolean hasChanged(String key, Property lhs, Property rhs) {
+			if(lhs == rhs)
+				return false;
+			
+			assert lhs.getField() == rhs.getField();
+			
+			Class<?> clazz = lhs.getField().getType();
+			
+			return Arrays.equals(ConversionTools.convert(lhs, clazz), ConversionTools.convert(rhs, clazz));
+		}
+
 	}
 
 	private Map<Class<?>, Set<Field>> typeProperties = new HashMap<Class<?>, Set<Field>>();
@@ -262,17 +274,18 @@ public aspect PropertyManagement {
 	private transient Map<Field, byte []> PersistingElement.lastState = new HashMap<Field, byte []>();
 	
 	void PersistingElement.storeProperties() {
-		for (Field f : PropertyManagement.getInstance().getProperties(this.getClass())) {
+		PropertyManagement pm = PropertyManagement.getInstance();
+		for (Field f : pm.getProperties(this.getClass())) {
 			if (f.isAnnotationPresent(Incrementing.class))
 				continue;
-			Object val = PropertyManagement.getInstance().candideReadValue(this, f);
+			Object val = pm.candideReadValue(this, f);
 			if (val == null) {
 				if (!this.lastState.containsKey(f) || this.lastState.get(f) != null) {
 					this.getProperties().removeKey(f.getName());
 					this.lastState.put(f, null);
 				}
 			} else {
-				byte [] valB = ConversionTools.convert(val);
+				byte [] valB = ConversionTools.convert(val, f.getType());
 				if (!this.lastState.containsKey(f) || !Arrays.equals(valB, this.lastState.get(f))) {
 					this.getProperties().put(f.getName(), new Property(f, val));
 					this.lastState.put(f, valB);
@@ -282,13 +295,14 @@ public aspect PropertyManagement {
 	}
 	
 	void PersistingElement.upgradeProperties() throws DatabaseNotReachedException {
-		for (Field f : PropertyManagement.getInstance().getProperties(this.getClass())) {
+		PropertyManagement pm = PropertyManagement.getInstance();
+		for (Field f : pm.getProperties(this.getClass())) {
 			if (f.isAnnotationPresent(Incrementing.class))
 				continue;
 			Object oldVal = null;
 			boolean oldValRead = false;
 			try {
-				oldVal = PropertyManagement.getInstance().readValue(this, f);
+				oldVal = pm.readValue(this, f);
 				oldValRead = true;
 			} catch (Exception x) {
 			}
@@ -317,8 +331,8 @@ public aspect PropertyManagement {
 				continue;
 			}
 
-			byte [] oldValB = oldVal == null ? null : ConversionTools.convert(oldVal);
-			byte [] valB = val == null ? null : ConversionTools.convert(val);
+			byte [] oldValB = oldVal == null ? null : ConversionTools.convert(oldVal, f.getType());
+			byte [] valB = val == null ? null : ConversionTools.convert(val, f.getType());
 	
 			if (oldValRead && (oldVal == null ? val == null : Arrays.equals(oldValB, valB))) {
 				this.lastState.put(f, valB);
@@ -328,7 +342,7 @@ public aspect PropertyManagement {
 			if ((f.getModifiers() & Modifier.FINAL) == 0) {
 				// Setting proper value in property
 				try {
-					PropertyManagement.getInstance().setValue(this, f, val);
+					pm.setValue(this, f, val);
 					this.lastState.put(f, valB);
 				} catch (Exception x) { //May happen in case f is of simple type (e.g. boolean and not Boolean) and value is unknown from the base (i.e. null)
 					this.lastState.put(f, oldValB);

@@ -54,6 +54,10 @@ public class ColumnFamily<T> {
 		return name;
 	}
 	
+	public Class<T> getClazz() {
+		return clazz;
+	}
+
 	/**
 	 * @return the property corresponding to that column family ; may be null, e.g. for the properties or increments column families
 	 */
@@ -165,16 +169,16 @@ public class ColumnFamily<T> {
 		} else {
 			if (element == null)
 				this.removeKey(key);
-			else if (old == null || ! this.hasChanged(old, element))
+			else if (old == null || ! this.hasChanged(key, old, element))
 				this.changes.put(key, ChangeKind.SET);
 		}
 	}
 	
-	protected boolean hasChanged(T lhs, T rhs) {
+	protected boolean hasChanged(String key, T lhs, T rhs) {
 		if(lhs == rhs)
 			return false;
 		
-		return Arrays.equals(ConversionTools.convert(lhs), ConversionTools.convert(rhs));
+		return Arrays.equals(ConversionTools.convert(lhs, this.clazz), ConversionTools.convert(rhs, this.clazz));
 	}
 	
 	/**

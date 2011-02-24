@@ -74,7 +74,7 @@ public class Constraint {
 				if (checkKeys)
 					throw new IllegalArgumentException("In order to select an element depending on " + searchedKey + ", you must supply a value for " + f);
 			} else {
-				fixedPartb.append(ConversionTools.convertToString(values.get(keys.get(i))));
+				fixedPartb.append(ConversionTools.convertToString(values.get(keys.get(i)), f.getType()));
 				fixedPartb.append(sep);
 				values.remove(f);
 			}
@@ -90,7 +90,7 @@ public class Constraint {
 				this.startKey = fixedPart;
 			}
 		} else
-			this.startKey = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(startValue);
+			this.startKey = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(startValue, startValue.getClass());
 
 		char sepp = (char) (sep.charAt(sep.length()-1) + 1);
 		sep = sep.substring(0, sep.length()-1) + sepp;
@@ -101,7 +101,7 @@ public class Constraint {
 				this.endKey = fixedPart.substring(0, fixedPart.length()-1) + sep;
 			}
 		} else
-			this.endKey = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(endValue) + sep;
+			this.endKey = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(endValue, endValue.getClass()) + sep;
 	}
 
 	/**

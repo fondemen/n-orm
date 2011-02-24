@@ -4,18 +4,20 @@ import com.mt.storage.KeyManagement;
 import com.mt.storage.PersistingElement;
 
 class PersistingConverter extends Converter<PersistingElement> {
+	private final KeyManagement keyManager = KeyManagement.getInstance();
+	
 	public PersistingConverter() {
 		super(PersistingElement.class);
 	}
 
 	@Override
 	public PersistingElement fromString(String rep, Class<?> expected) {
-		return (PersistingElement) KeyManagement.getInstance().createElement(expected, rep);
+		return (PersistingElement) keyManager.createElement(expected, rep);
 	}
 
 	@Override
-	public String toString(PersistingElement obj) {
-		return obj.getIdentifier();
+	public String toString(PersistingElement obj, Class<? extends PersistingElement> expected) {
+		return obj.getClass().equals(expected) ? obj.getIdentifier() : keyManager.createIdentifier(obj, expected);
 	}
 
 	@Override
@@ -24,8 +26,8 @@ class PersistingConverter extends Converter<PersistingElement> {
 	}
 
 	@Override
-	public byte[] toBytes(PersistingElement obj) {
-		return ConversionTools.stringConverter.toBytes(this.toString(obj));
+	public byte[] toBytes(PersistingElement obj, Class<? extends PersistingElement> expected) {
+		return ConversionTools.stringConverter.toBytes(this.toString(obj, expected));
 	}
 
 	@Override
