@@ -15,7 +15,6 @@ import com.mt.storage.query.ConstraintBuilder;
 public aspect StorageManagement {
 	public static final String CLASS_COLUMN_FAMILY = "class";
 	public static final String CLASS_COLUMN = "";
-	public static final String INDENTIFIER_CLASS_SEPARATOR = ":::";
 	
 	private transient Boolean PersistingElement.exists = null;
 	private transient boolean PersistingElement.isStoring = false;

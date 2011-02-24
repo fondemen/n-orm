@@ -213,8 +213,19 @@ public class ConversionTest {
 	@Test
 	public void bytesArray() {
 		byte[] array = new byte[] {1,2,-3};
-		assertArrayEquals(array, ConversionTools.convert(array, byte[].class));
-		assertArrayEquals(array, ConversionTools.convert(byte[].class, array));
+	}
+	
+	@Test
+	public void multidimensionalIntArray() {
+		int[][] array = new int[][] {{1,2,-3}, {}, {4,5}};
+		byte[] res = ConversionTools.convert(array, array.getClass());
+		assertArrayEquals(array, ConversionTools.convert(array.getClass(), res));
+	}
+	
+	@Test(expected=Exception.class)
+	public void multidimensionalIntArrayStringified() {
+		int[][] array = new int[][] {{1,2,-3}, {}, {4,5}};
+		ConversionTools.convertToString(array, array.getClass());
 	}
 	
 	public static class Inner {
@@ -250,5 +261,59 @@ public class ConversionTest {
 		Outer sutBack = ConversionTools.convertFromString(Outer.class, sutAsString);
 		assertArrayEquals(i1, sutBack.k1);
 		assertArrayEquals(i2, sutBack.k2);
+	}
+	
+	public static class Inner2 {
+		@Key(order = 1) public final String[] k;
+		public Inner2(String... k) {
+			this.k = k;
+		}
+		@Override public boolean equals(Object rhs) {
+			if (!(rhs instanceof Inner2))
+				return false;
+			Inner2 ri = (Inner2)rhs;
+			if (this.k.length != ri.k.length)
+				return false;
+			for (int i = 0; i < this.k.length; i++) {
+				if (!this.k[i].equals(ri.k[i]))
+					return false;
+			}
+			return  true;
+		}
+	}
+	public static class Outer2 {
+		@Key(order=1) public final Inner2[] k;
+		public Outer2(Inner2... k) {
+			this.k = k;
+		}
+		
+	}
+	@Test public void multidimensionalArrayKeys() {
+		Inner2 i11 = new Inner2("i111", "i112", "i113");
+		Inner2 i12 = new Inner2("i121", "i122");
+		Inner2 i13 = new Inner2("i131", "i132");
+		Outer2 sut = new Outer2(i11, i12, i13);
+		String sutAsString = ConversionTools.convertToString(sut);
+		Outer2 sutBack = ConversionTools.convertFromString(Outer2.class, sutAsString);
+		assertArrayEquals(new Inner2[] {i11, i12, i13}, sutBack.k);
+	}
+	
+	public static class Outer3 {
+		@Key(order=1) public final String f;
+		@Key(order=2) public final Inner2[] k;
+		public Outer3(String f, Inner2... k) {
+			this.f = f;
+			this.k = k;
+		}
+		
+	}
+	@Test public void multidimensionalArrayKeys2() {
+		Inner2 i11 = new Inner2("i111", "i112", "i113");
+		Inner2 i12 = new Inner2("i121", "i122");
+		Inner2 i13 = new Inner2("i131", "i132");
+		Outer3 sut = new Outer3("sep", i11, i12, i13);
+		String sutAsString = ConversionTools.convertToString(sut);
+		Outer3 sutBack = ConversionTools.convertFromString(Outer3.class, sutAsString);
+		assertArrayEquals(new Inner2[] {i11, i12, i13}, sutBack.k);
 	}
 }

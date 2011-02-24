@@ -1,16 +1,24 @@
 package com.mt.storage;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
+import com.mt.storage.conversion.ArrayConverter;
 import com.mt.storage.conversion.ConversionTools;
 
 public aspect KeyManagement {
+	public static final String KEY_SEPARATOR = ":"; 
+	public static final String INDENTIFIER_CLASS_SEPARATOR = "`";
+	
 	private static KeyManagement INSTANCE;
 	
 	public static KeyManagement getInstance() {
@@ -24,6 +32,117 @@ public aspect KeyManagement {
 	declare error: set(@Key float PersistingElement+.*) : "Floating values not supported in keys...";
 	declare error: set(@Key java.lang.Float PersistingElement+.*) : "Floating values not supported in keys...";
 	
+	private static class DecomposableString {
+		private static final String keySeparator;
+		private static final String arraySeparator;
+		private static final String arrayEndSeparator;
+		private static final String classSeparator;
+		private static final Set<String> specialChars;
+		
+		static {
+			keySeparator = KEY_SEPARATOR;
+			arraySeparator = ArrayConverter.StringSeparator;
+			arrayEndSeparator = ArrayConverter.StringEndSeparator;
+			classSeparator = INDENTIFIER_CLASS_SEPARATOR;
+			
+			specialChars = new TreeSet<String>();
+			specialChars.add(keySeparator);
+			specialChars.add(arraySeparator);
+			specialChars.add(arrayEndSeparator);
+			specialChars.add(classSeparator);
+		}
+		
+		private final KeyManagement km = KeyManagement.getInstance();
+		private final String ident;
+		private String rest;
+		
+		public DecomposableString(String ident) {
+			this.ident = ident;
+			this.rest = ident;
+		}
+		
+		public boolean isEmpty() {
+			return this.rest.isEmpty();
+		}
+		
+		public void detect(String start) {
+			if (this.rest.startsWith(start)) {
+				this.rest = this.rest.substring(start.length());
+			} else
+				throw new IllegalArgumentException("Expecting " + start + " before " + this.rest + " on identifier " + this.ident);
+		}
+		
+		public <U> U detect(Class<U> type) {
+			if (type.isArray()) {
+				return detectArray(type);
+			} else {
+				if (km.detectKeys(type).size() > 0) {
+					return detectKeyedElement(type);
+				} else {
+					return detectSimpleElement(type);
+				}
+			}
+		}
+
+		private <U> U detectSimpleElement(Class<U> type) {
+			String ret = new String(this.rest);
+			for (String sc : specialChars) {
+				int i = ret.indexOf(sc);
+				if (i >= 0)
+					ret = ret.substring(0, i);
+			}
+			this.detect(ret);
+			return ConversionTools.convertFromString(type, ret);
+		}
+
+		@SuppressWarnings("unchecked")
+		private <U> U detectKeyedElement(Class<U> type) {
+			List<Field> keys = km.detectKeys(type);
+			Object [] vals = new Object[keys.size()];
+			for (int i = 0; i < vals.length; i++) {
+				if (i != 0)
+					this.detect(keySeparator);
+				vals[i] = this.detect(keys.get(i).getType());
+			}
+			Class<? extends U> actualType = type;
+			if (this.rest.startsWith(classSeparator)) {
+				this.detect(classSeparator);
+				String clsName = this.detectSimpleElement(String.class);
+				try {
+					actualType = (Class<? extends U>) Class.forName(clsName);
+				} catch (ClassNotFoundException e) {
+					throw new IllegalArgumentException("Cannot find class " + clsName + " as declared in key " + this.ident + " before " + this.rest, e);
+				}
+			}
+			return KeyManagement.getInstance().createElement(actualType, vals);
+		}
+
+		private <U> U detectArray(Class<U> type) {
+			Class<?> componentType = type.getComponentType();
+			List<Object> res = new LinkedList<Object>();
+			boolean fst = true;
+			while (! rest.startsWith(arrayEndSeparator) && ! rest.isEmpty()) {
+				if (fst) {
+					fst = false;
+					assert ! this.rest.startsWith(arraySeparator);
+				} else {
+					this.detect(arraySeparator);
+				}
+				res.add(this.detect(componentType));
+			}
+			if (! this.rest.isEmpty())
+				this.detect(arrayEndSeparator);
+			@SuppressWarnings("unchecked")
+			U ret = (U) Array.newInstance(type.getComponentType(), res.size());
+			int i = 0;
+			for (Object elt : res) {
+				Array.set(ret, i, elt);
+				i++;
+			}
+			return ret;
+		}
+	}
+	
 	private Map<Class<?>, List<Field>> typeKeys = new HashMap<Class<?>, List<Field>>();
 
 	private transient String PersistingElement.identifier;
@@ -33,37 +152,21 @@ public aspect KeyManagement {
 		self.identifier = this.createIdentifier(self, self.getClass());
 	}
 	
-	@SuppressWarnings("unchecked")
 	public <T> T createElement(Class<T> expectedType, String id) {
-		Class<? extends T> actualType = expectedType;
-		{//Detecting whether this identifier contains the class of the element to be created
-			int clsSep = id.lastIndexOf(StorageManagement.INDENTIFIER_CLASS_SEPARATOR);
-			if (clsSep > 0) {
-				String className = id.substring(clsSep + StorageManagement.INDENTIFIER_CLASS_SEPARATOR.length());
-				if (!className.contains(this.getSeparator(expectedType))) {
-					Class<?> detectedClass;
-					try {
-						detectedClass = Class.forName(className);
-					} catch (ClassNotFoundException e) {
-						throw new IllegalArgumentException("Cannot find class " + className + " as designated by id " + id, e);
-					}
-					if (! expectedType.isAssignableFrom(detectedClass)) {
-						throw new IllegalArgumentException("Cannot create a " + expectedType + " with an id designating a non-compatible class " + detectedClass + " (id is " + id + ')');
-					}
-					actualType = (Class <? extends T>)detectedClass;
-					id = id.substring(0, clsSep);
-				}
-			}
-		}
+		return new DecomposableString(id).detect(expectedType);
+	}
+	
+	@SuppressWarnings("unchecked")
+	private <T> T createElement(Class<T> type, Object [] keyValues) {
 		
-		if(!canCreateFromKeys(actualType))
-			throw new IllegalArgumentException("Non-persisting " + actualType + " should have either no or only properties annotated with " + Key.class);
+		if(!canCreateFromKeys(type))
+			throw new IllegalArgumentException("Non-persisting " + type + " should have either no or only properties annotated with " + Key.class);
 		
 		try {
-			List<Field> tkeys = typeKeys.get(actualType);
+			List<Field> tkeys = typeKeys.get(type);
 			if (tkeys == null) {
-				this.detectKeys(actualType);
-				tkeys = typeKeys.get(actualType);
+				this.detectKeys(type);
+				tkeys = typeKeys.get(type);
 			}
 			Class<?>[] tkeyTypes = new Class<?>[tkeys.size()];
 			int i = 0;
@@ -71,14 +174,15 @@ public aspect KeyManagement {
 				tkeyTypes[i] = key.getType();
 				i++;
 			}
-			Constructor<? extends T> constr = actualType.getConstructor(tkeyTypes);
-			
-			String separator = this.getSeparator(actualType);
-			Object[] keyValues = ConversionTools.decompose(id, separator, tkeyTypes);
+			Constructor<? extends T> constr = type.getConstructor(tkeyTypes);
 			
 			return constr.newInstance(keyValues);
 		} catch (Exception x) {
-			throw new RuntimeException("Cannot build new instance of " + actualType + " with key " + id, x);
+			String[] strVals = new String[keyValues.length];
+			for (int i = 0; i < strVals.length; i++) {
+				strVals[i] = ConversionTools.convertToString(keyValues[i]);
+			}
+			throw new RuntimeException("Cannot build new instance of " + type + " with key values " + strVals, x);
 		}
 	}
 
@@ -90,10 +194,6 @@ public aspect KeyManagement {
 			}
 		}
 		return true;
-	}
-
-	public <T> String getSeparator(Class<T> clazz) {
-		return ":";
 	}
 	
 	public List<Field> PersistingElement.getKeys() {
@@ -170,10 +270,9 @@ public aspect KeyManagement {
 			if ((element instanceof PersistingElement) && ((PersistingElement)element).identifier != null) {
 				ret.append(((PersistingElement)element).identifier);
 			} else {
-				String sep = this.getSeparator(element.getClass());
 				boolean fst = true;
 				for (Field key : this.detectKeys(element.getClass())) {
-					if (fst) fst = false; else ret.append(sep);
+					if (fst) fst = false; else ret.append(KEY_SEPARATOR);
 					Object o = PropertyManagement.getInstance().readValue(element, key);
 					if (o == null)
 						throw new IllegalStateException("A key cannot be null.");
@@ -182,7 +281,7 @@ public aspect KeyManagement {
 			}
 			
 			if (!element.getClass().equals(expected)) {
-				ret.append(StorageManagement.INDENTIFIER_CLASS_SEPARATOR);
+				ret.append(INDENTIFIER_CLASS_SEPARATOR);
 				ret.append(element.getClass().getName());
 			}
 			

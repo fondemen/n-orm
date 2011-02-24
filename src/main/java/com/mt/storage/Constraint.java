@@ -64,7 +64,7 @@ public class Constraint {
 		if (keys.size() < length)
 			throw new IllegalArgumentException("Too many constrained values compared to the number of keys ; only key values may be constrained.");
 		StringBuffer fixedPartb = new StringBuffer();
-		String sep = KeyManagement.getInstance().getSeparator(clazz);
+		String sep = KeyManagement.KEY_SEPARATOR;
 		Field f; Object val;
 		values = values == null ? new HashMap<Field, Object>() : new HashMap<Field, Object>(values);
 		for(int i = 0; i < length; ++i) {
