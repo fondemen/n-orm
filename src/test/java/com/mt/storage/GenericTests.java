@@ -8,7 +8,8 @@ import org.junit.runners.Suite.SuiteClasses;
 @SuiteClasses(value={
 		BasicTest.class,
 		CollectionStorageTest.class,
-		PersistableSearchTest.class
+		PersistableSearchTest.class,
+		InheritanceTest.class
 })
 
 public class GenericTests {

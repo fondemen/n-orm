@@ -4,8 +4,9 @@ import java.lang.reflect.Array;
 import java.util.StringTokenizer;
 
 public class ArrayConverter extends Converter<Object> {
-	public static final String StringSeparator = "\u00A7";
-	public static final String StringEndSeparator = "]";
+	public static final String StringSeparator = "\uFFFF"; //As large as possible so that [0, 1] (identified by 0 + StringSeparator + 1) < [0, 1] (identified by 0 + StringSeparator + 1 + StringSeparator + 2)
+
+	//public static final String StringEndSeparator = "]";
 	private static int IntBytesLength = -1;
 	
 	public static int getIntBytesLength() {
@@ -20,9 +21,6 @@ public class ArrayConverter extends Converter<Object> {
 
 	@Override
 	public Object fromString(String rep, Class<?> expected) {
-		if (rep.endsWith(StringEndSeparator)) {
-			rep = rep.substring(0, rep.length()-StringEndSeparator.length());
-		}
 		Class<?> clazz = expected.getComponentType();
 		if (clazz.isArray())
 			throw new IllegalArgumentException("Cannot convert to string a multidimensional array as " + expected);
@@ -49,7 +47,6 @@ public class ArrayConverter extends Converter<Object> {
 				sb.append(StringSeparator);
 			sb.append(ConversionTools.convertToString(Array.get(obj, i), expectedComponent));
 		}
-		sb.append(StringEndSeparator);
 		return sb.toString();
 	}
 

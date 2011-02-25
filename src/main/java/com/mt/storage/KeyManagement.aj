@@ -6,18 +6,33 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 import com.mt.storage.conversion.ArrayConverter;
 import com.mt.storage.conversion.ConversionTools;
 
+
+
+/**
+ * To be identifiable, a persisting object must define fields to setup the key by annotating them with {@link Key}.
+ * Keys must declare an order from 1 to N, must not overlap, and must be all there, e.g. if N=3, the class must declare keys for orders 1, 2 and 3.
+ * Keys are inherited.
+ * For non-persisting elements (i.e. elements that are not annotated with {@link Persisting}, all fields must be keys.
+ * As such, an element may be identified by a string, whose format is the following:
+ * <code>
+ * id ::=   sid //for a simple element such as a character string, an integer, an enum...<br>
+ *        | id ( {@link KeyManagement#KEY_SEPARATOR} id)* ({@link KeyManagement#KEY_END_SEPARATOR} sid)? '}' //for an element as decribed above ; each included id representing its key values, and the last optional sid representing its class<br>
+ *        | id ( {@link ArrayConverter#StringSeparator}  id)* //for an array<br>
+ * sid ::= (~({@link KeyManagement#KEY_SEPARATOR}|{@link KeyManagement#KEY_END_SEPARATOR}|{@link ArrayConverter#StringSeparator}))*
+ * </code>
+ * @author fondemen
+ *
+ */
 public aspect KeyManagement {
-	public static final String KEY_SEPARATOR = ":"; 
-	public static final String INDENTIFIER_CLASS_SEPARATOR = "`";
+	public static final String KEY_SEPARATOR = "\u0017";  //Shouldn't be a printable char
+	public static final String KEY_END_SEPARATOR = "\u0001"; //As small as possible so that {v="AA"}.identifier (= "AA"+KEY_END_SEPARATOR) < {v="AAA"}.identifier (= "AAA"+KEY_END_SEPARATOR)
 	
 	private static KeyManagement INSTANCE;
 	
@@ -35,21 +50,18 @@ public aspect KeyManagement {
 	private static class DecomposableString {
 		private static final String keySeparator;
 		private static final String arraySeparator;
-		private static final String arrayEndSeparator;
-		private static final String classSeparator;
-		private static final Set<String> specialChars;
+		private static final String keyEndSeparator;
+		private static final String[] specialChars;
 		
 		static {
 			keySeparator = KEY_SEPARATOR;
 			arraySeparator = ArrayConverter.StringSeparator;
-			arrayEndSeparator = ArrayConverter.StringEndSeparator;
-			classSeparator = INDENTIFIER_CLASS_SEPARATOR;
+			keyEndSeparator = KEY_END_SEPARATOR;
 			
-			specialChars = new TreeSet<String>();
-			specialChars.add(keySeparator);
-			specialChars.add(arraySeparator);
-			specialChars.add(arrayEndSeparator);
-			specialChars.add(classSeparator);
+			specialChars = new String [3];
+			specialChars[0] = keySeparator;
+			specialChars[1] = arraySeparator;
+			specialChars[2] = keyEndSeparator;
 		}
 		
 		private final KeyManagement km = KeyManagement.getInstance();
@@ -65,80 +77,109 @@ public aspect KeyManagement {
 			return this.rest.isEmpty();
 		}
 		
-		public void detect(String start) {
-			if (this.rest.startsWith(start)) {
-				this.rest = this.rest.substring(start.length());
-			} else
-				throw new IllegalArgumentException("Expecting " + start + " before " + this.rest + " on identifier " + this.ident);
+		public <U> U detect(Class<U> type) {
+			U ret = this.detectLast(type);
+			if (! this.isEmpty()) {
+				throw new IllegalArgumentException("Could not analyze the complete string: " + this.rest + " left over while analyzing " + this.ident + " as a " + type + " instance.");
+			}
+			return ret;
 		}
 		
-		public <U> U detect(Class<U> type) {
-			if (type.isArray()) {
-				return detectArray(type);
+		protected <U> U detectLast(Class<U> expected) {
+			if (expected.isArray()) {
+				return detectLastArray(expected);
 			} else {
-				if (km.detectKeys(type).size() > 0) {
-					return detectKeyedElement(type);
+				if (km.detectKeys(expected).size() > 0) {
+					return detectLastKeyedElement(expected);
 				} else {
-					return detectSimpleElement(type);
+					return detectLastSimpleElement(expected);
 				}
 			}
 		}
-
-		private <U> U detectSimpleElement(Class<U> type) {
-			String ret = new String(this.rest);
-			for (String sc : specialChars) {
-				int i = ret.indexOf(sc);
-				if (i >= 0)
-					ret = ret.substring(0, i);
-			}
-			this.detect(ret);
-			return ConversionTools.convertFromString(type, ret);
-		}
-
-		@SuppressWarnings("unchecked")
-		private <U> U detectKeyedElement(Class<U> type) {
-			List<Field> keys = km.detectKeys(type);
-			Object [] vals = new Object[keys.size()];
-			for (int i = 0; i < vals.length; i++) {
-				if (i != 0)
-					this.detect(keySeparator);
-				vals[i] = this.detect(keys.get(i).getType());
-			}
-			Class<? extends U> actualType = type;
-			if (this.rest.startsWith(classSeparator)) {
-				this.detect(classSeparator);
-				String clsName = this.detectSimpleElement(String.class);
+		
+		private <U> U detectLastArray(Class<U> expected) {
+			Class<?> componentType = expected.getComponentType();
+			LinkedList<Object> elements = new LinkedList<Object>();
+			String restSav = this.rest;
+			do {
 				try {
-					actualType = (Class<? extends U>) Class.forName(clsName);
-				} catch (ClassNotFoundException e) {
-					throw new IllegalArgumentException("Cannot find class " + clsName + " as declared in key " + this.ident + " before " + this.rest, e);
+					elements.addFirst(this.detectLast(componentType));
+					restSav = this.rest;
+				} catch (Exception x) {
+					this.rest = restSav;
+					break;
 				}
+			} while (this.detectLast(arraySeparator) && !this.rest.isEmpty());
+			
+			Object[] res = elements.toArray();
+			@SuppressWarnings("unchecked")
+			U ret = (U) Array.newInstance(componentType, res.length);
+			System.arraycopy(res, 0, ret, 0, res.length);
+			return ret;
+		}
+		
+		@SuppressWarnings("unchecked")
+		private <U> U detectLastKeyedElement(Class<U> expected) {
+			Class<? extends U> actualType = expected;
+			String actualTypeName = this.detectLastUpTo(true, keyEndSeparator);
+			if (!actualTypeName.isEmpty()) {
+				try {
+					Class<?> detectedCls = Class.forName(actualTypeName);
+					actualType = (Class<? extends U>) detectedCls;
+				} catch (ClassNotFoundException e) {
+					throw new IllegalArgumentException("Cannot find class " + actualTypeName + " as declared in key " + this.ident + " after " + this.rest, e);
+				} catch (ClassCastException e) {
+					throw new IllegalArgumentException("Expecting a " + actualTypeName + " element while identifier declares incompatible type " + actualTypeName + " (identifier is " + this.ident + ')', e);
+				}
+			}
+			
+			List<Field> keys = km.detectKeys(actualType);
+			Object [] vals = new Object[keys.size()];
+			for (int i = vals.length-1; i >= 0; i--) {
+				vals[i] = this.detectLast(keys.get(i).getType());
+				if (i > 0)
+					this.checkLast(keySeparator);
 			}
 			return KeyManagement.getInstance().createElement(actualType, vals);
 		}
-
-		private <U> U detectArray(Class<U> type) {
-			Class<?> componentType = type.getComponentType();
-			List<Object> res = new LinkedList<Object>();
-			boolean fst = true;
-			while (! rest.startsWith(arrayEndSeparator) && ! rest.isEmpty()) {
-				if (fst) {
-					fst = false;
-					assert ! this.rest.startsWith(arraySeparator);
-				} else {
-					this.detect(arraySeparator);
+		
+		private <U> U detectLastSimpleElement(Class<U> expected) {
+			if (rest.endsWith(keyEndSeparator))
+				throw new IllegalArgumentException("Detecting complex type at the end of " + this.rest + " while expecting element of simple type " + expected);
+			return ConversionTools.convertFromString(expected, this.detectLastSimpleId());
+		}
+		
+		protected String detectLastSimpleId() {
+			return this.detectLastUpTo(false, specialChars);
+		}
+		
+		protected void checkLast(String expected) {
+			if (! this.detectLast(expected))
+				throw new IllegalArgumentException("Expecting " + expected + " at the end of " + this.rest + " in identifier " + this.ident);
+		}
+		
+		protected boolean detectLast(String expected) {
+			if (expected.isEmpty())
+				return true;
+			if (! this.rest.endsWith(expected))
+				return false;;
+			this.rest = this.rest.substring(0, this.rest.length() - expected.length());
+			return true;
+		}
+		
+		protected String detectLastUpTo(boolean andIncluding, String... separators) {
+			String ret = this.rest;
+			String separator = null;
+			for (String sc : separators) {
+				int sep = ret.lastIndexOf(sc);
+				if (sep >= 0) {
+					ret = ret.substring(sep + sc.length());
+					separator = sc;
 				}
-				res.add(this.detect(componentType));
 			}
-			if (! this.rest.isEmpty())
-				this.detect(arrayEndSeparator);
-			@SuppressWarnings("unchecked")
-			U ret = (U) Array.newInstance(type.getComponentType(), res.size());
-			int i = 0;
-			for (Object elt : res) {
-				Array.set(ret, i, elt);
-				i++;
-			}
+			this.checkLast(ret);
+			if (andIncluding && separator != null)
+				this.checkLast(separator);
 			return ret;
 		}
 	}
@@ -153,7 +194,11 @@ public aspect KeyManagement {
 	}
 	
 	public <T> T createElement(Class<T> expectedType, String id) {
-		return new DecomposableString(id).detect(expectedType);
+		try {
+			return new DecomposableString(id).detect(expectedType);
+		} catch (Exception x) {
+			throw new IllegalArgumentException("Cannot create instance of " + expectedType + " with id " + id, x);
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -278,10 +323,10 @@ public aspect KeyManagement {
 						throw new IllegalStateException("A key cannot be null.");
 					ret.append(ConversionTools.convertToString(o, key.getType()));
 				}
+				ret.append(KEY_END_SEPARATOR);
 			}
 			
 			if (!element.getClass().equals(expected)) {
-				ret.append(INDENTIFIER_CLASS_SEPARATOR);
 				ret.append(element.getClass().getName());
 			}
 			

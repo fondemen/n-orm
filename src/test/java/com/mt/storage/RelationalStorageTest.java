@@ -10,6 +10,9 @@ import com.mt.storage.memory.Memory;
 
 
 public class RelationalStorageTest {
+
+	private static final String ke = KeyManagement.KEY_END_SEPARATOR;
+	private static final String ks = KeyManagement.KEY_SEPARATOR;
 	
 	@After public void resetStorage() {
 		Memory.INSTANCE.reset();
@@ -24,9 +27,9 @@ public class RelationalStorageTest {
 	}
 
 	@Test public void getFromId() {
-		SimpleElement sut = ConversionTools.convert(SimpleElement.class, "prop1val".getBytes());
+		SimpleElement sut = ConversionTools.convert(SimpleElement.class, ("prop1val" + ke).getBytes());
 		assertEquals("prop1val", sut.prop1);
-		assertEquals("prop1val", ConversionTools.convertToString(sut, SimpleElement.class));
+		assertEquals("prop1val" + ke, ConversionTools.convertToString(sut, SimpleElement.class));
 	}
 	
 	public static class NotOnlyKeysElement {
@@ -53,9 +56,9 @@ public class RelationalStorageTest {
 		}
 	}
 	@Test public void composition() {
-		Composed1Element sut = ConversionTools.convert(Composed1Element.class, "prop1val".getBytes());
+		Composed1Element sut = ConversionTools.convert(Composed1Element.class, ("prop1val" + ke + ke).getBytes());
 		assertEquals("prop1val", sut.key.prop1);
-		assertEquals("prop1val", ConversionTools.convertToString(sut, Composed1Element.class));
+		assertEquals("prop1val" + ke + ke, ConversionTools.convertToString(sut, Composed1Element.class));
 	}
 	
 	public static class Composed2Elements {
@@ -73,10 +76,10 @@ public class RelationalStorageTest {
 		}
 	}
 	@Test public void doubleComposition() {
-		Composed2Elements sut = ConversionTools.convert(Composed2Elements.class, "1prop1val:2prop1val".getBytes());
+		Composed2Elements sut = ConversionTools.convert(Composed2Elements.class, ("1prop1val" + ke + ks + "2prop1val" + ke + ke + ke).getBytes());
 		assertEquals("1prop1val", sut.key1.prop1);
 		assertEquals("2prop1val", sut.key2.key.prop1);
-		assertEquals("1prop1val:2prop1val", ConversionTools.convertToString(sut, Composed2Elements.class));
+		assertEquals("1prop1val" + ke + ks + "2prop1val" + ke + ke + ke, ConversionTools.convertToString(sut, Composed2Elements.class));
 	}
 	
 	public static class Composed3Elements {
@@ -94,12 +97,12 @@ public class RelationalStorageTest {
 		}
 	}
 	@Test public void tripleComposition() {
-		Composed3Elements sut = ConversionTools.convert(Composed3Elements.class, "11prop1val:12prop1val:21prop1val:22prop1val".getBytes());
+		Composed3Elements sut = ConversionTools.convert(Composed3Elements.class, ("11prop1val" + ke + ks + "12prop1val" + ke + "" + ke + "" + ke + ks + "21prop1val" + ke + ks + "22prop1val" + ke + ke + ke + ke).getBytes());
 		assertEquals("11prop1val", sut.key1.key1.prop1);
 		assertEquals("12prop1val", sut.key1.key2.key.prop1);
 		assertEquals("21prop1val", sut.key2.key1.prop1);
 		assertEquals("22prop1val", sut.key2.key2.key.prop1);
-		assertEquals("11prop1val:12prop1val:21prop1val:22prop1val", ConversionTools.convertToString(sut, Composed3Elements.class));
+		assertEquals("11prop1val" + ke + ks + "12prop1val" + ke + "" + ke + "" + ke + ks + "21prop1val" + ke + ks + "22prop1val" + ke + ke + ke + ke, ConversionTools.convertToString(sut, Composed3Elements.class));
 	}
 	
 	@Persisting(table="PC") public static class PersistingComposed {
@@ -115,7 +118,7 @@ public class RelationalStorageTest {
 		PersistingComposed sut = new PersistingComposed("key");
 		sut.value = val;
 		sut.store();
-		assertEquals("1:2:3:4", ConversionTools.convert(String.class, Memory.INSTANCE.get("PC", "key", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "value")));
+		assertEquals("1" + ke + ks + "2" + ke + ke + ke + ks + "3" + ke + ks + "4" + ke + ke + ke + ke, ConversionTools.convert(String.class, Memory.INSTANCE.get("PC", "key" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "value")));
 		PersistingComposed sut2 = new PersistingComposed("key");
 		sut2.activate();
 		assertEquals("1", sut2.value.key1.key1.prop1);
@@ -147,10 +150,10 @@ public class RelationalStorageTest {
 		PersistingOutside out = new PersistingOutside("outside");
 		out.val = in;
 		out.store(); //No need to store in ; should be triggered automatically.
-		assertEquals("outside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
-		assertEquals("inside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
-		assertEquals("inside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Inside", "inside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
-		assertEquals("value", ConversionTools.convert(String.class, Memory.INSTANCE.get("Inside", "inside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
+		assertEquals("outside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
+		assertEquals("inside" + ke, ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
+		assertEquals("inside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Inside", "inside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
+		assertEquals("value", ConversionTools.convert(String.class, Memory.INSTANCE.get("Inside", "inside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
 		
 		PersistingOutside out2 = new PersistingOutside("outside");
 		out2.activate();
@@ -167,9 +170,9 @@ public class RelationalStorageTest {
 		PersistingOutside out = new PersistingOutside("outside");
 		out.val = in;
 		out.store(); //Should store keys
-		assertEquals("outside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
-		assertEquals("inside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
-		assertTrue(Memory.INSTANCE.getTable("Inside").containsKey("inside"));
+		assertEquals("outside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
+		assertEquals("inside" + ke, ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
+		assertTrue(Memory.INSTANCE.getTable("Inside").containsKey("inside" + ke));
 	}
 	
 	@Persisting(table="Outside") public static class PersistingOutsideExplicit {
@@ -187,10 +190,10 @@ public class RelationalStorageTest {
 		out.val = in;
 		out.store();
 		
-		assertFalse(Memory.INSTANCE.getTable("Inside").containsKey("inside"));
+		assertFalse(Memory.INSTANCE.getTable("Inside").containsKey("inside" + ke));
 		
 		in.store();
-		assertTrue(Memory.INSTANCE.getTable("Inside").containsKey("inside"));
+		assertTrue(Memory.INSTANCE.getTable("Inside").containsKey("inside" + ke));
 		
 		PersistingOutsideExplicit out2 = new PersistingOutsideExplicit("outside");
 		out2.activate();
