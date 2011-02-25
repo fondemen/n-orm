@@ -90,18 +90,24 @@ public class Constraint {
 				this.startKey = fixedPart;
 			}
 		} else
-			this.startKey = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(startValue, startValue.getClass());
+			this.startKey = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(startValue, searchedKey.getType());
 
-		char sepp = (char) (sep.charAt(sep.length()-1) + 1);
-		sep = sep.substring(0, sep.length()-1) + sepp;
+		String end;
 		if (endValue == null) {
 			if (fixedPart == null) {
-				this.endKey = null;
+				end = null;
 			} else {
-				this.endKey = fixedPart.substring(0, fixedPart.length()-1) + sep;
+				end = fixedPart.substring(0, fixedPart.length()-1);
 			}
-		} else
-			this.endKey = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(endValue, endValue.getClass()) + sep;
+		} else {
+			end = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(endValue, searchedKey.getType());
+		}
+		if (end != null) {
+			char lastEnd = end.charAt(end.length()-1);
+			lastEnd++;
+			end = end.substring(0, end.length()-1) + lastEnd;
+		}
+		this.endKey = end;
 	}
 
 	/**

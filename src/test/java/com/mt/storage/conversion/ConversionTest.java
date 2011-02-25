@@ -56,7 +56,7 @@ public class ConversionTest {
 		
 		if (checkString) {
 			for(int p = 1; p < res.length; ++p) {
-				assertTrue(res[p-1].compareTo(res[p]) < 0);
+				assertTrue(res[p-1].compareTo(res[p]) <= 0);
 			}
 		}
 		
@@ -108,7 +108,8 @@ public class ConversionTest {
 	
 	@Test
 	public void charConv() throws IllegalArgumentException, SecurityException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
-		this.convTest(char.class, Character.class, new Character [] {Character.MIN_VALUE, 1, 'B', 'Z', 'a', 'k', 512, Character.MAX_VALUE}, true);
+		this.convTest(char.class, Character.class, new Character [] {Character.MIN_VALUE, 1, 'B', 'Z', 'a', 'k', 512, '\uFFFE'}, true);
+		//\uFFFF is reserved as the array value separator
 	}
 	
 	@Test

@@ -71,10 +71,29 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 		return this.keyValues.isEmpty() && this.searchedKey == null ? null : new Constraint(this.clazz, this.keyValues, this.searchedKey, this.searchFrom, this.searchTo, true);
 	}
 	
+	/**
+	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link ClassConstraintBuilder#withKey(String)}.
+	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
+	 * @throws DatabaseNotReachedException
+	 */
 	public Set<T> go() throws DatabaseNotReachedException {
 		if (this.limit == null || this.limit < 1)
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
 		return StorageManagement.findElement(this.clazz, this.getConstraint(), this.limit);
+	}
+
+	
+	/**
+	 * Runs the query to find . Any limit set by {@link ClassConstraintBuilder#withKey(String)} will be ignored.
+	 * @return A (possibly null) element matching the query.
+	 * @throws DatabaseNotReachedException
+	 */
+	public T any()  throws DatabaseNotReachedException {
+		Set<T> elts = StorageManagement.findElement(this.clazz, this.getConstraint(), 1);
+		if (elts.isEmpty())
+			return null;
+		else
+			return elts.iterator().next();
 	}
 
 	public KeyConstraintBuilder<T> andWithKey(String key) {
