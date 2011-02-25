@@ -192,8 +192,23 @@ public class Store implements com.mt.storage.GenericStore {
 		this.admin = admin;
 		this.setConf(admin.getConfiguration());
 	}
+	
+	protected String mangleTableName(String table) {
+		if (table.startsWith(".") || table.startsWith("-")) {
+			table = "t" + table;
+		}
+		
+		for (int i = 0; i < table.length(); i++) {
+			char c = table.charAt(i);
+			if (! (Character.isLetterOrDigit(c) || c == '_' || c == '-' || c == '.'))
+				table = table.substring(0, i) + '_' + table.substring(i+1);
+		}
+		
+		return table;
+	}
 
 	protected boolean hasTable(String name) throws DatabaseNotReachedException {
+		name = this.mangleTableName(name);
 		if (this.tablesD.containsKey(name))
 			return true;
 
@@ -206,6 +221,7 @@ public class Store implements com.mt.storage.GenericStore {
 
 	protected HTable getTable(String name, Set<String> expectedFamilies)
 			throws DatabaseNotReachedException {
+		name = this.mangleTableName(name);
 		HTableDescriptor td;
 		boolean created = false;
 		synchronized (this.tablesD) {
@@ -252,6 +268,7 @@ public class Store implements com.mt.storage.GenericStore {
 
 	protected boolean hasColumnFamily(String table, String family)
 			throws DatabaseNotReachedException {
+		table = this.mangleTableName(table);
 		if (!this.hasTable(table))
 			return false;
 
