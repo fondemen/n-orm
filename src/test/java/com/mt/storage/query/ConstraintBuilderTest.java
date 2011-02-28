@@ -21,8 +21,8 @@ public class ConstraintBuilderTest {
 	
 	@Persisting(table="PersistableSearch")
 	public static class SUTClass {
-		@Key public final int key1;
-		@Key(order=2) public final int key2;
+		@Key public int key1;
+		@Key(order=2) public int key2;
 		
 		public int dummyVar;
 		

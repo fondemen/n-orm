@@ -12,18 +12,18 @@ public class IncrementsTest {
 
 	@Persisting
 	public static class Element {
-		@Key public final int key;
+		@Key public int key;
 		public int notIncrmenting;
 		@Incrementing public int incrementing;
-		@Incrementing public final MapColumnFamily<String, Short> incrementingFamily = null;
+		@Incrementing public MapColumnFamily<String, Short> incrementingFamily = null;
 		public Element(int key) {
 			this.key = key;
 		}
 	}
 	
 	public static class Value {
-		@Key public final String key;
-		@Key public final short value;
+		@Key public String key;
+		@Key public short value;
 		public Value(String key, short value) {
 			this.key = key;
 			this.value = value;

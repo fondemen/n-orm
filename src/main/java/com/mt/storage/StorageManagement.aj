@@ -32,6 +32,10 @@ public aspect StorageManagement {
 	}
 	
 	public void PersistingElement.store() throws DatabaseNotReachedException {
+		if (this.getIdentifier() == null)
+			throw new IllegalArgumentException("Cannot activate " + this + " before all its keys are valued.");
+		this.checkKeys();
+		
 		synchronized(this) {
 			if (this.isStoring)
 				return;
@@ -129,6 +133,8 @@ public aspect StorageManagement {
 				Map<String, byte[]> classColumn = new TreeMap<String, byte[]>();
 				String clsName = this.getClass().getName();
 				classColumn.put(CLASS_COLUMN, ConversionTools.convert(clsName, String.class));
+				//The next line to avoid repeating all properties in superclasses
+				changed.clear(); deleted.clear(); increments.clear();
 				changed.put(CLASS_COLUMN_FAMILY, classColumn);
 				String ident = this.getFullIdentifier();
 				for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
@@ -163,6 +169,10 @@ public aspect StorageManagement {
 	}
 
 	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
+		this.checkKeys();
+		if (this.getIdentifier() == null)
+			throw new IllegalArgumentException("Cannot activate " + this + " before all its keys are valued.");
+		
 		Set<String> toBeActivated = new TreeSet<String>();
 		if (families != null) {
 			for (String family : families) {

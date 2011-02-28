@@ -29,6 +29,8 @@ public aspect PropertyManagement {
 	}
 
 	declare soft : DatabaseNotReachedException : within(PropertyManagement) && adviceexecution();
+	
+//	declare error: set(!static !transient (!Collection+ && !java.io.Serializable+) PersistingElement+.*) : "Non serializable field ; may break element's serialization";
 
 	declare warning: get(@ExplicitActivation transient * PersistingElement+.*)
 		|| get(@ExplicitActivation static * PersistingElement+.*) : "This field is not persitent, thus cannot be auto-activated";
@@ -197,6 +199,9 @@ public aspect PropertyManagement {
 	public void checkProperty(Field f) {
 		if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) != 0)
 			return;
+		
+		if ((f.getModifiers()&Modifier.FINAL) != 0)
+			throw new IllegalStateException("The property " + f + " should not be final.");
 
 		Class<?> type = f.getType();
 		if (type.isArray())
@@ -275,7 +280,10 @@ public aspect PropertyManagement {
 	
 	void PersistingElement.storeProperties() {
 		PropertyManagement pm = PropertyManagement.getInstance();
+		KeyManagement km = KeyManagement.getInstance();
 		for (Field f : pm.getProperties(this.getClass())) {
+			if (km.isKey(f))
+				continue;
 			if (f.isAnnotationPresent(Incrementing.class))
 				continue;
 			Object val = pm.candideReadValue(this, f);
@@ -296,6 +304,8 @@ public aspect PropertyManagement {
 	
 	void PersistingElement.upgradeProperties() throws DatabaseNotReachedException {
 		PropertyManagement pm = PropertyManagement.getInstance();
+		KeyManagement km = KeyManagement.getInstance();
+		PropertyFamily props = this.getProperties();
 		for (Field f : pm.getProperties(this.getClass())) {
 			if (f.isAnnotationPresent(Incrementing.class))
 				continue;
@@ -309,7 +319,7 @@ public aspect PropertyManagement {
 			
 			Object val;
 			
-			Property prop = (Property) this.getProperties().getElement(f.getName());
+			Property prop = (Property) props.getElement(f.getName());
 			if (prop != null) {
 				val = prop.getValue();
 				if (oldVal != null && val != null && (oldVal instanceof PersistingElement) && (val instanceof byte []) && ConversionTools.convert(String.class, (byte[])val).equals(((PersistingElement)oldVal).getIdentifier())) {
@@ -339,7 +349,7 @@ public aspect PropertyManagement {
 				continue;
 			}
 	
-			if ((f.getModifiers() & Modifier.FINAL) == 0) {
+			if (! km.isKey(f)) {
 				// Setting proper value in property
 				try {
 					pm.setValue(this, f, val);

@@ -21,9 +21,10 @@ public class IDGeneratorTest {
 	
 	private static enum ExampleEnum {e1, e2};
 	@Persisting private static class Nominal {
-		@Key(order=3) public final String k1;
-		@Key(order=2) public final int k2;
-		@Key(order=1) public final ExampleEnum k3;
+		private static final long serialVersionUID = 3133936807735279330L;
+		@Key(order=3) public String k1;
+		@Key(order=2) public int k2;
+		@Key(order=1) public ExampleEnum k3;
 		public String anotherProperty;
 		public Nominal(String k1, int k2, ExampleEnum k3) {
 			super();
@@ -40,6 +41,11 @@ public class IDGeneratorTest {
 	}
 	
 	private static class InheritingNominal extends Nominal {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
 		public InheritingNominal(String k1, int k2, ExampleEnum k3) {
 			super(k1, k2, k3);
 		}
@@ -52,7 +58,7 @@ public class IDGeneratorTest {
 	}
 	
 	private static class InheritingNominalWithOneMoreKey extends Nominal {
-		@Key(order=4) public final String k4;
+		@Key(order=4) public String k4;
 		public InheritingNominalWithOneMoreKey(String k1, int k2, ExampleEnum k3, String k4) {
 			super(k1, k2, k3);
 			this.k4 = k4;
@@ -66,7 +72,7 @@ public class IDGeneratorTest {
 	}
 	
 	private static class InheritingNominalWithMissingKey extends Nominal {
-		@Key(order=5) public final String k4;
+		@Key(order=5) public String k4;
 		public InheritingNominalWithMissingKey(String k1, int k2, ExampleEnum k3, String k4) {
 			super(k1, k2, k3);
 			this.k4 = k4;
@@ -79,7 +85,7 @@ public class IDGeneratorTest {
 	}
 	
 	private static class InheritingNominalWithOverloadedKey extends Nominal {
-		@Key(order=2) public final String k4;
+		@Key(order=2) public String k4;
 		public InheritingNominalWithOverloadedKey(String k1, int k2, ExampleEnum k3, String k4) {
 			super(k1, k2, k3);
 			this.k4 = k4;
@@ -92,7 +98,7 @@ public class IDGeneratorTest {
 	}
 	
 	@Persisting	private static class KeWith0Index extends Nominal {
-		@Key(order=0) public final String k4;
+		@Key(order=0) public String k4;
 		public KeWith0Index(String k1, int k2, ExampleEnum k3, String k4) {
 			super(k1, k2, k3);
 			this.k4 = k4;
@@ -105,7 +111,7 @@ public class IDGeneratorTest {
 	}
 	
 	@Persisting	private static class PersitingWithObjectKey {
-		@Key(order=1) public final Object k4;
+		@Key(order=1) public Object k4;
 		public PersitingWithObjectKey(Object k4) {
 			this.k4 = k4;
 		}
@@ -141,7 +147,7 @@ public class IDGeneratorTest {
 	}
 	
 	@Persisting	private static class PersitingOwingPersisting {
-		@Key(order=1) public final Nominal el;
+		@Key(order=1) public Nominal el;
 		public PersitingOwingPersisting(String k1, int k2, ExampleEnum k3) {
 			this.el = new Nominal(k1, k2, k3);
 		}
@@ -151,25 +157,19 @@ public class IDGeneratorTest {
 		PersitingOwingPersisting po = new PersitingOwingPersisting("k1val", -3, ExampleEnum.e2);
 		Assert.assertEquals("e2" + ks + ConversionTools.convertToString(-3, int.class) + ks + "k1val" + ke + ke, po.getIdentifier());
 	}
-	
-	@Persisting private static class PersistingClassWithNonFinalKey {
-		@Key(order=1) public boolean key = false;
-	}
-	@Test(expected=IllegalStateException.class) public void persistingClassWithNonFinalKey() {
-		new PersistingClassWithNonFinalKey();
-	}
 
 	@Persisting
 	public static class AllTypesPersister {
-		@Key public final Date k1;
-		@Key(order = 2) public final String k2;
-		@Key(order = 3) public final boolean k3;
-		@Key(order = 4) public final int k4;
-		@Key(order = 5) public final byte k5;
-		@Key(order = 6) public final short k6;
-		@Key(order = 7) public final long k7;
-		@Key(order = 8) public final char k10;
-		@Key(order = 9) public final Integer k11;
+		private static final long serialVersionUID = 3565409613534779084L;
+		@Key public Date k1;
+		@Key(order = 2) public String k2;
+		@Key(order = 3) public boolean k3;
+		@Key(order = 4) public int k4;
+		@Key(order = 5) public byte k5;
+		@Key(order = 6) public short k6;
+		@Key(order = 7) public long k7;
+		@Key(order = 8) public char k10;
+		@Key(order = 9) public Integer k11;
 
 		public AllTypesPersister(Date k1, String k2, boolean k3, int k4,
 				byte k5, short k6, long k7, char k10,

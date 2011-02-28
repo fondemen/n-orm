@@ -4,17 +4,17 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.mt.storage.cf.CollectionColumnFamily;
 import com.mt.storage.cf.ColumnFamily;
 import com.mt.storage.cf.MapColumnFamily;
+import com.mt.storage.cf.SetColumnFamily;
 
 
 public class CollectionStorageTest {
@@ -43,8 +43,10 @@ public class CollectionStorageTest {
 	}
 	
 	public static class Element {
-		@Key public final int anint;
-		@Key(order=2) public final String key;
+		@Key public int anint;
+		@Key(order=2) public String key;
+		
+		public Element(){}
 
 		public Element(int anint, String key) {
 			this.anint = anint;
@@ -59,9 +61,12 @@ public class CollectionStorageTest {
 
 	@Persisting(table="TestContainer")
 	public static class Container {
-		@Key public final String key;
-		@Indexed(field="key") @ImplicitActivation public final Collection<Element> elements = null;
-		@Incrementing public final Map<String, Integer> elementsInc = null;
+		private static final long serialVersionUID = 6300245095742806502L;
+		@Key public String key;
+		@Indexed(field="key") @ImplicitActivation public Set<Element> elements = null;
+		@Incrementing public Map<String, Integer> elementsInc = null;
+		
+		public Container() {}
 
 		public Container(String key) {
 			this.key = key;
@@ -90,14 +95,15 @@ public class CollectionStorageTest {
 	
 	@Test
 	public void hasFamily() {
-		assertEquals(CollectionColumnFamily.class, sut.elements.getClass());
+		assertEquals(SetColumnFamily.class, sut.elements.getClass());
 		assertEquals(MapColumnFamily.class, sut.elementsInc.getClass());
 	}
 	
 	@Persisting
 	public static class ContainerSettingNonNull{
-		@Key public final String key = "key";
-		@Indexed(field="key") public final Collection<Element> elements = new ArrayList<CollectionStorageTest.Element>();
+		private static final long serialVersionUID = -6733375483339331294L;
+		@Key public String key = "key";
+		@Indexed(field="key") public Set<Element> elements = new TreeSet<CollectionStorageTest.Element>();
 	}
 	@Test(expected=IllegalArgumentException.class)
 	public void notSettingNull() {
@@ -106,8 +112,9 @@ public class CollectionStorageTest {
 	
 	@Persisting
 	public static class ContainerNotIndexed{
-		@Key public final String key = "key";
-		public final Collection<Element> elements = null;
+		private static final long serialVersionUID = -5893974957978021103L;
+		@Key public String key = "key";
+		public Set<Element> elements = null;
 	}
 	@Test(expected=IllegalArgumentException.class)
 	public void notIndexed() {
@@ -129,7 +136,7 @@ public class CollectionStorageTest {
 		assertEquals(sut.elements.size(), copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 1; i <= sut.elements.size(); ++i) {
-			assertTrue(((CollectionColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(((SetColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
 		}
 		assertTrue(copy.elements.containsAll(sut.elements));
 		this.assertHadNoQuery();
@@ -144,7 +151,7 @@ public class CollectionStorageTest {
 		assertEquals(4, copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 3; i <= 6; ++i) {
-			assertTrue(((CollectionColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(((SetColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
 		}
 		this.assertHadNoQuery();
 	}
@@ -158,7 +165,7 @@ public class CollectionStorageTest {
 		assertEquals(3, copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 7; i <= 9; ++i) {
-			assertTrue(((CollectionColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(((SetColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
 		}
 		this.assertHadNoQuery();
 	}
@@ -172,9 +179,9 @@ public class CollectionStorageTest {
 		assertEquals(5, copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 1; i <= 4; ++i) {
-			assertTrue(((CollectionColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(((SetColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
 		}
-		assertTrue(((CollectionColumnFamily<Element>)copy.elements).contains(new Element("E10")));
+		assertTrue(((SetColumnFamily<Element>)copy.elements).contains(new Element("E10")));
 		this.assertHadNoQuery();
 	}
 	
@@ -192,8 +199,9 @@ public class CollectionStorageTest {
 	
 	@Persisting(table="TestContainer")
 	public static class AddonlyContainer {
-		@Key public final String key;
-		@Indexed(field="key") @AddOnly public final Collection<Element> elements = null;
+		private static final long serialVersionUID = -8766880305630431989L;
+		@Key public String key;
+		@Indexed(field="key") @AddOnly public Set<Element> elements = null;
 
 		public AddonlyContainer(String key) {
 			this.key = key;
@@ -218,12 +226,12 @@ public class CollectionStorageTest {
 		this.assertHadNoQuery();
 		assertTrue(!copy.elements.contains(new Element("GFYUBY")));
 		this.assertHadNoQuery();
-		assertFalse(((CollectionColumnFamily<Element>)copy.elements).containsInStore(new Element("GFYUBY")));
+		assertFalse(((SetColumnFamily<Element>)copy.elements).containsInStore(new Element("GFYUBY")));
 		assertTrue(copy.elements.isEmpty());
 		this.assertHadAQuery();
 		assertFalse(copy.elements.contains(new Element("E6")));
 		this.assertHadNoQuery();
-		assertTrue(((CollectionColumnFamily<Element>)copy.elements).containsInStore(new Element("E6")));
+		assertTrue(((SetColumnFamily<Element>)copy.elements).containsInStore(new Element("E6")));
 		assertEquals(1, copy.elements.size());
 		this.assertHadAQuery();
 		assertTrue(copy.elements.contains(new Element("E6")));
