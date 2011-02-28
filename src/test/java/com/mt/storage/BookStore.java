@@ -2,9 +2,12 @@ package com.mt.storage;
 
 @Persisting
 public class BookStore {
-	@Key private final String hashcode;
+	private static final long serialVersionUID = -3919962605456785443L;
+	@Key private String hashcode;
 	private String name;
 
+	public BookStore() {}
+	
 	public BookStore(String hashcode) {
 		this.hashcode = hashcode;
 	}

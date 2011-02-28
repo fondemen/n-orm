@@ -22,9 +22,9 @@ public class SimpleStorageTest {
 	public static class SimpleElement {
 		@SuppressWarnings("unused")
 		@Key(order = 1)
-		private final String key1;
+		private  String key1;
 		@Key(order = 2)
-		public final String[] key2;
+		public  String[] key2;
 		public String prop1;
 		public boolean prop2;
 		public String nullProp;
@@ -250,7 +250,7 @@ public class SimpleStorageTest {
 	@Persisting
 	public static class DummyPersister {
 		@Key
-		public final String key = "singleton";
+		public  String key = "singleton";
 		public Object property;
 	}
 
@@ -262,7 +262,7 @@ public class SimpleStorageTest {
 	
 	@Persisting
 	public static class IncrementingElement {
-		@Key public final String key;
+		@Key public  String key;
 		@Incrementing public long lval;
 		@Incrementing public int ival;
 		@Incrementing public short sval;

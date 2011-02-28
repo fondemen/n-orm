@@ -19,7 +19,7 @@ public class RelationalStorageTest {
 	}
 	
 	public static class SimpleElement {
-		@Key public final String prop1;
+		@Key public String prop1;
 		public SimpleElement(String prop1) {
 			super();
 			this.prop1 = prop1;
@@ -33,7 +33,7 @@ public class RelationalStorageTest {
 	}
 	
 	public static class NotOnlyKeysElement {
-		@Key public final String prop1;
+		@Key public String prop1;
 		public String prop3;
 		public NotOnlyKeysElement(String prop1) {
 			super();
@@ -45,7 +45,7 @@ public class RelationalStorageTest {
 	}
 	
 	public static class Composed1Element {
-		@Key private final SimpleElement key;
+		@Key private  SimpleElement key;
 		public Composed1Element(SimpleElement key) {
 			super();
 			this.key = key;
@@ -62,8 +62,8 @@ public class RelationalStorageTest {
 	}
 	
 	public static class Composed2Elements {
-		@Key private final SimpleElement key1;
-		@Key(order=2) private final Composed1Element key2;
+		@Key private  SimpleElement key1;
+		@Key(order=2) private  Composed1Element key2;
 		public Composed2Elements(SimpleElement key1, Composed1Element key2) {
 			this.key1 = key1;
 			this.key2 = key2;
@@ -83,8 +83,8 @@ public class RelationalStorageTest {
 	}
 	
 	public static class Composed3Elements {
-		@Key private final Composed2Elements key1;
-		@Key(order=2) private final Composed2Elements key2;
+		@Key private  Composed2Elements key1;
+		@Key(order=2) private  Composed2Elements key2;
 		public Composed3Elements(Composed2Elements key1, Composed2Elements key2) {
 			this.key1 = key1;
 			this.key2 = key2;
@@ -106,7 +106,7 @@ public class RelationalStorageTest {
 	}
 	
 	@Persisting(table="PC") public static class PersistingComposed {
-		@Key public final String key;
+		@Key public  String key;
 		public Composed3Elements value;
 		public PersistingComposed(String key) {
 			super();
@@ -128,7 +128,7 @@ public class RelationalStorageTest {
 	}
 	
 	@Persisting(table="Inside") public static class PersistingInside {
-		@Key public final String key;
+		@Key public  String key;
 		public String val;
 		public PersistingInside(String key) {
 			super();
@@ -136,7 +136,7 @@ public class RelationalStorageTest {
 		}
 	}
 	@Persisting(table="Outside") public static class PersistingOutside {
-		@Key public final String key;
+		@Key public  String key;
 		public PersistingInside val;
 		public PersistingOutside(String key) {
 			super();
@@ -176,7 +176,7 @@ public class RelationalStorageTest {
 	}
 	
 	@Persisting(table="Outside") public static class PersistingOutsideExplicit {
-		@Key public final String key;
+		@Key public  String key;
 		@ExplicitActivation public PersistingInside val;
 		public PersistingOutsideExplicit(String key) {
 			super();

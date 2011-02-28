@@ -5,5 +5,5 @@ import com.mt.storage.Persisting;
 
 @Persisting
 public class Element {
-	@Key public final byte key = '\0';
+	@Key public byte key = '\0';
 }

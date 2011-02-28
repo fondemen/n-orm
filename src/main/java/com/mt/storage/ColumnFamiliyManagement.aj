@@ -12,10 +12,9 @@ import java.util.Set;
 
 import org.aspectj.lang.reflect.FieldSignature;
 
-import com.mt.storage.cf.CollectionColumnFamily;
+import com.mt.storage.cf.SetColumnFamily;
 import com.mt.storage.cf.ColumnFamily;
 import com.mt.storage.cf.MapColumnFamily;
-import com.mt.storage.conversion.ConversionTools;
 
 
 public aspect ColumnFamiliyManagement {
@@ -32,10 +31,9 @@ public aspect ColumnFamiliyManagement {
 	declare soft : NoSuchMethodException : within(ColumnFamiliyManagement) && adviceexecution();
 	declare soft : InvocationTargetException : within(ColumnFamiliyManagement) && adviceexecution();
 
-	declare error: set(!transient !static !final Collection+ PersistingElement+.*) : "A persisting column family must be final";
-	declare error: set(!transient !static !final Map+ PersistingElement+.*) : "A persisting column family must be final";
-	declare error: set(!transient !static !final ColumnFamily+ PersistingElement+.*) : "A persisting column family must be final";
-	declare error: set(static ColumnFamily+ PersistingElement+.*) : "Column families must not be static";
+	declare error: set(!transient !static final (Set || Map || ColumnFamily+) PersistingElement+.*) : "A persisting column family must not be final";
+	declare error: set(static (Set || Map || ColumnFamily+) PersistingElement+.*) : "Column families must not be static";
+	declare error: set(!transient !static (Collection+ && !Set && !ColumnFamily+) PersistingElement+.*) : "Only Set and Maps are supported collections";
 
 	declare warning: get(@ImplicitActivation transient * PersistingElement+.*)
 		|| get(@ImplicitActivation static * PersistingElement+.*) : "This field is not persitent, thus cannot be auto-activated";
@@ -82,18 +80,23 @@ public aspect ColumnFamiliyManagement {
 	}
 
 	public boolean isCollectionType(Class<?> type) {
-		return Collection.class.equals(type) || Map.class.equals(type) || ColumnFamily.class.isAssignableFrom(type);
+		return Set.class.equals(type) || Map.class.equals(type) || SetColumnFamily.class.isAssignableFrom(type) || MapColumnFamily.class.isAssignableFrom(type);
 	}
 	
-	void around(PersistingElement self, Object cf): (set(!transient !static final Collection+ PersistingElement+.*) || set(!transient !static final Map+ PersistingElement+.*)) && target(self) && args(cf) {
+	void around(PersistingElement self, Object cf): set(!transient !static (Set+ || Map+) PersistingElement+.*) && target(self) && args(cf) {
+
+		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();
+		Field field = sign.getField();
+		assert isCollectionFamily(field);
+		
+		if (PropertyManagement.getInstance().candideReadValue(self, field) != null)
+			throw new IllegalArgumentException("Cannot change column family " + field + " as it is already set in " + self);
+		
 		if (cf != null && (cf instanceof ColumnFamily<?>)) {
 			proceed(self, cf);
 			return;
 		}
 		
-		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();
-		Field field = sign.getField();
-		assert isCollectionFamily(field);
 		Indexed index = field.getAnnotation(Indexed.class);
 		if (cf != null)
 			throw new IllegalArgumentException("Can only set null value to persisting collection " + field);
@@ -108,7 +111,7 @@ public aspect ColumnFamiliyManagement {
 			if (index == null)
 				throw new IllegalArgumentException("Field " + field + " must declare annotation " + Indexed.class);
 			Class<?> elementClass = (Class<?>)collType.getActualTypeArguments()[0];
-			acf = new CollectionColumnFamily(elementClass, field, self, index.field(), field.isAnnotationPresent(AddOnly.class));
+			acf = new SetColumnFamily(elementClass, field, self, index.field(), field.isAnnotationPresent(AddOnly.class));
 		}
 		proceed(self, acf);
 	}

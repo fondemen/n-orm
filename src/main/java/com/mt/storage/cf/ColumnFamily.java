@@ -14,7 +14,7 @@ import com.mt.storage.IncrementManagement;
 import com.mt.storage.PersistingElement;
 import com.mt.storage.conversion.ConversionTools;
 
-public class ColumnFamily<T> {
+public abstract class ColumnFamily<T> {
 	public static enum ChangeKind {SET, DELETE};
 	
 	protected final Class<T> clazz;
@@ -49,6 +49,8 @@ public class ColumnFamily<T> {
 			this.increments = null;
 		}
 	}
+	
+	public abstract Object getSerializableVersion();
 	
 	public String getName() {
 		return name;
@@ -91,6 +93,7 @@ public class ColumnFamily<T> {
 	}
 	
 	public void activate(Constraint c) throws DatabaseNotReachedException {
+		this.owner.checkKeys();
 		String id = this.owner.getIdentifier();
 		assert id != null;
 		Map<String, byte[]> elements = c == null ? this.owner.getStore().get(this.ownerTable, id, this.name) : this.owner.getStore().get(this.ownerTable, id, this.name, c);

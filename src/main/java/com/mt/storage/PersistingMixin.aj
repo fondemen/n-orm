@@ -18,6 +18,7 @@ public privileged aspect PersistingMixin {
 	//declare error: set(!@Key !transient !static (!Collection+) (PersistingElement+).*) && withincode((@Persisting *).new(..)) : "Only key attribute should be set within a persisting constructor.";
 
 	declare error : set(static !transient !final * PersistingElement+.*) : "Static fields can only be transient in persisting classes";
+	declare error: set(final !transient !static * PersistingElement+.*) : "Final fields must be transient";
 	
 	pointcut creation(PersistingElement self): execution(com.mt.storage.PersistingElement+.new(..)) && this(self) && if(thisJoinPointStaticPart.getSignature().getDeclaringType().equals(self.getClass()));
 	
@@ -50,7 +51,7 @@ public privileged aspect PersistingMixin {
 	}
 	
 	public int PersistingElement.hashCode() {
-		return (this.getClass().getName() + ':' + this.getIdentifier()).hashCode();
+		return this.getFullIdentifier().hashCode();
 	}
 	
 	public int PersistingElement.compareTo(PersistingElement rhs) {
@@ -61,6 +62,18 @@ public privileged aspect PersistingMixin {
 			return clsCmp;
 		
 		return this.getIdentifier().compareTo(((PersistingElement)rhs).getIdentifier());
+	}
+	
+	public String PersistingElement.toString() {
+		StringBuffer sb = new StringBuffer();
+		sb.append(this.getClass().getName());
+		String ident = this.getIdentifier();
+		if (ident == null) {
+			sb.append(" with no key yet (missing some key values)");
+		} else {
+			sb.append(" with key " + ident);
+		}
+		return sb.toString();
 	}
 	
 }

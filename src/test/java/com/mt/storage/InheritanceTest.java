@@ -8,7 +8,7 @@ import java.util.TreeSet;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.mt.storage.cf.CollectionColumnFamily;
+import com.mt.storage.cf.SetColumnFamily;
 import com.mt.storage.cf.MapColumnFamily;
 import com.mt.storage.conversion.ConversionTools;
 
@@ -27,7 +27,7 @@ public class InheritanceTest {
 
 	 @Persisting
 	 public static class Ancestor {
-		 @Key(order=1) public final String key;
+		 @Key(order=1) public String key;
 
 		public Ancestor(String key) {
 			this.key = key;
@@ -37,7 +37,7 @@ public class InheritanceTest {
 
 	 @Persisting
 	 public static class Child1 extends Ancestor {
-		 @Key(order = 2) public final String key2;
+		 @Key(order = 2) public String key2;
 
 		public Child1(String key, String key2) {
 			super(key);
@@ -47,7 +47,7 @@ public class InheritanceTest {
 
 	 @Persisting
 	 public static class Child2 extends Ancestor {
-		 @Key(order = 2) public final String key2;
+		 @Key(order = 2) public String key2;
 
 		public Child2(String key, String key2) {
 			super(key);
@@ -109,7 +109,7 @@ public class InheritanceTest {
 	}
 	
 	public static class AncestorKeyed {
-		@Key public final Ancestor key;
+		@Key public Ancestor key;
 		public AncestorKeyed(Ancestor key) {
 			this.key = key;
 		}
@@ -117,12 +117,12 @@ public class InheritanceTest {
 	 
 	 @Persisting
 	 public static class AncestorContainer {
-		@Key public final Ancestor[] aak;
+		@Key public Ancestor[] aak;
 		public Ancestor[] aap;
-		@Indexed(field="key") public final CollectionColumnFamily<Ancestor> ac = null;
-		@Indexed(field="key") public final CollectionColumnFamily<AncestorKeyed> ack = null;
-		public final MapColumnFamily<Ancestor, String> akm = null;
-		public final MapColumnFamily<String, Ancestor> avm = null;
+		@Indexed(field="key") public SetColumnFamily<Ancestor> ac = null;
+		@Indexed(field="key") public SetColumnFamily<AncestorKeyed> ack = null;
+		public MapColumnFamily<Ancestor, String> akm = null;
+		public MapColumnFamily<String, Ancestor> avm = null;
 		public AncestorContainer(Ancestor... aak) {
 			this.aak = aak;
 		}

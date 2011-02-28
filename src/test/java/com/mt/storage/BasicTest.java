@@ -89,7 +89,7 @@ public class BasicTest {
 		 assertEquals("book name", p.getName());
 	 }
 	 
-	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStore() {
+	 @Test(expected=IllegalArgumentException.class) public void bookWithNoBookStore() {
 		 new Book(null, new Date(1234567890), new Date(1234567890));
 	 }
 	

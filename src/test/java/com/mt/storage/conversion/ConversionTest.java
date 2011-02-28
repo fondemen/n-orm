@@ -129,7 +129,7 @@ public class ConversionTest {
 	}
 	
 	public static class Keyable1Key {
-		@Key public final String key;
+		@Key public  String key;
 
 		public Keyable1Key(String key) {
 			super();
@@ -147,8 +147,8 @@ public class ConversionTest {
 	}
 	
 	public static class Keyable2Keys {
-		@Key public final int key1;
-		@Key(order=2) public final String key2;
+		@Key public  int key1;
+		@Key(order=2) public  String key2;
 
 		public Keyable2Keys(int key1, String key2) {
 			super();
@@ -168,7 +168,7 @@ public class ConversionTest {
 	
 	@Persisting
 	public static class Persistable {
-		@Key public final String key;
+		@Key public  String key;
 		public String value;
 		
 		public Persistable(String key) {
@@ -230,8 +230,8 @@ public class ConversionTest {
 	}
 	
 	public static class Inner {
-		@Key(order = 1) public final String k1;
-		@Key(order = 2) public final String k2;
+		@Key(order = 1) public  String k1;
+		@Key(order = 2) public  String k2;
 		public Inner(String k1, String k2) {
 			this.k1 = k1;
 			this.k2 = k2;
@@ -241,8 +241,8 @@ public class ConversionTest {
 		}
 	}
 	public static class Outer {
-		@Key(order=1) public final Inner[] k1;
-		@Key(order=2) public final Inner[] k2;
+		@Key(order=1) public  Inner[] k1;
+		@Key(order=2) public  Inner[] k2;
 		public Outer(Inner[] k1, Inner[] k2) {
 			this.k1 = k1;
 			this.k2 = k2;
@@ -265,7 +265,7 @@ public class ConversionTest {
 	}
 	
 	public static class Inner2 {
-		@Key(order = 1) public final String[] k;
+		@Key(order = 1) public  String[] k;
 		public Inner2(String... k) {
 			this.k = k;
 		}
@@ -283,7 +283,7 @@ public class ConversionTest {
 		}
 	}
 	public static class Outer2 {
-		@Key(order=1) public final Inner2[] k;
+		@Key(order=1) public  Inner2[] k;
 		public Outer2(Inner2... k) {
 			this.k = k;
 		}
@@ -300,8 +300,8 @@ public class ConversionTest {
 	}
 	
 	public static class Outer3 {
-		@Key(order=1) public final String f;
-		@Key(order=2) public final Inner2[] k;
+		@Key(order=1) public  String f;
+		@Key(order=2) public  Inner2[] k;
 		public Outer3(String f, Inner2... k) {
 			this.f = f;
 			this.k = k;

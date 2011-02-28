@@ -5,10 +5,15 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.aspectj.lang.reflect.FieldSignature;
 
 import com.mt.storage.conversion.ArrayConverter;
 import com.mt.storage.conversion.ConversionTools;
@@ -46,6 +51,8 @@ public aspect KeyManagement {
 	declare error: set(@Key java.lang.Double PersistingElement+.*) : "Floating values not supported in keys...";
 	declare error: set(@Key float PersistingElement+.*) : "Floating values not supported in keys...";
 	declare error: set(@Key java.lang.Float PersistingElement+.*) : "Floating values not supported in keys...";
+	//declare error: PersistingElement+ && hasField(@Key double *) : "Floating values not supported in keys..."; //AJ 1.6.9 style
+	declare error: set(@Key final * *.*) : "A key should not be final";
 	
 	private static class DecomposableString {
 		private static final String keySeparator;
@@ -121,7 +128,7 @@ public aspect KeyManagement {
 		@SuppressWarnings("unchecked")
 		private <U> U detectLastKeyedElement(Class<U> expected) {
 			Class<? extends U> actualType = expected;
-			String actualTypeName = this.detectLastUpTo(true, keyEndSeparator);
+			String actualTypeName = this.detectLastUpTo(false, keyEndSeparator);
 			if (!actualTypeName.isEmpty()) {
 				try {
 					Class<?> detectedCls = Class.forName(actualTypeName);
@@ -133,6 +140,8 @@ public aspect KeyManagement {
 				}
 			}
 			
+			String ident = this.rest;
+			this.detectLast(keyEndSeparator);
 			List<Field> keys = km.detectKeys(actualType);
 			Object [] vals = new Object[keys.size()];
 			for (int i = vals.length-1; i >= 0; i--) {
@@ -140,7 +149,13 @@ public aspect KeyManagement {
 				if (i > 0)
 					this.checkLast(keySeparator);
 			}
-			return KeyManagement.getInstance().createElement(actualType, vals);
+			ident = ident.substring(this.rest.length());
+			U ret = KeyManagement.getInstance().createElement(actualType, vals);
+			if (ret instanceof PersistingElement) {
+				((PersistingElement)ret).identifier = ident;
+				((PersistingElement)ret).getFullIdentifier();
+			}
+			return ret;
 		}
 		
 		private <U> U detectLastSimpleElement(Class<U> expected) {
@@ -189,10 +204,6 @@ public aspect KeyManagement {
 	private transient String PersistingElement.identifier;
 	private transient String PersistingElement.fullIdentifier;
 	
-	after(PersistingElement self) returning: PersistingMixin.creation(self) {
-		self.identifier = this.createIdentifier(self, self.getClass());
-	}
-	
 	public <T> T createElement(Class<T> expectedType, String id) {
 		try {
 			return new DecomposableString(id).detect(expectedType);
@@ -219,9 +230,21 @@ public aspect KeyManagement {
 				tkeyTypes[i] = key.getType();
 				i++;
 			}
-			Constructor<? extends T> constr = type.getConstructor(tkeyTypes);
 			
-			return constr.newInstance(keyValues);
+			T ret;
+			try { //using the default constructor
+				ret = type.getConstructor().newInstance();
+				i = 0;
+				PropertyManagement pm = PropertyManagement.getInstance();
+				for (Field key : tkeys) {
+					pm.setValue(ret, key, keyValues[i]);
+					i++;
+				}
+			} catch (NoSuchMethodException x) { //Old fashion: a constructor taking keys as arguments following the order of the keys
+				Constructor<? extends T> constr = type.getConstructor(tkeyTypes);
+				ret = constr.newInstance(keyValues);
+			}
+			return ret;
 		} catch (Exception x) {
 			String[] strVals = new String[keyValues.length];
 			for (int i = 0; i < strVals.length; i++) {
@@ -233,8 +256,9 @@ public aspect KeyManagement {
 
 	public boolean canCreateFromKeys(Class<?> type) {
 		if (!PersistingElement.class.isAssignableFrom(type)) {
-			for (Field property : PropertyManagement.getInstance().getProperties(type)) {
-				if (PropertyManagement.getInstance().isProperty(property) && ! this.isKey(property))
+			PropertyManagement pm = PropertyManagement.getInstance();
+			for (Field property : pm.getProperties(type)) {
+				if (pm.isProperty(property) && ! this.isKey(property))
 					return false;
 			}
 		}
@@ -293,8 +317,8 @@ public aspect KeyManagement {
 		if (f.getAnnotation(Key.class).order() <= 0)
 			throw new IllegalArgumentException("A key should declare an order which must bhe at least 1.");
 		
-		if ((f.getModifiers()&Modifier.FINAL) == 0)
-			throw new IllegalStateException("The key " + f + " should be final.");
+		if ((f.getModifiers()&Modifier.FINAL) != 0)
+			throw new IllegalStateException("The key " + f + " should not be final.");
 	}
 	
 	public boolean isKey(Field key) {
@@ -320,7 +344,9 @@ public aspect KeyManagement {
 					if (fst) fst = false; else ret.append(KEY_SEPARATOR);
 					Object o = PropertyManagement.getInstance().readValue(element, key);
 					if (o == null)
-						throw new IllegalStateException("A key cannot be null.");
+						throw new IllegalStateException("A key cannot be null as it is the case for key " + key + " of " + element);
+//					if (key.getType().isArray() && Array.getLength(o) == 0)
+//						throw new IllegalStateException("An array key cannot be empty as it is the case for key " + key + " of " + element);
 					ret.append(ConversionTools.convertToString(o, key.getType()));
 				}
 				ret.append(KEY_END_SEPARATOR);
@@ -337,16 +363,48 @@ public aspect KeyManagement {
 			throw new RuntimeException(x);
 		}
 	}
-
+	
+	private transient Set<String> PersistingElement.keysSet = new TreeSet<String>();
+	private transient boolean PersistingElement.allKeysSet = false;
+	
+	before (PersistingElement self, Object newVal) : set(@Key * PersistingElement+.*) && target(self) && args(newVal) {
+		Field key = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
+		if (newVal == null)
+			throw new IllegalArgumentException("Cannot set key " + key + " to null.");
+		Class<?> type = key.getType();
+		boolean isArray = type.isArray();
+//		if(isArray && Array.getLength(newVal)==0)
+//			throw new IllegalArgumentException("Cannot set key " + key + " to an empty array.");
+		String keyName = key.getName();
+		if (self.keysSet.contains(keyName))
+			throw new IllegalArgumentException("Cannot change the value of key " + key + " already set for object " + self + " (key was already set to " + PropertyManagement.getInstance().candideReadValue(self, key) + ')');
+		self.keysSet.add(keyName);
+		if (self.keysSet.size() == this.detectKeys(self.getClass()).size())
+			self.allKeysSet = true;
+	}
+	
+	public void PersistingElement.checkKeys() {
+		String actualIdent = KeyManagement.getInstance().createIdentifier(this, this.getClass());
+		if (!this.getIdentifier().equals(actualIdent))
+			throw new IllegalStateException("Keys of " + this + " must have changed: identifier " + this.getIdentifier() + " became " + actualIdent);
+	}
 
 	public String PersistingElement.getIdentifier() {
+		if (this.allKeysSet && this.identifier == null) {
+			this.identifier = KeyManagement.getInstance().createIdentifier(this, this.getClass());
+			if (this.identifier == null)
+				throw new IllegalStateException("Element " + this + " has no identifier ; have all keys been set ?");
+		}
 		return this.identifier;
 	}
 
 
 	public String PersistingElement.getFullIdentifier() {
-		if (this.fullIdentifier == null)
+		if (this.allKeysSet && this.fullIdentifier == null) {
 			this.fullIdentifier = KeyManagement.getInstance().createIdentifier(this, PersistingElement.class);
+			if (this.fullIdentifier == null)
+				throw new IllegalStateException("Element " + this + " has no identifier ; have all keys been set ?");
+		}
 		return this.fullIdentifier;
 	}
 }

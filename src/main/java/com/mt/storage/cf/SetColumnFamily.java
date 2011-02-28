@@ -3,24 +3,30 @@ package com.mt.storage.cf;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Set;
 
 import com.mt.storage.DatabaseNotReachedException;
 import com.mt.storage.DecrementException;
 import com.mt.storage.PersistingElement;
 import com.mt.storage.PropertyManagement;
 
-public class CollectionColumnFamily<T> extends ColumnFamily<T> implements Collection<T> {
+public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	private final Field index;
 
-	public CollectionColumnFamily(Class<T> clazz, Field property,
+	public SetColumnFamily(Class<T> clazz, Field property,
 			PersistingElement owner, String index, boolean addOnly) throws SecurityException, NoSuchFieldException {
 		this(clazz, property, property.getName(), owner, PropertyManagement.getInstance().getProperty(clazz, index), addOnly);
 	}
 
-	public CollectionColumnFamily(Class<T> clazz, Field property, String name,
+	public SetColumnFamily(Class<T> clazz, Field property, String name,
 			PersistingElement owner, Field index, boolean addOnly) {
 		super(clazz, property, name, owner, addOnly, false);
 		this.index = index;
+	}
+	
+	@Override
+	public Object getSerializableVersion() {
+		return this.collection.values();
 	}
 
 	protected String getIndex(T object) {

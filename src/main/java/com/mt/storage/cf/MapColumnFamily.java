@@ -20,6 +20,11 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 		this.keyIsString = this.keyClazz.equals(String.class);
 	}
 	
+	@Override
+	public Object getSerializableVersion() {
+		return this.collection;
+	}
+	
 	protected String toKey(K key) {
 		return this.keyIsString ? (String)key : ConversionTools.convertToString(key, this.keyClazz);
 	}
