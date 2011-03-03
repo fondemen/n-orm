@@ -5,7 +5,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.LinkedList;
@@ -371,8 +370,8 @@ public aspect KeyManagement {
 		Field key = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
 		if (newVal == null)
 			throw new IllegalArgumentException("Cannot set key " + key + " to null.");
-		Class<?> type = key.getType();
-		boolean isArray = type.isArray();
+//		Class<?> type = key.getType();
+//		boolean isArray = type.isArray();
 //		if(isArray && Array.getLength(newVal)==0)
 //			throw new IllegalArgumentException("Cannot set key " + key + " to an empty array.");
 		String keyName = key.getName();
@@ -383,6 +382,23 @@ public aspect KeyManagement {
 			self.allKeysSet = true;
 	}
 	
+	public boolean PersistingElement.areAllKeysSet() {
+		if (this.allKeysSet)
+			return true;
+
+		PropertyManagement pm = PropertyManagement.getInstance();
+		for (Field key : KeyManagement.getInstance().detectKeys(this.getClass())) {
+			if (this.keysSet != null && this.keysSet.contains(key.getName()))
+				continue;
+			if (Object.class.isAssignableFrom(key.getType()))
+				continue;
+			if (pm.candideReadValue(this, key) == null)
+				return false;
+		}
+		this.allKeysSet = true;
+		return true;
+	}
+	
 	public void PersistingElement.checkKeys() {
 		String actualIdent = KeyManagement.getInstance().createIdentifier(this, this.getClass());
 		if (!this.getIdentifier().equals(actualIdent))
@@ -390,7 +406,7 @@ public aspect KeyManagement {
 	}
 
 	public String PersistingElement.getIdentifier() {
-		if (this.allKeysSet && this.identifier == null) {
+		if (this.areAllKeysSet() && this.identifier == null) {
 			this.identifier = KeyManagement.getInstance().createIdentifier(this, this.getClass());
 			if (this.identifier == null)
 				throw new IllegalStateException("Element " + this + " has no identifier ; have all keys been set ?");
@@ -400,7 +416,7 @@ public aspect KeyManagement {
 
 
 	public String PersistingElement.getFullIdentifier() {
-		if (this.allKeysSet && this.fullIdentifier == null) {
+		if (this.areAllKeysSet() && this.fullIdentifier == null) {
 			this.fullIdentifier = KeyManagement.getInstance().createIdentifier(this, PersistingElement.class);
 			if (this.fullIdentifier == null)
 				throw new IllegalStateException("Element " + this + " has no identifier ; have all keys been set ?");

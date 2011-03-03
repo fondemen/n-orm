@@ -1,5 +1,6 @@
 package com.mt.storage.cf;
 
+import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Map;
@@ -50,7 +51,7 @@ public abstract class ColumnFamily<T> {
 		}
 	}
 	
-	public abstract Object getSerializableVersion();
+	public abstract Serializable getSerializableVersion();
 	
 	public String getName() {
 		return name;

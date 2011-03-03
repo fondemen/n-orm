@@ -1,9 +1,11 @@
 package com.mt.storage.cf;
 
+import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.TreeSet;
 
 import com.mt.storage.DatabaseNotReachedException;
 import com.mt.storage.DecrementException;
@@ -25,8 +27,8 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	}
 	
 	@Override
-	public Object getSerializableVersion() {
-		return this.collection.values();
+	public Serializable getSerializableVersion() {
+		return new TreeSet<T>(this.collection.values());
 	}
 
 	protected String getIndex(T object) {
