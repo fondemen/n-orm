@@ -1,10 +1,14 @@
 package com.mt.storage.cf;
 
+import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+
+import javax.xml.crypto.dsig.keyinfo.KeyValue;
 
 import com.mt.storage.PersistingElement;
 import com.mt.storage.conversion.ConversionTools;
@@ -21,8 +25,12 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 	}
 	
 	@Override
-	public Object getSerializableVersion() {
-		return this.collection;
+	public Serializable getSerializableVersion() {
+		TreeMap<K, T> ret = new TreeMap<K, T>();
+		for (java.util.Map.Entry<K, T> kv : this.entrySet()) {
+			ret.put(kv.getKey(), kv.getValue());
+		}
+		return ret;
 	}
 	
 	protected String toKey(K key) {
