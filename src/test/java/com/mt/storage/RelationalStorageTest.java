@@ -150,9 +150,7 @@ public class RelationalStorageTest {
 		PersistingOutside out = new PersistingOutside("outside");
 		out.val = in;
 		out.store(); //No need to store in ; should be triggered automatically.
-		assertEquals("outside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
 		assertEquals("inside" + ke, ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
-		assertEquals("inside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Inside", "inside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
 		assertEquals("value", ConversionTools.convert(String.class, Memory.INSTANCE.get("Inside", "inside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
 		
 		PersistingOutside out2 = new PersistingOutside("outside");
@@ -166,13 +164,12 @@ public class RelationalStorageTest {
 		PersistingInside in = new PersistingInside("inside");
 		in.val = "value";
 		in.store();
-		Memory.INSTANCE.reset();
+		Memory.INSTANCE.reset(); //Makes in believe that it already exists while memory forgets
 		PersistingOutside out = new PersistingOutside("outside");
 		out.val = in;
-		out.store(); //Should store keys
-		assertEquals("outside", ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key")));
+		out.store(); //Should not store anything
 		assertEquals("inside" + ke, ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
-		assertTrue(Memory.INSTANCE.getTable("Inside").containsKey("inside" + ke));
+		assertFalse(Memory.INSTANCE.getTable("Inside").containsKey("inside" + ke)); //memory was reseted ; in was not stored for it thought it was not changed and in store
 	}
 	
 	@Persisting(table="Outside") public static class PersistingOutsideExplicit {

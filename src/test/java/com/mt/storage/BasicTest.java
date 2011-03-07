@@ -33,7 +33,7 @@ public class BasicTest {
 		
 		if (bssut == null) {
 			 bssut = new BookStore("testbookstore");
-			 bssut.setName("book name");
+			 bssut.setName("bookstore name");
 			 changed = true;
 		}
 		
@@ -54,7 +54,7 @@ public class BasicTest {
 	 @Test public void bookStoreRetrieve() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
-		 assertEquals("book name", p.getName());
+		 assertEquals("bookstore name", p.getName());
 	 }
 	 
 	 @Test public void unknownBookStoreRetrieve() throws DatabaseNotReachedException {
@@ -85,8 +85,8 @@ public class BasicTest {
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 v.activate();
 		 assertSame(p, v.getBookStore());
-		 assertEquals("book name", v.getBookStore().getName());
-		 assertEquals("book name", p.getName());
+		 assertEquals("bookstore name", v.getBookStore().getName());
+		 assertEquals("bookstore name", p.getName());
 	 }
 	 
 	 @Test(expected=IllegalArgumentException.class) public void bookWithNoBookStore() {
@@ -108,8 +108,8 @@ public class BasicTest {
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 v.activate();
 		 assertSame(p, v.getBookStore());
-		 assertEquals("book name", v.getBookStore().getName());
-		 assertEquals("book name", p.getName());
+		 assertEquals("bookstore name", v.getBookStore().getName());
+		 assertEquals("bookstore name", p.getName());
 	 }
 	 
 	 @Test public void searchAllBooks() throws DatabaseNotReachedException {
