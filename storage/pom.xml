@@ -2,13 +2,36 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<parent>
 		<artifactId>parent-aspect</artifactId>
-		<groupId>org.norm</groupId>
+		<groupId>org.n-orm</groupId>
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.norm</groupId>
+	<groupId>org.n-orm</groupId>
 	<artifactId>storage</artifactId>
 	<version>${project.parent.version}</version>
+	
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>2.2.1</version>
+				<configuration>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+				</configuration>
+				<executions>
+					<execution>
+						<id>make-assembly</id> <!-- this is used for inheritance merges -->
+						<phase>package</phase> <!-- bind to the packaging phase -->
+						<goals>
+							<goal>single</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 	
 	<dependencies>
 		<dependency>
@@ -19,4 +42,11 @@
 			<scope>compile</scope>
 		</dependency>
 	</dependencies>
+        <distributionManagement>
+		<site>
+			<id>wiki</id>
+			<name>n-orm Wiki pages</name>
+			<url>file://${basedir}/../../n-orm-wiki/storage</url>
+		</site>
+        </distributionManagement>	
 </project>
