@@ -73,22 +73,16 @@
 	
 	<repositories>
 		<repository>
-			<id>com.mt.xtraxion</id>
-			<name>MT repository</name>
-			<url>http://sitemeter.univ-mulhouse.fr/mvn</url>
+			<id>org.apache</id>
+			<name>Apache repository</name>
+			<url>https://repository.apache.org/content/groups/public/</url>
 		</repository>
+                <repository>
+                        <id>org.codehaus</id>
+                        <name>Codehaus repository</name>
+                        <url>https://nexus.codehaus.org/content/groups/public/</url>
+                </repository>
+
 	</repositories>
 	
-	<distributionManagement>
-		<repository>
-			<id>actionside</id>
-			<name>AcionSide</name>
-			<url>file:/opt/nexus/./../sonatype-work/nexus/storage/actionside</url>
-		</repository>
-		<snapshotRepository>
-			<id>actionside</id>
-			<name>AcionSide</name>
-			<url>file:/opt/nexus/./../sonatype-work/nexus/storage/actionside</url>
-		</snapshotRepository>
-	</distributionManagement>
 </project>
