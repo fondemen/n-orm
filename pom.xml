@@ -6,7 +6,7 @@
 		<groupId>com.mt</groupId>
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
-	<groupId>com.mt</groupId>
+	<groupId>org.norm</groupId>
 	<artifactId>parent-aspect</artifactId>
 	<version>${project.parent.version}</version>
 	<packaging>pom</packaging>
