@@ -13,8 +13,9 @@ import com.mt.storage.conversion.ConversionTools;
 import com.mt.storage.query.ConstraintBuilder;
 
 public aspect StorageManagement {
-	public static final String CLASS_COLUMN_FAMILY = "class";
-	public static final String CLASS_COLUMN = "";
+	//Dangerous: a subclass would need to store one more column family (i.e. alter the data store metadata) which may be long even if this information is never read
+//	public static final String CLASS_COLUMN_FAMILY = "class";
+//	public static final String CLASS_COLUMN = "";
 	
 	private transient Boolean PersistingElement.exists = null;
 	private transient boolean PersistingElement.isStoring = false;
@@ -129,14 +130,14 @@ public aspect StorageManagement {
 				Collection<Class<? extends PersistingElement>> persistingSuperClasses = this.getPersistingSuperClasses();
 				if (!persistingSuperClasses.isEmpty()) {
 					PersistingMixin px = PersistingMixin.getInstance();
-					Map<String, byte[]> classColumn = new TreeMap<String, byte[]>();
-					String clsName = this.getClass().getName();
-					classColumn.put(CLASS_COLUMN, ConversionTools.convert(clsName, String.class));
 					//The next line to avoid repeating all properties in superclasses
 					if (!annotation.storeAlsoInSuperClasses()) {
 						changed.clear(); deleted.clear(); increments.clear();
 					}
-					changed.put(CLASS_COLUMN_FAMILY, classColumn);
+//					Map<String, byte[]> classColumn = new TreeMap<String, byte[]>();
+//					String clsName = this.getClass().getName();
+//					classColumn.put(CLASS_COLUMN, ConversionTools.convert(clsName, String.class));
+//					changed.put(CLASS_COLUMN_FAMILY, classColumn);
 					String ident = this.getFullIdentifier();
 					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
 						this.getStore().storeChanges(px.getTable(sc), ident, changed, deleted, increments);
@@ -239,7 +240,9 @@ public aspect StorageManagement {
 			Set<T> ret = new TreeSet<T>();
 			int count = 0;
 			while(keys.hasNext()) {
-				ret.add(ConversionTools.convertFromString(clazz, keys.next()));
+				T elt = ConversionTools.convertFromString(clazz, keys.next());
+				elt.exists = true;
+				ret.add(elt);
 				count++;
 				if (count >= limit)
 					break;
