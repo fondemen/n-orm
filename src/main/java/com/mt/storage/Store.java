@@ -3,8 +3,20 @@ package com.mt.storage;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * The interface that defines what a data store should implement.
+ * The expected data model is that one of column-oriented databases such as data models of <a href="http://labs.google.com/papers/bigtable.html">BigTable</a>, <a href="http://wiki.apache.org/hadoop/Hbase/DataModel">HBase</a> or <a href="http://wiki.apache.org/cassandra/DataModel">Cassandra</a>.
+ * To summarize, a data store should provide a set of maps (we'll call <i>tables</i>).
+ * Each one of these <b>tables</b> is a map which contains <i>rows</i> that associate a {@link String} <i>key</i> with a set of <i>column families</i>.
+ * It should be easy and efficient to find a row in a table using its key, or defining a key with a minimum value and a maximum value as if key would be organized in a dictionary (see {@link String#compareTo(String)}).
+ * Each <b>column family</b> is a map which associates a <i>qualifier</i> with data, represented by a byte array.
+ * @see com.mt.storage.memory.Memory a default implementation
+ */
 public interface Store {
 	
+	/**
+	 * Called once the store is created ; only one store is instanciated with the same properties.
+	 */
 	void start() throws DatabaseNotReachedException;
 	
 	//void add(String table, String id, String family, String key, byte[] value);
@@ -55,7 +67,7 @@ public interface Store {
 	
 	/**
 	 * Stores given piece of information.
-	 * In case an element is missing (table, row, family, ...), it is created.
+	 * In case an element is missing in the data store (table, row, family, ...), it is created.
 	 */
 	void storeChanges(String table, String id, Map<String, Map<String, byte[]>> changed, Map<String, Set<String>> removed, Map<String, Map<String, Number>> increments) throws DatabaseNotReachedException;
 	
