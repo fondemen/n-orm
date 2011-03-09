@@ -53,19 +53,30 @@ public aspect ColumnFamiliyManagement {
 		this.getColumnFamiliesInt().put(cf.getName(), cf);
 	}
 	
+	/**
+	 * The list of column families for this persisting element.
+	 */
 	public Set<ColumnFamily<?>> PersistingElement.getColumnFamilies() {
 		return new HashSet<ColumnFamily<?>>(this.getColumnFamiliesInt().values());
 	}
 	
+	/**
+	 * Get a column family for this persisting element.
+	 * @param name the name of the column family, that should be the name of the represented Set or Map, or {@link PropertyManagement#PROPERTY_COLUMNFAMILY_NAME}
+	 */
 	public ColumnFamily<?> PersistingElement.getColumnFamily(String name) {
 		return this.getColumnFamiliesInt().get(name);
 	}
 	
-	//For test pupose
+	//For test purpose
 	void PersistingElement.clearColumnFamilies() {
 		this.getColumnFamiliesInt().clear();
 	}
 	
+	/**
+	 * Checks whether this persisting element has changed and thus needs to be sent to the store.
+	 * A change is detected as soon as one of its column family has changed.
+	 */
 	public boolean PersistingElement.hasChanged() {
 		for (ColumnFamily<?> cf : this.getColumnFamiliesInt().values()) {
 			if (cf.hasChanged())
@@ -74,14 +85,23 @@ public aspect ColumnFamiliyManagement {
 		return false;
 	}
 	
+	/**
+	 * Checks whether a {@link Field} of this persisting element represents a column family.
+	 */
 	public boolean isCollectionFamily(Field f) {
 		return ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) == 0) && this.isCollectionType(f.getType());
 	}
 
+	/**
+	 * Checks whether a column family attribute can have this type
+	 */
 	public boolean isCollectionType(Class<?> type) {
 		return Set.class.equals(type) || Map.class.equals(type) || SetColumnFamily.class.isAssignableFrom(type) || MapColumnFamily.class.isAssignableFrom(type);
 	}
 	
+	/**
+	 * Finds in a class the fields that are column families
+	 */
 	public Set<Field> detectColumnFamilies(Class<? extends PersistingElement> clazz) {
 		Set<Field> ret = new HashSet<Field>();
 		Class<?> c = clazz;
@@ -102,7 +122,7 @@ public aspect ColumnFamiliyManagement {
 	 * simple elements, i.e. with no reference to ColumnFamily or one of its subclass. This is performed
 	 * a transitive way, which means that all referenced persisting elements will also be set to the
 	 * requested POJO mode. The main interest of this method is for serializing Persisting elements:
-	 * a persisting element sould be set into POJO mode before being serialized, and into normal mode
+	 * a persisting element should be set into POJO mode before being serialized, and into normal mode
 	 * once deserialized.
 	 * @param pojo
 	 */

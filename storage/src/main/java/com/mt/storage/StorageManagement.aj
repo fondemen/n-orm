@@ -13,8 +13,9 @@ import com.mt.storage.conversion.ConversionTools;
 import com.mt.storage.query.ConstraintBuilder;
 
 public aspect StorageManagement {
-	public static final String CLASS_COLUMN_FAMILY = "class";
-	public static final String CLASS_COLUMN = "";
+	//Dangerous: a subclass would need to store one more column family (i.e. alter the data store metadata) which may be long even if this information is never read
+//	public static final String CLASS_COLUMN_FAMILY = "class";
+//	public static final String CLASS_COLUMN = "";
 	
 	private transient Boolean PersistingElement.exists = null;
 	private transient boolean PersistingElement.isStoring = false;
@@ -42,9 +43,11 @@ public aspect StorageManagement {
 			isStoring = true;
 		}
 		try {
+			Persisting annotation = this.getClass().getAnnotation(Persisting.class);
+			
 			PropertyManagement pm = PropertyManagement.getInstance();
 			this.storeProperties();
-			Map<String, Map<String, byte[]>> changed = new TreeMap<String, Map<String,byte[]>>();
+			Map<String, Map<String, byte[]>> changed = new TreeMap<String, Map<String,byte[]>>(), localChanges;
 			Map<String, Set<String>> deleted = new TreeMap<String, Set<String>>();
 			Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String,Number>>();
 			Map<String,Number> propsIncrs = this.getIncrements();
@@ -93,12 +96,15 @@ public aspect StorageManagement {
 			}
 			
 			//Storing keys into properties. As keys are final, there is no need to store them again if we know that the object already exists within the base
-			if (this.exists == null || this.exists.equals(Boolean.FALSE)) {
+			if (annotation.storeKeys() && (this.exists == null || this.exists.equals(Boolean.FALSE))) {
+				localChanges = new TreeMap<String, Map<String,byte[]>>(changed);
 				Map<String, byte[]> changedProperties = changed.get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 				if (changedProperties == null) {
 					changedProperties = new TreeMap<String, byte[]>();
-					changed.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changedProperties);
+				} else {
+					changedProperties = new TreeMap<String, byte[]>(changedProperties);
 				}
+				localChanges.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changedProperties);
 				for (Field key : this.getKeys()) {
 					try {
 						changedProperties.put(key.getName(), ConversionTools.convert(pm.readValue(this, key), key.getType()));
@@ -108,13 +114,35 @@ public aspect StorageManagement {
 						throw new IllegalStateException("Cannot save object ; problem reading property : " + e.getMessage(), e);
 					}
 				}
-			}
+			} else
+				localChanges = changed;
 			
-			this.getStore().storeChanges(this.getTable(), this.getIdentifier(), changed, deleted, increments);
-
-			propsIncrs.clear();
-			for(ColumnFamily<?> family : families) {
-				family.clearChanges();
+			if (!(this.exists == Boolean.TRUE && changed.isEmpty() && deleted.isEmpty() && increments.isEmpty())) {
+				
+				this.getStore().storeChanges(this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
+	
+				propsIncrs.clear();
+				for(ColumnFamily<?> family : families) {
+					family.clearChanges();
+				}
+				
+				//Storing in persisting superclasses
+				Collection<Class<? extends PersistingElement>> persistingSuperClasses = this.getPersistingSuperClasses();
+				if (!persistingSuperClasses.isEmpty()) {
+					PersistingMixin px = PersistingMixin.getInstance();
+					//The next line to avoid repeating all properties in superclasses
+					if (!annotation.storeAlsoInSuperClasses()) {
+						changed.clear(); deleted.clear(); increments.clear();
+					}
+//					Map<String, byte[]> classColumn = new TreeMap<String, byte[]>();
+//					String clsName = this.getClass().getName();
+//					classColumn.put(CLASS_COLUMN, ConversionTools.convert(clsName, String.class));
+//					changed.put(CLASS_COLUMN_FAMILY, classColumn);
+					String ident = this.getFullIdentifier();
+					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
+						this.getStore().storeChanges(px.getTable(sc), ident, changed, deleted, increments);
+					}
+				}
 			}
 			
 			//Store depending properties
@@ -123,22 +151,6 @@ public aspect StorageManagement {
 					Object kVal = pm.candideReadValue(this, prop);
 					if (kVal != null)
 						((PersistingElement)kVal).store();
-				}
-			}
-			
-			//Storing in persisting superclasses
-			Collection<Class<? extends PersistingElement>> persistingSuperClasses = this.getPersistingSuperClasses();
-			if (!persistingSuperClasses.isEmpty()) {
-				PersistingMixin px = PersistingMixin.getInstance();
-				Map<String, byte[]> classColumn = new TreeMap<String, byte[]>();
-				String clsName = this.getClass().getName();
-				classColumn.put(CLASS_COLUMN, ConversionTools.convert(clsName, String.class));
-				//The next line to avoid repeating all properties in superclasses
-				changed.clear(); deleted.clear(); increments.clear();
-				changed.put(CLASS_COLUMN_FAMILY, classColumn);
-				String ident = this.getFullIdentifier();
-				for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
-					this.getStore().storeChanges(px.getTable(sc), ident, changed, deleted, increments);
 				}
 			}
 			
@@ -228,7 +240,9 @@ public aspect StorageManagement {
 			Set<T> ret = new TreeSet<T>();
 			int count = 0;
 			while(keys.hasNext()) {
-				ret.add(ConversionTools.convertFromString(clazz, keys.next()));
+				T elt = ConversionTools.convertFromString(clazz, keys.next());
+				elt.exists = true;
+				ret.add(elt);
 				count++;
 				if (count >= limit)
 					break;

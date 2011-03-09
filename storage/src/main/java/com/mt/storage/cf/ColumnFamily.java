@@ -27,7 +27,7 @@ public abstract class ColumnFamily<T> {
 
 	protected final Map<String, T> collection = new TreeMap<String, T>();
 
-	protected final Map<String, ChangeKind> changes;
+	protected Map<String, ChangeKind> changes;
 	protected final Map<String, Number> increments;
 	
 	protected boolean activated = false;
