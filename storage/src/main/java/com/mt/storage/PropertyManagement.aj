@@ -8,8 +8,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.apache.commons.beanutils.PropertyUtils;
 import org.aspectj.lang.SoftException;
@@ -145,6 +148,23 @@ public aspect PropertyManagement {
 		private PropertyFamily(PersistingElement owner)
 				throws SecurityException, NoSuchFieldException {
 			super(String.class, Property.class, null, PROPERTY_COLUMNFAMILY_NAME, owner, false, false);
+			assert this.changes != null;
+			List<Field> keysF = KeyManagement.getInstance().detectKeys(getOwner().getClass());
+			final Set<String> keys = new TreeSet<String>();
+			for (Field key : keysF) {
+				keys.add(key.getName());
+			}
+			this.changes = new TreeMap<String, ChangeKind>() {
+				private static final long serialVersionUID = 1L;
+
+				@Override
+				public ChangeKind put(String key, ChangeKind value) {
+					if (keys.contains(key))
+						return null;
+					return super.put(key, value);
+				}
+				
+			};
 		}
 
 		@Override
@@ -281,21 +301,22 @@ public aspect PropertyManagement {
 	void PersistingElement.storeProperties() {
 		PropertyManagement pm = PropertyManagement.getInstance();
 		KeyManagement km = KeyManagement.getInstance();
+		PropertyManagement.PropertyFamily props = this.getProperties();
 		for (Field f : pm.getProperties(this.getClass())) {
-			if (km.isKey(f))
-				continue;
 			if (f.isAnnotationPresent(Incrementing.class))
 				continue;
 			Object val = pm.candideReadValue(this, f);
 			if (val == null) {
+				if (km.isKey(f))
+					throw new IllegalStateException("Key " + f + " is left null for " + this);
 				if (!this.lastState.containsKey(f) || this.lastState.get(f) != null) {
-					this.getProperties().removeKey(f.getName());
+					props.removeKey(f.getName());
 					this.lastState.put(f, null);
 				}
 			} else {
 				byte [] valB = ConversionTools.convert(val, f.getType());
 				if (!this.lastState.containsKey(f) || !Arrays.equals(valB, this.lastState.get(f))) {
-					this.getProperties().put(f.getName(), new Property(f, val));
+					props.put(f.getName(), new Property(f, val));
 					this.lastState.put(f, valB);
 				}
 			}
@@ -320,6 +341,10 @@ public aspect PropertyManagement {
 			Object val;
 			
 			Property prop = (Property) props.getElement(f.getName());
+			if (prop == null && km.isKey(f)) { //Keys might not be in properties just after activation
+				prop = new Property(f, oldVal);
+				props.put(f.getName(), prop);
+			}
 			if (prop != null) {
 				val = prop.getValue();
 				if (oldVal != null && val != null && (oldVal instanceof PersistingElement) && (val instanceof byte []) && ConversionTools.convert(String.class, (byte[])val).equals(((PersistingElement)oldVal).getIdentifier())) {
@@ -357,7 +382,8 @@ public aspect PropertyManagement {
 				} catch (Exception x) { //May happen in case f is of simple type (e.g. boolean and not Boolean) and value is unknown from the base (i.e. null)
 					this.lastState.put(f, oldValB);
 				}
-			}
+			} else
+				this.lastState.put(f, oldValB);
 		}
 	}
 

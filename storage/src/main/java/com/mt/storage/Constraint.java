@@ -7,6 +7,11 @@ import java.util.Map;
 
 import com.mt.storage.conversion.ConversionTools;
 
+/**
+ * A restriction to a {@link Store} search.
+ * In case this restriction applies to a table (as in {@link Store#get(String, Constraint, int)}, returned rows should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
+ * In case this restrictions applies to a column family (as in {@link Store#get(String, String, String, Constraint)}, returned columns should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
+ */
 public class Constraint {
 	
 	protected static Map<Field, Object> toMapOfFields(Class<?> clazz, Map<String, Object> values) {
@@ -43,7 +48,7 @@ public class Constraint {
 	/**
 	 * Describes a search for a particular key.
 	 * To search for a range of a key of cardinality n, all values for k of cardinalities less than n must be supplied.
-	 * startValue are endValue both inclusive.
+	 * startValue and endValue are both inclusive.
 	 * @param checkKeys to check whether all keys with a lower category is given a value
 	 */
 	public Constraint(Class<? extends PersistingElement> clazz, Map<Field, Object> values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {
@@ -119,10 +124,16 @@ public class Constraint {
 		this(toMapOfFields(type, values), PropertyManagement.getInstance().getProperty(type, field), startValue, endValue, true);
 	}
 
+	/**
+	 * The minimal (inclusive) value for searched keys
+	 */
 	public String getStartKey() {
 		return startKey;
 	}
-	
+
+	/**
+	 * The maximal (inclusive) value for searched keys
+	 */
 	public String getEndKey() {
 		return endKey;
 	}
