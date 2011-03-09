@@ -4,6 +4,7 @@
 		<artifactId>parent</artifactId>
 		<groupId>org.n-orm</groupId>
 		<version>0.0.1-SNAPSHOT</version>
+		<relativePath>../parent/pom.xml</relativePath>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.n-orm</groupId>
@@ -11,7 +12,7 @@
 	<version>${project.parent.version}-${hbase.version}</version>
 
 
-	
+
 	<build>
 		<plugins>
 			<plugin>
@@ -82,11 +83,11 @@
 			</snapshots>
 		</repository>
 	</repositories>
-        <distributionManagement>
+	<distributionManagement>
 		<site>
 			<id>wiki</id>
 			<name>n-orm Wiki pages</name>
 			<url>file://${basedir}/../../n-orm-wiki/hbase</url>
 		</site>
-        </distributionManagement>	
+	</distributionManagement>
 </project>
