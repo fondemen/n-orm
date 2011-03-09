@@ -5,6 +5,7 @@
 		<artifactId>parent</artifactId>
 		<groupId>org.n-orm</groupId>
 		<version>0.0.1-SNAPSHOT</version>
+		<relativePath>../parent/pom.xml</relativePath>
 	</parent>
 	<groupId>org.n-orm</groupId>
 	<artifactId>parent-aspect</artifactId>
