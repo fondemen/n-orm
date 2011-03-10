@@ -2,7 +2,8 @@ package org.norm.sample.businessmodel;
 
 import java.util.Date;
 
-import com.mt.storage.Persisting;
+import org.norm.Persisting;
+
 
 @Persisting
 public class Novel extends Book {
