@@ -1,4 +1,4 @@
-package org.norm.sample.businessmodel;
+package org.norm;
 
 import org.norm.Key;
 import org.norm.Persisting;
@@ -6,13 +6,13 @@ import org.norm.Persisting;
 @Persisting
 public class BookStore {
 	private static final long serialVersionUID = -3919962605456785443L;
-	@Key private String name;
-	private String address;
+	@Key private String hashcode;
+	private String name;
 
 	public BookStore() {}
 	
-	public BookStore(String name) {
-		this.name = name;
+	public BookStore(String hashcode) {
+		this.hashcode = hashcode;
 	}
 
 	public String getName() {
@@ -23,12 +23,8 @@ public class BookStore {
 		this.name = name;
 	}
 
-	public String getAddress() {
-		return address;
-	}
-
-	public void setAddress(String address) {
-		this.address = address;
+	public String getHashcode() {
+		return hashcode;
 	}
 
 }

@@ -1,4 +1,4 @@
-package org.norm.sample.businessmodel;
+package org.norm;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -9,6 +9,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Date;
 import java.util.Iterator;
+import java.util.Properties;
 import java.util.Set;
 
 import org.junit.Before;
@@ -16,10 +17,16 @@ import org.junit.Test;
 import org.norm.DatabaseNotReachedException;
 import org.norm.PersistingElement;
 import org.norm.StorageManagement;
-
+import org.norm.StoreSelector;
 
 public class BasicTest {
-	//Store for tests is given in /src/test/resources/org/norm/sample/businessmodel/store.properties
+
+	public BasicTest() {
+		Properties props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
+		StoreSelector.getInstance().setPropertiesFor(BookStore.class, props);
+		StoreSelector.getInstance().setPropertiesFor(Book.class, props);
+		StoreSelector.getInstance().setPropertiesFor(Novel.class, props);
+	}
 	
 	private BookStore bssut = null;
 	private Book bsut = null;
@@ -30,12 +37,12 @@ public class BasicTest {
 		
 		if (bssut == null) {
 			 bssut = new BookStore("testbookstore");
-			 bssut.setAddress("turing str. 41");
+			 bssut.setName("bookstore name");
 			 changed = true;
 		}
 		
 		if (changed || bsut == null) {
-			bsut = new Book(bssut, "testtitle", new Date(1234567890));
+			bsut = new Book(bssut, new Date(1234567890), new Date(1234567890));
 			bsut.setNumber((short)12);
 			bsut.store();
 		}
@@ -51,22 +58,22 @@ public class BasicTest {
 	 @Test public void bookStoreRetrieve() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
-		 assertEquals("turing str. 41", p.getAddress());
+		 assertEquals("bookstore name", p.getName());
 	 }
 	 
 	 @Test public void unknownBookStoreRetrieve() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("gdcfknueghficlnehfuci");
 		 p.activate();
-		 assertNull(p.getAddress());
+		 assertNull(p.getName());
 		 assertFalse( p.existsInStore());
 	 }
 	 
 	 @Test public void bookStoreSetNull() throws DatabaseNotReachedException {
-		 bssut.setAddress(null);
+		 bssut.setName(null);
 		 bssut.store();
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
-		 assertNull(p.getAddress());
+		 assertNull(p.getName());
 		 deleteBookstore();
 	 }
 	
@@ -74,45 +81,45 @@ public class BasicTest {
 		 deleteBookstore();
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
-		 assertNull(p.getAddress());
+		 assertNull(p.getName());
 	 }
 	
 	 @Test public void bookStoreAccessFromBook() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
-		 Book v = new Book(p, "testtitle", new Date(1234567890));
+		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 v.activate();
 		 assertSame(p, v.getBookStore());
-		 assertEquals("turing str. 41", v.getBookStore().getAddress());
-		 assertEquals("turing str. 41", p.getAddress());
+		 assertEquals("bookstore name", v.getBookStore().getName());
+		 assertEquals("bookstore name", p.getName());
 	 }
 	 
 	 @Test(expected=IllegalArgumentException.class) public void bookWithNoBookStore() {
-		 new Book(null, "testtitle", new Date(1234567890));
+		 new Book(null, new Date(1234567890), new Date(1234567890));
 	 }
 	
 	 @Test public void unactivatedBookStoreAccessFromBook() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("testbookstore");
-		 Book v = new Book(p, "testtitle", new Date(1234567890));
+		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 assertSame(p, v.getBookStore());
-		 assertNull(v.getBookStore().getAddress());
-		 assertNull(p.getAddress());
+		 assertNull(v.getBookStore().getName());
+		 assertNull(p.getName());
 	 }
 	
 	 @Test public void bookStoreDeletionAndthenAccess() throws DatabaseNotReachedException {
 		 deleteBookstore();
 		 this.storeSUTs();
 		 BookStore p = new BookStore("testbookstore");
-		 Book v = new Book(p, "testtitle", new Date(1234567890));
+		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 v.activate();
 		 assertSame(p, v.getBookStore());
-		 assertEquals("turing str. 41", v.getBookStore().getAddress());
-		 assertEquals("turing str. 41", p.getAddress());
+		 assertEquals("bookstore name", v.getBookStore().getName());
+		 assertEquals("bookstore name", p.getName());
 	 }
 	 
 	 @Test public void searchAllBooks() throws DatabaseNotReachedException {
-		 Book b2 = new Book(bssut, "testtitle2", new Date());
+		 Book b2 = new Book(bssut, new Date(123456789), new Date());
 		 b2.store();
-		 Book b3 = new Book(new BookStore("rfgbuhfgj"), "testtitle3", new Date());
+		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
 		 b3.store();
 		 
 		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go();		 
@@ -136,9 +143,9 @@ public class BasicTest {
 	}
 	 
 	 @Test public void searchBook() throws DatabaseNotReachedException {
-		 Book b2 = new Book(bssut, "testtitle2", new Date());
+		 Book b2 = new Book(bssut, new Date(123456789), new Date());
 		 b2.store();
-		 Book b3 = new Book(new BookStore("rfgbuhfgj"), "testtitle3", new Date());
+		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
 		 b3.store();
 		 
 		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().go();		 
@@ -153,30 +160,11 @@ public class BasicTest {
 		 checkOrder(storeBooks);
 	 }
 	 
-	 @Test public void searchBookWithMinTitle() throws DatabaseNotReachedException {
-		 Book b2 = new Book(bssut, "testtitle2", new Date());
+	 @Test public void searchBookWithMinSellerDate() throws DatabaseNotReachedException {
+		 Book b2 = new Book(bssut, new Date(123456789), new Date());
 		 b2.store();
 		 
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withKey("title").greaterOrEqualsThan("testtitle1").withAtMost(1000).elements().go();		 
-		 b2.delete();
-		 
-		 assertEquals(1, storeBooks.size());
-		 assertFalse(storeBooks.contains(bsut));
-		 assertTrue(storeBooks.contains(b2));
-		 
-		 Iterator<Book> ib = storeBooks.iterator();
-		 Book fb = ib.next();
-		 assertEquals(b2, fb);
-		 
-		 //Unfortunately
-		 assertNotSame(b2, fb);
-	 }
-	 
-	 @Test public void searchBookWithMaxTitle() throws DatabaseNotReachedException {
-		 Book b2 = new Book(bssut, "testtitle2", new Date());
-		 b2.store();
-		 
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withKey("title").lessOrEqualsThan("testtitle1").withAtMost(1000).elements().go();		 
+		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withKey("sellerDate").greaterOrEqualsThan(new Date(1000000000)).withAtMost(1000).elements().go();		 
 		 b2.delete();
 		 
 		 assertEquals(1, storeBooks.size());
@@ -191,16 +179,38 @@ public class BasicTest {
 		 assertNotSame(bsut, fb);
 	 }
 	 
-	 @Test public void getSubClass() throws DatabaseNotReachedException {
-		 Novel n = new Novel(bssut, "noveltitle", new Date());
-		 n.store();
-
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go();		 
-		 n.delete();
+	 @Test public void searchBookWithMaxSellerDate() throws DatabaseNotReachedException {
+		 Book b2 = new Book(bssut, new Date(123456789), new Date());
+		 b2.store();
 		 
-		 assertEquals(2, storeBooks.size());
-		 assertTrue(storeBooks.contains(bsut));
-		 assertTrue(storeBooks.contains(n));
+		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withKey("sellerDate").lessOrEqualsThan(new Date(1000000000)).withAtMost(1000).elements().go();		 
+		 b2.delete();
+		 
+		 assertEquals(1, storeBooks.size());
+		 //assertTrue(storeBooks.contains(bsut));
+		 //assertTrue(storeBooks.contains(b2));
+		 
+		 Iterator<Book> ib = storeBooks.iterator();
+		 Book fb = ib.next();
+		 assertEquals(b2, fb);
+		 
+		 //Unfortunately
+		 assertNotSame(b2, fb);
+	 }
+	 
+	 @Test public void getSubClass() throws DatabaseNotReachedException {
+		 Novel n = new Novel(bssut, new Date(123456799), new Date());
+		 n.store();
+		 
+		 try {
+			 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go();		 
+			 
+			 assertEquals(2, storeBooks.size());
+			 assertTrue(storeBooks.contains(bsut));
+			 assertTrue(storeBooks.contains(n));
+		 } finally {
+			 n.delete();
+		 }
 	 }
 
 }
