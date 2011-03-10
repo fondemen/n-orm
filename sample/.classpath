@@ -5,7 +5,7 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.6"/>
 	<classpathentry kind="con" path="org.maven.ide.eclipse.MAVEN2_CLASSPATH_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.ajdt.core.ASPECTJRT_CONTAINER"/>
-	<classpathentry kind="var" path="M2_REPO/org/n-orm/storage/0.0.1-SNAPSHOT/storage-0.0.1-SNAPSHOT-jar-with-dependencies.jar">
+	<classpathentry kind="var" path="M2_REPO/com/googlecode/n_orm/storage/0.0.1-SNAPSHOT/storage-0.0.1-SNAPSHOT.jar">
 		<attributes>
 			<attribute name="org.eclipse.ajdt.aspectpath" value="org.eclipse.ajdt.aspectpath"/>
 		</attributes>
