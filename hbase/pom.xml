@@ -2,12 +2,12 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<parent>
 		<artifactId>parent</artifactId>
-		<groupId>org.n-orm</groupId>
+		<groupId>com.googlecode.n_orm</groupId>
 		<version>0.0.1-SNAPSHOT</version>
 		<relativePath>../parent/pom.xml</relativePath>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.n-orm</groupId>
+	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>hbase</artifactId>
 	<version>${project.parent.version}-${hbase.version}</version>
 
@@ -19,21 +19,21 @@
 			<version>${hbase.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.n-orm</groupId>
+			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
 			<version>${project.parent.version}</version>
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.n-orm</groupId>
+			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
 			<version>${project.parent.version}</version>
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.n-orm</groupId>
+			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>hbase-test-deps</artifactId>
 			<version>${hbase.version}</version>
 			<type>pom</type>
