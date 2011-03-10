@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>org.n-orm</groupId>
+	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>sample</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<description>Simple starter project.</description>
@@ -31,7 +31,7 @@
 					<complianceLevel>${java.version}</complianceLevel>
 					<aspectLibraries>
 						<aspectLibrary>
-							<groupId>org.n-orm</groupId>
+							<groupId>com.googlecode.n_orm</groupId>
 							<artifactId>storage</artifactId>
 						</aspectLibrary>
 					</aspectLibraries>
@@ -56,14 +56,14 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.n-orm</groupId>
+			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.n-orm</groupId>
+			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 			<type>test-jar</type>
@@ -79,7 +79,7 @@
 	</dependencies>
 	<repositories>
 		<repository>
-			<id>org.n-orm</id>
+			<id>com.googlecode.n_orm</id>
 			<name>n-orm repository</name>
 			<url>http://n-orm.googlecode.com/hg/mavenrepo</url>
 		</repository>

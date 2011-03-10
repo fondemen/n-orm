@@ -10,3 +10,6 @@ cd ../hbase-test-deps
 mvn clean deploy
 cd ../hbase
 mvn clean deploy site-deploy -P release
+
+cd ../sample
+mvn test
