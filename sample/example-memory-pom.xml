@@ -7,8 +7,6 @@
 	<description>Simple starter project.</description>
 	<properties>
 		<java.version>1.6</java.version>
-		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
-		<hbase.version>0.90.1-CDH3B4</hbase.version>
 	</properties>
 	<build>
 		<plugins>
@@ -22,7 +20,7 @@
 					<target>${java.version}</target>
 				</configuration>
 			</plugin>
-
+			
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>aspectj-maven-plugin</artifactId>
@@ -60,14 +58,14 @@
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
-			<version>${n-orm.version}</version>
+			<version>0.0.1-SNAPSHOT</version>
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
-			<version>${n-orm.version}</version>
+			<version>0.0.1-SNAPSHOT</version>
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
@@ -78,31 +76,6 @@
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
-
-		<!-- HBase-specific dependencies -->
-		<dependency>
-			<groupId>com.googlecode.n_orm</groupId>
-			<artifactId>hbase</artifactId>
-			<version>${n-orm.version}-${hbase.version}</version>
-			<type>jar</type>
-			<scope>compile</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.googlecode.n_orm</groupId>
-			<artifactId>hbase</artifactId>
-			<version>${n-orm.version}-${hbase.version}</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.googlecode.n_orm</groupId>
-			<artifactId>hbase-test-deps</artifactId>
-			<version>${hbase.version}</version>
-			<type>pom</type>
-			<scope>test</scope>
-		</dependency>
-
-
 	</dependencies>
 	<repositories>
 		<repository>
