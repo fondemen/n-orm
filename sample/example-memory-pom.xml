@@ -84,9 +84,9 @@
 	</dependencies>
 	<repositories>
 		<repository>
-			<id>com.googlecode.n_orm</id>
-			<name>n-orm repository</name>
-			<url>http://n-orm.googlecode.com/hg/mavenrepo</url>
+			<id>org.sonatype.oss.public</id>
+			<name>OSS public</name>
+			<url>http://oss.sonatype.org/content/groups/public</url>
 		</repository>
 	</repositories>
 </project>
