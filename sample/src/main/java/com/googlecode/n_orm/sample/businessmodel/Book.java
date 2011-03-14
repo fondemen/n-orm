@@ -30,6 +30,9 @@ public class Book {
 
 	public void setNumber(short number) {
 		this.number = number;
+		if (this.number <= 2) {
+			this.bookStore.setToBeOrdered(this);
+		}
 	}
 
 	public BookStore getBookStore() {

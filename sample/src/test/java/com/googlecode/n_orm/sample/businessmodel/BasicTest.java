@@ -7,49 +7,20 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-import java.io.IOException;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.Properties;
 import java.util.Set;
 
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
-import com.googlecode.n_orm.StoreSelector;
-import com.googlecode.n_orm.hbase.Store;
-import com.googlecode.n_orm.sample.businessmodel.Book;
-import com.googlecode.n_orm.sample.businessmodel.BookStore;
-import com.googlecode.n_orm.sample.businessmodel.Novel;
-import com.googlecode.n_orm.storage.HBaseLauncher;
 
 
-public class BasicTest {
-	//The following is unecessary for production code: all information is available in the nearest store.properties
-	// (here in src/test/resources/com/googlecode/n_orm/sample/store.properties found from the classpath)
-	static { //Launching a test HBase data store if unavailable
-		Properties p;
-		try {
-			//Finding properties for our sample classes
-			p = StoreSelector.getInstance().findProperties(BookStore.class);
-			assert Store.class.getName().equals(p.getProperty("class"));
-			//Setting them to the test HBase instance
-			HBaseLauncher.hbaseHost = p.getProperty("1");
-	        HBaseLauncher.hbasePort = Integer.parseInt(p.getProperty("2"));
-	        Store store = Store.getStore(HBaseLauncher.hbaseHost, HBaseLauncher.hbasePort);
-	        HBaseLauncher.prepareHBase();
-	        if (HBaseLauncher.hBaseServer != null) {
-	        		//Cheating the actual store for it to point the test data store
-	                HBaseLauncher.setConf(store);
-	        }
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-
-	}
+public class BasicTest extends HBaseTestLauncher {
 	
 	private BookStore bssut = null;
 	private Book bsut = null;
@@ -69,6 +40,19 @@ public class BasicTest {
 			bsut.setNumber((short)12);
 			bsut.store();
 		}
+	}
+	
+	@AfterClass
+	public static void vacuumStore() {
+		for (BookStore bs : StorageManagement.findElements().ofClass(BookStore.class).withAtMost(10000).elements().go()) {
+			bs.delete();
+		}
+		for (Book b : StorageManagement.findElements().ofClass(Book.class).withAtMost(10000).elements().go()) {
+			b.delete();
+		}
+		//Novel is subclass of Book:
+		// emptying the Book table should also make the Novel table empty 
+		assertNull(StorageManagement.findElements().ofClass(Novel.class).any());
 	}
 	
 	public void deleteBookstore() throws DatabaseNotReachedException {
@@ -226,11 +210,14 @@ public class BasicTest {
 		 n.store();
 
 		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go();		 
-		 n.delete();
 		 
 		 assertEquals(2, storeBooks.size());
 		 assertTrue(storeBooks.contains(bsut));
 		 assertTrue(storeBooks.contains(n));
+	 }
+	 
+	 @Test public void serialize() throws DatabaseNotReachedException {
+		 
 	 }
 
 }
