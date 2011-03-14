@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 
+import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.conversion.ConversionTools;
 
@@ -129,6 +130,17 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 	@Override
 	public Collection<T> values() {
 		return this.collection.values();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public void activate(Object from, Object to)
+			throws DatabaseNotReachedException {
+		if (! this.keyClazz.isInstance(from))
+			throw new IllegalArgumentException(from.toString() + " is not compatible with " + this.keyClazz);
+		if (! this.keyClazz.isInstance(to))
+			throw new IllegalArgumentException(to.toString() + " is not compatible with " + this.keyClazz);
+		super.activate(this.toKey((K) from), this.toKey((K) to));
 	}
 
 }
