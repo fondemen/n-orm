@@ -20,6 +20,11 @@
 				<configuration>
 					<source>${java.version}</source>
 					<target>${java.version}</target>
+					<excludes>
+						<!-- excluding business model as it must be compiled using AspectJ -->
+						<exclude>**/*.java</exclude>
+						<!-- no need to exclude tests as no persisting class is defined there -->
+					</excludes>
 				</configuration>
 			</plugin>
 
@@ -42,7 +47,7 @@
 					<execution>
 						<goals>
 							<goal>compile</goal>       <!-- use this goal to weave all your main classes -->
-							<goal>test-compile</goal>  <!-- use this goal to weave all your test classes -->
+							<!--  goal>test-compile</goal -->  <!-- use this goal to weave all your test classes -->
 						</goals>
 					</execution>
 				</executions>
