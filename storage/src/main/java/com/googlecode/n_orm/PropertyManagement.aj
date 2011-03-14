@@ -39,8 +39,6 @@ public aspect PropertyManagement {
 			INSTANCE = aspectOf();
 		return INSTANCE;
 	}
-
-	declare soft : DatabaseNotReachedException : within(PropertyManagement) && adviceexecution();
 	
 //	declare error: set(!static !transient (!Collection+ && !java.io.Serializable+) PersistingElement+.*) : "Non serializable field ; may break element's serialization";
 
