@@ -9,7 +9,8 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>hbase-test-deps</artifactId>
-	<version>${hbase.version}</version>
+	<name>HBase test dependencies</name>
+	<version>${hbase.version}-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<properties>
@@ -41,11 +42,16 @@
 		</dependency>
 	</dependencies>
 
+	<scm>
+		<connection>scm:hg:http://n-orm.googlecode.com/hg/</connection>
+		<developerConnection>scm:hg:https://n-orm.googlecode.com/hg/</developerConnection>
+		<url>http://n-orm.googlecode.com/hg/</url>
+	</scm>
 	<repositories>
 
 		<repository>
 			<id>cdh.releases.repo</id>
-			<url>https://repository.cloudera.com/content/repositories/releases</url>
+			<url>http://repository.cloudera.com/content/repositories/releases</url>
 			<name>CDH Releases Repository</name>
 			<snapshots>
 				<enabled>false</enabled>
@@ -53,7 +59,7 @@
 		</repository>
 		<repository>
 			<id>cdh.snapshots.repo</id>
-			<url>https://repository.cloudera.com/content/repositories/snapshots</url>
+			<url>http://repository.cloudera.com/content/repositories/snapshots</url>
 			<name>CDH Snapshots Repository</name>
 			<snapshots>
 				<enabled>true</enabled>
