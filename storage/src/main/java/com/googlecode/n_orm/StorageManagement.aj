@@ -192,8 +192,36 @@ public aspect StorageManagement {
 		}
 		return this.persistingSuperClasses;
 	}
-
+	
+	public void PersistingElement.activateColumnFamily(String name) throws DatabaseNotReachedException {
+		this.getColumnFamily(name).activate();
+	}
+	
+	public void PersistingElement.activateColumnFamily(String name, Object fromObject, Object toObject) throws DatabaseNotReachedException {
+		this.getColumnFamily(name).activate(fromObject, toObject);
+	}
+	
+	public void PersistingElement.activateColumnFamilyIfNotAlready(String name) throws DatabaseNotReachedException {
+		ColumnFamily<?> cf = this.getColumnFamily(name);
+		if (!cf.isActivated())
+			cf.activate();
+	}
+	
+	public void PersistingElement.activateColumnFamilyIfNotAlready(String name, Object fromObject, Object toObject) throws DatabaseNotReachedException {
+		ColumnFamily<?> cf = this.getColumnFamily(name);
+		if (!cf.isActivated())
+			cf.activate(fromObject, toObject);
+	}
+	
+	public void PersistingElement.activateIfNotAlready(String... families) throws DatabaseNotReachedException {
+		this.activate(false, families);
+	}
+	
 	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
+		this.activate(true, families);
+	}
+
+	private void PersistingElement.activate(boolean force, String... families) throws DatabaseNotReachedException {
 		this.checkKeys();
 		if (this.getIdentifier() == null)
 			throw new IllegalArgumentException("Cannot activate " + this + " before all its keys are valued.");
@@ -201,9 +229,11 @@ public aspect StorageManagement {
 		Set<String> toBeActivated = new TreeSet<String>();
 		if (families != null) {
 			for (String family : families) {
-				if (this.getColumnFamily(family) == null)
+				ColumnFamily<?> cf = this.getColumnFamily(family);
+				if (cf == null)
 					throw new IllegalArgumentException("Unknown column family " + family + " in class " + this.getClass());
-				toBeActivated.add(family);
+				if (force || !cf.isActivated())
+					toBeActivated.add(family);
 			}
 		}
 
@@ -213,26 +243,29 @@ public aspect StorageManagement {
 				Field f = cf.getProperty();
 				ImplicitActivation ia = f == null ? null : f.getAnnotation(ImplicitActivation.class);
 				if (f == null || ia != null) {
-					toBeActivated.add(cf.getName());
+					if (force || !cf.isActivated())
+						toBeActivated.add(cf.getName());
 				}
 			}
 		}
 		
-		Map<String, Map<String, byte[]>> rawData = this.getStore().get(this.getTable(), this.getIdentifier(), toBeActivated);
-		for (String family : rawData.keySet()) {
-			this.getColumnFamily(family).rebuild(rawData.get(family));
-			boolean removed = toBeActivated.remove(family);
-			assert removed;
-		}
-		
-		if (!toBeActivated.isEmpty()) {
-			Map<String, byte[]> emptyTree = new TreeMap<String, byte[]>();
-			for (String tba : toBeActivated) {
-				this.getColumnFamily(tba).rebuild(emptyTree);
+		if (! toBeActivated.isEmpty()) {
+			Map<String, Map<String, byte[]>> rawData = this.getStore().get(this.getTable(), this.getIdentifier(), toBeActivated);
+			for (String family : rawData.keySet()) {
+				this.getColumnFamily(family).rebuild(rawData.get(family));
+				boolean removed = toBeActivated.remove(family);
+				assert removed;
 			}
+			
+			if (!toBeActivated.isEmpty()) {
+				Map<String, byte[]> emptyTree = new TreeMap<String, byte[]>();
+				for (String tba : toBeActivated) {
+					this.getColumnFamily(tba).rebuild(emptyTree);
+				}
+			}
+			
+			this.upgradeProperties();
 		}
-		
-		this.upgradeProperties();
 	}
 	
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {

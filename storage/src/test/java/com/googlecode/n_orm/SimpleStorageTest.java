@@ -401,4 +401,14 @@ public class SimpleStorageTest {
 		assertFalse(Memory.INSTANCE.getTable(s.getTable()).get(s.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).containsKey("key1"));
 		assertEquals(s.prop1, ConversionTools.convert(String.class, Memory.INSTANCE.getTable(s.getTable()).get(s.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).get("prop1")));
 	}
+	
+	@Test
+	public void multipleActivations() {
+		sut1.activateIfNotAlready();
+		assertTrue(Memory.INSTANCE.hadAQuery());
+		sut1.activateIfNotAlready();
+		assertFalse(Memory.INSTANCE.hadAQuery());
+		sut1.activate();
+		assertTrue(Memory.INSTANCE.hadAQuery());
+	}
 }

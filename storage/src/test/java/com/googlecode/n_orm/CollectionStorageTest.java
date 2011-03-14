@@ -296,4 +296,16 @@ public class CollectionStorageTest {
 		assertTrue(((ColumnFamily<?>)copy.elements).isActivated());
 		assertTrue(((ColumnFamily<?>)copy.elementsInc).isActivated());
 	}
+	
+	@Test
+	public void multipleActivations() {
+		sut.activateColumnFamily("elements");
+		this.assertHadAQuery();
+		sut.activateColumnFamilyIfNotAlready("elements");
+		this.assertHadNoQuery();
+		sut.activateColumnFamilyIfNotAlready("elements");
+		this.assertHadNoQuery();
+		sut.activateColumnFamily("elements");
+		this.assertHadAQuery();
+	}
 }
