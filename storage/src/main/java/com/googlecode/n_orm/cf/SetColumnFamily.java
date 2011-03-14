@@ -201,4 +201,15 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 		return this.collection.values().toArray(a);
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
+	public void activate(Object from, Object to)
+			throws DatabaseNotReachedException {
+		if (! this.clazz.isInstance(from))
+			throw new IllegalArgumentException(from.toString() + " is not compatible with " + this.clazz);
+		if (! this.clazz.isInstance(to))
+			throw new IllegalArgumentException(to.toString() + " is not compatible with " + this.clazz);
+		super.activate(this.getIndex((T) from), this.getIndex((T) to));
+	}
+
 }

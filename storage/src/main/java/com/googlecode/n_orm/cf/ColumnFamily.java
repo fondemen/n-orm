@@ -91,6 +91,8 @@ public abstract class ColumnFamily<T> {
 		this.activate(null);
 	}
 	
+	public abstract void activate(Object from, Object to) throws DatabaseNotReachedException;
+	
 	public void activate(String fromIndex, String toIndex) throws DatabaseNotReachedException {
 		this.activate(new Constraint(fromIndex, toIndex));
 	}

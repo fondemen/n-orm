@@ -59,19 +59,16 @@ public aspect ColumnFamiliyManagement {
 		this.getColumnFamiliesInt().put(cf.getName(), cf);
 	}
 	
-	/**
-	 * The list of column families for this persisting element.
-	 */
 	public Set<ColumnFamily<?>> PersistingElement.getColumnFamilies() {
 		return new HashSet<ColumnFamily<?>>(this.getColumnFamiliesInt().values());
 	}
 	
-	/**
-	 * Get a column family for this persisting element.
-	 * @param name the name of the column family, that should be the name of the represented Set or Map, or {@link PropertyManagement#PROPERTY_COLUMNFAMILY_NAME}
-	 */
-	public ColumnFamily<?> PersistingElement.getColumnFamily(String name) {
-		return this.getColumnFamiliesInt().get(name);
+	public ColumnFamily<?> PersistingElement.getColumnFamily(String name) throws UnknownColumnFamily {
+		ColumnFamily<?> ret = this.getColumnFamiliesInt().get(name);
+		if (ret == null)
+			throw new UnknownColumnFamily(this.getClass(), name);
+		else
+			return ret;
 	}
 	
 	//For test purpose
@@ -79,10 +76,6 @@ public aspect ColumnFamiliyManagement {
 		this.getColumnFamiliesInt().clear();
 	}
 	
-	/**
-	 * Checks whether this persisting element has changed and thus needs to be sent to the store.
-	 * A change is detected as soon as one of its column family has changed.
-	 */
 	public boolean PersistingElement.hasChanged() {
 		for (ColumnFamily<?> cf : this.getColumnFamiliesInt().values()) {
 			if (cf.hasChanged())

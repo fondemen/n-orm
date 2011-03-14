@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -73,7 +74,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * The name is the name of the property for the column family, i.e. the non static, non final , non transient {@link Map} or {@link Set} field.
 	 * @see ColumnFamily#getName()
 	 */
-	ColumnFamily<?> getColumnFamily(String columnFailyName);
+	ColumnFamily<?> getColumnFamily(String columnFailyName) throws UnknownColumnFamily;
 
 	/**
 	 * The identifier for this persisting element.
@@ -133,12 +134,65 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 
 	/**
 	 * Retrieves information from the store and put it into this persisting element.
+	 * Erases changes done in properties and column families.
 	 * Properties that are persisting elements are also activated.
 	 * Column families annotated with {@link ImplicitActivation} are also activated.
+	 * Use {@link #activateIfNotAlready()} in case you want to avoid re-activating already activated elements of this persisting elements.
 	 * @param families names of the families to activate even if they are not annotated with {@link ImplicitActivation} (see {@link #getColumnFamily(String)})
 	 * @throws IllegalArgumentException in case a given column family does not exists
 	 */
 	void activate(String... families) throws DatabaseNotReachedException;
+
+	/**
+	 * Retrieves information that have not been activated yet from the store and put it into this persisting element.
+	 * Column families (the set of simple properties is considered as a column family) that have already been activated by whatever mean (e.g. {@link #activateColumnFamily(String, Object, Object)}) will not be activated.
+	 * This means that if a constraint were passed at a previous activation time, it will be preserved.
+	 * @param families names of the families to activate even if they are not annotated with {@link ImplicitActivation} (see {@link #getColumnFamily(String)})
+	 * @throws IllegalArgumentException in case a given column family does not exists
+	 */
+	void activateIfNotAlready(String... families) throws DatabaseNotReachedException;
+	
+	/**
+	 * Activates a given column family (does not activate included persisting elements).
+	 * @param name name of the column family
+	 * @throws UnknownColumnFamily in case this column family does not exist
+	 * @throws DatabaseNotReachedException
+	 * @see {@link #getColumnFamily(String)}
+	 */
+	void activateColumnFamily(String name) throws UnknownColumnFamily, DatabaseNotReachedException;
+
+	/**
+	 * Activates a given column family (does not activate included persisting elements).
+	 * @param name name of the column family
+	 * @param from the minimal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
+	 * @param to the maximal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
+	 * @throws UnknownColumnFamily in case this column family does not exist
+	 * @throws DatabaseNotReachedException
+	 * @see {@link #getColumnFamily(String)}
+	 */
+	void activateColumnFamily(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
+	
+	/**
+	 * Activates a given column family (does not activate included persisting elements) in case it was not done before (with any possible activation method).
+	 * The column family won't be loaded if a previous activation was done, even if a constraint was given by {@link #activateColumnFamily(String, Object, Object)} or {@link #activateColumnFamilyIfNotAlready(String, Object, Object)}.
+	 * @param name name of the column family
+	 * @throws UnknownColumnFamily in case this column family does not exist
+	 * @throws DatabaseNotReachedException
+	 * @see {@link #getColumnFamily(String)}
+	 */
+	void activateColumnFamilyIfNotAlready(String name) throws UnknownColumnFamily, DatabaseNotReachedException;
+	
+	/**
+	 * Activates a given column family (does not activate included persisting elements) in case it was not done before (with any possible activation method).
+	 * The column family won't be loaded if a previous activation was done, even if a constraint was given by {@link #activateColumnFamily(String, Object, Object)} or {@link #activateColumnFamilyIfNotAlready(String, Object, Object)}.
+	 * @param name name of the column family
+	 * @param from the minimal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
+	 * @param to the maximal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
+	 * @throws UnknownColumnFamily in case this column family does not exist
+	 * @throws DatabaseNotReachedException
+	 * @see {@link #getColumnFamily(String)}
+	 */
+	void activateColumnFamilyIfNotAlready(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
 	/**
 	 * To be equal, two persisting elements must implement the same class and have the same identifier, no matter they have same values for properties and column families.
