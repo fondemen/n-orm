@@ -11,7 +11,8 @@
 	<name>n-orm parent pom</name>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
-	<description>Storage parent project for non aspectified projects (e.g. drivers). Use parent-aspect for aspectified projects.</description>
+	<description>Storage parent project for non aspectified projects (e.g.
+		drivers). Use parent-aspect for aspectified projects.</description>
 	<url>http://n-orm.googlecode.com/</url>
 	<licenses>
 		<license>
@@ -110,6 +111,16 @@
 					</execution>
 				</executions>
 			</plugin>
+
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>2.2.1</version>
+				<configuration>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 
@@ -162,45 +173,17 @@
 		</repository>
 
 	</repositories>
-	<!-- distributionManagement>
-		<downloadUrl>http://code.google.com/p/n-orm/downloads/list</downloadUrl>
-		<repository>
-			<id>local.repo</id>
-			<name>file repository to svn</name>
-			<url>file://${basedir}/../mavenrepo</url>
-		</repository>
-		<snapshotRepository>
-			<id>local.repo</id>
-			<name>file repository to svn</name>
-			<url>file://${basedir}/../mavenrepo</url>
-		</snapshotRepository>
-	</distributionManagement -->
+	<!-- distributionManagement> <downloadUrl>http://code.google.com/p/n-orm/downloads/list</downloadUrl> 
+		<repository> <id>local.repo</id> <name>file repository to svn</name> <url>file://${basedir}/../mavenrepo</url> 
+		</repository> <snapshotRepository> <id>local.repo</id> <name>file repository 
+		to svn</name> <url>file://${basedir}/../mavenrepo</url> </snapshotRepository> 
+		</distributionManagement -->
 	<profiles>
 		<profile>
 			<id>release</id>
 
 			<build>
 				<plugins>
-					<plugin>
-						<artifactId>maven-assembly-plugin</artifactId>
-						<version>2.2.1</version>
-						<configuration>
-							<descriptorRefs>
-								<descriptorRef>jar-with-dependencies</descriptorRef>
-							</descriptorRefs>
-						</configuration>
-						<!-- executions>
-							<execution>
-								<id>make-assembly</id>
-								<phase>package</phase>
-								<goals>
-									<goal>single</goal>
-								</goals>
-							</execution>
-						</executions-->
-					</plugin>
-
-
 					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-source-plugin</artifactId>
