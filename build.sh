@@ -72,6 +72,11 @@ function coverage {
 	check $1
 }
 
+function hudson {
+	coverage $1
+}
+
+
 if [ "$1" = "install" ]; then
 	echo "Installing project artifact into local maven repository"
 elif [ "$1" = "deploy" ]; then
@@ -80,10 +85,14 @@ elif [ "$1" = "report" ]; then
 	echo "Installing project artifact into local maven repository and reporting to site"
 elif [ "$1" = "coverage" ]; then
 	echo "Generating coverage reports"
+elif [ "$1" = "hudson" ]; then
+	echo "Running hudson"
 else
 	echo "Usage `basename $0` [install|deploy]"
 	echo "	install: compile and install into local maven repository"
 	echo "	report: compile and install into local maven repository an generate reports"
+	echo "	coverage: generate coverage reports"
+	echo "	hudson: hudson goal"
 	echo "	deploy: compile and install into OSS repository"
 	exit 1
 fi
@@ -99,6 +108,8 @@ $1 hbase final
 
 $1 sample test
 
+cd ..
+
 echo "$1 completed with no error"
 
 if [ "$1" = "install" ]; then
@@ -111,7 +122,9 @@ elif [ "$1" = "report" ]; then
 	echo "The following reports were generated:"
 	find $LOC -type d -name site
 elif [ "$1" = "coverage" ]; then
-	cd ..
+	echo "The following coverage reports were generated:"
+	find $LOC/coverage -type f -name coverage.xml
+elif [ "$1" = "hudson" ]; then
 	if [ -d coverage  ]; then
 		rm -rf coverage
 	fi
@@ -123,6 +136,7 @@ elif [ "$1" = "coverage" ]; then
 	done
 	echo "The following coverage reports were generated:"
 	find $LOC/coverage -type f -name coverage.xml
+	$0 install
 fi
 
 exit 0
