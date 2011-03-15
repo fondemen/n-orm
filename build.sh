@@ -54,12 +54,32 @@ function report {
 	check $1
 }
 
+function coverage {
+	cd ../$1
+	if [ "$2" = "jar" ]; then
+		mvn clean install
+		check $1
+		mvn cobertura:cobertura -P coverage
+	elif [ "$2" = "final" ]; then
+		mvn clean install
+		check $1
+		mvn cobertura:cobertura -P coverage
+	elif [ "$2" = "test" ]; then
+		mvn clean cobertura:cobertura
+	else
+		mvn clean install
+	fi
+	check $1
+}
+
 if [ "$1" = "install" ]; then
 	echo "Installing project artifact into local maven repository"
 elif [ "$1" = "deploy" ]; then
 	echo "Deploying project artifact into maven repository"
 elif [ "$1" = "report" ]; then
 	echo "Installing project artifact into local maven repository and reporting to site"
+elif [ "$1" = "coverage" ]; then
+	echo "Generating coverage reports"
 else
 	echo "Usage `basename $0` [install|deploy]"
 	echo "	install: compile and install into local maven repository"
@@ -90,6 +110,9 @@ elif [ "$1" = "deploy" ]; then
 elif [ "$1" = "report" ]; then
 	echo "The following reports were generated:"
 	find $LOC -type d -name site
+elif [ "$1" = "coverage" ]; then
+	echo "The following reports were generated:"
+	find $LOC -type f -name coverage.xml
 fi
 
 exit 0
