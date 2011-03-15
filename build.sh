@@ -1,7 +1,7 @@
 #!/bin/bash
 function check {
 	if [ $? -ne 0 ]; then
-		echo "ERROR"
+		echo "ERROR at step " $1
 		exit $?
 	fi
 }
@@ -15,7 +15,7 @@ function install {
 	else
 		mvn clean install
 	fi
-	check
+	check $1
 }
 
 function deploy {
@@ -29,7 +29,7 @@ function deploy {
 	else
 		mvn clean deploy
 	fi
-	check
+	check $1
 }
 
 if [ "$1" = "install" ]; then
