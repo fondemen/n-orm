@@ -3,4 +3,5 @@ syntax: regexp
 ^.*/target$
 ^.metadata$
 ^.DS_Store$
+^coverage$
 
