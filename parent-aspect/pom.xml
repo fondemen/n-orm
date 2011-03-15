@@ -13,8 +13,8 @@
 	<version>${project.parent.version}</version>
 	<packaging>pom</packaging>
 	<properties>
-		<aspectj.version>1.6.7</aspectj.version>
-		<aspectj.plugin.version>1.3</aspectj.plugin.version>
+		<aspectj.version>1.6.10</aspectj.version>
+		<aspectj.plugin.version>1.3.1</aspectj.plugin.version>
 	</properties>
 
 	<scm>
@@ -75,29 +75,13 @@
 		</dependency>
 	</dependencies>
 
-	<!-- reporting>
-		<plugins>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>aspectj-maven-plugin</artifactId>
-				<version>${aspectj.plugin.version}</version>
-				<configuration>
-					<source>${java.version}</source>
-					<target>${java.version}</target>
-					<complianceLevel>${java.version}</complianceLevel>
-					<aspectDirectory>src/main/java</aspectDirectory>
-					<publicScope>true</publicScope>
-				</configuration>
-				<reportSets>
-					<reportSet>
-						<reports>
-							<report>aspectj-report</report>
-						</reports>
-					</reportSet>
-				</reportSets>
-			</plugin>
-		</plugins>
-	</reporting -->
+	<!-- reporting> <plugins> <plugin> <groupId>org.codehaus.mojo</groupId> 
+		<artifactId>aspectj-maven-plugin</artifactId> <version>${aspectj.plugin.version}</version> 
+		<configuration> <source>${java.version}</source> <target>${java.version}</target> 
+		<complianceLevel>${java.version}</complianceLevel> <aspectDirectory>src/main/java</aspectDirectory> 
+		<publicScope>true</publicScope> </configuration> <reportSets> <reportSet> 
+		<reports> <report>aspectj-report</report> </reports> </reportSet> </reportSets> 
+		</plugin> </plugins> </reporting -->
 
 	<repositories>
 		<repository>
@@ -125,4 +109,14 @@
 			</snapshots>
 		</pluginRepository>
 	</pluginRepositories>
+
+	<profiles>
+		<profile>
+			<id>coverage</id>
+			<properties>
+				<aspectj.version>1.6.7</aspectj.version>
+				<aspectj.plugin.version>1.3</aspectj.plugin.version>
+			</properties>
+		</profile>
+	</profiles>
 </project>

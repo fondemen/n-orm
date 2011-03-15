@@ -21,13 +21,35 @@ function install {
 function deploy {
 	cd ../$1
 	if [ "$2" = "jar" ]; then
-		mvn clean deploy site-deploy -P release
+		mvn clean deploy -P release
+		check $1
+		mvn site-deploy -P coverage
 	elif [ "$2" = "final" ]; then
-		mvn clean deploy assembly:single site-deploy -P release
+		mvn clean deploy assembly:single -P release
+		check $1
+		mvn site-deploy -P coverage
 	elif [ "$2" = "test" ]; then
-		mvn clean test
+		mvn clean test 
 	else
 		mvn clean deploy
+	fi
+	check $1
+}
+
+function report {
+	cd ../$1
+	if [ "$2" = "jar" ]; then
+		mvn clean install
+		check $1
+		mvn site -P coverage
+	elif [ "$2" = "final" ]; then
+		mvn clean install
+		check $1
+		mvn site -P coverage
+	elif [ "$2" = "test" ]; then
+		mvn clean site
+	else
+		mvn clean install
 	fi
 	check $1
 }
@@ -36,15 +58,18 @@ if [ "$1" = "install" ]; then
 	echo "Installing project artifact into local maven repository"
 elif [ "$1" = "deploy" ]; then
 	echo "Deploying project artifact into maven repository"
+elif [ "$1" = "report" ]; then
+	echo "Installing project artifact into local maven repository and reporting to site"
 else
 	echo "Usage `basename $0` [install|deploy]"
 	echo "	install: compile and install into local maven repository"
+	echo "	report: compile and install into local maven repository an generate reports"
 	echo "	deploy: compile and install into OSS repository"
 	exit 1
 fi
 
-cd `dirname $0`/parent
-
+LOC=`dirname $0`
+cd $LOC/parent
 
 $1 parent
 $1 parent-aspect
@@ -56,8 +81,15 @@ $1 sample test
 
 echo "$1 completed with no error"
 
-cd ..
-echo "The following assemblies were genrated:"
-find . -type f -name *jar-with-dependencies.jar
+if [ "$1" = "install" ]; then
+	echo "The following assemblies were generated:"
+	find $LOC -type f -name *jar-with-dependencies.jar
+elif [ "$1" = "deploy" ]; then
+	echo "The following assemblies were generated:"
+	find $LOC -type f -name *jar-with-dependencies.jar
+elif [ "$1" = "report" ]; then
+	echo "The following reports were generated:"
+	find $LOC -type d -name site
+fi
 
 exit 0
