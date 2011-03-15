@@ -64,6 +64,9 @@
 				<artifactId>cobertura-maven-plugin</artifactId>
 				<version>2.4</version>
 				<configuration>
+					<check>
+						<lineRate>80</lineRate>
+					</check>
 					<formats>
 						<format>xml</format>
 						<format>html</format>
@@ -71,13 +74,12 @@
 				</configuration>
 				<executions>
 					<execution>
-						<id>clean</id>
 						<goals>
 							<goal>clean</goal>
 						</goals>
 					</execution>
 					<execution>
-						<id>site</id>
+						<id>report</id>
 						<phase>pre-site</phase>
 						<goals>
 							<goal>cobertura</goal>
@@ -106,7 +108,7 @@
 					<execution>
 						<phase>pre-site</phase>
 						<goals>
-							<goal>report</goal>
+							<goal>report-only</goal>
 						</goals>
 					</execution>
 				</executions>
