@@ -111,8 +111,18 @@ elif [ "$1" = "report" ]; then
 	echo "The following reports were generated:"
 	find $LOC -type d -name site
 elif [ "$1" = "coverage" ]; then
-	echo "The following reports were generated:"
-	find $LOC -type f -name coverage.xml
+	cd ..
+	if [ -d coverage  ]; then
+		rm -rf coverage
+	fi
+	mkdir coverage
+	for f in `find . -name coverage.xml`; do
+		fdir=`dirname $f`;
+		mkdir -p coverage/$fdir
+		cp $f coverage/$fdir
+	done
+	echo "The following coverage reports were generated:"
+	find $LOC/coverage -type f -name coverage.xml
 fi
 
 exit 0
