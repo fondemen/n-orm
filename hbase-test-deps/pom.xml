@@ -10,12 +10,12 @@
 	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>hbase-test-deps</artifactId>
 	<name>HBase test dependencies</name>
-	<version>${hbase.version}-SNAPSHOT</version>
+	<version>hbase-${hbase.version}-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<properties>
-		<hbase.version>0.90.1-CDH3B4</hbase.version>
-		<hadoop.version>0.20.2-CDH3B4</hadoop.version>
+		<hbase.version>0.90.0</hbase.version>
+		<hadoop.version>0.20.2</hadoop.version>
 	</properties>
 
 	<dependencies>
@@ -47,25 +47,6 @@
 		<developerConnection>scm:hg:https://n-orm.googlecode.com/hg/</developerConnection>
 		<url>http://n-orm.googlecode.com/hg/</url>
 	</scm>
-	<repositories>
-
-		<repository>
-			<id>cdh.releases.repo</id>
-			<url>http://repository.cloudera.com/content/repositories/releases</url>
-			<name>CDH Releases Repository</name>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-		</repository>
-		<repository>
-			<id>cdh.snapshots.repo</id>
-			<url>http://repository.cloudera.com/content/repositories/snapshots</url>
-			<name>CDH Snapshots Repository</name>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
-		</repository>
-	</repositories>
 
 	<distributionManagement>
 		<site>
@@ -74,4 +55,34 @@
 			<url>file://${basedir}/../../n-orm-wiki/hbase-test-deps</url>
 		</site>
 	</distributionManagement>
+
+	<profiles>
+		<profile>
+			<id>hbase-cdh3b4</id>
+			<properties>
+				<hbase.version>0.90.1-CDH3B4</hbase.version>
+				<hadoop.version>0.20.2-CDH3B4</hadoop.version>
+			</properties>
+
+			<repositories>
+
+				<repository>
+					<id>cdh.releases.repo</id>
+					<url>http://repository.cloudera.com/content/repositories/releases</url>
+					<name>CDH Releases Repository</name>
+					<snapshots>
+						<enabled>false</enabled>
+					</snapshots>
+				</repository>
+				<repository>
+					<id>cdh.snapshots.repo</id>
+					<url>http://repository.cloudera.com/content/repositories/snapshots</url>
+					<name>CDH Snapshots Repository</name>
+					<snapshots>
+						<enabled>true</enabled>
+					</snapshots>
+				</repository>
+			</repositories>
+		</profile>
+	</profiles>
 </project>
