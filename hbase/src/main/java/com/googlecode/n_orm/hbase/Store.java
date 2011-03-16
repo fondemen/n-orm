@@ -1,5 +1,8 @@
 package com.googlecode.n_orm.hbase;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,7 +44,20 @@ import com.googlecode.n_orm.Constraint;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PropertyManagement;
 
-
+/**
+ * The HBase store found according to its configuration folder.
+ * An example store.properties file is:<br><code>
+ * class=com.googlecode.n_orm.hbase.Store<br>
+ * static-accessor=getStore<br>
+ * 1=/usr/lib/hadoop-0.20/conf/,/usr/lib/hbase/conf/
+ * </code><br>
+ * For test purpose, you can also directly reach an HBase instance thanks to one of its zookeeper host and client port:<br><code>
+ * class=com.googlecode.n_orm.hbase.Store<br>
+ * static-accessor=getStore<br>
+ * 1=localhost
+ * 2=2181
+ * </code><br>  
+ */
 public class Store implements com.googlecode.n_orm.GenericStore {
 
 	private static final class CloseableIterator implements Iterator<String>,
@@ -89,10 +105,16 @@ public class Store implements com.googlecode.n_orm.GenericStore {
 
 	protected static Map<Properties, Store> knownStores = new HashMap<Properties, Store>();
 
+	/**
+	 * For test purpose ; avoid using this.
+	 */
 	public static Store getStore(String host, int port) {
 		return getStore(host, port, null);
 	}
 
+	/**
+	 * For test purpose ; avoid using this.
+	 */
 	public static Store getStore(String host, int port, Integer maxRetries) {
 		synchronized (Store.class) {
 			Properties p = new Properties();
@@ -111,6 +133,43 @@ public class Store implements com.googlecode.n_orm.GenericStore {
 			}
 			return ret;
 		}
+	}
+	
+	/**
+	 * Get an HBase store according to a set of comma-separated configuration folders.
+	 * Those folders are supposed to have configuration files following the pattern *-site.xml. 
+	 */
+	public static Store getStore(String commaSeparatedConfigurationFolders) throws IOException {
+		boolean foundHbase = false, foundConfFile = false;
+		
+		Configuration conf = new Configuration();
+		for (String  configurationFolder : commaSeparatedConfigurationFolders.split(",")) {
+			
+			File confd = new File(configurationFolder);
+			if (!confd.isDirectory())
+				throw new IOException("Cannot read HBase configuration folder " + confd);
+			
+			for (String confFileName : confd.list(new FilenameFilter() {
+				
+				@Override
+				public boolean accept(File dir, String name) {
+					return name.endsWith("-site.xml");
+				}
+			})) {
+				conf.addResource(new FileInputStream(new File(confd, confFileName)));
+				foundHbase |= confFileName.equals("hbase-site.xml");
+				foundConfFile = true;
+			}
+		}
+	
+		if (!foundConfFile)
+			throw new IOException("No configuration file found in the following folders " + commaSeparatedConfigurationFolders + " ; expecting some *-site.xml files");
+		if (! foundHbase)
+			throw new IOException("Could not find hbase-site.xml from folders " + commaSeparatedConfigurationFolders);
+		
+		Store ret = new Store();
+		ret.setConf(HBaseConfiguration.create(conf));
+		return ret;
 	}
 
 	private String host = "localhost";
