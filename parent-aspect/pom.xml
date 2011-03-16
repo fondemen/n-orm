@@ -10,7 +10,7 @@
 	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>parent-aspect</artifactId>
 	<name>n-orm aspect parent pom</name>
-	<version>${project.parent.version}</version>
+	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<properties>
 		<aspectj.version>1.6.10</aspectj.version>
@@ -22,9 +22,19 @@
 		<developerConnection>scm:hg:https://n-orm.googlecode.com/hg/</developerConnection>
 		<url>http://n-orm.googlecode.com/hg/</url>
 	</scm>
+	<distributionManagement>
+		<site>
+			<id>wiki</id>
+			<name>n-orm Wiki pages</name>
+			<url>file://${basedir}/../../n-orm-wiki/parent-aspect</url>
+		</site>
+	</distributionManagement>
 
 	<description>Storage parent project for aspectified projects (e.g. storage).</description>
 	<url>http://n-orm.googlecode.com/</url>
+	<modules>
+		<module>../storage/</module>
+	</modules>
 	<build>
 		<plugins>
 			<plugin>
@@ -83,32 +93,13 @@
 		<reports> <report>aspectj-report</report> </reports> </reportSet> </reportSets> 
 		</plugin> </plugins> </reporting -->
 
-	<repositories>
-		<repository>
-			<id>codehaus-nexus</id>
-			<name>Mojo Maven Repository</name>
-			<url>https://nexus.codehaus.org/content/groups/public/</url>
-			<releases>
-				<enabled>true</enabled>
-			</releases>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
-		</repository>
-	</repositories>
-	<pluginRepositories>
-		<pluginRepository>
-			<id>codehaus-nexus</id>
-			<name>Mojo Maven Repository</name>
-			<url>https://nexus.codehaus.org/content/groups/public/</url>
-			<releases>
-				<enabled>true</enabled>
-			</releases>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
-		</pluginRepository>
-	</pluginRepositories>
+	<!-- repositories> <repository> <id>codehaus-nexus</id> <name>Mojo Maven 
+		Repository</name> <url>https://nexus.codehaus.org/content/groups/public/</url> 
+		<releases> <enabled>true</enabled> </releases> <snapshots> <enabled>true</enabled> 
+		</snapshots> </repository> </repositories> <pluginRepositories> <pluginRepository> 
+		<id>codehaus-nexus</id> <name>Mojo Maven Repository</name> <url>https://nexus.codehaus.org/content/groups/public/</url> 
+		<releases> <enabled>true</enabled> </releases> <snapshots> <enabled>true</enabled> 
+		</snapshots> </pluginRepository> </pluginRepositories -->
 
 	<profiles>
 		<profile>
