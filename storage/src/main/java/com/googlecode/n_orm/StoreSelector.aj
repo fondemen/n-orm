@@ -58,6 +58,7 @@ public aspect StoreSelector {
     public Properties findProperties(Class<?> clazz) throws IOException {
     	File f = new File(clazz.getName().replace('.', '/') + ".class"), dir = f;
     	Properties ret = new Properties();
+    	//@ TODO: consider using thread group to find class loaders of all threads
     	ClassLoader [] loaders = {ClassLoader.getSystemClassLoader(), Thread.currentThread().getContextClassLoader(), clazz.getClassLoader()};
     	do {
     		dir = dir.getParentFile();
