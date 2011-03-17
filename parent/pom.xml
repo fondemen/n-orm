@@ -205,13 +205,13 @@
 			<id>local-nexus</id>
 			<distributionManagement>
 				<repository>
-					<id>actionside</id>
-					<name>AcionSide</name>
+					<id>releases</id>
+					<name>Local Nexus releases</name>
 					<url>file:/opt/nexus/./../sonatype-work/nexus/storage/releases/</url>
 				</repository>
 				<snapshotRepository>
-					<id>actionside</id>
-					<name>AcionSide</name>
+					<id>snapshots</id>
+					<name>Local Nexus snapshots</name>
 					<url>file:/opt/nexus/./../sonatype-work/nexus/storage/snapshots/</url>
 				</snapshotRepository>
 			</distributionManagement>
