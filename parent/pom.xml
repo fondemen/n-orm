@@ -207,12 +207,12 @@
 				<repository>
 					<id>actionside</id>
 					<name>AcionSide</name>
-					<url>file:/opt/nexus/./../sonatype-work/nexus/storage/actionside</url>
+					<url>file:/opt/nexus/./../sonatype-work/nexus/storage/releases/</url>
 				</repository>
 				<snapshotRepository>
 					<id>actionside</id>
 					<name>AcionSide</name>
-					<url>file:/opt/nexus/./../sonatype-work/nexus/storage/actionside</url>
+					<url>file:/opt/nexus/./../sonatype-work/nexus/storage/snapshots/</url>
 				</snapshotRepository>
 			</distributionManagement>
 		</profile>
