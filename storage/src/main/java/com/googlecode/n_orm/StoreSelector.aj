@@ -58,7 +58,7 @@ public aspect StoreSelector {
     public Properties findProperties(Class<?> clazz) throws IOException {
     	File f = new File(clazz.getName().replace('.', '/') + ".class"), dir = f;
     	Properties ret = new Properties();
-    	ClassLoader loader = ClassLoader.getSystemClassLoader();
+    	ClassLoader [] loaders = {ClassLoader.getSystemClassLoader(), Thread.currentThread().getContextClassLoader(), clazz.getClassLoader()};
     	do {
     		dir = dir.getParentFile();
     		if (dir == null)
@@ -68,7 +68,13 @@ public aspect StoreSelector {
     		//Evil windows states that \ is a separator while / is expected by getResourceAsStream
     		if (File.separatorChar == '\\')
     			path = path.replace('\\', '/');
-    		InputStream in = loader.getResourceAsStream(path);
+    		
+    		InputStream in = null;
+    		for (ClassLoader loader : loaders) {
+				in = loader.getResourceAsStream(path);
+				if (in != null) break;
+			}
+    			
     		if (in != null)
 	    		try {
 	    			ret.load(in);
