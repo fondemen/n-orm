@@ -368,60 +368,40 @@ public aspect KeyManagement {
 		}
 	}
 	
-	private transient Set<String> PersistingElement.keysSet = new TreeSet<String>();
-	private transient boolean PersistingElement.allKeysSet = false;
-	
-	before (PersistingElement self, Object newVal) : set(@Key * PersistingElement+.*) && target(self) && args(newVal) {
-		Field key = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
-		if (newVal == null)
-			throw new IllegalArgumentException("Cannot set key " + key + " to null.");
-//		Class<?> type = key.getType();
-//		boolean isArray = type.isArray();
-//		if(isArray && Array.getLength(newVal)==0)
-//			throw new IllegalArgumentException("Cannot set key " + key + " to an empty array.");
-		String keyName = key.getName();
-		if (self.keysSet.contains(keyName))
-			throw new IllegalArgumentException("Cannot change the value of key " + key + " already set for object " + self + " (key was already set to " + PropertyManagement.getInstance().candideReadValue(self, key) + ')');
-		self.keysSet.add(keyName);
-		if (self.keysSet.size() == this.detectKeys(self.getClass()).size())
-			self.allKeysSet = true;
-	}
-	
-	public boolean PersistingElement.areAllKeysSet() {
-		if (this.allKeysSet)
-			return true;
-
-		PropertyManagement pm = PropertyManagement.getInstance();
-		for (Field key : KeyManagement.getInstance().detectKeys(this.getClass())) {
-			if (this.keysSet != null && this.keysSet.contains(key.getName()))
-				continue;
-			if (Object.class.isAssignableFrom(key.getType()))
-				continue;
-			if (pm.candideReadValue(this, key) == null)
-				return false;
-		}
-		this.allKeysSet = true;
-		return true;
-	}
-	
-	public void PersistingElement.checkKeys() {
-		String actualIdent = KeyManagement.getInstance().createIdentifier(this, this.getClass());
-		if (!this.getIdentifier().equals(actualIdent))
-			throw new IllegalStateException("Keys of " + this + " must have changed: identifier " + this.getIdentifier() + " became " + actualIdent);
-	}
+	private volatile boolean PersistingElement.creatingIdentifier = false;
 
 	public String PersistingElement.getIdentifier() {
-		if (this.areAllKeysSet() && this.identifier == null) {
-			this.identifier = KeyManagement.getInstance().createIdentifier(this, this.getClass());
-			if (this.identifier == null)
-				throw new IllegalStateException("Element " + this + " has no identifier ; have all keys been set ?");
+		if (this.identifier == null && !this.creatingIdentifier) {
+			this.creatingIdentifier = true;
+			try {
+				this.identifier = KeyManagement.getInstance().createIdentifier(this, this.getClass());
+				if (this.identifier == null)
+					throw new IllegalStateException("Element " + this + " has no identifier ; have all keys been set ?");
+			} finally {
+				this.creatingIdentifier = false;
+			}
 		}
 		return this.identifier;
 	}
-
+	
+	/**
+	 * Checks whether this persisting element has a stable key.
+	 * This means that each one of its keys is set to a valid and unchanged value.
+	 */
+	public void PersistingElement.checkIsValid() throws IllegalStateException {
+		if (this.getIdentifier() == null)
+			throw new IllegalStateException("Persisting element ot type " + this.getClass() + " is missing some of its key values.");
+		String newKey = KeyManagement.getInstance().createIdentifier(this, getClass());
+		if (!this.getIdentifier().equals(newKey)) {
+			if (newKey == null)
+				throw new IllegalArgumentException("One of the key value for " + this + " is no longer valid.");
+			else
+				throw new IllegalArgumentException("At leat a key for object " + this + " has changed (identifier would be now " + newKey + ")");
+		}
+	}
 
 	public String PersistingElement.getFullIdentifier() {
-		if (this.areAllKeysSet() && this.fullIdentifier == null) {
+		if (this.fullIdentifier == null) {
 			this.fullIdentifier = KeyManagement.getInstance().createIdentifier(this, PersistingElement.class);
 			if (this.fullIdentifier == null)
 				throw new IllegalStateException("Element " + this + " has no identifier ; have all keys been set ?");

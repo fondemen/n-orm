@@ -42,4 +42,16 @@ public class Book {
 	public Date getReceptionDate() {
 		return receptionDate;
 	}
+
+	public void setBookStore(BookStore bookStore) {
+		this.bookStore = bookStore;
+	}
+
+	public void setSellerDate(Date sellerDate) {
+		this.sellerDate = sellerDate;
+	}
+
+	public void setReceptionDate(Date receptionDate) {
+		this.receptionDate = receptionDate;
+	}
 }
