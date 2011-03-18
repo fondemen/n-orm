@@ -52,9 +52,9 @@
 		</developer>
 	</developers>
 	<modules>
-		<module>../parent-aspect/</module>
-		<module>../hbase-test-deps/</module>
-		<module>../hbase/</module>
+		<module>parent-aspect</module>
+		<module>hbase-test-deps</module>
+		<module>hbase</module>
 	</modules>
 
 	<build>
@@ -194,10 +194,10 @@
 		<profile>
 			<id>with-sample</id>
 			<modules>
-				<module>../parent-aspect/</module>
-				<module>../hbase-test-deps/</module>
-				<module>../hbase/</module>
-				<module>../sample/</module>
+				<module>parent-aspect</module>
+				<module>hbase-test-deps</module>
+				<module>hbase</module>
+				<module>sample</module>
 			</modules>
 		</profile>
 

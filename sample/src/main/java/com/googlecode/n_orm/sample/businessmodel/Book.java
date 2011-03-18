@@ -46,4 +46,8 @@ public class Book {
 	public Date getReceptionDate() {
 		return receptionDate;
 	}
+
+	void setReceptionDate(Date receptionDate) {
+		this.receptionDate = receptionDate;
+	}
 }
