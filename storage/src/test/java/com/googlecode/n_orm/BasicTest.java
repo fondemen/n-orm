@@ -94,8 +94,23 @@ public class BasicTest {
 		 assertEquals("bookstore name", p.getName());
 	 }
 	 
-	 @Test(expected=IllegalArgumentException.class) public void bookWithNoBookStore() {
-		 new Book(null, new Date(1234567890), new Date(1234567890));
+	 @Test(expected=Test.None.class) public void bookWithNoBookStore() {
+		 Book b = new Book(null, new Date(1234567890), new Date(1234567890));
+		 b.setReceptionDate(null);
+	 }
+	 
+	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStoreSet() {
+		 Book b = new Book(bssut, new Date(1234567890), new Date(1234567890));
+		 b.setReceptionDate(null);
+		 b.activate();
+	 }
+	 
+	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStoreStored() {
+		 new Book(null, new Date(1234567890), new Date(1234567890)).store();
+	 }
+	 
+	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStoreActivated() {
+		 new Book(null, new Date(1234567890), new Date(1234567890)).activate();
 	 }
 	
 	 @Test public void unactivatedBookStoreAccessFromBook() throws DatabaseNotReachedException {
