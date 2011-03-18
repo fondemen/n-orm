@@ -100,8 +100,23 @@ public class BasicTest extends HBaseTestLauncher {
 		 assertEquals("turing str. 41", p.getAddress());
 	 }
 	 
-	 @Test(expected=IllegalArgumentException.class) public void bookWithNoBookStore() {
-		 new Book(null, "testtitle", new Date(1234567890));
+	 @Test(expected=Test.None.class) public void bookWithNoBookStore() {
+		 Book b = new Book(null, "testtitle", new Date(1234567890));
+		 b.setReceptionDate(null);
+	 }
+	 
+	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStoreSet() {
+		 Book b = new Book(bssut, "testtitle", new Date(1234567890));
+		 b.setReceptionDate(null);
+		 b.activate();
+	 }
+	 
+	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStoreStored() {
+		 new Book(null, "testtitle", new Date(1234567890)).store();
+	 }
+	 
+	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStoreActivated() {
+		 new Book(null, "testtitle", new Date(1234567890)).activate();
 	 }
 	
 	 @Test public void unactivatedBookStoreAccessFromBook() throws DatabaseNotReachedException {
