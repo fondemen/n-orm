@@ -98,7 +98,7 @@ public abstract class ColumnFamily<T> {
 	}
 	
 	public void activate(Constraint c) throws DatabaseNotReachedException {
-		this.owner.checkKeys();
+		this.owner.checkIsValid();
 		String id = this.owner.getIdentifier();
 		assert id != null;
 		Map<String, byte[]> elements = c == null ? this.owner.getStore().get(this.ownerTable, id, this.name) : this.owner.getStore().get(this.ownerTable, id, this.name, c);

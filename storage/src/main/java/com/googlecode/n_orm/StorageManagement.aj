@@ -46,9 +46,7 @@ public aspect StorageManagement {
 	}
 	
 	public void PersistingElement.store() throws DatabaseNotReachedException {
-		if (this.getIdentifier() == null)
-			throw new IllegalArgumentException("Cannot activate " + this + " before all its keys are valued.");
-		this.checkKeys();
+		this.checkIsValid();
 		
 		synchronized(this) {
 			if (this.isStoring)
@@ -222,7 +220,7 @@ public aspect StorageManagement {
 	}
 
 	private void PersistingElement.activate(boolean force, String... families) throws DatabaseNotReachedException {
-		this.checkKeys();
+		this.checkIsValid();
 		if (this.getIdentifier() == null)
 			throw new IllegalArgumentException("Cannot activate " + this + " before all its keys are valued.");
 		
