@@ -276,28 +276,68 @@ public aspect StorageManagement {
 		return KeyManagement.getInstance().createElement(clazz, identifier);
 	}
 	
-	public static <T extends PersistingElement> Set<T> findElement(Class<T> clazz, Constraint c, int limit) throws DatabaseNotReachedException {
+	public static <T extends PersistingElement> CloseableIterator<T> findElement(final Class<T> clazz, Constraint c, final int limit) throws DatabaseNotReachedException {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
-		CloseableKeyIterator keys = null;
+		final CloseableKeyIterator keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit);
 		try {
-			keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit);
-			Set<T> ret = new TreeSet<T>();
-			int count = 0;
-			while(keys.hasNext()) {
-				T elt = ConversionTools.convertFromString(clazz, keys.next());
-				elt.exists = true;
-				ret.add(elt);
-				count++;
-				if (count >= limit)
-					break;
-			}
+			CloseableIterator<T> ret = new CloseableIterator<T>() {
+				private int returned = 0;
+
+				@Override
+				public boolean hasNext() {
+					return returned < limit && keys.hasNext();
+				}
+
+				@Override
+				public T next() {
+					if (!this.hasNext())
+						throw new IllegalStateException("The list is empty");
+					String key = keys.next();
+					try {
+						T elt = ConversionTools.convertFromString(clazz, key);
+						((PersistingElement)elt).exists = true;
+						return elt;
+					} finally {
+						returned++;
+					}
+				}
+
+				@Override
+				public void remove() {
+					keys.remove();
+				}
+
+				@Override
+				public void close() {
+					keys.close();
+				}
+				
+				@Override
+				protected void finalize() throws Throwable {
+					this.close();
+					super.finalize();
+				}
+			};
 			return ret;
 		} finally {
 			if (keys != null)
 				keys.close();
 		}
 	}
-	
+
+	public static <T extends PersistingElement> Set<T> findElementsToSet(final Class<T> clazz, Constraint c, final int limit) throws DatabaseNotReachedException {
+		CloseableIterator<T> found = findElement(clazz, c, limit);
+		try {
+			Set<T> ret = new TreeSet<T>();
+			while (found.hasNext()) {
+				ret.add(found.next());
+			}
+			return ret;
+		} finally {
+			found.close();
+		}
+	}
+
 	public static ConstraintBuilder findElements() {
 		return new ConstraintBuilder();
 	}
