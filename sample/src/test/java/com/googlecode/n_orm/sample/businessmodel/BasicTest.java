@@ -240,9 +240,10 @@ public class BasicTest extends HBaseTestLauncher {
 	 }
 	 
 	 @Test public void serialize() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
-		assertEquals(SetColumnFamily.class, bsut.getBookStore().getBooks().getClass());
+		//booksToBeOrdered is a column family
+		assertEquals(SetColumnFamily.class, bsut.getBookStore().getBooksToBeOrdered().getClass());
 		//As such, it is necessarily the case that:
-		assertFalse(ColumnFamily.class.isAssignableFrom(bsut.getBookStore().getBooks().getClass()));
+		assertTrue(ColumnFamily.class.isAssignableFrom(bsut.getBookStore().getBooksToBeOrdered().getClass()));
 		
 		bsut.setPOJO(true); //WARNING: column family changes won't be detected anymore !
 		assertFalse(ColumnFamily.class.isAssignableFrom(bsut.getBookStore().getBooks().getClass()));
@@ -273,7 +274,8 @@ public class BasicTest extends HBaseTestLauncher {
 			assertEquals(bsut, b2);
 		} finally {
 			bsut.setPOJO(false);
-			assertFalse(ColumnFamily.class.isAssignableFrom(bsut.getBookStore().getBooks().getClass()));
+			//Back to normal state
+			assertTrue(ColumnFamily.class.isAssignableFrom(bsut.getBookStore().getBooksToBeOrdered().getClass()));
 		}
 	 }
 
