@@ -319,9 +319,10 @@ public aspect StorageManagement {
 				}
 			};
 			return ret;
-		} finally {
+		} catch (RuntimeException x) {
 			if (keys != null)
 				keys.close();
+			throw x;
 		}
 	}
 
