@@ -1,12 +1,12 @@
 package com.googlecode.n_orm.sample.businessmodel;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Set;
@@ -18,8 +18,16 @@ import org.junit.Test;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.cf.SetColumnFamily;
 
-
+/**
+ * Sample tests to learn how n-orm works.
+ * In case those tests do not pass, try cleaning the project:<ul>
+ * <li>with maven: mvn clean
+ * <li>with eclipse: menu Project/Clean
+ * </ul>
+ */
 public class BasicTest extends HBaseTestLauncher {
 	
 	private BookStore bssut = null;
@@ -231,8 +239,42 @@ public class BasicTest extends HBaseTestLauncher {
 		 assertTrue(storeBooks.contains(n));
 	 }
 	 
-	 @Test public void serialize() throws DatabaseNotReachedException {
-		 
+	 @Test public void serialize() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
+		assertEquals(SetColumnFamily.class, bsut.getBookStore().getBooks().getClass());
+		//As such, it is necessarily the case that:
+		assertFalse(ColumnFamily.class.isAssignableFrom(bsut.getBookStore().getBooks().getClass()));
+		
+		bsut.setPOJO(true); //WARNING: column family changes won't be detected anymore !
+		assertFalse(ColumnFamily.class.isAssignableFrom(bsut.getBookStore().getBooks().getClass()));
+		
+		try {
+			//Java serialization ; also tested successfully with GSon
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			ObjectOutputStream oo = new ObjectOutputStream(out);
+			oo.writeObject(bsut);
+			oo.close();
+			
+			ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
+			ObjectInputStream oi = new ObjectInputStream(in);
+			Book b2 = (Book) oi.readObject();
+			
+			assertNotNull(b2);
+			assertNotSame(bsut, b2);
+			//Keys for both persisting objects are the same 
+			assertEquals(bsut.getIdentifier(), b2.getIdentifier());
+			
+			assertEquals(bsut.getNumber(), b2.getNumber());
+			assertNotSame(bsut.getBookStore(), b2.getBookStore());
+			assertEquals(bsut.getBookStore().getName(), b2.getBookStore().getName());
+			assertEquals(bsut.getBookStore().getAddress(), b2.getBookStore().getAddress());
+			//As such:
+			assertEquals(bsut.getBookStore(), b2.getBookStore());
+			//As such:
+			assertEquals(bsut, b2);
+		} finally {
+			bsut.setPOJO(false);
+			assertFalse(ColumnFamily.class.isAssignableFrom(bsut.getBookStore().getBooks().getClass()));
+		}
 	 }
 
 }
