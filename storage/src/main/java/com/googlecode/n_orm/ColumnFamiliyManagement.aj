@@ -143,6 +143,11 @@ public aspect ColumnFamiliyManagement {
 			return;
 		this.inPOJOMode = pojo;
 		Map<Field, Object> thisToBeSet = new HashMap<Field, Object>();
+		PropertyManagement pm = PropertyManagement.getInstance();
+		for (Field f : pm.getProperties(this.getClass())) {
+			if (PersistingElement.class.isAssignableFrom(f.getType()))
+				((PersistingElement)pm.candideReadValue(this, f)).grabSetPOJOAtts(pojo, toBeSet);
+		}
 		ColumnFamiliyManagement cfm = ColumnFamiliyManagement.getInstance();
 		for (Field f : cfm.detectColumnFamilies(this.getClass())) {
 			ColumnFamily<?> cf = this.getColumnFamiliesInt().get(f.getName());
@@ -157,14 +162,11 @@ public aspect ColumnFamiliyManagement {
 					}
 				}
 			}
-			Field prop = cf.getProperty();
-			if (prop != null) {
-				Object val = pojo ? cf.getSerializableVersion() : cf;
-				if (prop.getType().isInstance(val)) {
-					thisToBeSet.put(prop, val);
-				} else {
-					throw new ClassCastException("Cannot set " + prop + " to " + val + " in " + this);
-				}
+			Object val = pojo ? cf.getSerializableVersion() : cf;
+			if (f.getType().isInstance(val)) {
+				thisToBeSet.put(f, val);
+			} else {
+				throw new ClassCastException("Cannot set " + f + " to " + val + " in " + this);
 			}
 		}
 		toBeSet.put(this, thisToBeSet);
