@@ -12,7 +12,9 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.Set;
 
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -31,6 +33,22 @@ public class BasicTest {
 	
 	private BookStore bssut = null;
 	private Book bsut = null;
+	
+	@BeforeClass
+	@AfterClass
+	public static void vacuumDB() throws DatabaseNotReachedException {
+		for (Class<?> clazz : new Class<?> [] {BookStore.class, Book.class, Novel.class}) {
+			@SuppressWarnings("unchecked")
+			CloseableIterator<? extends PersistingElement> found = StorageManagement.findElements().ofClass((Class<? extends PersistingElement>)clazz).withAtMost(10000).elements().iterate();
+			try {
+				while (found.hasNext()) {
+					found.next().delete();
+				}
+			} finally {
+				found.close();
+			}
+		}
+	}
 	
 	@Before
 	public void storeSUTs() throws DatabaseNotReachedException {
