@@ -1,6 +1,7 @@
 package com.googlecode.n_orm;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
@@ -74,17 +75,17 @@ public class PersistableSearchTest {
 	}
 	
 	@Test public void searchInexistingSutsWithNegativeFirstKey() throws DatabaseNotReachedException {
-		Set<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, null, "key1", -10, -5), 50);
-		assertEquals(0, res.size());
+		CloseableIterator<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, null, "key1", -10, -5), 50);
+		assertFalse(res.hasNext());
 	}
 	
 	@Test public void searchInexistingSutsWithFirstKey() throws DatabaseNotReachedException {
-		Set<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 150, null), 50);
-		assertEquals(0, res.size());
+		CloseableIterator<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 150, null), 50);
+		assertFalse(res.hasNext());
 	}
 	
 	@Test public void searchSutsWithFirstKey() throws DatabaseNotReachedException {
-		Set<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 49, 55), 1000);
+		Set<SUTClass> res = StorageManagement.findElementsToSet(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 49, 55), 1000);
 		assertEquals((55-49+1)*11, res.size());
 		for (SUTClass sutClass : res) {
 			assertTrue(49 <= sutClass.key1 && sutClass.key1 <= 55);
@@ -93,20 +94,20 @@ public class PersistableSearchTest {
 	}
 	
 	@Test public void search50SutsWithFirstKey() throws DatabaseNotReachedException {
-		Set<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 49, 55), 50);
+		Set<SUTClass> res = StorageManagement.findElementsToSet(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 49, 55), 50);
 		assertEquals(50, res.size());
 		checkOrder(res);
 	}
 	
 	@Test public void search1SutWithFirstKey() throws DatabaseNotReachedException {
-		Set<SUTClass> ress = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 49, 55), 1);
+		Set<SUTClass> ress = StorageManagement.findElementsToSet(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 49, 55), 1);
 		assertEquals(1, ress.size());
 		SUTClass res = ress.iterator().next();
 		assertTrue(49 <= res.key1 && res.key1 <= 55);
 	}
 	
 	@Test public void search1SutWithFixedFirstKey() throws DatabaseNotReachedException {
-		Set<SUTClass> ress = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 49, 49), 1);
+		Set<SUTClass> ress = StorageManagement.findElementsToSet(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 49, 49), 1);
 		assertEquals(1, ress.size());
 		SUTClass res = ress.iterator().next();
 		assertEquals(49, res.key1);
@@ -115,7 +116,7 @@ public class PersistableSearchTest {
 	@Test public void searchSutsWithSecondKey() throws DatabaseNotReachedException {
 		Map<String, Object> k1Val = new TreeMap<String, Object>();
 		k1Val.put("key1", 35);
-		Set<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, k1Val, "key2", 5, 7), 1000);
+		Set<SUTClass> res = StorageManagement.findElementsToSet(SUTClass.class, new Constraint(SUTClass.class, k1Val, "key2", 5, 7), 1000);
 		List<Integer> toBeFound = Arrays.asList(new Integer [] {5, 6, 7});
 		assertEquals(3, res.size());
 		for (SUTClass ret : res) {
@@ -128,7 +129,7 @@ public class PersistableSearchTest {
 	@Test public void searchSutsWithSecondKeyNoUpper() throws DatabaseNotReachedException {
 		Map<String, Object> k1Val = new TreeMap<String, Object>();
 		k1Val.put("key1", 35);
-		Set<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, k1Val, "key2", 5, null), 1000);
+		Set<SUTClass> res = StorageManagement.findElementsToSet(SUTClass.class, new Constraint(SUTClass.class, k1Val, "key2", 5, null), 1000);
 		List<Integer> toBeFound = Arrays.asList(new Integer [] {5, 6, 7, 8, 9, 10});
 		assertEquals(6, res.size());
 		for (SUTClass ret : res) {
@@ -141,7 +142,7 @@ public class PersistableSearchTest {
 	@Test public void searchSutsWithSecondKeyNoLower() throws DatabaseNotReachedException {
 		Map<String, Object> k1Val = new TreeMap<String, Object>();
 		k1Val.put("key1", 35);
-		Set<SUTClass> res = StorageManagement.findElement(SUTClass.class, new Constraint(SUTClass.class, k1Val, "key2", null, 5), 1000);
+		Set<SUTClass> res = StorageManagement.findElementsToSet(SUTClass.class, new Constraint(SUTClass.class, k1Val, "key2", null, 5), 1000);
 		List<Integer> toBeFound = Arrays.asList(new Integer [] {5, 4, 3, 2, 1, 0});
 		assertEquals(6, res.size());
 		for (SUTClass ret : res) {

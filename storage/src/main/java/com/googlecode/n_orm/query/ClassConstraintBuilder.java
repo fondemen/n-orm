@@ -4,7 +4,9 @@ import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashMap;
+import java.util.TreeSet;
 
+import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.Constraint;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.Key;
@@ -74,10 +76,23 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 	
 	/**
 	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link ClassConstraintBuilder#withKey(String)}.
+	 * Elements are not activated, but their keys are all loaded into memory.
 	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
 	 * @throws DatabaseNotReachedException
 	 */
 	public Set<T> go() throws DatabaseNotReachedException {
+		if (this.limit == null || this.limit < 1)
+			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
+		return StorageManagement.findElementsToSet(this.clazz, this.getConstraint(), this.limit);
+	}
+	
+	/**
+	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link ClassConstraintBuilder#withKey(String)}.
+	 * Elements are not activated.
+	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
+	 * @throws DatabaseNotReachedException
+	 */
+	public CloseableIterator<T> iterate() throws DatabaseNotReachedException {
 		if (this.limit == null || this.limit < 1)
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
 		return StorageManagement.findElement(this.clazz, this.getConstraint(), this.limit);
@@ -86,15 +101,20 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 	
 	/**
 	 * Runs the query to find . Any limit set by {@link ClassConstraintBuilder#withKey(String)} will be ignored.
+	 * The element is not activated.
 	 * @return A (possibly null) element matching the query.
 	 * @throws DatabaseNotReachedException
 	 */
 	public T any()  throws DatabaseNotReachedException {
-		Set<T> elts = StorageManagement.findElement(this.clazz, this.getConstraint(), 1);
-		if (elts.isEmpty())
-			return null;
-		else
-			return elts.iterator().next();
+		CloseableIterator<T> found = StorageManagement.findElement(this.clazz, this.getConstraint(), 1);
+		try {
+			if (found.hasNext())
+				return found.next();
+			else
+				return null;
+		} finally {
+			found.close();
+		}
 	}
 
 	public KeyConstraintBuilder<T> andWithKey(String key) {
