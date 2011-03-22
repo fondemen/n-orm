@@ -1,6 +1,7 @@
 
 syntax: regexp
-^.*/target$
+^target/.*$
+^.*/target/.*$
 ^.metadata$
 ^.DS_Store$
 ^coverage$
