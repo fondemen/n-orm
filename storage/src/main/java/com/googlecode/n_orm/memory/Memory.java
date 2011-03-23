@@ -1,14 +1,16 @@
 package com.googlecode.n_orm.memory;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
 
-import com.googlecode.n_orm.CloseableKeyIterator;
 import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory.Table.Row;
@@ -19,6 +21,31 @@ import com.googlecode.n_orm.storeapi.Constraint;
 public class Memory implements Store {
 	public static final Memory INSTANCE = new Memory();
 	
+	private final class RowResult implements com.googlecode.n_orm.storeapi.Row, Comparable<RowResult> {
+		private final Map<String, Map<String, byte[]>> values;
+		private final String row;
+
+		private RowResult(Map<String, Map<String, byte[]>> values, String row) {
+			this.values = values;
+			this.row = row;
+		}
+
+		@Override
+		public Map<String, Map<String, byte[]>> getValues() {
+			return values;
+		}
+
+		@Override
+		public String getKey() {
+			return row;
+		}
+
+		@Override
+		public int compareTo(RowResult o) {
+			return this.getKey().compareTo(o.getKey());
+		}
+	}
+
 	@SuppressWarnings("serial")
 	private abstract class LazyHash<T> extends TreeMap<String, T> {
 		protected abstract T newElement(String key);
@@ -38,7 +65,13 @@ public class Memory implements Store {
 
 	@SuppressWarnings("serial")
 	public class Table extends TreeMap<String, Table.Row> {
-		public class Row extends LazyHash<Row.ColumnFamily> {
+		public class Row extends LazyHash<Row.ColumnFamily> implements com.googlecode.n_orm.storeapi.Row {
+			public final String key;
+			
+			public Row(String key) {
+				this.key = key;
+			}
+
 			public class ColumnFamily extends LazyHash<byte[]> {
 
 				@Override
@@ -52,10 +85,20 @@ public class Memory implements Store {
 			protected ColumnFamily newElement(String key) {
 				return new ColumnFamily();
 			}
+
+			@Override
+			public String getKey() {
+				return key;
+			}
+
+			@Override
+			public Map<String, Map<String, byte[]>> getValues() {
+				return new TreeMap<String, Map<String,byte[]>>(this);
+			}
 		}
 
 		protected Row newElement(String key) {
-			return new Row();
+			return new Row(key);
 		}
 	}
 	
@@ -120,7 +163,7 @@ public class Memory implements Store {
 			Map<String, Map<String, Number>> incremented) {
 		Row r = this.getTable(table).get(id);
 		if (r == null) {
-			r = this.getTable(table).new Row();
+			r = this.getTable(table).new Row(id);
 			this.getTable(table).put(id, r);
 		}
 		for (String family : changed.keySet()) {
@@ -259,9 +302,27 @@ public class Memory implements Store {
 	}
 
 	@Override
-	public CloseableKeyIterator get(String table, Constraint c, int limit)
+	public CloseableKeyIterator get(final String table, Constraint c, int limit, Set<String> families)
 			throws DatabaseNotReachedException {
-		final Iterator<String> res = this.matchingKeys(this.getTable(table).keySet(), c, limit).iterator();
+		Table t = this.getTable(table);
+		Set<String> res = this.matchingKeys(t.keySet(), c, limit);
+		Set<com.googlecode.n_orm.storeapi.Row> rows = new TreeSet<com.googlecode.n_orm.storeapi.Row>();
+		for (final String row : res) {
+			final Map<String, Map<String, byte[]>> values = new TreeMap<String, Map<String,byte[]>>();
+			if (families != null) {
+				for (Entry<String, ColumnFamily> fams : t.get(row).entrySet()) {
+					if (families.contains(fams.getKey())) {
+						TreeMap<String, byte[]> columns = new TreeMap<String, byte[]>();
+						values.put(fams.getKey(), columns);
+						for (Entry<String, byte[]> cols : fams.getValue().entrySet()) {
+							columns.put(cols.getKey(), cols.getValue());
+						}
+					}
+				}
+			}
+			rows.add(new RowResult(values, row));
+		}
+		final Iterator<com.googlecode.n_orm.storeapi.Row> ret = rows.iterator();
 		return new CloseableKeyIterator() {
 			
 			@Override
@@ -270,13 +331,13 @@ public class Memory implements Store {
 			}
 			
 			@Override
-			public String next() {
-				return res.next();
+			public com.googlecode.n_orm.storeapi.Row next() {
+				return ret.next();
 			}
 			
 			@Override
 			public boolean hasNext() {
-				return res.hasNext();
+				return ret.hasNext();
 			}
 			
 			@Override

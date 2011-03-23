@@ -3,7 +3,6 @@ package com.googlecode.n_orm.storeapi;
 import java.util.Map;
 import java.util.Set;
 
-import com.googlecode.n_orm.CloseableKeyIterator;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 
 /**
@@ -42,8 +41,9 @@ public interface Store {
 	
 	/**
 	 * Rows matching constraint sorted according to their key in ascending order.
+	 * @param families TODO
 	 */
-	CloseableKeyIterator get(String table, Constraint c, int limit) throws DatabaseNotReachedException;
+	CloseableKeyIterator get(String table, Constraint c, int limit, Set<String> families) throws DatabaseNotReachedException;
 	
 	/**
 	 * Returns an element from a family.

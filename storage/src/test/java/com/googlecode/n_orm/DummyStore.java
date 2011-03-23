@@ -3,8 +3,8 @@ package com.googlecode.n_orm;
 import java.util.Map;
 import java.util.Set;
 
-import com.googlecode.n_orm.CloseableKeyIterator;
 import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.Constraint;
 
@@ -68,7 +68,7 @@ public class DummyStore implements Store {
 	}
 
 	@Override
-	public CloseableKeyIterator get(String table, Constraint c, int limit)
+	public CloseableKeyIterator get(String table, Constraint c, int limit, Set<String> families)
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
 		return null;
