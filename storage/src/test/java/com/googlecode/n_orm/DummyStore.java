@@ -4,9 +4,9 @@ import java.util.Map;
 import java.util.Set;
 
 import com.googlecode.n_orm.CloseableKeyIterator;
-import com.googlecode.n_orm.Constraint;
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.Store;
+import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 public class DummyStore implements Store {
 	
