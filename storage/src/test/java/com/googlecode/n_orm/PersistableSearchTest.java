@@ -13,12 +13,12 @@ import java.util.TreeMap;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.googlecode.n_orm.Constraint;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 
 public class PersistableSearchTest {

@@ -4,7 +4,7 @@ import static org.junit.Assert.*;
 
 import org.junit.Test;
 
-import com.googlecode.n_orm.Store;
+import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.memory.Memory;
 
 

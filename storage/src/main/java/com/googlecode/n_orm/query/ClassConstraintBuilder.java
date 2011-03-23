@@ -7,12 +7,12 @@ import java.util.HashMap;
 import java.util.TreeSet;
 
 import com.googlecode.n_orm.CloseableIterator;
-import com.googlecode.n_orm.Constraint;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 
 public class ClassConstraintBuilder<T extends PersistingElement> {

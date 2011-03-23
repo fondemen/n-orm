@@ -8,7 +8,6 @@ import java.util.Map;
 
 import org.junit.Test;
 
-import com.googlecode.n_orm.Constraint;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
@@ -16,6 +15,7 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.query.ClassConstraintBuilder;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 
 

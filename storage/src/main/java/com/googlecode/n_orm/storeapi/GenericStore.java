@@ -1,6 +1,5 @@
-package com.googlecode.n_orm;
+package com.googlecode.n_orm.storeapi;
 
-import com.googlecode.n_orm.Store;
 
 
 /**
