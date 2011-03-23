@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 
 import com.googlecode.n_orm.Key;
@@ -15,7 +16,7 @@ import com.googlecode.n_orm.storeapi.Constraint;
 
 /**
  * A restriction to a {@link Store} search.
- * In case this restriction applies to a table (as in {@link Store#get(String, Constraint, int)}, returned rows should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
+ * In case this restriction applies to a table (as in {@link Store#get(String, Constraint, int, Set)}, returned rows should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
  * In case this restrictions applies to a column family (as in {@link Store#get(String, String, String, Constraint)}, returned columns should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
  */
 public class Constraint {

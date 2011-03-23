@@ -22,6 +22,7 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 	private Field searchedKey = null;
 	private Object searchFrom = null, searchTo = null;
 	private Integer limit = null;
+	private String [] toBeActivated = null; //null: no activation, non null: autoactivation
 
 	public ClassConstraintBuilder(Class<T> clazz) {
 		this.clazz = clazz;
@@ -83,7 +84,7 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 	public Set<T> go() throws DatabaseNotReachedException {
 		if (this.limit == null || this.limit < 1)
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
-		return StorageManagement.findElementsToSet(this.clazz, this.getConstraint(), this.limit);
+		return StorageManagement.findElementsToSet(this.clazz, this.getConstraint(), this.limit, this.toBeActivated);
 	}
 	
 	/**
@@ -95,7 +96,7 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 	public CloseableIterator<T> iterate() throws DatabaseNotReachedException {
 		if (this.limit == null || this.limit < 1)
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
-		return StorageManagement.findElement(this.clazz, this.getConstraint(), this.limit);
+		return StorageManagement.findElement(this.clazz, this.getConstraint(), this.limit, this.toBeActivated);
 	}
 
 	
@@ -106,7 +107,7 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 	 * @throws DatabaseNotReachedException
 	 */
 	public T any()  throws DatabaseNotReachedException {
-		CloseableIterator<T> found = StorageManagement.findElement(this.clazz, this.getConstraint(), 1);
+		CloseableIterator<T> found = StorageManagement.findElement(this.clazz, this.getConstraint(), 1, this.toBeActivated);
 		try {
 			if (found.hasNext())
 				return found.next();
@@ -135,5 +136,17 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 	
 	public LimitConstraintBuilder<T> withAtMost(int limit) {
 		return new LimitConstraintBuilder<T>(this, limit);
+	}
+	
+	public ClassConstraintBuilder<T> andActivate(String... families) {
+		if (this.toBeActivated == null)
+			this.toBeActivated = families;
+		else {
+			String [] tba = new String [families.length];
+			System.arraycopy(this.toBeActivated, 0, tba, 0, this.toBeActivated.length);
+			System.arraycopy(families, 0, tba, this.toBeActivated.length, families.length);
+			this.toBeActivated = tba;
+		}
+		return this;
 	}
 }
