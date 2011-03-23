@@ -10,7 +10,6 @@ import java.util.TreeSet;
 
 
 import com.googlecode.n_orm.CloseableKeyIterator;
-import com.googlecode.n_orm.Constraint;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.ExplicitActivation;
 import com.googlecode.n_orm.ImplicitActivation;
@@ -19,11 +18,12 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.Store;
+import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.query.ConstraintBuilder;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 public aspect StorageManagement {
 	//Dangerous: a subclass would need to store one more column family (i.e. alter the data store metadata) which may be long even if this information is never read

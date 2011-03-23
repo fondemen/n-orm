@@ -15,10 +15,10 @@ import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
-import com.googlecode.n_orm.Store;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.cf.SetColumnFamily;
+import com.googlecode.n_orm.storeapi.Store;
 
 /**
  * This annotation must be placed on any element with persistence capabilities ; such annotated classes automatically implement and offer services defined by {@link PersistingElement} (e.g. activation or storage).

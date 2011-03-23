@@ -9,12 +9,12 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 
-import com.googlecode.n_orm.Constraint;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.DecrementException;
 import com.googlecode.n_orm.IncrementManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 
 public abstract class ColumnFamily<T> {

@@ -1,4 +1,4 @@
-package com.googlecode.n_orm;
+package com.googlecode.n_orm.storeapi;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -6,13 +6,12 @@ import java.util.List;
 import java.util.Map;
 
 
-import com.googlecode.n_orm.Constraint;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.Store;
 import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 /**
  * A restriction to a {@link Store} search.

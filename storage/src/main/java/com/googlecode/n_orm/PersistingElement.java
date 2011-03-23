@@ -16,15 +16,16 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
-import com.googlecode.n_orm.Store;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.storeapi.Store;
 
 /**
  * Persisting elements are elements that can be stored and retrieved from a {@link Store}.
  * To make a class persisting, do not implement this interface, but rather declare the annotation {@link Persisting}.
  * @see Persisting
  */
+@SuppressWarnings("unused")
 public interface PersistingElement extends Comparable<PersistingElement>, Serializable {
 	/**
 	 * The list of possible types for simple properties (including keys).

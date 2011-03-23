@@ -17,7 +17,7 @@ import org.apache.commons.beanutils.ConvertUtils;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.Store;
+import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.StoreSelector;
 
 public aspect StoreSelector {

@@ -40,9 +40,9 @@ import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import com.googlecode.n_orm.CloseableKeyIterator;
-import com.googlecode.n_orm.Constraint;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 /**
  * The HBase store found according to its configuration folder.
@@ -58,7 +58,7 @@ import com.googlecode.n_orm.PropertyManagement;
  * 2=2181
  * </code><br>  
  */
-public class Store implements com.googlecode.n_orm.GenericStore {
+public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	private static final class CloseableIterator implements Iterator<String>,
 			CloseableKeyIterator {
