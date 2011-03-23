@@ -10,6 +10,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
@@ -39,10 +42,11 @@ import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 
-import com.googlecode.n_orm.CloseableKeyIterator;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.Row;
 
 /**
  * The HBase store found according to its configuration folder.
@@ -60,13 +64,14 @@ import com.googlecode.n_orm.storeapi.Constraint;
  */
 public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
-	private static final class CloseableIterator implements Iterator<String>,
-			CloseableKeyIterator {
+	private static final class CloseableIterator implements CloseableKeyIterator {
 		private final ResultScanner result;
 		private final Iterator<Result> iterator;
+		private final boolean sendValues;
 
-		private CloseableIterator(ResultScanner res) {
+		private CloseableIterator(ResultScanner res, boolean sendValues) {
 			this.result = res;
+			this.sendValues = sendValues;
 			this.iterator = res.iterator();
 		}
 
@@ -76,8 +81,31 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 
 		@Override
-		public String next() {
-			return Bytes.toString(iterator.next().getRow());
+		public Row next() {
+			final Result r = iterator.next();
+			final String key = Bytes.toString(r.getRow());
+			final Map<String, Map<String, byte[]>> vals = this.sendValues ? null : new TreeMap<String, Map<String,byte[]>>();
+			if (this.sendValues) {
+				for (Entry<byte[], NavigableMap<byte[], byte[]>> famData : r.getNoVersionMap().entrySet()) {
+					Map<String, byte[]> fam = new TreeMap<String, byte[]>();
+					vals.put(Bytes.toString(famData.getKey()), fam);
+					for (Entry<byte[], byte[]> colData : famData.getValue().entrySet()) {
+						fam.put(Bytes.toString(colData.getKey()), colData.getValue());
+					}
+				}
+			}
+			return new Row() {
+				
+				@Override
+				public Map<String, Map<String, byte[]>> getValues() {
+					return vals;
+				}
+				
+				@Override
+				public String getKey() {
+					return key;
+				}
+			};
 		}
 
 		@Override
@@ -714,10 +742,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	}
 
 	@Override
-	public com.googlecode.n_orm.CloseableKeyIterator get(String table, Constraint c,
-			int limit) throws DatabaseNotReachedException {
+	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(String table, Constraint c,
+			int limit, Set<String> families) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
-			return new com.googlecode.n_orm.CloseableKeyIterator() {
+			return new com.googlecode.n_orm.storeapi.CloseableKeyIterator() {
 
 				@Override
 				public void close() {
@@ -729,7 +757,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				}
 
 				@Override
-				public String next() {
+				public Row next() {
 					return null;
 				}
 
@@ -749,7 +777,20 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			endb = Bytes.add(endb, new byte[] { 0 });
 			s.setStopRow(endb);
 		}
-		s.setFilter(new PageFilter(limit));
+		Filter filter = new PageFilter(limit);
+		
+		if (families != null) {
+			for (String fam : families) {
+				s.addFamily(Bytes.toBytes(fam));
+			}
+		} else {
+			//No family to load ; avoid getting all information in the row (that may be big)
+			FilterList f = new FilterList();
+			f.addFilter(new FirstKeyOnlyFilter());
+			f.addFilter(filter);
+			filter = f;
+		}
+		s.setFilter(filter);
 
 		final ResultScanner r;
 		try {
@@ -757,7 +798,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		} catch (IOException e) {
 			throw new DatabaseNotReachedException(e);
 		}
-		return new CloseableIterator(r);
+		return new CloseableIterator(r, families != null);
 	}
 
 }
