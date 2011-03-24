@@ -58,7 +58,7 @@ import com.googlecode.n_orm.storeapi.Row;
  * For test purpose, you can also directly reach an HBase instance thanks to one of its zookeeper host and client port:<br><code>
  * class=com.googlecode.n_orm.hbase.Store<br>
  * static-accessor=getStore<br>
- * 1=localhost
+ * 1=localhost<br>
  * 2=2181
  * </code><br>  
  */
