@@ -40,10 +40,13 @@ public aspect PropertyManagement {
 		return INSTANCE;
 	}
 	
-//	declare error: set(!static !transient (!Collection+ && !java.io.Serializable+) PersistingElement+.*) : "Non serializable field ; may break element's serialization";
+//	declare error: set(!@Transient !static !transient (!Collection+ && !java.io.Serializable+) PersistingElement+.*) : "Non serializable field ; may break element's serialization";
 
 	declare warning: get(@ExplicitActivation transient * PersistingElement+.*)
-		|| get(@ExplicitActivation static * PersistingElement+.*) : "This field is not persitent, thus cannot be auto-activated";
+		|| get(@Transient @ExplicitActivation static * PersistingElement+.*)
+		|| get(@ExplicitActivation static * PersistingElement+.*)
+		: "This field is not persitent, thus cannot be auto-activated";
+	declare warning: set(@Transient transient * PersistingElement+.*) : "There is no need to annotate a transient field with @Transient";
 
 	public static final String PROPERTY_COLUMNFAMILY_NAME = "props";
 	public static final int MAXIMUM_PROPERTY_NUMBER = 256;
@@ -205,6 +208,7 @@ public aspect PropertyManagement {
 			for (Field f : new ArrayList<Field>(ret)) {
 				Class<?> ft = f.getType();
 				if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) != 0
+						|| f.isAnnotationPresent(Transient.class)
 						|| Collection.class.isAssignableFrom(ft)
 						|| Map.class.isAssignableFrom(ft)
 						|| ColumnFamily.class.isAssignableFrom(ft))
@@ -225,6 +229,8 @@ public aspect PropertyManagement {
 
 	public void checkProperty(Field f) {
 		if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) != 0)
+			return;
+		if (f.isAnnotationPresent(Transient.class))
 			return;
 		
 		if ((f.getModifiers()&Modifier.FINAL) != 0)
@@ -394,7 +400,7 @@ public aspect PropertyManagement {
 		}
 	}
 
-	pointcut attUpdated(PersistingElement self, Object val): set(!transient !static !(Collection+ || Map+ || ColumnFamily+) PersistingElement+.*) && target(self) && args(val);
+	pointcut attUpdated(PersistingElement self, Object val): set(!@Transient !transient !static !(Collection+ || Map+ || ColumnFamily+) PersistingElement+.*) && target(self) && args(val);
 
 	public Object candideReadValue(Object self, Field property) {
 		try {
