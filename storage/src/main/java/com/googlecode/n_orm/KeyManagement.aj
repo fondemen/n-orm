@@ -33,8 +33,8 @@ import com.googlecode.n_orm.conversion.ConversionTools;
  * <code>
  * id ::=   sid //for a simple element such as a character string, an integer, an enum...<br>
  *        | id ( {@link KeyManagement#KEY_SEPARATOR} id)* ({@link KeyManagement#KEY_END_SEPARATOR} sid)? '}' //for an element as decribed above ; each included id representing its key values, and the last optional sid representing its class<br>
- *        | id ( {@link ArrayConverter#StringSeparator}  id)* //for an array<br>
- * sid ::= (~({@link KeyManagement#KEY_SEPARATOR}|{@link KeyManagement#KEY_END_SEPARATOR}|{@link ArrayConverter#StringSeparator}))*
+ *        | id ( {@link ArrayConverter#ARRAY_SEPARATOR}  id)* //for an array<br>
+ * sid ::= (~({@link KeyManagement#KEY_SEPARATOR}|{@link KeyManagement#KEY_END_SEPARATOR}|{@link ArrayConverter#ARRAY_SEPARATOR}))*
  * </code>
  * @author fondemen
  *
@@ -42,7 +42,7 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 public aspect KeyManagement {
 	public static final String KEY_SEPARATOR = "\u0017";  //Shouldn't be a printable char
 	public static final String KEY_END_SEPARATOR = "\u0001"; //As small as possible so that {v="AA"}.identifier (= "AA"+KEY_END_SEPARATOR) < {v="AAA"}.identifier (= "AAA"+KEY_END_SEPARATOR)
-	
+	public static final String ARRAY_SEPARATOR = "\uFFFF"; //As large as possible so that [0, 1] (identified by 0 + StringSeparator + 1) < [0, 1] (identified by 0 + StringSeparator + 1 + StringSeparator + 2)
 	private static KeyManagement INSTANCE;
 	
 	public static KeyManagement getInstance() {
@@ -66,7 +66,7 @@ public aspect KeyManagement {
 		
 		static {
 			keySeparator = KEY_SEPARATOR;
-			arraySeparator = ArrayConverter.StringSeparator;
+			arraySeparator = ARRAY_SEPARATOR;
 			keyEndSeparator = KEY_END_SEPARATOR;
 			
 			specialChars = new String [3];
