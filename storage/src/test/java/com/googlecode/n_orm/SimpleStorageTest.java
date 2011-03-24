@@ -149,6 +149,12 @@ public class SimpleStorageTest {
 	}
 
 	@Test
+	public void soreNoPojoProperty() {
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).containsKey("ajc$interField$com_googlecode_n_orm_ColumnFamiliyManagement$com_googlecode_n_orm_PersistingElement$inPOJOMode"));
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).containsKey("inPOJOMode"));
+	}
+
+	@Test
 	public void soreNoKeyInProperties() {
 		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).containsKey("key1"));
 		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).containsKey("key2"));

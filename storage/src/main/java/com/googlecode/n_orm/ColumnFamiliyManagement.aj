@@ -118,7 +118,7 @@ public aspect ColumnFamiliyManagement {
 		return ret;
 	}
 	
-	private boolean PersistingElement.inPOJOMode = false;
+	@Transient private boolean PersistingElement.inPOJOMode = false; //Must be @Transient and not transient: in case the persisting element was serialized in pojo mode, it must be deserialized in pojo mode
 	
 	/**
 	 * Sets this object in POJO mode or not. POJO mode makes all non final static or transient fields
