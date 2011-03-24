@@ -70,6 +70,9 @@ public privileged aspect PersistingMixin {
 		StringBuffer sb = new StringBuffer();
 		sb.append(this.getClass().getName());
 		String ident = this.getIdentifier();
+		ident.replace(KeyManagement.KEY_SEPARATOR, ":");
+		ident.replace(KeyManagement.KEY_END_SEPARATOR, "}");
+		ident.replace(KeyManagement.ARRAY_SEPARATOR, ";");
 		if (ident == null) {
 			sb.append(" with no key yet (missing some key values)");
 		} else {

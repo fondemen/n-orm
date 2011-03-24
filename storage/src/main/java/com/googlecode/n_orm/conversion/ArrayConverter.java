@@ -3,9 +3,9 @@ package com.googlecode.n_orm.conversion;
 import java.lang.reflect.Array;
 import java.util.StringTokenizer;
 
-public class ArrayConverter extends Converter<Object> {
-	public static final String StringSeparator = "\uFFFF"; //As large as possible so that [0, 1] (identified by 0 + StringSeparator + 1) < [0, 1] (identified by 0 + StringSeparator + 1 + StringSeparator + 2)
+import com.googlecode.n_orm.KeyManagement;
 
+public class ArrayConverter extends Converter<Object> {
 	//public static final String StringEndSeparator = "]";
 	private static int IntBytesLength = -1;
 	
@@ -24,7 +24,7 @@ public class ArrayConverter extends Converter<Object> {
 		Class<?> clazz = expected.getComponentType();
 		if (clazz.isArray())
 			throw new IllegalArgumentException("Cannot convert to string a multidimensional array as " + expected);
-		StringTokenizer t = new StringTokenizer(rep, StringSeparator);
+		StringTokenizer t = new StringTokenizer(rep, KeyManagement.ARRAY_SEPARATOR);
 		int length = t.countTokens();
 		Object ret = Array.newInstance(clazz, length);
 		for (int i = 0; i < length; i++) {
@@ -44,7 +44,7 @@ public class ArrayConverter extends Converter<Object> {
 			if (first)
 				first = false;
 			else
-				sb.append(StringSeparator);
+				sb.append(KeyManagement.ARRAY_SEPARATOR);
 			sb.append(ConversionTools.convertToString(Array.get(obj, i), expectedComponent));
 		}
 		return sb.toString();
