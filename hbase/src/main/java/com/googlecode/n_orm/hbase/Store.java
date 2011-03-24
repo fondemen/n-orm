@@ -84,7 +84,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		public Row next() {
 			final Result r = iterator.next();
 			final String key = Bytes.toString(r.getRow());
-			final Map<String, Map<String, byte[]>> vals = this.sendValues ? null : new TreeMap<String, Map<String,byte[]>>();
+			final Map<String, Map<String, byte[]>> vals = this.sendValues ? new TreeMap<String, Map<String,byte[]>>() : null;
 			if (this.sendValues) {
 				for (Entry<byte[], NavigableMap<byte[], byte[]>> famData : r.getNoVersionMap().entrySet()) {
 					Map<String, byte[]> fam = new TreeMap<String, byte[]>();

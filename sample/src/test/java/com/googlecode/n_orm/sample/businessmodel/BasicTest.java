@@ -9,6 +9,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.NavigableSet;
 import java.util.Set;
 
 import org.junit.AfterClass;
@@ -174,11 +175,12 @@ public class BasicTest extends HBaseTestLauncher {
 	 
 	 @Test public void searchBook() throws DatabaseNotReachedException {
 		 Book b2 = new Book(bssut, "testtitle2", new Date());
+		 b2.setNumber((short) 18);
 		 b2.store();
 		 Book b3 = new Book(new BookStore("rfgbuhfgj"), "testtitle3", new Date());
 		 b3.store();
 		 
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().go();		 
+		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().go();		 
 		 b2.delete();
 		 b3.delete();
 		 
@@ -186,6 +188,48 @@ public class BasicTest extends HBaseTestLauncher {
 		 assertTrue(storeBooks.contains(bsut));
 		 assertTrue(storeBooks.contains(b2));
 		 assertFalse(storeBooks.contains(b3));
+
+		 assertEquals(bsut, storeBooks.first());//bsut has a lower title
+		 assertEquals(b2, storeBooks.last());
+		 
+		 //Not activated
+		 assertNotSame(b2, storeBooks.last());
+		 assertEquals(0, storeBooks.last().getNumber());
+		 assertFalse((short)0 == b2.getNumber()); //Just to test the test is well written
+		 assertNull(storeBooks.last().getBookStore().getAddress()); //Activation is (automatically) propagated to simple persisting elements ; here, no activation required
+		 assertNotNull(bssut.getAddress()); //Just to test the test is well written
+		 
+		 checkOrder(storeBooks);
+	 }
+	 
+	 @Test public void searchBookAndActivateProperties() throws DatabaseNotReachedException {
+		 Book b2 = new Book(bssut, "testtitle2", new Date());
+		 b2.setNumber((short) 18);
+		 b2.store();
+		 Book b3 = new Book(new BookStore("rfgbuhfgj"), "testtitle3", new Date());
+		 b3.store();
+		 
+		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class)
+		 									.withKey("bookStore").setTo(bssut)
+		 									.withAtMost(1000).elements()
+		 									.andActivate().go();		 
+		 b2.delete();
+		 b3.delete();
+		 
+		 assertEquals(2, storeBooks.size());
+		 assertTrue(storeBooks.contains(bsut));
+		 assertTrue(storeBooks.contains(b2));
+		 assertFalse(storeBooks.contains(b3));
+
+		 assertEquals(bsut, storeBooks.first());//bsut has a lower title
+		 assertEquals(b2, storeBooks.last());
+		 
+		 //Not activated
+		 assertNotSame(b2, storeBooks.last());
+		 assertEquals(b2.getNumber(), storeBooks.last().getNumber());
+		 assertFalse((short)0 == b2.getNumber()); //Just to test the test is well written
+		 assertEquals(bssut.getAddress(), storeBooks.last().getBookStore().getAddress()); //Activation is (automatically) propagated to simple persisting elements
+		 assertNotNull(bssut.getAddress()); //Just to test the test is well written
 		 
 		 checkOrder(storeBooks);
 	 }

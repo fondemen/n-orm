@@ -60,10 +60,12 @@ public aspect ColumnFamiliyManagement {
 	}
 	
 	public Set<ColumnFamily<?>> PersistingElement.getColumnFamilies() {
+		this.getProperties();
 		return new HashSet<ColumnFamily<?>>(this.getColumnFamiliesInt().values());
 	}
 	
 	public ColumnFamily<?> PersistingElement.getColumnFamily(String name) throws UnknownColumnFamily {
+		this.getProperties();
 		ColumnFamily<?> ret = this.getColumnFamiliesInt().get(name);
 		if (ret == null)
 			throw new UnknownColumnFamily(this.getClass(), name);
