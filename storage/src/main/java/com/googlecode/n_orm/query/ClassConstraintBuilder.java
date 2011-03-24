@@ -2,6 +2,7 @@ package com.googlecode.n_orm.query;
 
 import java.lang.reflect.Field;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.HashMap;
 import java.util.TreeSet;
@@ -81,7 +82,7 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
 	 * @throws DatabaseNotReachedException
 	 */
-	public Set<T> go() throws DatabaseNotReachedException {
+	public NavigableSet<T> go() throws DatabaseNotReachedException {
 		if (this.limit == null || this.limit < 1)
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
 		return StorageManagement.findElementsToSet(this.clazz, this.getConstraint(), this.limit, this.toBeActivated);

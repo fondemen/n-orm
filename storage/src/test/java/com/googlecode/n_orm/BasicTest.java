@@ -1,14 +1,10 @@
 package com.googlecode.n_orm;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.util.Date;
 import java.util.Iterator;
+import java.util.NavigableSet;
 import java.util.Properties;
 import java.util.Set;
 
@@ -178,11 +174,12 @@ public class BasicTest {
 	 
 	 @Test public void searchBook() throws DatabaseNotReachedException {
 		 Book b2 = new Book(bssut, new Date(123456789), new Date());
+		 b2.setNumber((short) 12);
 		 b2.store();
 		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
 		 b3.store();
 		 
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().go();		 
+		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().go();		 
 		 b2.delete();
 		 b3.delete();
 		 
@@ -190,6 +187,40 @@ public class BasicTest {
 		 assertTrue(storeBooks.contains(bsut));
 		 assertTrue(storeBooks.contains(b2));
 		 assertFalse(storeBooks.contains(b3));
+
+		 assertEquals(b2, storeBooks.first());//b2 has a lower sellerDate
+		 assertEquals(bsut, storeBooks.last());
+		 
+		 //Not activated
+		 assertNotSame(b2, storeBooks.first());
+		 assertEquals(0, storeBooks.first().getNumber());
+		 assertFalse((short)0 == b2.getNumber()); //Just to test the test is well written
+		 assertNull(storeBooks.first().getBookStore().getName());
+		 
+		 checkOrder(storeBooks);
+	 }
+	 
+	 @Test public void searchBookAndActivateProperties() throws DatabaseNotReachedException {
+		 Book b2 = new Book(bssut, new Date(123456789), new Date());
+		 b2.setNumber((short) 12);
+		 b2.store();
+		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
+		 b3.store();
+		 
+		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().andActivate().go();		 
+		 b2.delete();
+		 b3.delete();
+
+		 assertEquals(2, storeBooks.size());
+		 assertEquals(b2, storeBooks.first());//b2 has a lower sellerDate
+		 assertEquals(bsut, storeBooks.last());
+		 assertFalse(storeBooks.contains(b3));
+		 
+		 assertNotSame(b2, storeBooks.first());
+		 assertEquals(b2.getNumber(), storeBooks.first().getNumber());
+		 assertFalse((short)0 == storeBooks.first().getNumber()); //Just to test the test is well written
+		 assertEquals(bssut.getName(), storeBooks.first().getBookStore().getName()); //Activation is (automatically) propagated to simple persisting elements
+		 assertNotNull(bssut.getName()); //Just to test the test is well written
 		 
 		 checkOrder(storeBooks);
 	 }
