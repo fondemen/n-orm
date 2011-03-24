@@ -26,6 +26,7 @@ public class SimpleStorageTest {
 
 	@Persisting(table = "SimpleElement")
 	public static class SimpleElement {
+		private static final long serialVersionUID = 583478722942646042L;
 		@SuppressWarnings("unused")
 		@Key(order = 1)
 		protected  String key1;
@@ -87,23 +88,31 @@ public class SimpleStorageTest {
 	public void vacuumDb() {
 		Memory.INSTANCE.reset();
 	}
+
+	private void hadAQuery() {
+		assertTrue(Memory.INSTANCE.hadAQuery());
+	}
+
+	private void hadNoQuery() {
+		assertTrue(Memory.INSTANCE.hadNoQuery());
+	}
 	
 	@Test
 	public void inexisting() throws DatabaseNotReachedException {
 		SimpleElement unknown = new SimpleElement("guhkguilnu", new String [] {"gbuyikgnui", "yuihju"});
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 		assertFalse(unknown.existsInStore());
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		unknown.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertFalse(unknown.existsInStore());
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 	}
 
 	@Test
 	public void getSutTable() {
 		assertEquals("SimpleElement", this.sut1.getTable());
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 
 	@Test
@@ -113,13 +122,13 @@ public class SimpleStorageTest {
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "prop1")));
 		Memory.INSTANCE.resetQueries();
 		this.sut1.prop1 = "another prop1 value";
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 		assertEquals("pro1value", ConversionTools.convert(String.class, Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "prop1")));
 		Memory.INSTANCE.resetQueries();
 		this.sut1.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertEquals("another prop1 value", ConversionTools.convert(String.class, Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "prop1")));
@@ -148,18 +157,18 @@ public class SimpleStorageTest {
 	@Test
 	public void retreive() throws DatabaseNotReachedException {
 		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 		sut2.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertFalse(sut2.hasChanged());
 		assertEquals("pro1value", sut2.prop1);
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 
 	@Test
 	public void getNullProp() {
 		assertNull(this.sut1.nullProp);
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 
 	@Test
@@ -171,18 +180,18 @@ public class SimpleStorageTest {
 		Memory.INSTANCE.resetQueries();
 		this.sut1.prop1 = null;
 		this.sut1.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertFalse(Memory.INSTANCE.get(this.sut1.getTable(),
 				this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).containsKey(
 				"prop1"));
 		Memory.INSTANCE.resetQueries();
 		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 		sut2.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertEquals(null, sut2.prop1);
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 
 	@Test
@@ -191,46 +200,46 @@ public class SimpleStorageTest {
 		this.sut1.prop2 = false;
 		this.sut1.storeProperties();
 		assertTrue(this.sut1.hasChanged());
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 
 	@Test
 	public void retreiveArrayProperty() throws DatabaseNotReachedException {
 		this.sut1.intsProp = new int [] {1,2,3};
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 		this.sut1.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
 		sut2.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertArrayEquals(this.sut1.intsProp, sut2.intsProp);
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 
 	@Test
 	public void retreiveByteArrayProperty() throws DatabaseNotReachedException {
 		this.sut1.bytesProp = new byte [] {1,2,3};
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 		this.sut1.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
 		sut2.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertArrayEquals(this.sut1.bytesProp, sut2.bytesProp);
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 
 	@Test
 	public void retreivePrivateProperty() throws DatabaseNotReachedException {
 		this.sut1.setPrivProp("privatevalue");
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 		this.sut1.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		SimpleElement sut2 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
 		sut2.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertEquals("privatevalue", sut2.getPrivProp());
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 
 	@Test
@@ -301,25 +310,25 @@ public class SimpleStorageTest {
 		IncrementingElement elt = new IncrementingElement("elt");
 		elt.lval = 123l;
 		elt.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		elt = new IncrementingElement("elt");
 		elt.lval = 127l;
 		elt.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		elt = new IncrementingElement("elt");
 		elt.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertEquals(250, elt.lval);
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 		
 		elt.lval += 51;
 		elt.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		elt = new IncrementingElement("elt");
 		elt.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertEquals(301, elt.lval);
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 		
 	}
 	@Test
@@ -327,48 +336,48 @@ public class SimpleStorageTest {
 		IncrementingElement elt = new IncrementingElement("elt");
 		elt.ival = 123;
 		elt.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		elt = new IncrementingElement("elt");
 		elt.ival = 127;
 		elt.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		elt = new IncrementingElement("elt");
 		elt.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertEquals(250, elt.ival);
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 	@Test
 	public void incrementingShort() throws DatabaseNotReachedException {
 		IncrementingElement elt = new IncrementingElement("elt");
 		elt.sval = 123;
 		elt.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		elt = new IncrementingElement("elt");
 		elt.sval = 127;
 		elt.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		elt = new IncrementingElement("elt");
 		elt.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertEquals(250, elt.sval);
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 	@Test
 	public void incrementingByte() throws DatabaseNotReachedException {
 		IncrementingElement elt = new IncrementingElement("elt");
 		elt.bval = 19;
 		elt.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		elt = new IncrementingElement("elt");
 		elt.bval = 3;
 		elt.store();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		elt = new IncrementingElement("elt");
 		elt.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		assertEquals(22, elt.bval);
-		assertTrue(Memory.INSTANCE.hadNoQuery());
+		hadNoQuery();
 	}
 
 	@Persisting
@@ -405,10 +414,10 @@ public class SimpleStorageTest {
 	@Test
 	public void multipleActivations() {
 		sut1.activateIfNotAlready();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 		sut1.activateIfNotAlready();
 		assertFalse(Memory.INSTANCE.hadAQuery());
 		sut1.activate();
-		assertTrue(Memory.INSTANCE.hadAQuery());
+		hadAQuery();
 	}
 }

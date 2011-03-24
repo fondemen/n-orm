@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -237,13 +238,12 @@ public aspect StorageManagement {
 
 	private void PersistingElement.activateFromRawData(Set<String> toBeActivated,
 			Map<String, Map<String, byte[]>> rawData) {
-		
-		this.getProperties();
+		toBeActivated = new TreeSet<String>(toBeActivated);//Avoiding changing the initial collection
 		
 		for (String family : rawData.keySet()) {
 			this.getColumnFamily(family).rebuild(rawData.get(family));
 			boolean removed = toBeActivated.remove(family);
-			assert removed;
+			assert removed : "Got unexpected column family " + family + " from raw data for " + this;
 		}
 		
 		if (!toBeActivated.isEmpty()) {
@@ -259,7 +259,6 @@ public aspect StorageManagement {
 	private Set<String> PersistingElement.getActualFamiliesToBeActivated(boolean force, String... families) {
 		Set<String> toBeActivated = StorageManagement.getAutoActivatedFamilies(this.getClass(), families);
 
-		this.getProperties(); //Ensures the property family exists
 		if (!force) {
 			for (String family : new TreeSet<String>(toBeActivated)) {
 				ColumnFamily<?> cf = this.getColumnFamily(family);
@@ -361,10 +360,10 @@ public aspect StorageManagement {
 		}
 	}
 
-	public static <T extends PersistingElement> Set<T> findElementsToSet(final Class<T> clazz, Constraint c, final int limit, String... families) throws DatabaseNotReachedException {
+	public static <T extends PersistingElement> NavigableSet<T> findElementsToSet(final Class<T> clazz, Constraint c, final int limit, String... families) throws DatabaseNotReachedException {
 		CloseableIterator<T> found = findElement(clazz, c, limit, families);
 		try {
-			Set<T> ret = new TreeSet<T>();
+			NavigableSet<T> ret = new TreeSet<T>();
 			while (found.hasNext()) {
 				ret.add(found.next());
 			}
