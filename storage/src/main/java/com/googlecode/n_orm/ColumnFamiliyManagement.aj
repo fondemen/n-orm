@@ -39,12 +39,14 @@ public aspect ColumnFamiliyManagement {
 	declare soft : NoSuchMethodException : within(ColumnFamiliyManagement) && adviceexecution();
 	declare soft : InvocationTargetException : within(ColumnFamiliyManagement) && adviceexecution();
 
-	declare error: set(!transient !static final (Set || Map || ColumnFamily+) PersistingElement+.*) : "A persisting column family must not be final";
+	declare error: set(!@Transient !transient !static final (Set || Map || ColumnFamily+) PersistingElement+.*) : "A persisting column family must not be final";
 	declare error: set(static (Set || Map || ColumnFamily+) PersistingElement+.*) : "Column families must not be static";
-	declare error: set(!transient !static (Collection+ && !Set && !ColumnFamily+) PersistingElement+.*) : "Only Set and Maps are supported collections";
+	declare error: set(!@Transient !transient !static (Collection+ && !Set && !ColumnFamily+) PersistingElement+.*) : "Only Set and Maps are supported collections";
 
 	declare warning: get(@ImplicitActivation transient * PersistingElement+.*)
-		|| get(@ImplicitActivation static * PersistingElement+.*) : "This field is not persitent, thus cannot be auto-activated";
+		|| get(@ImplicitActivation static * PersistingElement+.*)
+		|| get(@ImplicitActivation @Transient * PersistingElement+.*)
+		: "This field is not persitent, thus cannot be auto-activated";
 	
 	private transient Map<String, ColumnFamily<?>> PersistingElement.columnFamilies = new TreeMap<String, ColumnFamily<?>>();
 	
@@ -90,7 +92,7 @@ public aspect ColumnFamiliyManagement {
 	 * Checks whether a {@link Field} of this persisting element represents a column family.
 	 */
 	public boolean isCollectionFamily(Field f) {
-		return ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) == 0) && this.isCollectionType(f.getType());
+		return ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) == 0) && !f.isAnnotationPresent(Transient.class) && this.isCollectionType(f.getType());
 	}
 
 	/**
@@ -183,7 +185,7 @@ public aspect ColumnFamiliyManagement {
 			throw new IllegalStateException("Cannot store a persisting element in POJO mode ; call setPOJO(false) before on " + self);
 	}
 	
-	void around(PersistingElement self, Object cf): set(!transient !static (Set+ || Map+) PersistingElement+.*) && target(self) && args(cf) {
+	void around(PersistingElement self, Object cf): set(!@Transient !transient !static (Set+ || Map+) PersistingElement+.*) && target(self) && args(cf) {
 
 		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();
 		Field field = sign.getField();

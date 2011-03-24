@@ -38,6 +38,8 @@ public class SimpleStorageTest {
 		private String privProp;
 		public byte[] bytesProp; 
 		public int[] intsProp; 
+		public transient String tProp1;
+		@Transient public String tProp2;
 
 		public SimpleElement(String key1, String[] key2) {
 			super();
@@ -81,6 +83,8 @@ public class SimpleStorageTest {
 		this.sut1.prop1 = "pro1value";
 		this.sut1.prop2 = true;
 		this.sut1.store();
+		this.sut1.tProp1 = "tProp1";
+		this.sut1.tProp2 = "tProp2";
 		Memory.INSTANCE.resetQueries();
 	}
 
@@ -132,6 +136,16 @@ public class SimpleStorageTest {
 		assertEquals("another prop1 value", ConversionTools.convert(String.class, Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "prop1")));
+	}
+
+	@Test
+	public void soreNoTransientProperties() {
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).containsKey("tProp1"));
+	}
+
+	@Test
+	public void soreNoAnnotatedTransientProperties() {
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).containsKey("tProp2"));
 	}
 
 	@Test
