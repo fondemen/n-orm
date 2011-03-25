@@ -214,4 +214,14 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see Comparable#compareTo(Object)
 	 */
 	int compareTo(PersistingElement rhs);
+
+	/**
+	 * Adds a listener to this persisting element.
+	 */
+	void addPersistingElementListener(PersistingElementListener listener);
+
+	/**
+	 * Removes a listener to this persisting element.
+	 */
+	void removePersistingElementListener(PersistingElementListener listener);
 }
