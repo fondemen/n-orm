@@ -7,7 +7,10 @@ import java.util.Iterator;
 import java.util.NavigableSet;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeSet;
 
+import org.easymock.Capture;
+import org.easymock.EasyMock;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -17,6 +20,7 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.cf.ColumnFamily;
 
 public class BasicTest {
 
@@ -278,4 +282,65 @@ public class BasicTest {
 		 }
 	 }
 
+	 @Test public void activationFailedListener() {
+		 bsut.activate(); //So that the next activateIfNotAlready does not trigger a data store request
+		 
+		 PersistingElementListener listener = EasyMock.createStrictMock(PersistingElementListener.class);
+		 listener.activateInvoked(bsut, new TreeSet<ColumnFamily<?>>());
+		 EasyMock.replay(listener);
+		 bsut.addPersistingElementListener(listener);
+		 bsut.activateIfNotAlready();
+		 EasyMock.verify(listener);
+	 }
+
+	 @Test public void activationOKListener() {
+		 PersistingElementListener listener = EasyMock.createStrictMock(PersistingElementListener.class);
+		 listener.activateInvoked(bsut, new TreeSet<ColumnFamily<?>>());
+		 TreeSet<ColumnFamily<?>> activated = new TreeSet<ColumnFamily<?>>();
+		 activated.add(bsut.getProperties());
+		 Capture<Set<ColumnFamily<?>>> famCap = new Capture<Set<ColumnFamily<?>>>();
+		 Capture<Book> bookCap = new Capture<Book>();
+		 listener.activated(EasyMock.capture(bookCap), EasyMock.capture(famCap));
+		 EasyMock.replay(listener);
+		 bsut.addPersistingElementListener(listener);
+		 bsut.activate();
+		 EasyMock.verify(listener);
+		 assertEquals(bsut, bookCap.getValue());
+		 assertArrayEquals(activated.toArray(), famCap.getValue().toArray());
+	 }
+
+	 @Test public void storeFailedListener() {
+		 bsut.store(); //So that the next store does not trigger a data store request (nothing changed)
+		 
+		 PersistingElementListener listener = EasyMock.createStrictMock(PersistingElementListener.class);
+		 listener.storeInvoked(bsut);
+		 EasyMock.replay(listener);
+		 bsut.addPersistingElementListener(listener);
+		 bsut.store();
+		 EasyMock.verify(listener);
+	 }
+
+	 @Test public void storeOKListener() {
+		 bsut.setNumber((short) (bsut.getNumber()+1)); //Makes a change so that the next store triggers a data store request
+		 
+		 PersistingElementListener listener = EasyMock.createStrictMock(PersistingElementListener.class);
+		 listener.storeInvoked(bsut);
+		 listener.stored(bsut);
+		 EasyMock.replay(listener);
+		 bsut.addPersistingElementListener(listener);
+		 bsut.store();
+		 EasyMock.verify(listener);
+	 }
+
+	 @Test public void storeFailed2Listeners() {
+		 bsut.store(); //So that the next store does not trigger a data store request (nothing changed)
+
+		 PersistingElementListener listener = EasyMock.createStrictMock(PersistingElementListener.class);
+		 PersistingElementListener listener2 = EasyMock.createStrictMock(PersistingElementListener.class);
+		 listener.storeInvoked(bsut);
+		 EasyMock.replay(listener, listener2);
+		 bsut.addPersistingElementListener(listener);
+		 bsut.store();
+		 EasyMock.verify(listener, listener2);
+	 }
 }

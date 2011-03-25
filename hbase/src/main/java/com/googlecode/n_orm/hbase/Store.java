@@ -487,6 +487,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		Set<String> families = new HashSet<String>(changed.keySet());
 		families.addAll(removed.keySet());
 		families.addAll(increments.keySet());
+		if (families.isEmpty())
+			families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 		HTable t = this.getTable(table, families);
 
 		byte[] row = Bytes.toBytes(id);
@@ -516,7 +518,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			}
 		}
 
-		if (rowPut == null && rowDel == null && (increments == null || increments.isEmpty())) {
+		if (rowPut == null && (increments == null || increments.isEmpty())) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
 			rowPut = new Put(row);
 			rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
 		}
