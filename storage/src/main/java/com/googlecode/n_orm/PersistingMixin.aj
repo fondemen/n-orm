@@ -73,9 +73,9 @@ public privileged aspect PersistingMixin {
 		if (ident == null) {
 			sb.append(" with no key yet (missing some key values)");
 		} else {
-			ident.replace(KeyManagement.KEY_SEPARATOR, ":");
-			ident.replace(KeyManagement.KEY_END_SEPARATOR, "}");
-			ident.replace(KeyManagement.ARRAY_SEPARATOR, ";");
+			ident = ident.replace(KeyManagement.KEY_SEPARATOR, ":");
+			ident = ident.replace(KeyManagement.KEY_END_SEPARATOR, "}");
+			ident = ident.replace(KeyManagement.ARRAY_SEPARATOR, ";");
 			sb.append(" with key " + ident);
 		}
 		return sb.toString();
