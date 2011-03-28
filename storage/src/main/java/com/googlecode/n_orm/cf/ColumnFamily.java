@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -110,8 +111,8 @@ public abstract class ColumnFamily<T> {
 		this.clearChanges();
 		String id = this.owner.getIdentifier();
 		assert id != null;
-		for (String key : rawData.keySet()) {
-			this.collection.put(key, this.preparePut(key, rawData.get(key)));
+		for (Entry<String, byte[]> entry : rawData.entrySet()) {
+			this.collection.put(entry.getKey(), this.preparePut(entry.getKey(), entry.getValue()));
 		}
 		markActivated();
 	}
