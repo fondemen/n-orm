@@ -193,11 +193,9 @@ public class RelationalStorageTest {
 		PersistingOutsideExplicit out = new PersistingOutsideExplicit("outside");
 		out.val = in;
 		out.store();
-		
-		assertFalse(Memory.INSTANCE.getTable("Inside").containsKey("inside" + ke));
-		
-		in.store();
 		assertTrue(Memory.INSTANCE.getTable("Inside").containsKey("inside" + ke));
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
 		
 		PersistingOutsideExplicit out2 = new PersistingOutsideExplicit("outside");
 		out2.activate();
@@ -206,5 +204,36 @@ public class RelationalStorageTest {
 		
 		out2.val.activate();
 		assertEquals("value", out2.val.val);
+	}
+
+	@Persisting public static class Ref1 {
+		@Key public String k;
+		public Ref2 ref;
+	}
+	@Persisting public static class Ref2 {
+		@Key public String k;
+		public Ref1 ref;
+	}
+	@Test(expected=Test.None.class) public void storingCircularDeps() {
+		Ref1 sut1 = new Ref1(); sut1.k = "k1";
+		Ref2 sut2 = new Ref2(); sut2.k = "k2";
+		sut1.ref = sut2; sut2.ref = sut1;
+		
+		sut1.store();
+		try {
+			assertTrue(sut1.existsInStore());
+			assertTrue(sut2.existsInStore());
+			
+			Ref1 sut12 = new Ref1(); sut12.k = "k1";
+			sut12.activate();
+			assertNotNull(sut12.ref);
+		} finally {
+			try {
+				sut1.delete();
+			} finally {
+				sut2.delete();
+			}
+		}
+		
 	}
 }
