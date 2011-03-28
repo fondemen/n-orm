@@ -178,6 +178,13 @@ public aspect PropertyManagement {
 		}
 
 		@Override
+		public void rebuild(Map<String, byte[]> rawData)
+				throws DatabaseNotReachedException {
+			super.rebuild(rawData);
+			this.getOwner().upgradeProperties();
+		}
+
+		@Override
 		protected Property preparePut(String key, byte[] rep) {
 			return new Property(key, rep);
 		}
