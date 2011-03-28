@@ -5,6 +5,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -285,7 +286,7 @@ public aspect KeyManagement {
 			for (int i = 0; i < strVals.length; i++) {
 				strVals[i] = ConversionTools.convertToString(keyValues[i]);
 			}
-			throw new RuntimeException("Cannot build new instance of " + type + " with key values " + strVals, x);
+			throw new RuntimeException("Cannot build new instance of " + type + " with key values " + Arrays.toString(strVals), x);
 		}
 	}
 

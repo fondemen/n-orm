@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 
@@ -31,8 +32,8 @@ public class Constraint {
 		}
 		
 		Map<Field, Object> ret = new HashMap<Field, Object>();
-		for (String field : values.keySet()) {
-			ret.put(fields.get(field), values.get(field));
+		for (Entry<String, Object> field : values.entrySet()) {
+			ret.put(fields.get(field.getKey()), field.getValue());
 		}
 		
 		return ret;

@@ -21,7 +21,7 @@ import com.googlecode.n_orm.storeapi.Constraint;
 public class Memory implements Store {
 	public static final Memory INSTANCE = new Memory();
 	
-	private final class RowResult implements com.googlecode.n_orm.storeapi.Row, Comparable<RowResult> {
+	private static class RowResult implements com.googlecode.n_orm.storeapi.Row, Comparable<RowResult> {
 		private final Map<String, Map<String, byte[]>> values;
 		private final String row;
 
@@ -181,12 +181,12 @@ public class Memory implements Store {
 			}
 		}
 		
-		for (String family : incremented.keySet()) {
-			ColumnFamily f = r.get(family);
-			Map<String, Number> incrs = incremented.get(family);
-			for (String key : incrs.keySet()) {
-				byte [] val = f.get(key);
-				Number increment = incrs.get(key);
+		for (Entry<String, Map<String, Number>> family : incremented.entrySet()) {
+			ColumnFamily f = r.get(family.getKey());
+			Map<String, Number> incrs = family.getValue();
+			for (Entry<String, Number> entry : incrs.entrySet()) {
+				byte [] val = f.get(entry.getKey());
+				Number increment = entry.getValue();
 				switch (val.length) {
 				case 0:
 					val = ConversionTools.convert(increment, Number.class);
@@ -206,7 +206,7 @@ public class Memory implements Store {
 				default:
 					assert false : "Unknown natural format: " + val.length*8 + " bytes.";	
 				}
-				f.put(key, val);
+				f.put(entry.getKey(), val);
 			}
 		}
 	}
