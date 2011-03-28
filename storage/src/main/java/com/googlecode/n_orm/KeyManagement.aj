@@ -235,7 +235,7 @@ public aspect KeyManagement {
 	}
 	
 	//For test purpose
-	void cleanupKnownPersistingElements() {
+	public void cleanupKnownPersistingElements() {
 		this.knownElements.clear();
 	}
 	
