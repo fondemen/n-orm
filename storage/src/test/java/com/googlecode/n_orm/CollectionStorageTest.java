@@ -73,6 +73,7 @@ public class CollectionStorageTest {
 		@Key public String key;
 		@Indexed(field="key") @ImplicitActivation public Set<Element> elements = null;
 		@Incrementing public Map<String, Integer> elementsInc = null;
+		public long prop;
 		
 		public Container() {}
 
@@ -307,5 +308,34 @@ public class CollectionStorageTest {
 		this.assertHadNoQuery();
 		sut.activateColumnFamily("elements");
 		this.assertHadAQuery();
+	}
+	
+	@Test
+	public void activateWithPropChanged() {
+		sut.prop = 12;
+		sut.store();
+		Container sut2 = new Container(); sut2.key = sut.key;
+		sut2.activate();
+		assertEquals(12, sut2.prop);
+		sut2.prop = 123;
+		sut2.activateIfNotAlready("elementsInc");
+		
+		assertEquals(123, sut2.prop);
+	}
+	
+	@Test
+	public void activateIfNotAlreadyIfAlreadyAndChanged() {
+		sut.activate("elements");
+		
+		Element e = new Element(-1, "test");
+		sut.elements.add(e);
+		
+		assertTrue(sut.elements.contains(e));
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		sut.activateIfNotAlready("elements");
+		
+		assertTrue(sut.elements.contains(e));
 	}
 }
