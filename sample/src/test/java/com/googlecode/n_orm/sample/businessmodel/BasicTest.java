@@ -17,6 +17,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.cf.ColumnFamily;
@@ -180,6 +181,9 @@ public class BasicTest extends HBaseTestLauncher {
 		 Book b3 = new Book(new BookStore("rfgbuhfgj"), "testtitle3", new Date());
 		 b3.store();
 		 
+		 //Simulates a new session by emptying elements cache
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+		 
 		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().go();		 
 		 b2.delete();
 		 b3.delete();
@@ -192,8 +196,6 @@ public class BasicTest extends HBaseTestLauncher {
 		 assertEquals(bsut, storeBooks.first());//bsut has a lower title
 		 assertEquals(b2, storeBooks.last());
 		 
-		 //Not activated
-		 assertNotSame(b2, storeBooks.last());
 		 assertEquals(0, storeBooks.last().getNumber());
 		 assertFalse((short)0 == b2.getNumber()); //Just to test the test is well written
 		 assertNull(storeBooks.last().getBookStore().getAddress()); //Activation is (automatically) propagated to simple persisting elements ; here, no activation required
@@ -224,8 +226,6 @@ public class BasicTest extends HBaseTestLauncher {
 		 assertEquals(bsut, storeBooks.first());//bsut has a lower title
 		 assertEquals(b2, storeBooks.last());
 		 
-		 //Not activated
-		 assertNotSame(b2, storeBooks.last());
 		 assertEquals(b2.getNumber(), storeBooks.last().getNumber());
 		 assertFalse((short)0 == b2.getNumber()); //Just to test the test is well written
 		 assertEquals(bssut.getAddress(), storeBooks.last().getBookStore().getAddress()); //Activation is (automatically) propagated to simple persisting elements
@@ -248,9 +248,6 @@ public class BasicTest extends HBaseTestLauncher {
 		 Iterator<Book> ib = storeBooks.iterator();
 		 Book fb = ib.next();
 		 assertEquals(b2, fb);
-		 
-		 //Unfortunately
-		 assertNotSame(b2, fb);
 	 }
 	 
 	 @Test public void searchBookWithMaxTitle() throws DatabaseNotReachedException {
@@ -267,9 +264,6 @@ public class BasicTest extends HBaseTestLauncher {
 		 Iterator<Book> ib = storeBooks.iterator();
 		 Book fb = ib.next();
 		 assertEquals(bsut, fb);
-		 
-		 //Unfortunately
-		 assertNotSame(bsut, fb);
 	 }
 	 
 	 @Test public void getSubClass() throws DatabaseNotReachedException {
