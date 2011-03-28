@@ -65,6 +65,9 @@ public class PersistableSearchTest {
 				}
 			}
 		}
+		 
+		 //Simulates a new session by emptying elements cache
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
 	}
 
 	public void checkOrder(Set<? extends PersistingElement> elements) {
