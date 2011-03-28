@@ -239,10 +239,10 @@ public aspect StorageManagement {
 			Map<String, Map<String, byte[]>> rawData) {
 		toBeActivated = new TreeSet<String>(toBeActivated);//Avoiding changing the initial collection
 		
-		for (String family : rawData.keySet()) {
-			this.getColumnFamily(family).rebuild(rawData.get(family));
-			boolean removed = toBeActivated.remove(family);
-			assert removed : "Got unexpected column family " + family + " from raw data for " + this;
+		for (Entry<String, Map<String, byte[]>> families : rawData.entrySet()) {
+			this.getColumnFamily(families.getKey()).rebuild(families.getValue());
+			boolean removed = toBeActivated.remove(families.getKey());
+			assert removed : "Got unexpected column family " + families.getKey() + " from raw data for " + this;
 		}
 		
 		if (!toBeActivated.isEmpty()) {
