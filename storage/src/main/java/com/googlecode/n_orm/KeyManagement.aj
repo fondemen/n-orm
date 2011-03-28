@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.WeakHashMap;
 
 import org.aspectj.lang.reflect.FieldSignature;
 
@@ -154,10 +155,16 @@ public aspect KeyManagement {
 					this.checkLast(keySeparator);
 			}
 			ident = ident.substring(this.rest.length());
-			U ret = KeyManagement.getInstance().createElement(actualType, vals);
-			if (ret instanceof PersistingElement) {
-				((PersistingElement)ret).identifier = ident;
-				((PersistingElement)ret).getFullIdentifier();
+			U ret = null;
+			try {
+				ret = (U) km.getKnownPersistingElement(ident, (Class<? extends PersistingElement>) actualType);
+			} catch (Exception x) {}
+			if (ret == null) {
+				ret = km.createElement(actualType, vals);
+				if (ret instanceof PersistingElement) {
+					((PersistingElement)ret).identifier = ident;
+					((PersistingElement)ret).getFullIdentifier();
+				}
 			}
 			return ret;
 		}
@@ -204,9 +211,33 @@ public aspect KeyManagement {
 	}
 	
 	private Map<Class<?>, List<Field>> typeKeys = new HashMap<Class<?>, List<Field>>();
+	
+	//The list of persisting elements stored with their full identifier as key.
+	private transient WeakHashMap<String, PersistingElement> knownElements = new WeakHashMap<String, PersistingElement>();
 
 	private transient String PersistingElement.identifier;
 	private transient String PersistingElement.fullIdentifier;
+	
+	public void register(PersistingElement element) {
+		this.knownElements.put(element.getFullIdentifier(), element);
+	}
+	
+	public void unregister(PersistingElement element) {
+		this.knownElements.remove(element.getFullIdentifier());
+	}
+	
+	public PersistingElement getKnownPersistingElement(String fullIdentifier) {
+		return this.knownElements.get(fullIdentifier);
+	}
+	
+	public PersistingElement getKnownPersistingElement(String identifier, Class<? extends PersistingElement> clazz) {
+		return this.getKnownPersistingElement(identifier + clazz.getName());
+	}
+	
+	//For test purpose
+	void cleanupKnownPersistingElements() {
+		this.knownElements.clear();
+	}
 	
 	public <T> T createElement(Class<T> expectedType, String id) {
 		try {
@@ -369,20 +400,6 @@ public aspect KeyManagement {
 	}
 	
 	private volatile transient boolean PersistingElement.creatingIdentifier = false;
-
-	public String PersistingElement.getIdentifier() {
-		if (this.identifier == null && !this.creatingIdentifier) {
-			this.creatingIdentifier = true;
-			try {
-				this.identifier = KeyManagement.getInstance().createIdentifier(this, this.getClass());
-				if (this.identifier == null)
-					throw new IllegalStateException("Element " + this + " has no identifier ; have all keys been set ?");
-			} finally {
-				this.creatingIdentifier = false;
-			}
-		}
-		return this.identifier;
-	}
 	
 	/**
 	 * Checks whether this persisting element has a stable key.
@@ -391,13 +408,31 @@ public aspect KeyManagement {
 	public void PersistingElement.checkIsValid() throws IllegalStateException {
 		if (this.getIdentifier() == null)
 			throw new IllegalStateException("Persisting element ot type " + this.getClass() + " is missing some of its key values.");
-		String newKey = KeyManagement.getInstance().createIdentifier(this, getClass());
+		KeyManagement km = KeyManagement.getInstance();
+		String newKey = km.createIdentifier(this, getClass());
 		if (!this.getIdentifier().equals(newKey)) {
+			km.unregister(this);
 			if (newKey == null)
 				throw new IllegalArgumentException("One of the key value for " + this + " is no longer valid.");
 			else
 				throw new IllegalArgumentException("At leat a key for object " + this + " has changed (identifier would be now " + newKey + ")");
 		}
+		km.register(this);
+	}
+
+	public String PersistingElement.getIdentifier() {
+		if (this.identifier == null && !this.creatingIdentifier) {
+			this.creatingIdentifier = true;
+			try {
+				this.identifier = KeyManagement.getInstance().createIdentifier(this, this.getClass());
+				if (this.identifier == null)
+					throw new IllegalStateException("Element " + this + " has no identifier ; have all keys been set ?");
+				this.getFullIdentifier(); //Must be created as soon as this function is valid
+			} finally {
+				this.creatingIdentifier = false;
+			}
+		}
+		return this.identifier;
 	}
 
 	public String PersistingElement.getFullIdentifier() {
@@ -405,6 +440,7 @@ public aspect KeyManagement {
 			this.fullIdentifier = KeyManagement.getInstance().createIdentifier(this, PersistingElement.class);
 			if (this.fullIdentifier == null)
 				throw new IllegalStateException("Element " + this + " has no identifier ; have all keys been set ?");
+			this.getIdentifier(); //Must be created as soon as this function is valid
 		}
 		return this.fullIdentifier;
 	}

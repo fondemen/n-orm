@@ -176,7 +176,7 @@ public aspect ColumnFamiliyManagement {
 		toBeSet.put(this, thisToBeSet);
 	}
 	
-	before(PersistingElement self): execution(void PersistingElement+.activate(String...)) && this(self) {
+	before(PersistingElement self): execution(void PersistingElement+.activate(boolean, String...)) && this(self) {
 		self.setPOJO(false);
 	}
 	

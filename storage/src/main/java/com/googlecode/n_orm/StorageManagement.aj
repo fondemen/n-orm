@@ -9,6 +9,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.WeakHashMap;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -162,7 +163,7 @@ public aspect StorageManagement {
 			
 			//Store depending properties
 			for (Field prop : pm.getProperties(this.getClass())) {
-				if (pm.isPersistingPropertyType(prop.getType()) && !prop.isAnnotationPresent(ExplicitActivation.class)) {
+				if (pm.isPersistingPropertyType(prop.getType())) {
 					Object kVal = pm.candideReadValue(this, prop);
 					if (kVal != null)
 						((PersistingElement)kVal).store();
@@ -225,8 +226,6 @@ public aspect StorageManagement {
 
 	private void PersistingElement.activate(boolean force, String... families) throws DatabaseNotReachedException {
 		this.checkIsValid();
-		if (this.getIdentifier() == null)
-			throw new IllegalArgumentException("Cannot activate " + this + " before all its keys are valued.");
 		
 		Set<String> toBeActivated = getActualFamiliesToBeActivated(force, families);
 		

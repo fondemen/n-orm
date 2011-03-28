@@ -183,6 +183,9 @@ public class BasicTest {
 		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
 		 b3.store();
 		 
+		 //Simulates a new session by emptying elements cache
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+		 
 		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().go();		 
 		 b2.delete();
 		 b3.delete();
@@ -211,6 +214,9 @@ public class BasicTest {
 		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
 		 b3.store();
 		 
+		 //Simulates a new session by emptying elements cache
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+		 
 		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().andActivate().go();		 
 		 b2.delete();
 		 b3.delete();
@@ -233,6 +239,9 @@ public class BasicTest {
 		 Book b2 = new Book(bssut, new Date(123456789), new Date());
 		 b2.store();
 		 
+		 //Simulates a new session by emptying elements cache
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+		 
 		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withKey("sellerDate").greaterOrEqualsThan(new Date(1000000000)).withAtMost(1000).elements().go();		 
 		 b2.delete();
 		 
@@ -251,6 +260,9 @@ public class BasicTest {
 	 @Test public void searchBookWithMaxSellerDate() throws DatabaseNotReachedException {
 		 Book b2 = new Book(bssut, new Date(123456789), new Date());
 		 b2.store();
+		 
+		 //Simulates a new session by emptying elements cache
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
 		 
 		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withKey("sellerDate").lessOrEqualsThan(new Date(1000000000)).withAtMost(1000).elements().go();		 
 		 b2.delete();

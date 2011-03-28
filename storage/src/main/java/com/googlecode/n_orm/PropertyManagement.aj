@@ -141,7 +141,7 @@ public aspect PropertyManagement {
 						&& !this.getField().isAnnotationPresent(ExplicitActivation.class)) {
 					Object val = this.getValue();
 					if (val instanceof PersistingElement)
-						((PersistingElement) this.getValue()).activate();
+						((PersistingElement) this.getValue()).activateIfNotAlready();
 				}
 				this.wasActivated = true;
 			}
