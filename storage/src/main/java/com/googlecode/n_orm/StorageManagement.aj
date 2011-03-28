@@ -251,8 +251,6 @@ public aspect StorageManagement {
 				this.getColumnFamily(tba).rebuild(emptyTree);
 			}
 		}
-		
-		this.upgradeProperties();
 	}
 
 	private Set<String> PersistingElement.getActualFamiliesToBeActivated(boolean force, String... families) {
