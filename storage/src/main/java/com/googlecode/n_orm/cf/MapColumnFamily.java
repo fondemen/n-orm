@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -141,6 +142,33 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 		if (! this.keyClazz.isInstance(to))
 			throw new IllegalArgumentException(to.toString() + " is not compatible with " + this.keyClazz);
 		super.activate(this.toKey((K) from), this.toKey((K) to));
+	}
+
+	@Override
+	protected void updateFromPOJO(Object pojo) {
+		if (this.getProperty() == null) {
+			assert false : "Shouldn't update column family " + this.getName();
+			return;
+		}
+		
+		Set<String> keys = new TreeSet<String>(this.getKeys());
+		
+		@SuppressWarnings("unchecked")
+		Map<K, T> pojoM = (Map<K, T>)pojo;
+		for (java.util.Map.Entry<K, T> element : pojoM.entrySet()) {
+			String key = this.toKey(element.getKey());
+			if (keys.remove(key)) {
+				T known = this.getElement(key);
+				if (known == null || this.hasChanged(key, known, element.getValue())) //New
+					this.putElement(key, element.getValue());
+			} else {
+				this.putElement(key, element.getValue());
+			}
+		}
+		
+		for (String key : keys) {
+			this.removeKey(key);
+		}
 	}
 
 }

@@ -14,6 +14,7 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.DecrementException;
 import com.googlecode.n_orm.IncrementManagement;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
 
@@ -55,6 +56,7 @@ public abstract class ColumnFamily<T> {
 	}
 	
 	public abstract Serializable getSerializableVersion();
+	protected abstract void updateFromPOJO(Object pojoVersion);
 	
 	public String getName() {
 		return name;
@@ -215,8 +217,9 @@ public abstract class ColumnFamily<T> {
 	 * Finds an cached element according to its key.
 	 */
 	public T getElement(String key) {
-		if (this.collection.containsKey(key))
-			return this.collection.get(key);
+		T ret = this.collection.get(key);
+		if (ret != null)
+			return ret;
 		if (this.changes != null && this.changes.containsKey(key)) {
 			assert this.changes.get(key).equals(ChangeKind.DELETE);
 			return null;
@@ -287,5 +290,15 @@ public abstract class ColumnFamily<T> {
 	@Override
 	public int hashCode() {
 		return this.name.hashCode();
+	}
+	
+	public void updateFromPOJO() {
+		if (this.getProperty() == null) {
+			assert false : "Shouldn't update column family " + this.getName();
+			return;
+		}
+
+		Object pojo = PropertyManagement.getInstance().candideReadValue(this.getOwner(), this.getProperty());
+		this.updateFromPOJO(pojo);
 	}
 }
