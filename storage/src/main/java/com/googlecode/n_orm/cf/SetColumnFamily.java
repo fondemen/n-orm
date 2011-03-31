@@ -3,6 +3,7 @@ package com.googlecode.n_orm.cf;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
@@ -15,21 +16,25 @@ import com.googlecode.n_orm.PropertyManagement;
 
 public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	private final Field index;
+	
+	public SetColumnFamily() {
+		index = null;
+	}
 
 	public SetColumnFamily(Class<T> clazz, Field property,
-			PersistingElement owner, String index, boolean addOnly) throws SecurityException, NoSuchFieldException {
-		this(clazz, property, property.getName(), owner, PropertyManagement.getInstance().getProperty(clazz, index), addOnly);
+			PersistingElement owner, String index) throws SecurityException, NoSuchFieldException {
+		this(clazz, property, property.getName(), owner, PropertyManagement.getInstance().getProperty(clazz, index));
 	}
 
 	public SetColumnFamily(Class<T> clazz, Field property, String name,
-			PersistingElement owner, Field index, boolean addOnly) {
-		super(clazz, property, name, owner, addOnly, false);
+			PersistingElement owner, Field index) {
+		super(clazz, property, name, owner, false);
 		this.index = index;
 	}
 	
 	@Override
 	public Serializable getSerializableVersion() {
-		return new TreeSet<T>(this.collection.values());
+		return new HashSet<T>(this.collection.values());
 	}
 
 	protected String getIndex(T object) {
@@ -215,11 +220,6 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 
 	@Override
 	protected void updateFromPOJO(Object pojo) {
-		if (this.getProperty() == null) {
-			assert false : "Shouldn't update column family " + this.getName();
-			return;
-		}
-		
 		Set<String> keys = new TreeSet<String>(this.getKeys());
 		
 		@SuppressWarnings("unchecked")
@@ -238,5 +238,20 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 		for (String key : keys) {
 			this.removeKey(key);
 		}
+	}
+
+	@Override
+	protected void storeToPOJO(Object pojo) {
+		@SuppressWarnings("unchecked")
+		Set<T> pojoS = (Set<T>)pojo;
+		pojoS.addAll(this);
+	}
+
+	@Override
+	protected void addToPOJO(Object pojo, String key, T element) {
+		@SuppressWarnings("unchecked")
+		Set<T> pojoS = (Set<T>)pojo;
+		
+		pojoS.add(element);
 	}
 }

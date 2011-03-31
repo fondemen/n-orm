@@ -62,7 +62,6 @@ public aspect StorageManagement {
 			Persisting annotation = this.getClass().getAnnotation(Persisting.class);
 			
 			PropertyManagement pm = PropertyManagement.getInstance();
-			this.storeProperties();
 			Map<String, Map<String, byte[]>> changed = new TreeMap<String, Map<String,byte[]>>(), localChanges;
 			Map<String, Set<String>> deleted = new TreeMap<String, Set<String>>();
 			Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String,Number>>();
