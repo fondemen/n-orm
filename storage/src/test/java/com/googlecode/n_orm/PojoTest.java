@@ -7,6 +7,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -15,6 +17,7 @@ import com.googlecode.n_orm.Indexed;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PojoTest.SimpleElement;
+import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.cf.SetColumnFamily;
 
@@ -31,8 +34,8 @@ public class PojoTest {
 	public static class SimpleElement {
 		private static final long serialVersionUID = -6353654986364855413L;
 		@Key public String key;
-		@Indexed(field="key") Set<SimpleElement> elementsSet = null;
-		Map<String, SimpleElement> elementsMap = null;
+		@Indexed(field="key") Set<SimpleElement> elementsSet = new TreeSet<PojoTest.SimpleElement>();
+		Map<String, SimpleElement> elementsMap = new TreeMap<String, PojoTest.SimpleElement>();
 	}
 
 	@Before
@@ -46,70 +49,33 @@ public class PojoTest {
 	}
 	
 	@Test
-	public void toPojo() {
-		assertNotNull(sut.elementsSet);
-		assertNotNull(sut.elementsMap);
-		assertTrue(sut.elementsSet instanceof SetColumnFamily<?>);
-		assertTrue(sut.elementsMap instanceof MapColumnFamily<?,?>);
+	public void comparePojoToColumnFamilies() {
 		
-		sut.setPOJO(true);
+		sut.updateFromPOJO();
+
+		SetColumnFamily<?> elementsSetCf = (SetColumnFamily<?>) sut.getColumnFamily(sut.elementsSet);
+		MapColumnFamily<?,?> elementsMapCf = (MapColumnFamily<?, ?>) sut.getColumnFamily(sut.elementsMap);
+		
+
 		assertNotNull(sut.elementsSet);
 		assertNotNull(sut.elementsMap);
 		assertFalse(sut.elementsSet instanceof SetColumnFamily<?>);
 		assertFalse(sut.elementsMap instanceof MapColumnFamily<?,?>);
 		
-		assertEquals(2, sut.elementsSet.size());
-		assertTrue(sut.elementsSet.contains(inner1));
-		assertTrue(sut.elementsSet.contains(inner2));
-		
-		assertEquals(2, sut.elementsMap.size());
-		assertEquals(inner1, sut.elementsMap.get("i1"));
-		assertEquals(inner2, sut.elementsMap.get("i2"));
-	}
-	
-	@Test
-	public void fromPojo() {
-		sut.setPOJO(true);
-		sut.setPOJO(false);
-		
-		assertNotNull(sut.elementsSet);
-		assertNotNull(sut.elementsMap);
-		assertTrue(sut.elementsSet instanceof SetColumnFamily<?>);
-		assertTrue(sut.elementsMap instanceof MapColumnFamily<?,?>);
+		assertNotNull(elementsSetCf);
+		assertNotNull(elementsMapCf);
 		
 		assertEquals(2, sut.elementsSet.size());
-		assertTrue(sut.elementsSet.contains(inner1));
-		assertTrue(sut.elementsSet.contains(inner2));
+		assertTrue(elementsSetCf.contains(inner1));
+		assertTrue(elementsSetCf.contains(inner2));
 		
 		assertEquals(2, sut.elementsMap.size());
-		assertEquals(inner1, sut.elementsMap.get("i1"));
-		assertEquals(inner2, sut.elementsMap.get("i2"));
-	}
-	
-	@Test
-	public void fromEmptyPojo() {
-		sut.setPOJO(true);
-		sut.clearColumnFamilies();
-		sut.setPOJO(false);
-		
-		assertNotNull(sut.elementsSet);
-		assertNotNull(sut.elementsMap);
-		assertTrue(sut.elementsSet instanceof SetColumnFamily<?>);
-		assertTrue(sut.elementsMap instanceof MapColumnFamily<?,?>);
-		
-		assertEquals(2, sut.elementsSet.size());
-		assertTrue(sut.elementsSet.contains(inner1));
-		assertTrue(sut.elementsSet.contains(inner2));
-		
-		assertEquals(2, sut.elementsMap.size());
-		assertEquals(inner1, sut.elementsMap.get("i1"));
-		assertEquals(inner2, sut.elementsMap.get("i2"));
+		assertEquals(inner1, elementsMapCf.get("i1"));
+		assertEquals(inner2, elementsMapCf.get("i2"));
 	}
 	
 	@Test
 	public void serialization() throws IOException, ClassNotFoundException {
-		sut.setPOJO(true);
-		
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ObjectOutputStream oo = new ObjectOutputStream(out);
 		oo.writeObject(sut);
@@ -131,7 +97,6 @@ public class PojoTest {
 	
 	@Test
 	public void fromPojoAfterSerialization() throws IOException, ClassNotFoundException {
-		sut.setPOJO(true);
 		
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ObjectOutputStream oo = new ObjectOutputStream(out);
@@ -142,12 +107,8 @@ public class PojoTest {
 		ObjectInputStream oi = new ObjectInputStream(in);
 		SimpleElement sut2 = (SimpleElement) oi.readObject();
 		
-		sut2.setPOJO(false);
-		
 		assertNotNull(sut2.elementsSet);
 		assertNotNull(sut2.elementsMap);
-		assertTrue(sut2.elementsSet instanceof SetColumnFamily<?>);
-		assertTrue(sut2.elementsMap instanceof MapColumnFamily<?,?>);
 		
 		assertEquals(2, sut.elementsSet.size());
 		assertTrue(sut2.elementsSet.contains(inner1));
@@ -160,9 +121,8 @@ public class PojoTest {
 	}
 	
 	@Test
-	public void changeInPojoMode() {
+	public void change() {
 		sut.store();
-		sut.setPOJO(true);
 		SimpleElement inner3 = new SimpleElement(); inner3.key = "inner3";
 		sut.elementsSet.add(inner1); //Not changed
 		sut.elementsSet.remove(inner2);
@@ -172,13 +132,10 @@ public class PojoTest {
 		sut.elementsMap.remove("i2");
 		sut.elementsMap.put("i3", inner3);
 		
-		sut.setPOJO(false);
 		assertTrue(sut.hasChanged());
 		
 		assertNotNull(sut.elementsSet);
 		assertNotNull(sut.elementsMap);
-		assertTrue(sut.elementsSet instanceof SetColumnFamily<?>);
-		assertTrue(sut.elementsMap instanceof MapColumnFamily<?,?>);
 		
 		assertEquals(2, sut.elementsSet.size());
 		assertTrue(sut.elementsSet.contains(inner1));

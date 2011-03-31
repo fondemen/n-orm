@@ -15,6 +15,7 @@ import com.googlecode.n_orm.DecrementException;
 import com.googlecode.n_orm.IncrementManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.Transient;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
 
@@ -27,7 +28,6 @@ public abstract class ColumnFamily<T> {
 	protected final String name;
 	protected final PersistingElement owner;
 	protected final String ownerTable;
-	protected final boolean addOnly;
 
 	protected final Map<String, T> collection = new TreeMap<String, T>();
 
@@ -35,14 +35,23 @@ public abstract class ColumnFamily<T> {
 	protected final Map<String, Number> increments;
 	
 	protected boolean activated = false;
+	
+	public ColumnFamily() { 
+		this.clazz = null;
+		this.property = null;
+		this.name = null;
+		this.owner = null;
+		this.ownerTable = null;
+		this.activated = false;
+		this.increments = null;
+	}
 
-	public ColumnFamily(Class<T> clazz, Field property, String name, PersistingElement owner, boolean addOnly, boolean incremental) {
+	public ColumnFamily(Class<T> clazz, Field property, String name, PersistingElement owner, boolean incremental) {
 		super();
 		this.clazz = clazz;
 		this.property = property;
 		this.name = name;
 		this.owner = owner;
-		this.addOnly = addOnly;
 		this.ownerTable = this.owner.getTable();
 		if (incremental) {
 			if (!Number.class.isAssignableFrom(clazz))
@@ -57,6 +66,8 @@ public abstract class ColumnFamily<T> {
 	
 	public abstract Serializable getSerializableVersion();
 	protected abstract void updateFromPOJO(Object pojoVersion);
+	protected abstract void storeToPOJO(Object pojoVersion);
+	protected abstract void addToPOJO(Object pojoVersion, String key, T element);
 	
 	public String getName() {
 		return name;
@@ -78,7 +89,7 @@ public abstract class ColumnFamily<T> {
 	}
 
 	public boolean isAddOnly() {
-		return addOnly || this.increments != null;
+		return this.increments != null;
 	}
 
 	public boolean isActivated() {
@@ -117,6 +128,7 @@ public abstract class ColumnFamily<T> {
 			this.collection.put(entry.getKey(), this.preparePut(entry.getKey(), entry.getValue()));
 		}
 		markActivated();
+		this.storeToPOJO();
 	}
 
 	private void markActivated() {
@@ -180,7 +192,7 @@ public abstract class ColumnFamily<T> {
 		} else {
 			if (element == null)
 				this.removeKey(key);
-			else if (old == null || ! this.hasChanged(key, old, element))
+			else if (old == null || this.hasChanged(key, old, element))
 				this.changes.put(key, ChangeKind.SET);
 		}
 	}
@@ -189,7 +201,7 @@ public abstract class ColumnFamily<T> {
 		if(lhs == rhs)
 			return false;
 		
-		return Arrays.equals(ConversionTools.convert(lhs, this.clazz), ConversionTools.convert(rhs, this.clazz));
+		return !Arrays.equals(ConversionTools.convert(lhs, this.clazz), ConversionTools.convert(rhs, this.clazz));
 	}
 	
 	/**
@@ -251,6 +263,7 @@ public abstract class ColumnFamily<T> {
 		if (this.changes != null)
 			this.changes.remove(key);
 		this.collection.put(key, element);
+		this.addToPOJO(this.getPOJO(true), key, element);
 		return element;
 	}
 	
@@ -292,13 +305,35 @@ public abstract class ColumnFamily<T> {
 		return this.name.hashCode();
 	}
 	
+	public Object getPOJO(boolean createIfNull) {
+		Object pojo = PropertyManagement.getInstance().candideReadValue(this.getOwner(), this.getProperty());
+		if (pojo == null && createIfNull) {
+			pojo = this.getSerializableVersion();
+			PropertyManagement.getInstance().candideSetValue(this.getOwner(), this.getProperty(), pojo);
+		}
+		
+		return pojo;
+	}
+	
 	public void updateFromPOJO() {
 		if (this.getProperty() == null) {
 			assert false : "Shouldn't update column family " + this.getName();
 			return;
 		}
 
-		Object pojo = PropertyManagement.getInstance().candideReadValue(this.getOwner(), this.getProperty());
-		this.updateFromPOJO(pojo);
+		Object pojo = this.getPOJO(false);
+		if (pojo != null && pojo != this)
+			this.updateFromPOJO(pojo);
+	}
+	
+	public void storeToPOJO() {
+		if (this.getProperty() == null) {
+			assert false : "Shouldn't store column family " + this.getName();
+			return;
+		}
+
+		Object pojo = this.getPOJO(true);
+		if (pojo != null && pojo != this)
+			this.storeToPOJO(pojo);
 	}
 }
