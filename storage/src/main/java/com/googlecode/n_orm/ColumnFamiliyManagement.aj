@@ -136,8 +136,14 @@ public aspect ColumnFamiliyManagement {
 		Map<PersistingElement, Map<Field, Object>> toBeSet = new HashMap<PersistingElement, Map<Field,Object>>();
 		this.grabSetPOJOAtts(pojo, toBeSet);
 		for (Entry<PersistingElement, Map<Field, Object>> pe : toBeSet.entrySet()) {
-			for (Entry<Field, Object> prop : pe.getValue().entrySet()) {
-				pm .candideSetValue(pe.getKey(), prop.getKey(), prop.getValue());
+			synchronized (pe.getKey()) {
+				for (Entry<Field, Object> prop : pe.getValue().entrySet()) {
+					if (pojo == false) {
+						this.getColumnFamily(prop.getKey().getName()).updateFromPOJO();
+					}
+					pm .candideSetValue(pe.getKey(), prop.getKey(), prop.getValue());
+				}
+				pe.getKey().inPOJOMode = true;
 			}
 		}
 	}
@@ -145,7 +151,6 @@ public aspect ColumnFamiliyManagement {
 	private void PersistingElement.grabSetPOJOAtts(boolean pojo, Map<PersistingElement, Map<Field, Object>> toBeSet) {
 		if (this.inPOJOMode == pojo)
 			return;
-		this.inPOJOMode = pojo;
 		Map<Field, Object> thisToBeSet = new HashMap<Field, Object>();
 		PropertyManagement pm = PropertyManagement.getInstance();
 		for (Field f : pm.getProperties(this.getClass())) {

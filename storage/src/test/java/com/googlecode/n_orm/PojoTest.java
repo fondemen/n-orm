@@ -14,6 +14,7 @@ import org.junit.Test;
 import com.googlecode.n_orm.Indexed;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.PojoTest.SimpleElement;
 import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.cf.SetColumnFamily;
 
@@ -156,5 +157,37 @@ public class PojoTest {
 		assertEquals(inner1, sut2.elementsMap.get("i1"));
 		assertEquals(inner2, sut2.elementsMap.get("i2"));
 		
+	}
+	
+	@Test
+	public void changeInPojoMode() {
+		sut.store();
+		sut.setPOJO(true);
+		SimpleElement inner3 = new SimpleElement(); inner3.key = "inner3";
+		sut.elementsSet.add(inner1); //Not changed
+		sut.elementsSet.remove(inner2);
+		sut.elementsSet.add(inner3); //New
+		
+		sut.elementsMap.put("i1", inner1);
+		sut.elementsMap.remove("i2");
+		sut.elementsMap.put("i3", inner3);
+		
+		sut.setPOJO(false);
+		assertTrue(sut.hasChanged());
+		
+		assertNotNull(sut.elementsSet);
+		assertNotNull(sut.elementsMap);
+		assertTrue(sut.elementsSet instanceof SetColumnFamily<?>);
+		assertTrue(sut.elementsMap instanceof MapColumnFamily<?,?>);
+		
+		assertEquals(2, sut.elementsSet.size());
+		assertTrue(sut.elementsSet.contains(inner1));
+		assertFalse(sut.elementsSet.contains(inner2));
+		assertTrue(sut.elementsSet.contains(inner3));
+		
+		assertEquals(2, sut.elementsMap.size());
+		assertEquals(inner1, sut.elementsMap.get("i1"));
+		assertNull(sut.elementsMap.get("i2"));
+		assertEquals(inner3, sut.elementsMap.get("i3"));
 	}
 }
