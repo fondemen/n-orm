@@ -3,10 +3,10 @@ package com.googlecode.n_orm.cf;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 
@@ -18,17 +18,22 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> {
 	protected final Class<K> keyClazz;
 	protected final boolean keyIsString;
+	
+	public MapColumnFamily() {
+		keyClazz = null;
+		keyIsString = false;
+	}
 
 	public MapColumnFamily(Class<K> keyClazz, Class<T> valueClazz, Field property, String name,
-			PersistingElement owner, boolean addOnly, boolean incremental) {
-		super(valueClazz, property, name, owner, addOnly, incremental);
+			PersistingElement owner, boolean incremental) {
+		super(valueClazz, property, name, owner, incremental);
 		this.keyClazz = keyClazz;
 		this.keyIsString = this.keyClazz.equals(String.class);
 	}
 	
 	@Override
 	public Serializable getSerializableVersion() {
-		TreeMap<K, T> ret = new TreeMap<K, T>();
+		HashMap<K, T> ret = new HashMap<K, T>();
 		for (java.util.Map.Entry<K, T> kv : this.entrySet()) {
 			ret.put(kv.getKey(), kv.getValue());
 		}
@@ -46,7 +51,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 
 	@Override
 	public void clear() {
-		for (String key : this.getKeys()) {
+		for (String key : new TreeSet<String>(this.getKeys())) {
 			this.removeKey(key);
 		}
 	}
@@ -146,11 +151,6 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 
 	@Override
 	protected void updateFromPOJO(Object pojo) {
-		if (this.getProperty() == null) {
-			assert false : "Shouldn't update column family " + this.getName();
-			return;
-		}
-		
 		Set<String> keys = new TreeSet<String>(this.getKeys());
 		
 		@SuppressWarnings("unchecked")
@@ -169,6 +169,23 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 		for (String key : keys) {
 			this.removeKey(key);
 		}
+	}
+
+	@Override
+	protected void storeToPOJO(Object pojo) {
+		@SuppressWarnings("unchecked")
+		Map<K, T> pojoM = (Map<K, T>)pojo;
+		
+		pojoM.clear();
+		pojoM.putAll(this);
+	}
+
+	@Override
+	protected void addToPOJO(Object pojo, String key, T element) {
+		@SuppressWarnings("unchecked")
+		Map<K, T> pojoM = (Map<K, T>)pojo;
+		
+		pojoM.put(this.fromKey(key), element);
 	}
 
 }

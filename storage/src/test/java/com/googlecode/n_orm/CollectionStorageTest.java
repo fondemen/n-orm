@@ -4,15 +4,15 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.ImplicitActivation;
 import com.googlecode.n_orm.Incrementing;
@@ -64,6 +64,25 @@ public class CollectionStorageTest {
 		public Element(String key) {
 			this(0, key);
 		}
+
+		@Override
+		public boolean equals(Object rhs) {
+			if (rhs == null)
+				return false;
+			
+			if (this == rhs)
+				return true;
+			
+			if (!(rhs instanceof Element))
+				return false;
+			
+			return this.key.equals(((Element)rhs).key);
+		}
+
+		@Override
+		public int hashCode() {
+			return this.key.hashCode();
+		}
 		
 	}
 
@@ -71,8 +90,8 @@ public class CollectionStorageTest {
 	public static class Container {
 		private static final long serialVersionUID = 6300245095742806502L;
 		@Key public String key;
-		@Indexed(field="key") @ImplicitActivation public Set<Element> elements = null;
-		@Incrementing public Map<String, Integer> elementsInc = null;
+		@Indexed(field="key") @ImplicitActivation public Set<Element> elements = new HashSet<CollectionStorageTest.Element>();
+		@Incrementing public Map<String, Integer> elementsInc = new HashMap<String, Integer>();
 		public long prop;
 		
 		public Container() {}
@@ -95,6 +114,7 @@ public class CollectionStorageTest {
 			sut.elementsInc.put("E" + i, i);
 		}
 		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
 		this.assertHadAQuery();
 	}
 
@@ -104,19 +124,8 @@ public class CollectionStorageTest {
 	
 	@Test
 	public void hasFamily() {
-		assertEquals(SetColumnFamily.class, sut.elements.getClass());
-		assertEquals(MapColumnFamily.class, sut.elementsInc.getClass());
-	}
-	
-	@Persisting
-	public static class ContainerSettingNonNull{
-		private static final long serialVersionUID = -6733375483339331294L;
-		@Key public String key = "key";
-		@Indexed(field="key") public Set<Element> elements = new TreeSet<CollectionStorageTest.Element>();
-	}
-	@Test(expected=IllegalArgumentException.class)
-	public void notSettingNull() {
-		new ContainerSettingNonNull();
+		assertEquals(SetColumnFamily.class, sut.getColumnFamily(sut.elements).getClass());
+		assertEquals(MapColumnFamily.class, sut.getColumnFamily(sut.elementsInc).getClass());
 	}
 	
 	@Persisting
@@ -135,7 +144,7 @@ public class CollectionStorageTest {
 	public void autoActivation() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
 		copy.activate();
-		assertTrue(((ColumnFamily<Element>)copy.elements).isActivated());
+		assertTrue(((ColumnFamily<Element>)copy.getColumnFamily("elements")).isActivated());
 	}
 	@Test
 	public void storeRetrieveElements() throws DatabaseNotReachedException {
@@ -145,7 +154,7 @@ public class CollectionStorageTest {
 		assertEquals(sut.elements.size(), copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 1; i <= sut.elements.size(); ++i) {
-			assertTrue(((SetColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(copy.elements.contains(new Element("E" + i)));
 		}
 		assertTrue(copy.elements.containsAll(sut.elements));
 		this.assertHadNoQuery();
@@ -155,12 +164,12 @@ public class CollectionStorageTest {
 	@Test
 	public void storeRetrieveElementsFrom3To65() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
-		((ColumnFamily<Element>)copy.elements).activate("E3", "E65");
+		((ColumnFamily<Element>)copy.getColumnFamily("elements")).activate("E3", "E65");
 		this.assertHadAQuery();
 		assertEquals(4, copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 3; i <= 6; ++i) {
-			assertTrue(((SetColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(copy.elements.contains(new Element("E" + i)));
 		}
 		this.assertHadNoQuery();
 	}
@@ -169,12 +178,12 @@ public class CollectionStorageTest {
 	@Test
 	public void storeRetrieveElementsFrom7ToEnd() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
-		((ColumnFamily<Element>)copy.elements).activate("E7", null);
+		((ColumnFamily<Element>)copy.getColumnFamily(copy.elements)).activate("E7", null);
 		this.assertHadAQuery();
 		assertEquals(3, copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 7; i <= 9; ++i) {
-			assertTrue(((SetColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(copy.elements.contains(new Element("E" + i)));
 		}
 		this.assertHadNoQuery();
 	}
@@ -183,14 +192,14 @@ public class CollectionStorageTest {
 	@Test
 	public void storeRetrieveElementsUpTo4() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
-		((ColumnFamily<Element>)copy.elements).activate(null, "E4");
+		((ColumnFamily<Element>)copy.getColumnFamily("elements")).activate(null, "E4");
 		this.assertHadAQuery();
 		assertEquals(5, copy.elements.size());
 		this.assertHadNoQuery();
 		for(int i = 1; i <= 4; ++i) {
-			assertTrue(((SetColumnFamily<Element>)copy.elements).contains(new Element("E" + i)));
+			assertTrue(copy.elements.contains(new Element("E" + i)));
 		}
-		assertTrue(((SetColumnFamily<Element>)copy.elements).contains(new Element("E10")));
+		assertTrue(copy.elements.contains(new Element("E10")));
 		this.assertHadNoQuery();
 	}
 	
@@ -201,7 +210,8 @@ public class CollectionStorageTest {
 		copy.activate("elements");
 		this.assertHadAQuery();
 		copy.elements.remove(new Element("E4"));
-		assertTrue(((ColumnFamily<Element>)copy.elements).wasDeleted("E4"));
+		copy.updateFromPOJO();
+		assertTrue(((ColumnFamily<Element>)copy.getColumnFamily("elements")).wasDeleted("E4"));
 		this.assertHadNoQuery();
 	}
 
@@ -210,23 +220,21 @@ public class CollectionStorageTest {
 	public static class AddonlyContainer {
 		private static final long serialVersionUID = -8766880305630431989L;
 		@Key public String key;
-		@Indexed(field="key") @AddOnly public Set<Element> elements = null;
+		@Indexed(field="key") public Set<Element> elements = null;
 
 		public AddonlyContainer(String key) {
 			this.key = key;
 		}
 	}
 	@Test
-	public void unauthorizedRemove() throws DatabaseNotReachedException {
+	public void activatingNullProperty() throws DatabaseNotReachedException {
 		AddonlyContainer copy = new AddonlyContainer(sut.key);
 		copy.activate("elements");
 		this.assertHadAQuery();
 		assertEquals(sut.elements.size(), copy.elements.size());
-		assertTrue(!copy.elements.remove(new Element("E4")));
-		assertTrue(copy.elements.contains(new Element("E4")));
-		this.assertHadNoQuery();
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Test
 	public void containsElementFromStore() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
@@ -235,12 +243,12 @@ public class CollectionStorageTest {
 		this.assertHadNoQuery();
 		assertTrue(!copy.elements.contains(new Element("GFYUBY")));
 		this.assertHadNoQuery();
-		assertFalse(((SetColumnFamily<Element>)copy.elements).containsInStore(new Element("GFYUBY")));
+		assertFalse(((SetColumnFamily<?>)copy.getColumnFamily(copy.elements)).containsInStore(new Element("GFYUBY")));
 		assertTrue(copy.elements.isEmpty());
 		this.assertHadAQuery();
 		assertFalse(copy.elements.contains(new Element("E6")));
 		this.assertHadNoQuery();
-		assertTrue(((SetColumnFamily<Element>)copy.elements).containsInStore(new Element("E6")));
+		assertTrue(((SetColumnFamily<Element>)copy.getColumnFamily(copy.elements)).containsInStore(new Element("E6")));
 		assertEquals(1, copy.elements.size());
 		this.assertHadAQuery();
 		assertTrue(copy.elements.contains(new Element("E6")));
@@ -264,9 +272,10 @@ public class CollectionStorageTest {
 		copy.activate("elementsInc");
 		this.assertHadAQuery();
 		copy.elementsInc.put("E4", 9);
-		assertFalse(((ColumnFamily<Element>)copy.elementsInc).wasDeleted("E4"));
-		assertTrue(((ColumnFamily<Element>)copy.elementsInc).wasChanged("E4"));
-		assertEquals(5, ((ColumnFamily<Element>)copy.elementsInc).getIncrement("E4"));
+		copy.updateFromPOJO();
+		assertFalse(((ColumnFamily<Element>)copy.getColumnFamily("elementsInc")).wasDeleted("E4"));
+		assertTrue(((ColumnFamily<Element>)copy.getColumnFamily("elementsInc")).wasChanged("E4"));
+		assertEquals(5, ((ColumnFamily<Element>)copy.getColumnFamily("elementsInc")).getIncrement("E4"));
 		this.assertHadNoQuery();
 		copy.store();
 		copy = new Container(sut.key);
@@ -279,7 +288,7 @@ public class CollectionStorageTest {
 	public void legalActivityCheck() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
 		copy.activate("elements");
-		((ColumnFamily<Element>)copy.elements).assertIsActivated(" testing legalActivityCheck");
+		((ColumnFamily<Element>)copy.getColumnFamily("elements")).assertIsActivated(" testing legalActivityCheck");
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -287,15 +296,15 @@ public class CollectionStorageTest {
 	public void illegalActivityCheck() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
 		copy.activate("elements");
-		((ColumnFamily<Element>)copy.elements).assertIsActivated("testing illegalActivityCheck");
+		((ColumnFamily<Element>)copy.getColumnFamily("elements")).assertIsActivated("testing illegalActivityCheck");
 	}
 	
 	@Test
 	public void unknownActivated() throws DatabaseNotReachedException {
 		Container copy = new Container("gyujgynugyiul,huohuo,");
 		copy.activate("elements", "elementsInc");
-		assertTrue(((ColumnFamily<?>)copy.elements).isActivated());
-		assertTrue(((ColumnFamily<?>)copy.elementsInc).isActivated());
+		assertTrue(((ColumnFamily<?>)copy.getColumnFamily("elements")).isActivated());
+		assertTrue(((ColumnFamily<?>)copy.getColumnFamily("elementsInc")).isActivated());
 	}
 	
 	@Test

@@ -154,10 +154,12 @@ public aspect PropertyManagement {
 	 * 
 	 */
 	public static class PropertyFamily extends MapColumnFamily<String, Property> {
+		
+		private transient Map<Field, byte []> lastState = new HashMap<Field, byte []>();
 
 		private PropertyFamily(PersistingElement owner)
 				throws SecurityException, NoSuchFieldException {
-			super(String.class, Property.class, null, PROPERTY_COLUMNFAMILY_NAME, owner, false, false);
+			super(String.class, Property.class, null, PROPERTY_COLUMNFAMILY_NAME, owner, false);
 			assert this.changes != null;
 			List<Field> keysF = KeyManagement.getInstance().detectKeys(getOwner().getClass());
 			final Set<String> keys = new TreeSet<String>();
@@ -178,13 +180,6 @@ public aspect PropertyManagement {
 		}
 
 		@Override
-		public void rebuild(Map<String, byte[]> rawData)
-				throws DatabaseNotReachedException {
-			super.rebuild(rawData);
-			this.getOwner().upgradeProperties();
-		}
-
-		@Override
 		protected Property preparePut(String key, byte[] rep) {
 			return new Property(key, rep);
 		}
@@ -198,7 +193,98 @@ public aspect PropertyManagement {
 			
 			Class<?> clazz = lhs.getField().getType();
 			
-			return Arrays.equals(ConversionTools.convert(lhs, clazz), ConversionTools.convert(rhs, clazz));
+			return !Arrays.equals(ConversionTools.convert(lhs, clazz), ConversionTools.convert(rhs, clazz));
+		}
+
+		@Override
+		public void updateFromPOJO() {
+			PropertyManagement pm = PropertyManagement.getInstance();
+			KeyManagement km = KeyManagement.getInstance();
+			PersistingElement owner = this.getOwner();
+			for (Field f : pm.getProperties(owner.getClass())) {
+				if (f.isAnnotationPresent(Incrementing.class))
+					continue;
+				Object val = pm.candideReadValue(owner, f);
+				if (val == null) {
+					if (km.isKey(f))
+						throw new IllegalStateException("Key " + f + " is left null for " + owner);
+					if (!this.lastState.containsKey(f) || this.lastState.get(f) != null) {
+						this.removeKey(f.getName());
+						this.lastState.put(f, null);
+					}
+				} else {
+					byte [] valB = ConversionTools.convert(val, f.getType());
+					if (!this.lastState.containsKey(f) || !Arrays.equals(valB, this.lastState.get(f))) {
+						this.put(f.getName(), new Property(f, val));
+						this.lastState.put(f, valB);
+					}
+				}
+			}
+		}
+
+		@Override
+		public void storeToPOJO() {
+			PropertyManagement pm = PropertyManagement.getInstance();
+			KeyManagement km = KeyManagement.getInstance();
+			PersistingElement owner = this.getOwner();
+			for (Field f : pm.getProperties(owner.getClass())) {
+				if (f.isAnnotationPresent(Incrementing.class))
+					continue;
+				Object oldVal = null;
+				boolean oldValRead = false;
+				try {
+					oldVal = pm.readValue(owner, f);
+					oldValRead = true;
+				} catch (Exception x) {
+				}
+				
+				Object val;
+				
+				Property prop = (Property) this.getElement(f.getName());
+				if (prop == null && km.isKey(f)) { //Keys might not be in properties just after activation
+					prop = new Property(f, oldVal);
+					this.put(f.getName(), prop);
+				}
+				if (prop != null) {
+					val = prop.getValue();
+					if (oldVal != null && val != null && (oldVal instanceof PersistingElement) && (val instanceof byte []) && ConversionTools.convert(String.class, (byte[])val).equals(((PersistingElement)oldVal).getIdentifier())) {
+						prop.setValue(oldVal);
+					}
+					if (prop.getField() == null)
+						prop.setField(f);
+					assert prop.getField().equals(f);
+					prop.activate();
+					val = prop.getValue();
+				} else {
+					val = null;
+				}
+				
+				if (PersistingElement.class.isAssignableFrom(f.getType()) && val != null && oldVal != null && val != oldVal && ((PersistingElement)val).getIdentifier().equals(((PersistingElement)oldVal).getIdentifier())) {
+					prop.setValue(oldVal);
+					prop.setField(f);
+					prop.reactivate();
+					continue;
+				}
+
+				byte [] oldValB = oldVal == null ? null : ConversionTools.convert(oldVal, f.getType());
+				byte [] valB = val == null ? null : ConversionTools.convert(val, f.getType());
+		
+				if (oldValRead && (oldVal == null ? val == null : Arrays.equals(oldValB, valB))) {
+					this.lastState.put(f, valB);
+					continue;
+				}
+		
+				if (! km.isKey(f)) {
+					// Setting proper value in property
+					try {
+						pm.setValue(owner, f, val);
+						this.lastState.put(f, valB);
+					} catch (Exception x) { //May happen in case f is of simple type (e.g. boolean and not Boolean) and value is unknown from the base (i.e. null)
+						this.lastState.put(f, oldValB);
+					}
+				} else
+					this.lastState.put(f, oldValB);
+			}
 		}
 
 	}
@@ -304,7 +390,7 @@ public aspect PropertyManagement {
 	/**
 	 * The column family used to store properties.
 	 */
-	public PropertyFamily PersistingElement.getProperties() {
+	public PropertyFamily PersistingElement.getPropertiesColumnFamily() {
 		if (this.properties == null)
 			try {
 				this.properties = new PropertyFamily(this);
@@ -314,97 +400,6 @@ public aspect PropertyManagement {
 				throw new RuntimeException(e);
 			}
 		return this.properties;
-	}
-	
-	private transient Map<Field, byte []> PersistingElement.lastState = new HashMap<Field, byte []>();
-	
-	void PersistingElement.storeProperties() {
-		PropertyManagement pm = PropertyManagement.getInstance();
-		KeyManagement km = KeyManagement.getInstance();
-		PropertyManagement.PropertyFamily props = this.getProperties();
-		for (Field f : pm.getProperties(this.getClass())) {
-			if (f.isAnnotationPresent(Incrementing.class))
-				continue;
-			Object val = pm.candideReadValue(this, f);
-			if (val == null) {
-				if (km.isKey(f))
-					throw new IllegalStateException("Key " + f + " is left null for " + this);
-				if (!this.lastState.containsKey(f) || this.lastState.get(f) != null) {
-					props.removeKey(f.getName());
-					this.lastState.put(f, null);
-				}
-			} else {
-				byte [] valB = ConversionTools.convert(val, f.getType());
-				if (!this.lastState.containsKey(f) || !Arrays.equals(valB, this.lastState.get(f))) {
-					props.put(f.getName(), new Property(f, val));
-					this.lastState.put(f, valB);
-				}
-			}
-		}
-	}
-	
-	void PersistingElement.upgradeProperties() throws DatabaseNotReachedException {
-		PropertyManagement pm = PropertyManagement.getInstance();
-		KeyManagement km = KeyManagement.getInstance();
-		PropertyFamily props = this.getProperties();
-		for (Field f : pm.getProperties(this.getClass())) {
-			if (f.isAnnotationPresent(Incrementing.class))
-				continue;
-			Object oldVal = null;
-			boolean oldValRead = false;
-			try {
-				oldVal = pm.readValue(this, f);
-				oldValRead = true;
-			} catch (Exception x) {
-			}
-			
-			Object val;
-			
-			Property prop = (Property) props.getElement(f.getName());
-			if (prop == null && km.isKey(f)) { //Keys might not be in properties just after activation
-				prop = new Property(f, oldVal);
-				props.put(f.getName(), prop);
-			}
-			if (prop != null) {
-				val = prop.getValue();
-				if (oldVal != null && val != null && (oldVal instanceof PersistingElement) && (val instanceof byte []) && ConversionTools.convert(String.class, (byte[])val).equals(((PersistingElement)oldVal).getIdentifier())) {
-					prop.setValue(oldVal);
-				}
-				if (prop.getField() == null)
-					prop.setField(f);
-				assert prop.getField().equals(f);
-				prop.activate();
-				val = prop.getValue();
-			} else {
-				val = null;
-			}
-			
-			if (PersistingElement.class.isAssignableFrom(f.getType()) && val != null && oldVal != null && val != oldVal && ((PersistingElement)val).getIdentifier().equals(((PersistingElement)oldVal).getIdentifier())) {
-				prop.setValue(oldVal);
-				prop.setField(f);
-				prop.reactivate();
-				continue;
-			}
-
-			byte [] oldValB = oldVal == null ? null : ConversionTools.convert(oldVal, f.getType());
-			byte [] valB = val == null ? null : ConversionTools.convert(val, f.getType());
-	
-			if (oldValRead && (oldVal == null ? val == null : Arrays.equals(oldValB, valB))) {
-				this.lastState.put(f, valB);
-				continue;
-			}
-	
-			if (! km.isKey(f)) {
-				// Setting proper value in property
-				try {
-					pm.setValue(this, f, val);
-					this.lastState.put(f, valB);
-				} catch (Exception x) { //May happen in case f is of simple type (e.g. boolean and not Boolean) and value is unknown from the base (i.e. null)
-					this.lastState.put(f, oldValB);
-				}
-			} else
-				this.lastState.put(f, oldValB);
-		}
 	}
 
 	pointcut attUpdated(PersistingElement self, Object val): set(!@Transient !transient !static !(Collection+ || Map+ || ColumnFamily+) PersistingElement+.*) && target(self) && args(val);

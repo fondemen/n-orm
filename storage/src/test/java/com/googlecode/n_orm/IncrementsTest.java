@@ -2,6 +2,9 @@ package com.googlecode.n_orm;
 
 import static org.junit.Assert.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.junit.Test;
 
 import com.googlecode.n_orm.DecrementException;
@@ -20,7 +23,7 @@ public class IncrementsTest {
 		@Key public int key;
 		public int notIncrmenting;
 		@Incrementing public int incrementing;
-		@Incrementing public MapColumnFamily<String, Short> incrementingFamily = null;
+		@Incrementing public Map<String, Short> incrementingFamily = new HashMap<String, Short>();
 		public Element(int key) {
 			this.key = key;
 		}
@@ -48,7 +51,7 @@ public class IncrementsTest {
 		e.incrementing = 3;
 		assertTrue(e.getIncrements().containsKey("incrementing"));
 		assertEquals(3l, e.getIncrements().get("incrementing").longValue());
-		assertTrue(! e.getProperties().changedKeySet().contains("incrementing"));
+		assertTrue(! e.getPropertiesColumnFamily().changedKeySet().contains("incrementing"));
 		e.getIncrements().clear();
 		assertTrue(!e.getIncrements().containsKey("incrementing"));
 		e.incrementing = 8;
@@ -59,26 +62,33 @@ public class IncrementsTest {
 	public void decrementCol() {
 		Element e = new Element(1);
 		e.incrementingFamily.put("val", (short)3);
+		e.updateFromPOJO();
 		e.incrementingFamily.put("val", (short)2);
+		e.updateFromPOJO();
 	}
 	
 	@Test
 	public void unusefulUpdtaeCol() {
 		Element e = new Element(1);
-		assertEquals(null, e.incrementingFamily.getIncrement("val"));
+		e.updateFromPOJO();
+		assertEquals(null, e.getColumnFamily("incrementingFamily").getIncrement("val"));
 		e.incrementingFamily.put("val", (short)3);
-		assertEquals((short)3, e.incrementingFamily.getIncrement("val"));
+		e.updateFromPOJO();
+		assertEquals((short)3, e.getColumnFamily("incrementingFamily").getIncrement("val"));
 		e.incrementingFamily.put("val", (short)3);
-		assertEquals((short)3, e.incrementingFamily.getIncrement("val"));
+		e.updateFromPOJO();
+		assertEquals((short)3, e.getColumnFamily("incrementingFamily").getIncrement("val"));
 	}
 	
 	@Test
 	public void usefulUpdtaeCol() {
 		Element e = new Element(1);
 		e.incrementingFamily.put("val", (short)3);
-		e.incrementingFamily.clearChanges();
-		assertEquals(null, e.incrementingFamily.getIncrement("val"));
+		e.updateFromPOJO();
+		e.getColumnFamily("incrementingFamily").clearChanges();
+		assertEquals(null, e.getColumnFamily("incrementingFamily").getIncrement("val"));
 		e.incrementingFamily.put("val", (short)7);
-		assertEquals((short)4, e.incrementingFamily.getIncrement("val"));
+		e.updateFromPOJO();
+		assertEquals((short)4, e.getColumnFamily("incrementingFamily").getIncrement("val"));
 	}
 }

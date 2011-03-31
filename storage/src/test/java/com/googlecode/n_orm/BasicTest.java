@@ -309,7 +309,7 @@ public class BasicTest {
 		 PersistingElementListener listener = EasyMock.createStrictMock(PersistingElementListener.class);
 		 listener.activateInvoked(bsut, new TreeSet<ColumnFamily<?>>());
 		 TreeSet<ColumnFamily<?>> activated = new TreeSet<ColumnFamily<?>>();
-		 activated.add(bsut.getProperties());
+		 activated.add(bsut.getPropertiesColumnFamily());
 		 Capture<Set<ColumnFamily<?>>> famCap = new Capture<Set<ColumnFamily<?>>>();
 		 Capture<Book> bookCap = new Capture<Book>();
 		 listener.activated(EasyMock.capture(bookCap), EasyMock.capture(famCap));

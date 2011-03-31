@@ -218,7 +218,7 @@ public class SimpleStorageTest {
 	public void changedObject() {
 		assertFalse(this.sut1.hasChanged());
 		this.sut1.prop2 = false;
-		this.sut1.storeProperties();
+		this.sut1.updateFromPOJO();
 		assertTrue(this.sut1.hasChanged());
 		hadNoQuery();
 	}
@@ -275,17 +275,17 @@ public class SimpleStorageTest {
 	@Test
 	public void noChange() {
 		assertEquals(new HashSet<String>(Arrays.asList(new String[] {})),
-				this.sut1.getProperties().changedKeySet());
+				this.sut1.getPropertiesColumnFamily().changedKeySet());
 	}
 
 	@Test
 	public void partialChange() {
 		this.sut1.nullProp = "not null!";
 		this.sut1.setPrivProp("null");
-		this.sut1.storeProperties();
+		this.sut1.updateFromPOJO();
 		assertEquals(
 				new HashSet<String>(Arrays.asList(new String[] { "privProp",
-						"nullProp" })), this.sut1.getProperties()
+						"nullProp" })), this.sut1.getPropertiesColumnFamily()
 						.changedKeySet());
 	}
 
@@ -294,10 +294,10 @@ public class SimpleStorageTest {
 		this.sut1.prop2 = true; // was already true
 		this.sut1.nullProp = "not null!";
 		this.sut1.setPrivProp("null");
-		this.sut1.storeProperties();
+		this.sut1.updateFromPOJO();
 		assertEquals(
 				new HashSet<String>(Arrays.asList(new String[] { "privProp",
-						"nullProp" })), this.sut1.getProperties()
+						"nullProp" })), this.sut1.getPropertiesColumnFamily()
 						.changedKeySet());
 	}
 

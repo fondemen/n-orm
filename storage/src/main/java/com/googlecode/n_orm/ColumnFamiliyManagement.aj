@@ -14,7 +14,6 @@ import java.util.TreeMap;
 
 import org.aspectj.lang.reflect.FieldSignature;
 
-import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.ColumnFamiliyManagement;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.Indexed;
@@ -48,11 +47,12 @@ public aspect ColumnFamiliyManagement {
 		|| get(@ImplicitActivation @Transient * PersistingElement+.*)
 		: "This field is not persitent, thus cannot be auto-activated";
 	
-	private transient Map<String, ColumnFamily<?>> PersistingElement.columnFamilies = new TreeMap<String, ColumnFamily<?>>();
+	private transient Map<String, ColumnFamily<?>> PersistingElement.columnFamilies = null;
 	
 	private Map<String, ColumnFamily<?>> PersistingElement.getColumnFamiliesInt() {
 		if (this.columnFamilies == null) {
 			this.columnFamilies = new TreeMap<String, ColumnFamily<?>>();
+			this.getPropertiesColumnFamily();
 		}
 		return this.columnFamilies;
 	}
@@ -62,17 +62,28 @@ public aspect ColumnFamiliyManagement {
 	}
 	
 	public Set<ColumnFamily<?>> PersistingElement.getColumnFamilies() {
-		this.getProperties();
+		this.getPropertiesColumnFamily();
 		return new HashSet<ColumnFamily<?>>(this.getColumnFamiliesInt().values());
 	}
 	
 	public ColumnFamily<?> PersistingElement.getColumnFamily(String name) throws UnknownColumnFamily {
-		this.getProperties();
 		ColumnFamily<?> ret = this.getColumnFamiliesInt().get(name);
 		if (ret == null)
 			throw new UnknownColumnFamily(this.getClass(), name);
 		else
 			return ret;
+	}
+	
+	public ColumnFamily<?> PersistingElement.getColumnFamily(Object collection) throws UnknownColumnFamily {
+		PropertyManagement pm = PropertyManagement.getInstance();
+		for (ColumnFamily<?> cf : this.getColumnFamiliesInt().values()) {
+			try {
+				if (pm.readValue(this, cf.getProperty()) == collection)
+					return cf;
+			} catch (Exception e) {
+			}
+		}
+		throw new UnknownColumnFamily(this.getClass(), collection.toString());
 	}
 	
 	//For test purpose
@@ -81,6 +92,7 @@ public aspect ColumnFamiliyManagement {
 	}
 	
 	public boolean PersistingElement.hasChanged() {
+		this.updateFromPOJO();
 		for (ColumnFamily<?> cf : this.getColumnFamiliesInt().values()) {
 			if (cf.hasChanged())
 				return true;
@@ -161,7 +173,7 @@ public aspect ColumnFamiliyManagement {
 		for (Field f : cfm.detectColumnFamilies(this.getClass())) {
 			ColumnFamily<?> cf = this.getColumnFamiliesInt().get(f.getName());
 			if (cf == null) {
-				cf = cfm.createColumnFamily(this, f);
+				cf = cfm.createColumnFamily(this, f, pm.candideReadValue(this, f));
 			}
 			if (cf.getClazz().isAssignableFrom(PersistingElement.class) || PersistingElement.class.isAssignableFrom(cf.getClazz())) {
 				for (String k : cf.getKeys()) {
@@ -181,13 +193,14 @@ public aspect ColumnFamiliyManagement {
 		toBeSet.put(this, thisToBeSet);
 	}
 	
-	before(PersistingElement self): execution(void PersistingElement+.activate(boolean, String...)) && this(self) {
-		self.setPOJO(false);
+	public void PersistingElement.updateFromPOJO() {
+		for (ColumnFamily<?> cf : this.getColumnFamiliesInt().values()) {
+			cf.updateFromPOJO();
+		}
 	}
 	
 	before(PersistingElement self): execution(void PersistingElement+.store()) && this(self) {
-		if (self.inPOJOMode)
-			throw new IllegalStateException("Cannot store a persisting element in POJO mode ; call setPOJO(false) before on " + self);
+		self.updateFromPOJO();
 	}
 	
 	void around(PersistingElement self, Object cf): set(!@Transient !transient !static (Set+ || Map+) PersistingElement+.*) && target(self) && args(cf) {
@@ -195,23 +208,18 @@ public aspect ColumnFamiliyManagement {
 		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();
 		Field field = sign.getField();
 		assert isCollectionFamily(field);
-		
-		if (cf != null && (cf instanceof ColumnFamily<?>)) {
-			proceed(self, cf);
-			return;
-		}
-		if (cf != null)
-			throw new IllegalArgumentException("Can only set null value to persisting collection " + field);
 
-		createColumnFamily(self, field);
+		ColumnFamily<?> ccf = createColumnFamily(self, field, cf);
+		
+		if (ColumnFamily.class.isAssignableFrom(field.getType()))
+			proceed(self, ccf);
+		else
+			proceed(self, cf);
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private ColumnFamily<?> createColumnFamily(PersistingElement self, Field field) {
+	private ColumnFamily<?> createColumnFamily(PersistingElement self, Field field, Object oldCf) {
 		PropertyManagement pm = PropertyManagement.getInstance();
-		Object oldCf = pm.candideReadValue(self, field);
-		if (oldCf != null && oldCf instanceof ColumnFamily<?>)
-			throw new IllegalArgumentException("Cannot change column family " + field + " as it is already set in " + self);
 		Indexed index = field.getAnnotation(Indexed.class);
 		ColumnFamily<?> acf;
 		ParameterizedType collType = (ParameterizedType) field.getGenericType();
@@ -219,7 +227,7 @@ public aspect ColumnFamiliyManagement {
 			if (index != null)
 				throw new IllegalArgumentException("Map " + field + " cannot declare annotation " + Indexed.class);
 			Class<?> keyClass = (Class<?>)collType.getActualTypeArguments()[0], valueClass = (Class<?>)collType.getActualTypeArguments()[1];
-			acf = new MapColumnFamily(keyClass, valueClass, field, field.getName(), self, field.isAnnotationPresent(AddOnly.class), field.isAnnotationPresent(Incrementing.class));
+			acf = new MapColumnFamily(keyClass, valueClass, field, field.getName(), self, field.isAnnotationPresent(Incrementing.class));
 			if (oldCf != null) {
 				for (Entry<?, ?> e : ((Map<?,?>)oldCf).entrySet()) {
 					((MapColumnFamily)acf).put(e.getKey(), e.getValue());
@@ -230,7 +238,7 @@ public aspect ColumnFamiliyManagement {
 				throw new IllegalArgumentException("Field " + field + " must declare annotation " + Indexed.class);
 			Class<?> elementClass = (Class<?>)collType.getActualTypeArguments()[0];
 			try {
-				acf = new SetColumnFamily(elementClass, field, self, index.field(), field.isAnnotationPresent(AddOnly.class));
+				acf = new SetColumnFamily(elementClass, field, self, index.field());
 				if (oldCf != null) {
 					for (Object e : (Set<?>)oldCf) {
 						((SetColumnFamily)acf).add(e);
@@ -240,7 +248,6 @@ public aspect ColumnFamiliyManagement {
 				throw new RuntimeException(x);
 			}
 		}
-		pm.candideSetValue(self, field, acf);
 		return acf;
 	}
 	

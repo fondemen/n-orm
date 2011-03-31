@@ -63,7 +63,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * The values stored in this column families are the last activated.
 	 * @see #activate(String...)
 	 */
-	PropertyFamily getProperties();
+	PropertyFamily getPropertiesColumnFamily();
 	
 	/**
 	 * The list of all {@link ColumnFamily} held by this persisting element.
@@ -75,7 +75,14 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * The name is the name of the property for the column family, i.e. the non static, non final , non transient {@link Map} or {@link Set} field.
 	 * @see ColumnFamily#getName()
 	 */
-	ColumnFamily<?> getColumnFamily(String columnFailyName) throws UnknownColumnFamily;
+	ColumnFamily<?> getColumnFamily(String columnFamilyName) throws UnknownColumnFamily;
+	
+	/**
+	 * The the {@link ColumnFamily} held by this persisting element corresponding to the object stored by the object as a column family.
+	 * Typical use is myPe.getColumnFamily(myPe.myCf)
+	 * @param collection the value for the property stored as a column family.
+	 */
+	ColumnFamily<?> getColumnFamily(Object collection) throws UnknownColumnFamily;
 
 	/**
 	 * The identifier for this persisting element.
