@@ -212,4 +212,31 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 		super.activate(this.getIndex((T) from), this.getIndex((T) to));
 	}
 
+
+	@Override
+	protected void updateFromPOJO(Object pojo) {
+		if (this.getProperty() == null) {
+			assert false : "Shouldn't update column family " + this.getName();
+			return;
+		}
+		
+		Set<String> keys = new TreeSet<String>(this.getKeys());
+		
+		@SuppressWarnings("unchecked")
+		Set<T> pojoS = (Set<T>)pojo;
+		for (T element : pojoS) {
+			String key = this.getIndex(element);
+			if (keys.remove(key)) {
+				T known = this.getElement(key);
+				if (known == null || this.hasChanged(key, known, element))
+					this.add(element);
+			} else {
+				this.add(element);
+			}
+		}
+		
+		for (String key : keys) {
+			this.removeKey(key);
+		}
+	}
 }
