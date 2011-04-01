@@ -91,7 +91,6 @@ public aspect PropertyManagement {
 		}
 
 		public Object getValue() {
-			assert this.value != null;
 			return value;
 		}
 
