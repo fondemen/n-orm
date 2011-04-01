@@ -39,37 +39,6 @@ public aspect IncrementManagement {
 		return this.increments;
 	}
 
-//	after(PersistingElement self) returning : PersistingMixin.creation(self) {
-//		PropertyFamily pf = self.getProperties();
-//		for (Field f : PropertyManagement.aspectOf().getProperties(self.getClass())) {
-//			if (f.isAnnotationPresent(Incrementing.class) && !self.getIncrements().containsKey(f.getName())) {
-//				self.getIncrements().put(f.getName(), 0);
-//			}
-//			
-//		}
-//	}
-	
-	after(PropertyManagement.PropertyFamily propertyFam) returning: execution(void PropertyManagement.PropertyFamily.updateFromPOJO()) && this(propertyFam) {
-		PersistingElement owner = propertyFam.getOwner();
-		for (Field f : propertyManager.getProperties(owner.getClass())) {
-			if (f.isAnnotationPresent(Incrementing.class)) {
-				Property prop = propertyFam.getElement(f.getName());
-				if (prop != null) {
-					if (prop.getField() == null)
-						prop.setField(f);
-					assert f.equals(prop.getField());
-					propertyManager.candideSetValue(owner, f, prop.getValue());
-				}
-			}
-		}
-	}
-	
-	before(PersistingElement self, Object val): PropertyManagement.attUpdated(self, val) && set(@Incrementing * *.*) {
-		Field prop = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
-		Number oldVal = (Number) propertyManager.candideReadValue(self, prop);
-		self.getIncrements().put(prop.getName(), getActualIncrement((Number)val, oldVal, self.getIncrements().get(prop.getName()), prop));
-	}
-
 	public Number getActualIncrement(Number val,
 			Number oldVal, Number previousIncrement, Field prop) throws DecrementException {
 		long value = toLong(val, prop);

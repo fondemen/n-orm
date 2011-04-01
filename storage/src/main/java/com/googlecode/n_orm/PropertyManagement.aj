@@ -29,6 +29,7 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.cf.ColumnFamily.ChangeKind;
 import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.conversion.ConversionTools;
 
@@ -56,6 +57,7 @@ public aspect PropertyManagement {
 	public static class Property {
 		private final PropertyManagement pm;
 		private final KeyManagement km;
+		private IncrementManagement im;
 		private boolean key, delta;
 		private final PropertyFamily family;
 		private final PersistingElement owner;
@@ -106,6 +108,10 @@ public aspect PropertyManagement {
 		public Field getField() {
 			return field;
 		}
+		
+		public PersistingElement getOwner() {
+			return this.owner;
+		}
 
 		void setField(Field field) {
 			if (this.field != null) {
@@ -115,6 +121,8 @@ public aspect PropertyManagement {
 			this.field = field;
 			this.key = km.isKey(field);
 			this.delta = field.isAnnotationPresent(Incrementing.class);
+			if (this.delta)
+				this.im = IncrementManagement.getInstance();
 			this.setType(field.getType());
 		}
 
@@ -177,33 +185,36 @@ public aspect PropertyManagement {
 			assert this.type != null;
 			if (pojoValue == null)
 				return true;
+			if (this.value == null)
+				return true;
 			byte [] valB = ConversionTools.convert(this.value, this.type), pojoValB = ConversionTools.convert(pojoValue, type);
 			return !Arrays.equals(valB, pojoValB);
 		}
 		
 		public void updateFromPOJO() {
 			Field f = this.getField();
-			if (this.delta)
-				return;
 			Object val = pm.candideReadValue(owner, f);
 			if (val == null) {
+				assert !this.delta;
 				if (this.key)
 					throw new IllegalStateException("Key " + f + " is left null for " + owner);
-				assert this.value != null;
 				this.family.removeKey(f.getName());
 				this.value = null;
 			} else {
 				if (this.hasChanged(val)) {
+					if (this.delta) {
+						this.owner.getIncrements().put(this.getName(), im.getActualIncrement((Number)val, (Number)this.value, this.owner.getIncrements().get(this.getName()), f));
+						this.family.setChanged(this, null);
+					} else
+						this.family.setChanged(this, ChangeKind.SET);
 					this.value = val;
-					this.family.setChanged(this.name);
 				}
 			}
+			assert !this.delta || !this.family.changedKeySet().contains(this.getName());
 		}
 		
 		public void storeToPOJO() {
-			Field f = this.getField(); 
-			if (this.delta)
-				return;
+			Field f = this.getField();
 			Object oldVal = pm.candideReadValue(owner, f);
 			
 			this.activateIfNotAlready();
@@ -249,8 +260,11 @@ public aspect PropertyManagement {
 			};
 		}
 
-		public void setChanged(String name) {
-			this.changes.put(name, ChangeKind.SET);
+		public void setChanged(Property prop, ChangeKind change) {
+			if (change == null)
+				this.changes.remove(prop.getName());
+			else
+				this.changes.put(prop.getName(), change);
 		}
 
 		@Override
@@ -277,11 +291,14 @@ public aspect PropertyManagement {
 			for (Field f : pm.getProperties(owner.getClass())) {
 				Property p = this.getElement(f.getName());
 				if (p == null) {
-					p = new Property(this, f);
-					if (p.getValue() != null)
-						this.putElement(p.getName(), p);
-				} else
-					p.updateFromPOJO();
+					Object val = pm.candideReadValue(owner, f);
+					if (val == null)
+						continue;
+					p = new Property(this, f, null);
+					this.putElement(p.getName(), p);
+				}
+				p.updateFromPOJO();
+				assert p.getValue() != null || !this.containsKey(p.getName());
 			}
 		}
 
@@ -295,7 +312,7 @@ public aspect PropertyManagement {
 				if (p == null) {
 					if (!km.isKey(f)) {
 						Class<?> type = f.getType();
-						Object defaultValue = type.isArray() ? null : ConvertUtils.convert((Object)null, type);
+						Object defaultValue = type.isArray() ? null : ConvertUtils.convert((Object)null, type); //ConvertUtils returns an empty array as a default value...
 						pm.candideSetValue(this.getOwner(), f, defaultValue);
 					} else {
 						p = new Property(this, f);

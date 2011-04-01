@@ -38,23 +38,19 @@ public class IncrementsTest {
 		}
 	}
 	
-	@Test(expected=DecrementException.class)
-	public void decrement() {
-		Element e = new Element(1);
-		e.incrementing--;
-	}
-	
 	@Test
 	public void increment() {
 		Element e = new Element(1);
-		assertTrue(!e.getIncrements().containsKey("incrementing"));
+		assertFalse(e.getIncrements().containsKey("incrementing"));
 		e.incrementing = 3;
+		e.updateFromPOJO();
 		assertTrue(e.getIncrements().containsKey("incrementing"));
 		assertEquals(3l, e.getIncrements().get("incrementing").longValue());
-		assertTrue(! e.getPropertiesColumnFamily().changedKeySet().contains("incrementing"));
+		assertFalse(e.getPropertiesColumnFamily().changedKeySet().contains("incrementing"));
 		e.getIncrements().clear();
-		assertTrue(!e.getIncrements().containsKey("incrementing"));
+		assertFalse(e.getIncrements().containsKey("incrementing"));
 		e.incrementing = 8;
+		e.updateFromPOJO();
 		assertEquals(5l, (long)e.getIncrements().get("incrementing").longValue());
 	}
 	
