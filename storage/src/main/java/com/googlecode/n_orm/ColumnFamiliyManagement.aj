@@ -199,10 +199,6 @@ public aspect ColumnFamiliyManagement {
 		}
 	}
 	
-	before(PersistingElement self): execution(void PersistingElement+.store()) && this(self) {
-		self.updateFromPOJO();
-	}
-	
 	void around(PersistingElement self, Object cf): set(!@Transient !transient !static (Set+ || Map+) PersistingElement+.*) && target(self) && args(cf) {
 
 		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();
@@ -211,8 +207,10 @@ public aspect ColumnFamiliyManagement {
 
 		ColumnFamily<?> ccf = createColumnFamily(self, field, cf);
 		
-		if (ColumnFamily.class.isAssignableFrom(field.getType()))
+		if(ColumnFamily.class.isAssignableFrom(field.getType()))
 			proceed(self, ccf);
+		else if (cf == null)
+			proceed(self, ccf.getSerializableVersion());
 		else
 			proceed(self, cf);
 	}

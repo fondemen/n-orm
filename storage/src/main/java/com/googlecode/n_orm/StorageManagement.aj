@@ -59,6 +59,8 @@ public aspect StorageManagement {
 			isStoring = true;
 		}
 		try {
+			this.updateFromPOJO();
+			
 			Persisting annotation = this.getClass().getAnnotation(Persisting.class);
 			
 			PropertyManagement pm = PropertyManagement.getInstance();

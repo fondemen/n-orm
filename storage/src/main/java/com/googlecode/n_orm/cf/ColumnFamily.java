@@ -129,6 +129,7 @@ public abstract class ColumnFamily<T> {
 		}
 		markActivated();
 		this.storeToPOJO();
+		assert ! this.hasChanged();
 	}
 
 	private void markActivated() {
