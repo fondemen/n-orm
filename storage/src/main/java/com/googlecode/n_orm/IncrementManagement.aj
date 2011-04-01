@@ -49,8 +49,8 @@ public aspect IncrementManagement {
 //		}
 //	}
 	
-	after(PersistingElement owner) returning: execution(void PersistingElement+.upgradeProperties()) && target(owner) {
-		PropertyFamily propertyFam = owner.getPropertiesColumnFamily();
+	after(PropertyManagement.PropertyFamily propertyFam) returning: execution(void PropertyManagement.PropertyFamily.updateFromPOJO()) && this(propertyFam) {
+		PersistingElement owner = propertyFam.getOwner();
 		for (Field f : propertyManager.getProperties(owner.getClass())) {
 			if (f.isAnnotationPresent(Incrementing.class)) {
 				Property prop = propertyFam.getElement(f.getName());
