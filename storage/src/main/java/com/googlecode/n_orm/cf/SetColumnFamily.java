@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
 
+import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.DecrementException;
 import com.googlecode.n_orm.PersistingElement;
@@ -28,7 +29,7 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 
 	public SetColumnFamily(Class<T> clazz, Field property, String name,
 			PersistingElement owner, Field index) {
-		super(clazz, property, name, owner, false);
+		super(clazz, property, name, owner);
 		this.index = index;
 	}
 	
