@@ -239,7 +239,7 @@ public aspect PropertyManagement {
 
 		private PropertyFamily(PersistingElement owner)
 				throws SecurityException, NoSuchFieldException {
-			super(String.class, Property.class, null, PROPERTY_COLUMNFAMILY_NAME, owner, false);
+			super(String.class, Property.class, null, PROPERTY_COLUMNFAMILY_NAME, owner);
 			assert this.changes != null;
 			List<Field> keysF = KeyManagement.getInstance().detectKeys(getOwner().getClass());
 			final Set<String> keys = new TreeSet<String>();

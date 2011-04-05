@@ -25,8 +25,8 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 	}
 
 	public MapColumnFamily(Class<K> keyClazz, Class<T> valueClazz, Field property, String name,
-			PersistingElement owner, boolean incremental) {
-		super(valueClazz, property, name, owner, incremental);
+			PersistingElement owner) {
+		super(valueClazz, property, name, owner);
 		this.keyClazz = keyClazz;
 		this.keyIsString = this.keyClazz.equals(String.class);
 	}

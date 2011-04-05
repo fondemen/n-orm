@@ -220,12 +220,34 @@ public class CollectionStorageTest {
 	public static class AddonlyContainer {
 		private static final long serialVersionUID = -8766880305630431989L;
 		@Key public String key;
-		@Indexed(field="key") public Set<Element> elements = null;
+		@Indexed(field="key") @AddOnly public Set<Element> elements = null;
 
 		public AddonlyContainer(String key) {
 			this.key = key;
 		}
 	}
+	@Test
+	public void unauthorizedRemoveNoStore() throws DatabaseNotReachedException {
+		AddonlyContainer copy = new AddonlyContainer(sut.key);
+		copy.activate("elements");
+		this.assertHadAQuery();
+		assertEquals(sut.elements.size(), copy.elements.size());
+		assertTrue(copy.elements.remove(new Element("E4")));
+		assertFalse(copy.elements.contains(new Element("E4")));
+		this.assertHadNoQuery();
+	}
+	@Test(expected=IllegalStateException.class)
+	public void unauthorizedRemoveStore() throws DatabaseNotReachedException {
+		AddonlyContainer copy = new AddonlyContainer(sut.key);
+		copy.activate("elements");
+		this.assertHadAQuery();
+		assertEquals(sut.elements.size(), copy.elements.size());
+		assertTrue(copy.elements.remove(new Element("E4")));
+		this.assertHadNoQuery();
+		copy.store();
+		this.assertHadNoQuery();
+	}
+	
 	@Test
 	public void activatingNullProperty() throws DatabaseNotReachedException {
 		AddonlyContainer copy = new AddonlyContainer(sut.key);

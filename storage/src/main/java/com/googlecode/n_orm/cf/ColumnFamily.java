@@ -10,9 +10,11 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 
+import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.DecrementException;
 import com.googlecode.n_orm.IncrementManagement;
+import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.Transient;
@@ -33,6 +35,7 @@ public abstract class ColumnFamily<T> {
 
 	protected Map<String, ChangeKind> changes;
 	protected final Map<String, Number> increments;
+	protected final boolean addOnly;
 	
 	protected boolean activated = false;
 	
@@ -44,16 +47,18 @@ public abstract class ColumnFamily<T> {
 		this.ownerTable = null;
 		this.activated = false;
 		this.increments = null;
+		this.addOnly = false;
 	}
 
-	public ColumnFamily(Class<T> clazz, Field property, String name, PersistingElement owner, boolean incremental) {
+	public ColumnFamily(Class<T> clazz, Field property, String name, PersistingElement owner) {
 		super();
 		this.clazz = clazz;
 		this.property = property;
 		this.name = name;
 		this.owner = owner;
 		this.ownerTable = this.owner.getTable();
-		if (incremental) {
+		this.addOnly = property != null && property.isAnnotationPresent(AddOnly.class);
+		if (property != null && property.isAnnotationPresent(Incrementing.class)) {
 			if (!Number.class.isAssignableFrom(clazz))
 				throw new IllegalArgumentException("Only number types may be incrementing, which is not the case of elements of " + property);
 			this.increments = new TreeMap<String, Number>();
@@ -89,7 +94,7 @@ public abstract class ColumnFamily<T> {
 	}
 
 	public boolean isAddOnly() {
-		return this.increments != null;
+		return this.addOnly || this.increments != null;
 	}
 
 	public boolean isActivated() {
