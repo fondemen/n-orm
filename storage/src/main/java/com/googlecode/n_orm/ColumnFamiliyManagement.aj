@@ -225,7 +225,7 @@ public aspect ColumnFamiliyManagement {
 			if (index != null)
 				throw new IllegalArgumentException("Map " + field + " cannot declare annotation " + Indexed.class);
 			Class<?> keyClass = (Class<?>)collType.getActualTypeArguments()[0], valueClass = (Class<?>)collType.getActualTypeArguments()[1];
-			acf = new MapColumnFamily(keyClass, valueClass, field, field.getName(), self, field.isAnnotationPresent(Incrementing.class));
+			acf = new MapColumnFamily(keyClass, valueClass, field, field.getName(), self);
 			if (oldCf != null) {
 				for (Entry<?, ?> e : ((Map<?,?>)oldCf).entrySet()) {
 					((MapColumnFamily)acf).put(e.getKey(), e.getValue());
