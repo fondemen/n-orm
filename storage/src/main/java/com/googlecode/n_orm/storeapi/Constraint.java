@@ -140,10 +140,10 @@ public class Constraint {
 		} else {
 			ret = (fixedPart == null ? "" : fixedPart) + end;
 		}
-		if (end != null) {
-			char lastEnd = end.charAt(end.length()-1);
+		if (ret != null) {
+			char lastEnd = ret.charAt(ret.length()-1);
 			lastEnd++;
-			ret = end.substring(0, end.length()-1) + lastEnd;
+			ret = ret.substring(0, ret.length()-1) + lastEnd;
 		}
 		return ret;
 	}
