@@ -60,7 +60,28 @@ public class Constraint {
 	 * @param checkKeys to check whether all keys with a lower category is given a value
 	 */
 	public Constraint(Class<? extends PersistingElement> clazz, Map<Field, Object> values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {
+		
+		String fixedPart = getPrefix(clazz, values, searchedKey, checkKeys);
+		this.startKey = createStart(fixedPart, startValue == null ? null : ConversionTools.convertToString(startValue, searchedKey.getType()));
+		this.endKey = createEnd(fixedPart, endValue == null ? null : ConversionTools.convertToString(endValue, searchedKey.getType()));
+	}
 
+	/**
+	 * Describes a search for a particular key.
+	 * To search for a range of a key of cardinality n, all values for k of cardinalities less than n must be supplied.
+	 * startValue are endValue both inclusive.
+	 */
+	public Constraint(Class<?> type, Map<String, Object> values, String field, Object startValue, Object endValue) {
+		this(toMapOfFields(type, values), PropertyManagement.getInstance().getProperty(type, field), startValue, endValue, true);
+	}
+	
+	public Constraint(Class<? extends PersistingElement> clazz, Map<Field, Object> values, Field searchedKey, Constraint subkeySearch, boolean checkKeys) {
+		String fixedPart = getPrefix(clazz, values, searchedKey, checkKeys);
+		this.startKey = createStart(fixedPart, subkeySearch.getStartKey());
+		this.endKey = createEnd(fixedPart, subkeySearch.getEndKey());
+	}
+
+	private static String getPrefix(Class<? extends PersistingElement> clazz, Map<Field, Object> values,Field searchedKey, boolean checkKeys) {
 		if (searchedKey == null && values.isEmpty())
 			throw new IllegalArgumentException("A search can only happen on a key ; please, supply one.");
 
@@ -70,8 +91,6 @@ public class Constraint {
 			if (length != index-1)
 				throw new IllegalArgumentException("In order to search depending on key " + searchedKey + " of order " + index + ", you must supply values for keys of previous orders.");
 		}
-		
-		//Class<?> clazz = searchedKey.getDeclaringClass();
 		
 		List<Field> keys = KeyManagement.getInstance().detectKeys(clazz);
 		if (keys.size() < length)
@@ -85,7 +104,7 @@ public class Constraint {
 			val = values.get(f);
 			if (val == null) {
 				if (checkKeys)
-					throw new IllegalArgumentException("In order to select an element depending on " + searchedKey + ", you must supply a value for " + f);
+					throw new IllegalArgumentException("In order to select an element of class " + clazz + ", you must supply a value for " + f);
 			} else {
 				fixedPartb.append(ConversionTools.convertToString(values.get(keys.get(i)), f.getType()));
 				fixedPartb.append(sep);
@@ -93,43 +112,40 @@ public class Constraint {
 			}
 		}
 		if (!values.isEmpty())
-			throw new IllegalArgumentException("Can only search according to keys with cardinality up to the search key (here " + searchedKey + ") ; remove values for " + values.keySet());
-		
-		String fixedPart = fixedPartb.length() > 0 ? fixedPartb.toString() : null;
-		if(startValue == null) {
+			throw new IllegalArgumentException("Can only search according to keys with cardinality up to the searched key ; remove values for " + values.keySet());
+		return fixedPartb.length() > 0 ? fixedPartb.toString() : null;
+	}
+
+	private static String createStart(String fixedPart, String start) {
+		String ret;
+		if(start == null) {
 			if (fixedPart == null) {
-				this.startKey = null;
+				ret = null;
 			} else {
-				this.startKey = fixedPart;
+				ret = fixedPart;
 			}
 		} else
-			this.startKey = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(startValue, searchedKey.getType());
+			ret = (fixedPart == null ? "" : fixedPart) + start;
+		return ret;
+	}
 
-		String end;
-		if (endValue == null) {
+	private static String createEnd(String fixedPart, String end) {
+		String ret;
+		if (end == null) {
 			if (fixedPart == null) {
-				end = null;
+				ret = null;
 			} else {
-				end = fixedPart.substring(0, fixedPart.length()-1);
+				ret = fixedPart.substring(0, fixedPart.length()-1);
 			}
 		} else {
-			end = (fixedPart == null ? "" : fixedPart) + ConversionTools.convertToString(endValue, searchedKey.getType());
+			ret = (fixedPart == null ? "" : fixedPart) + end;
 		}
 		if (end != null) {
 			char lastEnd = end.charAt(end.length()-1);
 			lastEnd++;
-			end = end.substring(0, end.length()-1) + lastEnd;
+			ret = end.substring(0, end.length()-1) + lastEnd;
 		}
-		this.endKey = end;
-	}
-
-	/**
-	 * Describes a search for a particular key.
-	 * To search for a range of a key of cardinality n, all values for k of cardinalities less than n must be supplied.
-	 * startValue are endValue both inclusive.
-	 */
-	public Constraint(Class<?> type, Map<String, Object> values, String field, Object startValue, Object endValue) {
-		this(toMapOfFields(type, values), PropertyManagement.getInstance().getProperty(type, field), startValue, endValue, true);
+		return ret;
 	}
 
 	/**
