@@ -71,14 +71,19 @@ public class Constraint {
 	 * To search for a range of a key of cardinality n, all values for k of cardinalities less than n must be supplied.
 	 * startValue are endValue both inclusive.
 	 */
-	public Constraint(Class<?> type, Map<String, Object> values, String field, Object startValue, Object endValue) {
+	public Constraint(Class<? extends PersistingElement> type, Map<String, Object> values, String field, Object startValue, Object endValue) {
 		this(toMapOfFields(type, values), PropertyManagement.getInstance().getProperty(type, field), startValue, endValue, true);
 	}
 	
-	public Constraint(Class<? extends PersistingElement> clazz, Map<Field, Object> values, Field searchedKey, Constraint subkeySearch, boolean checkKeys) {
-		String fixedPart = getPrefix(clazz, values, searchedKey, checkKeys);
+	public Constraint(Map<Field, Object> values, Field searchedKey, Constraint subkeySearch, boolean checkKeys) {
+		@SuppressWarnings("unchecked")
+		String fixedPart = getPrefix((Class<? extends PersistingElement>) searchedKey.getDeclaringClass(), values, searchedKey, checkKeys);
 		this.startKey = createStart(fixedPart, subkeySearch.getStartKey());
 		this.endKey = createEnd(fixedPart, subkeySearch.getEndKey());
+	}
+	
+	public Constraint(Class<? extends PersistingElement> type, Map<String, Object> values, String searchedKey, Constraint subkeySearch) {
+		this(toMapOfFields(type, values), PropertyManagement.getInstance().getProperty(type, searchedKey), subkeySearch, true);
 	}
 
 	private static String getPrefix(Class<? extends PersistingElement> clazz, Map<Field, Object> values,Field searchedKey, boolean checkKeys) {
