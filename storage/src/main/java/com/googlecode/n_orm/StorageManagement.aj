@@ -35,7 +35,7 @@ public aspect StorageManagement {
 //	public static final String CLASS_COLUMN_FAMILY = "class";
 //	public static final String CLASS_COLUMN = "";
 	
-	private transient Boolean PersistingElement.exists = null;
+	transient Boolean PersistingElement.exists = null;
 	private transient boolean PersistingElement.isStoring = false;
 	private transient Collection<Class<? extends PersistingElement>> PersistingElement.persistingSuperClasses = null;
 	

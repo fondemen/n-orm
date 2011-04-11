@@ -220,7 +220,8 @@ public aspect KeyManagement {
 	private transient String PersistingElement.fullIdentifier;
 	
 	public void register(PersistingElement element) {
-		this.knownElements.put(element.getFullIdentifier(), element);
+		if (element.exists == null || Boolean.TRUE.equals(element.exists))
+			this.knownElements.put(element.getFullIdentifier(), element);
 	}
 	
 	public void unregister(PersistingElement element) {
@@ -238,6 +239,10 @@ public aspect KeyManagement {
 	//For test purpose
 	public void cleanupKnownPersistingElements() {
 		this.knownElements.clear();
+	}
+	
+	after(PersistingElement self) returning: execution(void PersistingElement+.delete()) && this(self) {
+		this.unregister(self);
 	}
 	
 	public <T> T createElement(Class<T> expectedType, String id) {
