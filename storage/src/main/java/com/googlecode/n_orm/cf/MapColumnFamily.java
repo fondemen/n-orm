@@ -2,7 +2,6 @@ package com.googlecode.n_orm.cf;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -156,7 +155,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 		
 		@SuppressWarnings("unchecked")
 		Map<K, T> pojoM = (Map<K, T>)pojo;
-		for (java.util.Map.Entry<K, T> element : new ArrayList<java.util.Map.Entry<K, T>>(pojoM.entrySet())) {
+		for (java.util.Map.Entry<K, T> element : pojoM.entrySet()) {
 			String key = this.toKey(element.getKey());
 			if (keys.remove(key)) {
 				T known = this.getElement(key);
