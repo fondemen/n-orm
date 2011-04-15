@@ -2,7 +2,6 @@ package com.googlecode.n_orm.cf;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -226,7 +225,7 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 		
 		@SuppressWarnings("unchecked")
 		Set<T> pojoS = (Set<T>)pojo;
-		for (T element : new ArrayList<T>(pojoS)) {
+		for (T element : pojoS) {
 			String key = this.getIndex(element);
 			if (keys.remove(key)) {
 				T known = this.getElement(key);
