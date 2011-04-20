@@ -23,6 +23,7 @@ public class ConstraintBuilderTest {
 	
 	@Persisting(table="PersistableSearch")
 	public static class SUTClass {
+		private static final long serialVersionUID = 1L;
 		@Key public int key1;
 		@Key(order=2) public int key2;
 		

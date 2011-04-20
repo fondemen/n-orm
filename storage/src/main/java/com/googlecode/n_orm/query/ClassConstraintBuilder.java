@@ -2,34 +2,30 @@ package com.googlecode.n_orm.query;
 
 import java.lang.reflect.Field;
 import java.util.Map;
-import java.util.NavigableSet;
-import java.util.Set;
 import java.util.HashMap;
-import java.util.TreeSet;
 
-import com.googlecode.n_orm.CloseableIterator;
-import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
-import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.storeapi.Constraint;
 
 
-public class ClassConstraintBuilder<T extends PersistingElement> {
+/**
+ * @param <T> the outermost searched key
+ */
+public abstract class ClassConstraintBuilder<T extends PersistingElement> {
 
-	private Class<T> clazz;
+	private Class<?> clazz;
 	private Map<Field, Object> keyValues = new HashMap<Field, Object>();
 	private Field searchedKey = null;
 	private Object searchFrom = null, searchTo = null;
-	private Integer limit = null;
-	private String [] toBeActivated = null; //null: no activation, non null: autoactivation
+	private Object subConstraint;
 
-	public ClassConstraintBuilder(Class<T> clazz) {
+	public ClassConstraintBuilder(Class<?> clazz) {
 		this.clazz = clazz;
 	}
 
-	Class<? extends PersistingElement> getClazz() {
+	Class<?> getClazz() {
 		return this.clazz;
 	}
 
@@ -49,15 +45,13 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 		return searchTo;
 	}
 
-	Integer getLimit() {
-		return limit;
-	}
-
 	void addKeyValue(Field key, Object value) {
 		this.keyValues.put(key, value);
 	}
 	
 	void setSearchedKey(Field key, Object startValue, Object endValue) {
+		if (this.searchedKey != null && !this.searchedKey.equals(key))
+			throw new IllegalArgumentException("Searched key (with bouded values) is already set to " + this.searchedKey + " ; cannot search also on " + key + " ; try using setTo on one of those two keys instead.");
 		this.searchedKey = key;
 		if (startValue != null)
 			this.searchFrom = startValue;
@@ -65,89 +59,35 @@ public class ClassConstraintBuilder<T extends PersistingElement> {
 			this.searchTo = endValue;
 	}
 
-	void setLimit(int limit) {
-		if (this.limit != null) {
-			throw new IllegalArgumentException("A limit is already set to " + this.limit);
-		}
-		this.limit = limit;
+	Object getSubConstraint() {
+		return subConstraint;
 	}
-	
+
+	void setSubConstraint(Field key, Object subConstraint) {
+		if (this.searchedKey != null && !this.searchedKey.equals(key))
+			throw new IllegalArgumentException("Searched key is already set to " + this.searchedKey + " ; cannot set it to " + key);
+		this.searchedKey = key;
+		if (this.subConstraint != null)
+			throw new IllegalStateException("A subconstraint is already set for " + this.searchedKey);
+
+		this.subConstraint = subConstraint;
+	}
+
 	public Constraint getConstraint() {
 		return this.keyValues.isEmpty() && this.searchedKey == null ? null : new Constraint(this.clazz, this.keyValues, this.searchedKey, this.searchFrom, this.searchTo, true);
 	}
-	
-	/**
-	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link ClassConstraintBuilder#withKey(String)}.
-	 * Elements are not activated, but their keys are all loaded into memory.
-	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
-	 * @throws DatabaseNotReachedException
-	 */
-	public NavigableSet<T> go() throws DatabaseNotReachedException {
-		if (this.limit == null || this.limit < 1)
-			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
-		return StorageManagement.findElementsToSet(this.clazz, this.getConstraint(), this.limit, this.toBeActivated);
-	}
-	
-	/**
-	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link ClassConstraintBuilder#withKey(String)}.
-	 * Elements are not activated.
-	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
-	 * @throws DatabaseNotReachedException
-	 */
-	public CloseableIterator<T> iterate() throws DatabaseNotReachedException {
-		if (this.limit == null || this.limit < 1)
-			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
-		return StorageManagement.findElement(this.clazz, this.getConstraint(), this.limit, this.toBeActivated);
-	}
 
-	
-	/**
-	 * Runs the query to find . Any limit set by {@link ClassConstraintBuilder#withKey(String)} will be ignored.
-	 * The element is not activated.
-	 * @return A (possibly null) element matching the query.
-	 * @throws DatabaseNotReachedException
-	 */
-	public T any()  throws DatabaseNotReachedException {
-		CloseableIterator<T> found = StorageManagement.findElement(this.clazz, this.getConstraint(), 1, this.toBeActivated);
-		try {
-			if (found.hasNext())
-				return found.next();
-			else
-				return null;
-		} finally {
-			found.close();
-		}
-	}
-
-	public KeyConstraintBuilder<T> andWithKey(String key) {
-		return this.withKey(key);
-	}
-
-	public KeyConstraintBuilder<T> withKey(String key) {
+	protected KeyConstraintBuilder<T> withKeyInt(String key) {
 		if (this.clazz == null) {
 			throw new IllegalArgumentException("Please state the searched element's class before constraining the keys.");
 		}
 		for (Field f : KeyManagement.getInstance().detectKeys(this.clazz)) {
 			if (f.getName().equals(key)) {
-				return new KeyConstraintBuilder<T>(this, f);
+				return this.createKeyBuilder(f);
 			}
 		}
 		throw new IllegalArgumentException("No key " + key + " found in class " + this.clazz + " ; is this an attribute of the class or one of its superclass annotated with " + Key.class + " ?");
 	}
 	
-	public LimitConstraintBuilder<T> withAtMost(int limit) {
-		return new LimitConstraintBuilder<T>(this, limit);
-	}
-	
-	public ClassConstraintBuilder<T> andActivate(String... families) {
-		if (this.toBeActivated == null)
-			this.toBeActivated = families;
-		else {
-			String [] tba = new String [families.length];
-			System.arraycopy(this.toBeActivated, 0, tba, 0, this.toBeActivated.length);
-			System.arraycopy(families, 0, tba, this.toBeActivated.length, families.length);
-			this.toBeActivated = tba;
-		}
-		return this;
-	}
+	public abstract KeyConstraintBuilder<T> createKeyBuilder(Field f);
 }
