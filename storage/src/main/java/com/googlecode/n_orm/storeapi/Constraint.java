@@ -10,7 +10,6 @@ import java.util.Set;
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
-import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
@@ -48,9 +47,8 @@ public class Constraint {
 		this.endKey = endKey;
 	}
 
-	@SuppressWarnings("unchecked")
 	public Constraint(Map<Field, Object> values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {
-		this((Class<? extends PersistingElement>)searchedKey.getDeclaringClass(), values, searchedKey, startValue, endValue, checkKeys);
+		this(searchedKey.getDeclaringClass(), values, searchedKey, startValue, endValue, checkKeys);
 	}
 	
 	/**
@@ -59,7 +57,7 @@ public class Constraint {
 	 * startValue and endValue are both inclusive.
 	 * @param checkKeys to check whether all keys with a lower category is given a value
 	 */
-	public Constraint(Class<? extends PersistingElement> clazz, Map<Field, Object> values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {
+	public Constraint(Class<?> clazz, Map<Field, Object> values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {
 		
 		String fixedPart = getPrefix(clazz, values, searchedKey, checkKeys);
 		this.startKey = createStart(fixedPart, startValue == null ? null : ConversionTools.convertToString(startValue, searchedKey.getType()));
@@ -71,22 +69,25 @@ public class Constraint {
 	 * To search for a range of a key of cardinality n, all values for k of cardinalities less than n must be supplied.
 	 * startValue are endValue both inclusive.
 	 */
-	public Constraint(Class<? extends PersistingElement> type, Map<String, Object> values, String field, Object startValue, Object endValue) {
+	public Constraint(Class<?> type, Map<String, Object> values, String field, Object startValue, Object endValue) {
 		this(toMapOfFields(type, values), PropertyManagement.getInstance().getProperty(type, field), startValue, endValue, true);
 	}
 	
+	public Constraint(Map<Field, Object> values, Field searchedKey, Constraint subkeySearch) {
+		this(values, searchedKey, subkeySearch, true);
+	}
+	
 	public Constraint(Map<Field, Object> values, Field searchedKey, Constraint subkeySearch, boolean checkKeys) {
-		@SuppressWarnings("unchecked")
-		String fixedPart = getPrefix((Class<? extends PersistingElement>) searchedKey.getDeclaringClass(), values, searchedKey, checkKeys);
+		String fixedPart = getPrefix(searchedKey.getDeclaringClass(), values, searchedKey, checkKeys);
 		this.startKey = createStart(fixedPart, subkeySearch.getStartKey());
 		this.endKey = createEnd(fixedPart, subkeySearch.getEndKey());
 	}
 	
-	public Constraint(Class<? extends PersistingElement> type, Map<String, Object> values, String searchedKey, Constraint subkeySearch) {
+	public Constraint(Class<?> type, Map<String, Object> values, String searchedKey, Constraint subkeySearch) {
 		this(toMapOfFields(type, values), PropertyManagement.getInstance().getProperty(type, searchedKey), subkeySearch, true);
 	}
 
-	private static String getPrefix(Class<? extends PersistingElement> clazz, Map<Field, Object> values,Field searchedKey, boolean checkKeys) {
+	private static String getPrefix(Class<?> clazz, Map<Field, Object> values,Field searchedKey, boolean checkKeys) {
 		if (searchedKey == null && values.isEmpty())
 			throw new IllegalArgumentException("A search can only happen on a key ; please, supply one.");
 
