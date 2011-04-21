@@ -659,7 +659,6 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			return 0;
 
 		String tableName = this.mangleTableName(table);
-		
 		try {
 			Job count = RowCounter.createSubmittableJob(getConf(), tableName, s);
 			if(!count.waitForCompletion(false))
@@ -877,6 +876,52 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			throw new DatabaseNotReachedException(e);
 		}
 		return new CloseableIterator(r, families != null);
+	}
+
+	public void truncate(String table, Constraint c) throws DatabaseNotReachedException {
+		this.truncate(table, this.getScan(c));
+	}
+	
+	protected void truncate(String table, Scan s) {
+		this.truncateSimple(table, s);
+	}
+	
+	protected void truncateSimple(String table, Scan s)  {
+		if (! this.hasTableNoCache(table))
+			return;
+		
+		HTable t = this.getTable(table);
+		ResultScanner r = null;
+		try {
+			r = t.getScanner(s);
+			Iterator<Result> it = r.iterator();
+			while (it.hasNext()) {
+				t.delete(new Delete(it.next().getRow()));
+			}
+		} catch (IOException e) {
+			throw new DatabaseNotReachedException(e);
+		} finally {
+			if (r != null)
+				r.close();
+		}
+	}
+	
+	protected void truncateMapReduce(String table, Scan s)  {
+		if (!this.hasTableNoCache(table))
+			return;
+
+		String tableName = this.mangleTableName(table);
+		try {
+			Job count = Truncator.createSubmittableJob(getConf(), tableName, s);
+			if(!count.waitForCompletion(false))
+				throw new DatabaseNotReachedException("Truncate failed for table " + table);
+		} catch (IOException e) {
+			throw new DatabaseNotReachedException(e);
+		} catch (InterruptedException e) {
+			throw new DatabaseNotReachedException(e);
+		} catch (ClassNotFoundException e) {
+			throw new DatabaseNotReachedException(e);
+		}
 	}
 
 }

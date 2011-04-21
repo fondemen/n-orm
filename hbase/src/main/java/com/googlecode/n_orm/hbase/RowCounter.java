@@ -37,6 +37,7 @@ public class RowCounter {
 	public static Job createSubmittableJob(Configuration conf, String tableName,
 			Scan scan) throws IOException {
 		Job job = new Job(conf, NAME + "_" + tableName + "_" + scan.hashCode());
+		scan.setCaching(500);
 		job.setJarByClass(RowCounter.class);
 		scan.setFilter(new FirstKeyOnlyFilter());
 		job.setOutputFormatClass(NullOutputFormat.class);
