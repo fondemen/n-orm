@@ -5,7 +5,7 @@ import java.lang.reflect.Field;
 import com.googlecode.n_orm.PersistingElement;
 
 
-public class RangeKeyConstraintBuilder<T extends PersistingElement> {
+public abstract class RangeKeyConstraintBuilder<T extends PersistingElement> {
 	private final ClassConstraintBuilder<T> classConstraintBuilder;
 	private final Field key;
 	private final Object startValue;
@@ -16,7 +16,7 @@ public class RangeKeyConstraintBuilder<T extends PersistingElement> {
 		this.startValue = startValue;
 	}
 	
-	public ClassConstraintBuilder<T> and(Object includedEndValue) {
+	protected ClassConstraintBuilder<T> andInt(Object includedEndValue) {
 		this.classConstraintBuilder.setSearchedKey(key, this.startValue, includedEndValue);
 		return this.classConstraintBuilder;
 	}

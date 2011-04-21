@@ -266,6 +266,18 @@ public class BasicTest extends HBaseTestLauncher {
 		 assertEquals(bsut, fb);
 	 }
 	 
+	 @Test public void searchBookWithBookstoreKey() throws DatabaseNotReachedException {
+		 Book b2 = new Book(bssut, "testtitle2", new Date());
+		 b2.store();
+		 
+		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").isAnElement().withKey("name").greaterOrEqualsThan("test").and().withAtMost(1000).elements().go();		 
+		 b2.delete();
+		 
+		 assertEquals(2, storeBooks.size());
+		 assertTrue(storeBooks.contains(bsut));
+		 assertTrue(storeBooks.contains(b2));
+	 }
+	 
 	 @Test public void getSubClass() throws DatabaseNotReachedException {
 		 Novel n = new Novel(bssut, "noveltitle", new Date());
 		 n.store();

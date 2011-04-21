@@ -279,6 +279,21 @@ public class BasicTest {
 		 assertNotSame(b2, fb);
 	 }
 	 
+	 @Test public void searchBookWithBookstoreKey() throws DatabaseNotReachedException {
+		 Book b2 = new Book(bssut, new Date(123456789), new Date());
+		 b2.store();
+		 
+		 //Simulates a new session by emptying elements cache
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+		 
+		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").isAnElement().withKey("hashcode").setTo("testbookstore").and().withAtMost(1000).elements().go();		 
+		 b2.delete();
+		 
+		 assertEquals(2, storeBooks.size());
+		 assertTrue(storeBooks.contains(bsut));
+		 assertTrue(storeBooks.contains(b2));
+	 }
+	 
 	 @Test public void getSubClass() throws DatabaseNotReachedException {
 		 Novel n = new Novel(bssut, new Date(123456799), new Date());
 		 n.store();
