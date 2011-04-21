@@ -5,6 +5,7 @@ import static org.junit.Assert.assertNull;
 
 import java.lang.reflect.Field;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.junit.Test;
 
@@ -92,5 +93,45 @@ public class ConstraintBuilderTest {
 	public void lacksPreviousKeyConstraint() {
 		StorageManagement.findElements().ofClass(SUTClass.class).andWithKey("key2").between(2).and(3).withAtMost(4).elements().getConstraint();
 		
+	}
+	
+	@Persisting
+	public static class SUTOuterClass {
+		private static final long serialVersionUID = 1L;
+		public @Key SUTClass key1;
+		public @Key(order=2) SUTClass key2;
+	}
+	
+	@Test
+	public void completeSearchDivePartial() {
+		InnerClassConstraintBuilder<SUTOuterClass> co = StorageManagement.findElements().ofClass(SUTOuterClass.class).withKey("key1").isAnElement().withKey("key1").setTo(1).andWithKey("key2").between(2).and(3);
+		assertEquals(co.getClazz(), SUTClass.class);
+		assertEquals(co.getSearchedKey().getName(), "key2");
+		assertEquals(co.getSearchedKey().getType(), int.class);
+		assertEquals(2, co.getSearchFrom());
+		assertEquals(3, co.getSearchTo());
+		Map<Field, Object> keyValues = co.getKeyValues();
+		assertEquals(1, keyValues.keySet().size());
+		Entry<Field, Object> kv = keyValues.entrySet().iterator().next();
+		assertEquals("key1", kv.getKey().getName());
+		assertEquals(int.class,kv.getKey().getType());
+		assertEquals(1, kv.getValue());
+		
+	}
+	
+	@Test
+	public void completeSearchDive() {
+		ClassConstraintBuilder<SUTOuterClass> co = StorageManagement.findElements().ofClass(SUTOuterClass.class).withKey("key1").isAnElement().withKey("key1").setTo(1).andWithKey("key2").between(2).and(3).and().withAtMost(4).elements();
+		assertEquals(co.getClazz(), SUTOuterClass.class);
+		assertEquals(co.getSearchedKey().getName(), "key1");
+		assertEquals(co.getSearchedKey().getType(), SUTClass.class);
+		assertNull(co.getSearchFrom());
+		assertNull(co.getSearchTo());
+		Map<Field, Object> keyValues = co.getKeyValues();
+		assertEquals(0, keyValues.keySet().size());
+		
+		Constraint subcstr = co.getConstraint();
+		assertEquals(ConversionTools.convertToString(1) + KeyManagement.KEY_SEPARATOR + ConversionTools.convertToString(2), subcstr.getStartKey());
+		assertEquals(ConversionTools.convertToString(1) + KeyManagement.KEY_SEPARATOR + ConversionTools.convertToString(4), subcstr.getEndKey());
 	}
 }
