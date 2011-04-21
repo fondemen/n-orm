@@ -57,6 +57,33 @@
 
 	<profiles>
 		<profile>
+			<id>hbase-cdh3u0</id>
+			<properties>
+				<hbase.version>0.90.1-cdh3u0</hbase.version>
+				<hadoop.version>0.20.2-cdh3u0</hadoop.version>
+			</properties>
+
+			<repositories>
+
+				<repository>
+					<id>cdh.releases.repo</id>
+					<url>http://repository.cloudera.com/content/repositories/releases</url>
+					<name>CDH Releases Repository</name>
+					<snapshots>
+						<enabled>false</enabled>
+					</snapshots>
+				</repository>
+				<repository>
+					<id>cdh.snapshots.repo</id>
+					<url>http://repository.cloudera.com/content/repositories/snapshots</url>
+					<name>CDH Snapshots Repository</name>
+					<snapshots>
+						<enabled>true</enabled>
+					</snapshots>
+				</repository>
+			</repositories>
+		</profile>
+		<profile>
 			<id>hbase-cdh3b4</id>
 			<properties>
 				<hbase.version>0.90.1-CDH3B4</hbase.version>
