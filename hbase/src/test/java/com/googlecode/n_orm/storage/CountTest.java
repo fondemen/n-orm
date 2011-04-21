@@ -6,12 +6,14 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.hbase.Store;
-import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 public class CountTest {
 	private static Store store;
@@ -25,12 +27,12 @@ public class CountTest {
 	}
 	
 	@Before
+	@After
 	public void truncateTestTable() throws IOException {
 
 		if (store.getAdmin().tableExists(testTable)) {
-			CloseableKeyIterator it = store.get(testTable, null, Integer.MAX_VALUE, null);
-			while(it.hasNext())
-				store.delete(testTable, it.next().getKey());
+			store.truncate(testTable, null);
+			assertEquals(0, store.count(testTable, null));
 		}
 	}
 	
@@ -44,8 +46,7 @@ public class CountTest {
 
 	@Test
 	public void inexistingTable() throws IOException {
-		this.deleteTestTable();
-		assertEquals(0l, store.count(testTable, null));
+		assertEquals(0l, store.count("huidhzidxeozd", null));
 		
 	}
 
@@ -98,5 +99,21 @@ public class CountTest {
 			store.storeChanges(testTable, "testid"+i, null , null, null);
 		}
 		assertEquals(100l, store.count(testTable, null));
+	}
+	
+	@Test
+	public void hundredFrom33to66() {
+		for(int i = 0 ; i < 100; ++i) {
+			store.storeChanges(testTable, ConversionTools.convertToString(i), null , null, null);
+		}
+		assertEquals(1+66-33, store.count(testTable, new Constraint(ConversionTools.convertToString(33), ConversionTools.convertToString(66))));
+	}
+	
+	@Test
+	public void thousandsFrom33to66() {
+		for(int i = 0 ; i < 10000; ++i) {
+			store.storeChanges(testTable, ConversionTools.convertToString(i), null , null, null);
+		}
+		assertEquals(1+66-33, store.count(testTable, new Constraint(ConversionTools.convertToString(33), ConversionTools.convertToString(66))));
 	}
 }
