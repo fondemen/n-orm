@@ -11,7 +11,7 @@ public class InnerKeyConstraintBuilder<T extends PersistingElement> extends KeyC
 		super(cb, key);
 	}
 
-	public InnerClassConstraintBuilder<T> setTo(String value) {
+	public InnerClassConstraintBuilder<T> setTo(Object value) {
 		return (InnerClassConstraintBuilder<T>) super.setToInt(value);
 	}
 
