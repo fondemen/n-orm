@@ -859,12 +859,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		FilterList fl;
 		if (filter instanceof FilterList) {
 			fl = (FilterList)filter;
+			fl.addFilter(new PageFilter(limit));
 		} else {
-			fl = new FilterList();
-			fl.addFilter(filter);
-			s.setFilter(fl);
+			s.setFilter(new PageFilter(limit));
 		}
-		fl.addFilter(new PageFilter(limit));
 		
 		final ResultScanner r;
 		try {
