@@ -10,7 +10,6 @@ import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 
@@ -35,9 +34,8 @@ public class RowCounter {
 		}
 	}
 
-	public static Job createSubmittableJob(Configuration conf, byte [] table,
+	public static Job createSubmittableJob(Configuration conf, String tableName,
 			Scan scan) throws IOException {
-		String tableName = Bytes.toString(table);
 		Job job = new Job(conf, NAME + "_" + tableName + "_" + scan.hashCode());
 		job.setJarByClass(RowCounter.class);
 		scan.setFilter(new FirstKeyOnlyFilter());
