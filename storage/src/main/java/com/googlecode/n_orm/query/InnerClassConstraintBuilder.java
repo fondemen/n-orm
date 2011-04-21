@@ -2,15 +2,14 @@ package com.googlecode.n_orm.query;
 
 import java.lang.reflect.Field;
 
-import com.googlecode.n_orm.Book;
 import com.googlecode.n_orm.PersistingElement;
 
-public class InnerKeyClassConstraintBuilder<T extends PersistingElement> extends ClassConstraintBuilder<T> {
+public class InnerClassConstraintBuilder<T extends PersistingElement> extends ClassConstraintBuilder<T> {
 	private final ClassConstraintBuilder<T> constraintBuilder;
 	private final Field key;
 
 	@SuppressWarnings("unchecked")
-	public InnerKeyClassConstraintBuilder(Field key, ClassConstraintBuilder<T> constraintBuilder) {
+	public InnerClassConstraintBuilder(Field key, ClassConstraintBuilder<T> constraintBuilder) {
 		super(key.getType());
 		this.constraintBuilder = constraintBuilder;
 		this.key = key;
@@ -22,12 +21,13 @@ public class InnerKeyClassConstraintBuilder<T extends PersistingElement> extends
 		return new InnerKeyConstraintBuilder<T>(this, f);
 	}
 
+	@SuppressWarnings("unchecked")
 	public SearchableClassConstraintBuilder<T> and() {
 		this.constraintBuilder.setSubConstraint(key, this.getConstraint());
 		if (this.constraintBuilder instanceof SearchableClassConstraintBuilder)
 			return (SearchableClassConstraintBuilder<T>)this.constraintBuilder;
-		else if (this.constraintBuilder instanceof InnerKeyClassConstraintBuilder)
-			return ((InnerKeyClassConstraintBuilder<T>)this.constraintBuilder).and();
+		else if (this.constraintBuilder instanceof InnerClassConstraintBuilder)
+			return ((InnerClassConstraintBuilder<T>)this.constraintBuilder).and();
 		else
 			assert false;
 		return null;
@@ -35,5 +35,9 @@ public class InnerKeyClassConstraintBuilder<T extends PersistingElement> extends
 
 	public InnerKeyConstraintBuilder<T> withKey(String key) {
 		return (InnerKeyConstraintBuilder<T>) super.withKeyInt(key);
+	}
+
+	public InnerKeyConstraintBuilder<T> andWithKey(String key) {
+		return this.withKey(key);
 	}
 }
