@@ -617,7 +617,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	@Override
 	public void delete(String table, String id)
 			throws DatabaseNotReachedException {
-		HTable t = this.getTable(table, null);
+		HTable t = this.getTable(table);
 
 		Delete rowDel = new Delete(Bytes.toBytes(id));
 		try {
@@ -744,7 +744,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		if (!this.hasColumnFamily(table, family))
 			return false;
 
-		HTable t = this.getTable(table, null);
+		HTable t = this.getTable(table);
 		Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));
 
 		try {
@@ -760,7 +760,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		if (!this.hasTable(table))
 			return false;
 
-		HTable t = this.getTable(table, null);
+		HTable t = this.getTable(table);
 		Get g = new Get(Bytes.toBytes(row));
 		g.setFilter(new FirstKeyOnlyFilter());
 
