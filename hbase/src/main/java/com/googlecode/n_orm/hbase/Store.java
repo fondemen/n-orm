@@ -12,11 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
-import java.util.NavigableSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -42,6 +40,7 @@ import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.mapreduce.Job;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PropertyManagement;
@@ -309,7 +308,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 	}
 
-	protected HTable getTable(String name, Set<String> expectedFamilies)
+	protected HTable getTable(String name, String... expectedFamilies)
 			throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
@@ -341,7 +340,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 
 		if (!created && expectedFamilies != null) {
-			this.enforceColumnFamiliesExists(td, expectedFamilies, fromCache);
+			this.enforceColumnFamiliesExists(td, expectedFamilies);
 		}
 
 		synchronized (this.tablesC) {
@@ -383,10 +382,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	}
 
 	private void enforceColumnFamiliesExists(HTableDescriptor tableD,
-			Set<String> columnFamilies, boolean descriptoFromCache) throws DatabaseNotReachedException {
+			String... columnFamilies) throws DatabaseNotReachedException {
 		assert tableD != null;
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(
-				columnFamilies.size());
+				columnFamilies.length);
 		synchronized (tableD) {
 			boolean recreated = false;
 			for (String cf : columnFamilies) {
@@ -431,7 +430,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	@Override
 	public Map<String, Map<String, byte[]>> get(String table, String id,
 			Set<String> families) throws DatabaseNotReachedException {
-		HTable t = this.getTable(table, families);
+		HTable t = this.getTable(table, families.toArray(new String[families.size()]));
 
 		Get g = new Get(Bytes.toBytes(id));
 		for (String family : families) {
@@ -504,7 +503,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		families.addAll(increments.keySet());
 		if (families.isEmpty())
 			families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
-		HTable t = this.getTable(table, families);
+		HTable t = this.getTable(table, families.toArray(new String[families.size()]));
 
 		byte[] row = Bytes.toBytes(id);
 
@@ -591,27 +590,24 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 	}
 
-	// @Override
-	// public int count(String table) throws DatabaseNotReachedException {
-	// if (!this.hasTable(table))
-	// return 0;
-	//
-	// HTable t = this.getTable(table, null);
-	// Scan s = new Scan();
-	// s.setFilter(new FirstKeyOnlyFilter());
-	//
-	// try {
-	// int ret = 0;
-	// Iterator<?> res = t.getScanner(s).iterator();
-	// while(res.hasNext()) {
-	// ret++;
-	// res.next();
-	// }
-	// return ret;
-	// } catch (IOException e) {
-	// throw new DatabaseNotReachedException(e);
-	// }
-	// }
+	//@Override
+	protected long count(String table, Scan s) throws DatabaseNotReachedException {
+		if (!this.hasTable(table))
+			return 0;
+
+		try {
+			Job count = RowCounter.createSubmittableJob(getConf(), this.getTable(table).getTableName(), s);
+			if(!count.waitForCompletion(false))
+				throw new DatabaseNotReachedException("Row count failed for table " + table);
+			return count.getCounters().findCounter(RowCounter.RowCounterMapper.Counters.ROWS).getValue();
+		} catch (IOException e) {
+			throw new DatabaseNotReachedException(e);
+		} catch (InterruptedException e) {
+			throw new DatabaseNotReachedException(e);
+		} catch (ClassNotFoundException e) {
+			throw new DatabaseNotReachedException(e);
+		}
+	}
 
 	// @Override
 	// public int count(String table, String row, String family) throws
@@ -713,9 +709,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	@Override
 	public byte[] get(String table, String row, String family, String key)
 			throws DatabaseNotReachedException {
-		HashSet<String> fam = new HashSet<String>();
-		fam.add(family);
-		HTable t = this.getTable(table, fam);
+		HTable t = this.getTable(table, family);
 		Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
 				Bytes.toBytes(key));
 
@@ -738,9 +732,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	@Override
 	public Map<String, byte[]> get(String table, String id, String family,
 			Constraint c) throws DatabaseNotReachedException {
-		Set<String> families = new TreeSet<String>();
-		families.add(family);
-		HTable t = this.getTable(table, families);
+		HTable t = this.getTable(table, family);
 
 		Get g = new Get(Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
 
@@ -763,9 +755,36 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		return ret;
 	}
 
+	protected Scan getScan(Constraint c, String... families) throws DatabaseNotReachedException {
+		Scan s = new Scan();
+		if (c != null && c.getStartKey() != null)
+			s.setStartRow(Bytes.toBytes(c.getStartKey()));
+		if (c != null && c.getEndKey() != null) {
+			byte[] endb = Bytes.toBytes(c.getEndKey());
+			endb = Bytes.add(endb, new byte[] { 0 });
+			s.setStopRow(endb);
+		}
+		
+		if (families != null) {
+			for (String fam : families) {
+				s.addFamily(Bytes.toBytes(fam));
+			}
+		} else {
+			//No family to load ; avoid getting all information in the row (that may be big)
+			s.setFilter(new FirstKeyOnlyFilter());
+		}
+		
+		return s;
+	}
+
+	@Override
+	public long count(String table, Constraint c) throws DatabaseNotReachedException {
+		return this.count(table, this.getScan(c));
+	}
+
 	@Override
 	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(String table, Constraint c,
-			int limit, Set<String> families) throws DatabaseNotReachedException {
+			 int limit, Set<String> families) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return new com.googlecode.n_orm.storeapi.CloseableKeyIterator() {
 
@@ -789,31 +808,20 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 			};
 
-		HTable ht = this.getTable(table, null);
-
-		Scan s = new Scan();
-		if (c != null && c.getStartKey() != null)
-			s.setStartRow(Bytes.toBytes(c.getStartKey()));
-		if (c != null && c.getEndKey() != null) {
-			byte[] endb = Bytes.toBytes(c.getEndKey());
-			endb = Bytes.add(endb, new byte[] { 0 });
-			s.setStopRow(endb);
-		}
-		Filter filter = new PageFilter(limit);
+		HTable ht = this.getTable(table);
 		
-		if (families != null) {
-			for (String fam : families) {
-				s.addFamily(Bytes.toBytes(fam));
-			}
+		Scan s = this.getScan(c, families.toArray(new String[families.size()]));
+		Filter filter = s.getFilter();
+		FilterList fl;
+		if (filter instanceof FilterList) {
+			fl = (FilterList)filter;
 		} else {
-			//No family to load ; avoid getting all information in the row (that may be big)
-			FilterList f = new FilterList();
-			f.addFilter(new FirstKeyOnlyFilter());
-			f.addFilter(filter);
-			filter = f;
+			fl = new FilterList();
+			fl.addFilter(filter);
+			s.setFilter(fl);
 		}
-		s.setFilter(filter);
-
+		fl.addFilter(new PageFilter(limit));
+		
 		final ResultScanner r;
 		try {
 			r = ht.getScanner(s);
