@@ -105,4 +105,17 @@ public class DummyStore implements Store {
 		return null;
 	}
 
+	@Override
+	public long count(String table, Constraint c)
+			throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public void truncate(String table, Constraint c)
+			throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		
+	}
+
 }
