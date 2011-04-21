@@ -6,6 +6,9 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -33,19 +36,28 @@ public class ConcurrentTest {
 		assertNotSame(store1, store2);
 	}
 	
-	@Test
-	public void gettingEmptyObjectAndGetItFromBothStores() {
-		store1.storeChanges("t1", "idt1", null, null, null);
-		assertTrue(store1.exists("t1", "idt1"));
-		assertTrue(store2.exists("t1", "idt1"));
+	private void deleteTable(String table) throws IOException {
+
+		if (store1.getAdmin().tableExists(table)) {
+			store1.getAdmin().disableTable(table);
+			store1.getAdmin().deleteTable(table);
+		}
 	}
 	
 	@Test
-	public void gettingCfCreatedFromAnotherStore() throws IOException {
-		if (store1.getAdmin().tableExists("t1")) {
-			store1.getAdmin().disableTable("t1");
-			store1.getAdmin().deleteTable("t1");
-		}
+	public void gettingEmptyObjectAndGetItFromBothStores() throws IOException {
+		this.deleteTable("t1");
+		
+		store1.storeChanges("t1", "idt1", null, null, null);
+		assertTrue(store1.exists("t1", "idt1"));
+		assertTrue(store2.exists("t1", "idt1"));
+		
+		this.deleteTable("t1");
+	}
+	
+	@Test
+	public void acceptingOutsideTableRemoval() throws IOException {
+		this.deleteTable("t1");
 		
 		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
 		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
@@ -55,13 +67,11 @@ public class ConcurrentTest {
 		store2.storeChanges("t1", "idt1", change1 , null, null);
 		assertTrue(store2.exists("t1", "idt1", "cf1"));
 		
-		change1.remove("cf1");
-		change1.put("cf2", ch1);
+		this.deleteTable("t1");
+		
 		store1.storeChanges("t1", "idt1", change1 , null, null);
-		store2.storeChanges("t1", "idt1", change1 , null, null);
-		assertTrue(store2.exists("t1", "idt1", "cf2"));
+		assertTrue(store2.exists("t1", "idt1", "cf1"));
 
-		store1.getAdmin().disableTable("t1");
-		store1.getAdmin().deleteTable("t1");
+		this.deleteTable("t1");
 	}
 }

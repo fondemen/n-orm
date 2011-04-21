@@ -25,6 +25,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -396,6 +397,11 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 								.getTableDescriptor(tableD.getName());
 						this.tablesD.put(tableD.getNameAsString(), tableD);
 						recreated = true;
+					} catch (TableNotFoundException x) {
+						//Table exists in the cache but was dropped for some reason...
+						this.tablesD.remove(tableD.getNameAsString());
+						this.getTable(tableD.getNameAsString(), columnFamilies);
+						return;
 					} catch (IOException e) {
 						throw new DatabaseNotReachedException(e);
 					}
@@ -559,6 +565,13 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		} catch (IOException e) {
 			if (problem == null)
 				problem = e;
+		}
+		
+		if (problem instanceof TableNotFoundException) {
+			//Table was deleted for some reasons though the cache still knows it
+			this.tablesD.remove(Bytes.toString(t.getTableName()));
+			this.storeChanges(table, id, changed, removed, increments);
+			return;
 		}
 
 		if (problem != null)
