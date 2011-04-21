@@ -104,4 +104,8 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	public SearchableKeyConstraintBuilder<T> withKey(String key) {
 		return (SearchableKeyConstraintBuilder<T>) this.withKeyInt(key);
 	}
+
+	public SearchableKeyConstraintBuilder<T> andWithKey(String key) {
+		return this.withKey(key);
+	}
 }

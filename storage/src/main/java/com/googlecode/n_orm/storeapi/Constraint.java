@@ -61,7 +61,7 @@ public class Constraint {
 		
 		String fixedPart = getPrefix(clazz, values, searchedKey, checkKeys);
 		this.startKey = createStart(fixedPart, startValue == null ? null : ConversionTools.convertToString(startValue, searchedKey.getType()));
-		this.endKey = createEnd(fixedPart, endValue == null ? null : ConversionTools.convertToString(endValue, searchedKey.getType()));
+		this.endKey = createEnd(fixedPart, endValue == null ? null : ConversionTools.convertToString(endValue, searchedKey.getType()), true);
 	}
 
 	/**
@@ -80,7 +80,7 @@ public class Constraint {
 	public Constraint(Map<Field, Object> values, Field searchedKey, Constraint subkeySearch, boolean checkKeys) {
 		String fixedPart = getPrefix(searchedKey.getDeclaringClass(), values, searchedKey, checkKeys);
 		this.startKey = createStart(fixedPart, subkeySearch.getStartKey());
-		this.endKey = createEnd(fixedPart, subkeySearch.getEndKey());
+		this.endKey = createEnd(fixedPart, subkeySearch.getEndKey(), false);
 	}
 	
 	public Constraint(Class<?> type, Map<String, Object> values, String searchedKey, Constraint subkeySearch) {
@@ -101,6 +101,7 @@ public class Constraint {
 		List<Field> keys = KeyManagement.getInstance().detectKeys(clazz);
 		if (keys.size() < length)
 			throw new IllegalArgumentException("Too many constrained values compared to the number of keys ; only key values may be constrained.");
+		boolean allKeysThere = keys.size() == length;
 		StringBuffer fixedPartb = new StringBuffer();
 		String sep = KeyManagement.KEY_SEPARATOR;
 		Field f; Object val;
@@ -113,7 +114,10 @@ public class Constraint {
 					throw new IllegalArgumentException("In order to select an element of class " + clazz + ", you must supply a value for " + f);
 			} else {
 				fixedPartb.append(ConversionTools.convertToString(values.get(keys.get(i)), f.getType()));
-				fixedPartb.append(sep);
+				if (allKeysThere && i == length-1)
+					fixedPartb.append(KeyManagement.KEY_END_SEPARATOR);
+				else
+					fixedPartb.append(sep);
 				values.remove(f);
 			}
 		}
@@ -135,7 +139,7 @@ public class Constraint {
 		return ret;
 	}
 
-	private static String createEnd(String fixedPart, String end) {
+	private static String createEnd(String fixedPart, String end, boolean increment) {
 		String ret;
 		if (end == null) {
 			if (fixedPart == null) {
@@ -146,7 +150,7 @@ public class Constraint {
 		} else {
 			ret = (fixedPart == null ? "" : fixedPart) + end;
 		}
-		if (ret != null) {
+		if (ret != null && increment) {
 			char lastEnd = ret.charAt(ret.length()-1);
 			lastEnd++;
 			ret = ret.substring(0, ret.length()-1) + lastEnd;

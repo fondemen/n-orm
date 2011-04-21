@@ -19,7 +19,7 @@ public abstract class ClassConstraintBuilder<T extends PersistingElement> {
 	private Map<Field, Object> keyValues = new HashMap<Field, Object>();
 	private Field searchedKey = null;
 	private Object searchFrom = null, searchTo = null;
-	private Object subConstraint;
+	private Constraint subConstraint;
 
 	public ClassConstraintBuilder(Class<?> clazz) {
 		this.clazz = clazz;
@@ -51,6 +51,10 @@ public abstract class ClassConstraintBuilder<T extends PersistingElement> {
 	
 	void setSearchedKey(Field key, Object startValue, Object endValue) {
 		if (this.searchedKey != null && !this.searchedKey.equals(key))
+			throw new IllegalArgumentException("Searched key is already set to " + searchedKey + " ; cannot perform a search based on bounds for another key (here " + key +")");
+		if (this.subConstraint != null)
+			throw new IllegalArgumentException("A constraint is alredy given for " + searchedKey);
+		if (this.searchedKey != null && !this.searchedKey.equals(key))
 			throw new IllegalArgumentException("Searched key (with bouded values) is already set to " + this.searchedKey + " ; cannot search also on " + key + " ; try using setTo on one of those two keys instead.");
 		this.searchedKey = key;
 		if (startValue != null)
@@ -63,18 +67,28 @@ public abstract class ClassConstraintBuilder<T extends PersistingElement> {
 		return subConstraint;
 	}
 
-	void setSubConstraint(Field key, Object subConstraint) {
+	void setSubConstraint(Field key, Constraint subConstraint) {
 		if (this.searchedKey != null && !this.searchedKey.equals(key))
 			throw new IllegalArgumentException("Searched key is already set to " + this.searchedKey + " ; cannot set it to " + key);
 		this.searchedKey = key;
 		if (this.subConstraint != null)
 			throw new IllegalStateException("A subconstraint is already set for " + this.searchedKey);
+		if (this.searchFrom != null || this.searchTo != null)
+			throw new IllegalArgumentException("A search range is already set for searched key " + key + " and thus you cannot set a sub constraint using isAnElement");
 
 		this.subConstraint = subConstraint;
 	}
 
 	public Constraint getConstraint() {
-		return this.keyValues.isEmpty() && this.searchedKey == null ? null : new Constraint(this.clazz, this.keyValues, this.searchedKey, this.searchFrom, this.searchTo, true);
+		if (this.subConstraint == null) {
+			if (this.keyValues.isEmpty() && this.searchedKey == null)
+				return null;
+			else
+				return new Constraint(this.clazz, this.keyValues, this.searchedKey, this.searchFrom, this.searchTo, true);
+		} else {
+			assert searchedKey != null;
+			return new Constraint(keyValues, searchedKey, subConstraint);
+		}
 	}
 
 	protected KeyConstraintBuilder<T> withKeyInt(String key) {

@@ -1,9 +1,6 @@
 package com.googlecode.n_orm.query;
 
 import java.lang.reflect.Field;
-import java.util.Date;
-
-import com.googlecode.n_orm.BookStore;
 import com.googlecode.n_orm.PersistingElement;
 
 
@@ -24,5 +21,9 @@ public class SearchableKeyConstraintBuilder<T extends PersistingElement> extends
 
 	public SearchableClassConstraintBuilder<T> greaterOrEqualsThan(Object value) {
 		return (SearchableClassConstraintBuilder<T>) super.greaterOrEqualsThanInt(value);
+	}
+	
+	public SearchableRangeKeyConstraintBuilder<T> between(Object value) {
+		return new SearchableRangeKeyConstraintBuilder<T>((SearchableClassConstraintBuilder<T>) this.getConstraintBuilder(), this.getKey(), value);
 	}
 }

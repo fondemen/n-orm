@@ -7,20 +7,24 @@ import com.googlecode.n_orm.PersistingElement;
 public class InnerKeyConstraintBuilder<T extends PersistingElement> extends KeyConstraintBuilder<T> {
 
 	public InnerKeyConstraintBuilder(
-			InnerKeyClassConstraintBuilder<T> cb, Field key) {
+			InnerClassConstraintBuilder<T> cb, Field key) {
 		super(cb, key);
 	}
 
-	public InnerKeyClassConstraintBuilder<T> setTo(String value) {
-		return (InnerKeyClassConstraintBuilder<T>) super.setToInt(value);
+	public InnerClassConstraintBuilder<T> setTo(String value) {
+		return (InnerClassConstraintBuilder<T>) super.setToInt(value);
 	}
 
-	public InnerKeyClassConstraintBuilder<T> lessOrEqualsThan(Object value) {
-		return (InnerKeyClassConstraintBuilder<T>) super.lessOrEqualsThanInt(value);
+	public InnerClassConstraintBuilder<T> lessOrEqualsThan(Object value) {
+		return (InnerClassConstraintBuilder<T>) super.lessOrEqualsThanInt(value);
 	}
 
-	public InnerKeyClassConstraintBuilder<T> greaterOrEqualsThan(Object value) {
-		return (InnerKeyClassConstraintBuilder<T>) super.greaterOrEqualsThanInt(value);
+	public InnerClassConstraintBuilder<T> greaterOrEqualsThan(Object value) {
+		return (InnerClassConstraintBuilder<T>) super.greaterOrEqualsThanInt(value);
+	}
+	
+	public InnerRangeKeyConstraintBuilder<T> between(Object value) {
+		return new InnerRangeKeyConstraintBuilder<T>((InnerClassConstraintBuilder<T>) this.getConstraintBuilder(), this.getKey(), value);
 	}
 
 }
