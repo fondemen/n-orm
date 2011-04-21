@@ -5,8 +5,8 @@ import com.googlecode.n_orm.PersistingElement;
 
 public class ConstraintBuilder {
 	
-	public <T extends PersistingElement> ClassConstraintBuilder<T> ofClass(Class<T> clazz) {
-		return new ClassConstraintBuilder<T>(clazz);
+	public <T extends PersistingElement> SearchableClassConstraintBuilder<T> ofClass(Class<T> clazz) {
+		return new SearchableClassConstraintBuilder<T>(clazz);
 	}
 
 }

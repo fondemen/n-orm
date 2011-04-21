@@ -4,8 +4,7 @@ import java.lang.reflect.Field;
 
 import com.googlecode.n_orm.PersistingElement;
 
-
-public class KeyConstraintBuilder<T extends PersistingElement> {
+public abstract class KeyConstraintBuilder<T extends PersistingElement> {
 	private final ClassConstraintBuilder<T> constraintBuilder;
 	private final Field key;
 
@@ -14,7 +13,15 @@ public class KeyConstraintBuilder<T extends PersistingElement> {
 		this.key = key;
 	}
 
-	public ClassConstraintBuilder<T> setTo(Object value) {
+	ClassConstraintBuilder<T> getConstraintBuilder() {
+		return constraintBuilder;
+	}
+
+	Field getKey() {
+		return key;
+	}
+
+	protected ClassConstraintBuilder<T> setToInt(Object value) {
 		if (value == null)
 			throw new IllegalArgumentException("Keys cannot be null.");
 //		if (! this.key.getType().isAssignableFrom(value.getClass()))
@@ -23,17 +30,18 @@ public class KeyConstraintBuilder<T extends PersistingElement> {
 		return this.constraintBuilder;
 	}
 	
-	public RangeKeyConstraintBuilder<T> between(Object value) {
-		return new RangeKeyConstraintBuilder<T>(this.constraintBuilder, this.key, value);
-	}
-	
-	public ClassConstraintBuilder<T> greaterOrEqualsThan(Object value) {
+	protected ClassConstraintBuilder<T> greaterOrEqualsThanInt(Object value) {
 		this.constraintBuilder.setSearchedKey(this.key, value, null);
 		return this.constraintBuilder;
 	}
 	
-	public ClassConstraintBuilder<T> lessOrEqualsThan(Object value) {
+	protected ClassConstraintBuilder<T> lessOrEqualsThanInt(Object value) {
 		this.constraintBuilder.setSearchedKey(this.key, null, value);
 		return this.constraintBuilder;
 	}
+
+	public InnerClassConstraintBuilder<T> isAnElement() {
+		return new InnerClassConstraintBuilder<T>(key, this.constraintBuilder);
+	}
+
 }
