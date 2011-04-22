@@ -130,9 +130,10 @@ public aspect ColumnFamiliyManagement {
 		return ret;
 	}
 	
-	@Transient private boolean PersistingElement.inPOJOMode = false; //Must be @Transient and not transient: in case the persisting element was serialized in pojo mode, it must be deserialized in pojo mode
+	//@Transient private boolean PersistingElement.inPOJOMode = false; //Must be @Transient and not transient: in case the persisting element was serialized in pojo mode, it must be deserialized in pojo mode
 	
 	/**
+	 * @deprecated already working in POJO mode ; this method is just useless
 	 * Sets this object in POJO mode or not. POJO mode makes all non final static or transient fields
 	 * simple elements, i.e. with no reference to ColumnFamily or one of its subclass. This is performed
 	 * a transitive way, which means that all referenced persisting elements will also be set to the
@@ -141,57 +142,58 @@ public aspect ColumnFamiliyManagement {
 	 * once deserialized.
 	 * @param pojo
 	 */
+	@Deprecated
 	public void PersistingElement.setPOJO(boolean pojo) {
-		if (this.inPOJOMode == pojo)
-			return;
-		PropertyManagement pm = PropertyManagement.getInstance();
-		Map<PersistingElement, Map<Field, Object>> toBeSet = new HashMap<PersistingElement, Map<Field,Object>>();
-		this.grabSetPOJOAtts(pojo, toBeSet);
-		for (Entry<PersistingElement, Map<Field, Object>> pe : toBeSet.entrySet()) {
-			synchronized (pe.getKey()) {
-				for (Entry<Field, Object> prop : pe.getValue().entrySet()) {
-					if (pojo == false) {
-						this.getColumnFamily(prop.getKey().getName()).updateFromPOJO();
-					}
-					pm .candideSetValue(pe.getKey(), prop.getKey(), prop.getValue());
-				}
-				pe.getKey().inPOJOMode = true;
-			}
-		}
+//		if (this.inPOJOMode == pojo)
+//			return;
+//		PropertyManagement pm = PropertyManagement.getInstance();
+//		Map<PersistingElement, Map<Field, Object>> toBeSet = new HashMap<PersistingElement, Map<Field,Object>>();
+//		this.grabSetPOJOAtts(pojo, toBeSet);
+//		for (Entry<PersistingElement, Map<Field, Object>> pe : toBeSet.entrySet()) {
+//			synchronized (pe.getKey()) {
+//				for (Entry<Field, Object> prop : pe.getValue().entrySet()) {
+//					if (pojo == false) {
+//						this.getColumnFamily(prop.getKey().getName()).updateFromPOJO();
+//					}
+//					pm .candideSetValue(pe.getKey(), prop.getKey(), prop.getValue());
+//				}
+//				pe.getKey().inPOJOMode = true;
+//			}
+//		}
 	}
 		
-	private void PersistingElement.grabSetPOJOAtts(boolean pojo, Map<PersistingElement, Map<Field, Object>> toBeSet) {
-		if (this.inPOJOMode == pojo)
-			return;
-		Map<Field, Object> thisToBeSet = new HashMap<Field, Object>();
-		PropertyManagement pm = PropertyManagement.getInstance();
-		for (Field f : pm.getProperties(this.getClass())) {
-			if (PersistingElement.class.isAssignableFrom(f.getType()))
-				((PersistingElement)pm.candideReadValue(this, f)).grabSetPOJOAtts(pojo, toBeSet);
-		}
-		ColumnFamiliyManagement cfm = ColumnFamiliyManagement.getInstance();
-		for (Field f : cfm.detectColumnFamilies(this.getClass())) {
-			ColumnFamily<?> cf = this.getColumnFamiliesInt().get(f.getName());
-			if (cf == null) {
-				cf = cfm.createColumnFamily(this, f, pm.candideReadValue(this, f));
-			}
-			if (cf.getClazz().isAssignableFrom(PersistingElement.class) || PersistingElement.class.isAssignableFrom(cf.getClazz())) {
-				for (String k : cf.getKeys()) {
-					Object o = cf.getElement(k);
-					if (o instanceof PersistingElement) {
-						((PersistingElement)o).grabSetPOJOAtts(pojo, toBeSet);
-					}
-				}
-			}
-			Object val = pojo ? cf.getSerializableVersion() : cf;
-			if (f.getType().isInstance(val)) {
-				thisToBeSet.put(f, val);
-			} else {
-				throw new ClassCastException("Cannot set " + f + " to " + val + " in " + this);
-			}
-		}
-		toBeSet.put(this, thisToBeSet);
-	}
+//	private void PersistingElement.grabSetPOJOAtts(boolean pojo, Map<PersistingElement, Map<Field, Object>> toBeSet) {
+//		if (this.inPOJOMode == pojo)
+//			return;
+//		Map<Field, Object> thisToBeSet = new HashMap<Field, Object>();
+//		PropertyManagement pm = PropertyManagement.getInstance();
+//		for (Field f : pm.getProperties(this.getClass())) {
+//			if (PersistingElement.class.isAssignableFrom(f.getType()))
+//				((PersistingElement)pm.candideReadValue(this, f)).grabSetPOJOAtts(pojo, toBeSet);
+//		}
+//		ColumnFamiliyManagement cfm = ColumnFamiliyManagement.getInstance();
+//		for (Field f : cfm.detectColumnFamilies(this.getClass())) {
+//			ColumnFamily<?> cf = this.getColumnFamiliesInt().get(f.getName());
+//			if (cf == null) {
+//				cf = cfm.createColumnFamily(this, f, pm.candideReadValue(this, f));
+//			}
+//			if (cf.getClazz().isAssignableFrom(PersistingElement.class) || PersistingElement.class.isAssignableFrom(cf.getClazz())) {
+//				for (String k : cf.getKeys()) {
+//					Object o = cf.getElement(k);
+//					if (o instanceof PersistingElement) {
+//						((PersistingElement)o).grabSetPOJOAtts(pojo, toBeSet);
+//					}
+//				}
+//			}
+//			Object val = pojo ? cf.getSerializableVersion() : cf;
+//			if (f.getType().isInstance(val)) {
+//				thisToBeSet.put(f, val);
+//			} else {
+//				throw new ClassCastException("Cannot set " + f + " to " + val + " in " + this);
+//			}
+//		}
+//		toBeSet.put(this, thisToBeSet);
+//	}
 	
 	public void PersistingElement.updateFromPOJO() {
 		for (ColumnFamily<?> cf : this.getColumnFamiliesInt().values()) {
