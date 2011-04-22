@@ -267,6 +267,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				
 				ret = new Store();
 				ret.setConf(HBaseConfiguration.create(conf));
+				
+				knownStores.put(p, ret);
 			}
 			
 			return ret;
