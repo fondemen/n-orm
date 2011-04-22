@@ -25,9 +25,11 @@ public abstract class RecursiveFileAction {
 
 
 	public void recursiveManageFile(File file, Report r) {
-		if (!file.canWrite())
+		if (!file.canRead()) {
 			System.err
 					.println("WARNING: cannot read " + file.getAbsolutePath());
+			return;
+		}
 
 		if (file.isDirectory()) {
 			for (String name : file.list(this.filter)) {

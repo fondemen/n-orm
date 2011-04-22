@@ -191,6 +191,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		public void manageFile(File f, Report r) {
 			try {
 				((ReportConf)r).getConf().addResource(new FileInputStream(f));
+				System.out.println("Getting HBase store: found configuration file " + f.getAbsolutePath());
 			} catch (FileNotFoundException e) {
 				System.err.println("Could not load configuration file " + f.getName());
 				e.printStackTrace();
