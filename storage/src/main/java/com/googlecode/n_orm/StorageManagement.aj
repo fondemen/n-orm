@@ -310,10 +310,16 @@ public aspect StorageManagement {
 		try {
 			CloseableIterator<T> ret = new CloseableIterator<T>() {
 				private int returned = 0;
+				private boolean closed = false;
 
 				@Override
 				public boolean hasNext() {
-					return returned < limit && keys.hasNext();
+					if (closed)
+						return false;
+					boolean ret = returned < limit && keys.hasNext();
+					if (! ret) 
+						this.close();
+					return ret;
 				}
 
 				@Override
@@ -341,7 +347,11 @@ public aspect StorageManagement {
 
 				@Override
 				public void close() {
+					if (closed)
+						return;
+					
 					keys.close();
+					this.closed = true;
 				}
 				
 				@Override
