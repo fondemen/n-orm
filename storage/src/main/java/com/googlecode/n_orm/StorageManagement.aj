@@ -35,7 +35,7 @@ public aspect StorageManagement {
 //	public static final String CLASS_COLUMN_FAMILY = "class";
 //	public static final String CLASS_COLUMN = "";
 	
-	private transient Boolean PersistingElement.exists = null;
+	transient Boolean PersistingElement.exists = null;
 	private transient boolean PersistingElement.isStoring = false;
 	private transient Collection<Class<? extends PersistingElement>> PersistingElement.persistingSuperClasses = null;
 	
@@ -324,7 +324,7 @@ public aspect StorageManagement {
 					try {
 						T elt = ConversionTools.convertFromString(clazz, data.getKey());
 						((PersistingElement)elt).exists = true;
-						assert (toBeActivated == null) == ((data.getValues() == null)  || (data.getValues().entrySet().isEmpty()));
+						//assert (toBeActivated == null) == ((data.getValues() == null)  || (data.getValues().entrySet().isEmpty())); //may be false (e.g. no properties)
 						if (toBeActivated != null) { //the element should be activated
 							elt.activateFromRawData(toBeActivated, data.getValues());
 						}

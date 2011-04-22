@@ -167,4 +167,162 @@ public class PersistableSearchTest {
 		}
 		checkOrder(res);
 	}
+	
+	@Persisting(table="PersistableSearchComposite")
+	public static class CompositeSUT {
+		@Key(order=1) SUTClass sut1;
+		@Key(order=2) SUTClass sut2;
+	}
+	
+	@Test
+	public void seachWithDiveFirst() {
+		CompositeSUT sut = new CompositeSUT();
+		SUTClass sut1 = new SUTClass(11, 12);
+		SUTClass sut2 = new SUTClass(21, 22);
+		sut.sut1 = sut1;
+		sut.sut2 = sut2;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		Constraint c = new Constraint(CompositeSUT.class, null, "sut1", new Constraint(SUTClass.class, null, "key1", 11, 11));
+		
+		Set<CompositeSUT> found = StorageManagement.findElementsToSet(CompositeSUT.class, c, 100);
+		assertEquals(1, found.size());
+		assertEquals(sut, found.iterator().next());
+	}
+	
+	@Test
+	public void negativeSeachWithDiveFirst() {
+		CompositeSUT sut = new CompositeSUT();
+		SUTClass sut1 = new SUTClass(11, 12);
+		SUTClass sut2 = new SUTClass(21, 22);
+		sut.sut1 = sut1;
+		sut.sut2 = sut2;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		Constraint c = new Constraint(CompositeSUT.class, null, "sut1", new Constraint(SUTClass.class, null, "key1", 12, 15));
+		
+		Set<CompositeSUT> found = StorageManagement.findElementsToSet(CompositeSUT.class, c, 100);
+		assertEquals(0, found.size());
+	}
+	
+	@Test
+	public void seachWithDiveSecondFirst() {
+		CompositeSUT sut = new CompositeSUT();
+		SUTClass sut1 = new SUTClass(11, 12);
+		SUTClass sut2 = new SUTClass(21, 22);
+		sut.sut1 = sut1;
+		sut.sut2 = sut2;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		Map<String, Object> k1Val = new TreeMap<String, Object>();
+		k1Val.put("key1", 11);
+		Constraint c = new Constraint(CompositeSUT.class, null, "sut1", new Constraint(SUTClass.class, k1Val, "key2", 12, 15));
+		
+		Set<CompositeSUT> found = StorageManagement.findElementsToSet(CompositeSUT.class, c, 100);
+		assertEquals(1, found.size());
+		assertEquals(sut, found.iterator().next());
+	}
+	
+	@Test
+	public void seachWithDiveSecondFirstNegativeForFirst() {
+		CompositeSUT sut = new CompositeSUT();
+		SUTClass sut1 = new SUTClass(11, 12);
+		SUTClass sut2 = new SUTClass(21, 22);
+		sut.sut1 = sut1;
+		sut.sut2 = sut2;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		Map<String, Object> k1Val = new TreeMap<String, Object>();
+		k1Val.put("key1", 35);
+		Constraint c = new Constraint(CompositeSUT.class, null, "sut1", new Constraint(SUTClass.class, k1Val, "key2", 12, 15));
+		
+		Set<CompositeSUT> found = StorageManagement.findElementsToSet(CompositeSUT.class, c, 100);
+		assertEquals(0, found.size());
+	}
+	
+	@Test
+	public void seachWithDiveSecondFirstNegativeForSecond() {
+		CompositeSUT sut = new CompositeSUT();
+		SUTClass sut1 = new SUTClass(11, 12);
+		SUTClass sut2 = new SUTClass(21, 22);
+		sut.sut1 = sut1;
+		sut.sut2 = sut2;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		Map<String, Object> k1Val = new TreeMap<String, Object>();
+		k1Val.put("key1", 11);
+		Constraint c = new Constraint(CompositeSUT.class, null, "sut1", new Constraint(SUTClass.class, k1Val, "key2", 0, 10));
+		
+		Set<CompositeSUT> found = StorageManagement.findElementsToSet(CompositeSUT.class, c, 100);
+		assertEquals(0, found.size());
+	}
+	
+	@Test
+	public void seachWithDiveSecondSecond() {
+		CompositeSUT sut = new CompositeSUT();
+		SUTClass sut1 = new SUTClass(11, 12);
+		SUTClass sut2 = new SUTClass(21, 22);
+		sut.sut1 = sut1;
+		sut.sut2 = sut2;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		Map<String, Object> sut1Val = new TreeMap<String, Object>();
+		sut1Val.put("sut1", sut1);
+
+		Map<String, Object> k1Val = new TreeMap<String, Object>();
+		k1Val.put("key1", 21);
+		Constraint c = new Constraint(CompositeSUT.class, sut1Val, "sut2", new Constraint(SUTClass.class, k1Val, "key2", 21, 25));
+		
+		Set<CompositeSUT> found = StorageManagement.findElementsToSet(CompositeSUT.class, c, 100);
+		assertEquals(1, found.size());
+		assertEquals(sut, found.iterator().next());
+	}
+	
+	@Test
+	public void seachWithDiveSecondSecondNegativeForFirst() {
+		CompositeSUT sut = new CompositeSUT();
+		SUTClass sut1 = new SUTClass(11, 12);
+		SUTClass sut2 = new SUTClass(21, 22);
+		sut.sut1 = sut1;
+		sut.sut2 = sut2;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		Map<String, Object> sut1Val = new TreeMap<String, Object>();
+		sut1Val.put("sut1", sut1);
+
+		Map<String, Object> k1Val = new TreeMap<String, Object>();
+		k1Val.put("key1", 35);
+		Constraint c = new Constraint(CompositeSUT.class, sut1Val, "sut2", new Constraint(SUTClass.class, k1Val, "key2", 22, 25));
+		
+		Set<CompositeSUT> found = StorageManagement.findElementsToSet(CompositeSUT.class, c, 100);
+		assertEquals(0, found.size());
+	}
+	
+	@Test
+	public void seachWithDiveSecondNegativeForSecond() {
+		CompositeSUT sut = new CompositeSUT();
+		SUTClass sut1 = new SUTClass(11, 12);
+		SUTClass sut2 = new SUTClass(21, 22);
+		sut.sut1 = sut1;
+		sut.sut2 = sut2;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		Map<String, Object> sut1Val = new TreeMap<String, Object>();
+		sut1Val.put("sut1", sut1);
+
+		Map<String, Object> k1Val = new TreeMap<String, Object>();
+		k1Val.put("key1", 21);
+		Constraint c = new Constraint(CompositeSUT.class, sut1Val, "sut2", new Constraint(SUTClass.class, k1Val, "key2", 0, 20));
+		
+		Set<CompositeSUT> found = StorageManagement.findElementsToSet(CompositeSUT.class, c, 100);
+		assertEquals(0, found.size());
+	}
 }

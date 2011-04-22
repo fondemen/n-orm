@@ -25,6 +25,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -312,7 +313,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
-		boolean created = false;
+		boolean created = false, fromCache;
 		synchronized (this.tablesD) {
 			if (!this.tablesD.containsKey(name)) {
 				try {
@@ -329,15 +330,18 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						td = this.admin.getTableDescriptor(Bytes.toBytes(name));
 					}
 					this.tablesD.put(name, td);
+					fromCache = false;
 				} catch (IOException e) {
 					throw new DatabaseNotReachedException(e);
 				}
-			} else
+			} else {
 				td = this.tablesD.get(name);
+				fromCache = true;
+			}
 		}
 
 		if (!created && expectedFamilies != null) {
-			this.enforceColumnFamiliesExists(td, expectedFamilies);
+			this.enforceColumnFamiliesExists(td, expectedFamilies, fromCache);
 		}
 
 		synchronized (this.tablesC) {
@@ -365,11 +369,11 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		synchronized (this.tablesD) {
 			td = this.tablesD.get(table);
 		}
-		if (td.hasFamily(Bytes.toBytes(family)))
+		if (td != null && td.hasFamily(Bytes.toBytes(family)))
 			return true;
 		synchronized (this.tablesD) {
 			try {
-				td = this.admin.getTableDescriptor(td.getName());
+				td = this.admin.getTableDescriptor(Bytes.toBytes(table));
 				this.tablesD.put(table, td);
 			} catch (IOException e) {
 				throw new DatabaseNotReachedException(e);
@@ -379,7 +383,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	}
 
 	private void enforceColumnFamiliesExists(HTableDescriptor tableD,
-			Set<String> columnFamilies) throws DatabaseNotReachedException {
+			Set<String> columnFamilies, boolean descriptoFromCache) throws DatabaseNotReachedException {
 		assert tableD != null;
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(
 				columnFamilies.size());
@@ -393,6 +397,11 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 								.getTableDescriptor(tableD.getName());
 						this.tablesD.put(tableD.getNameAsString(), tableD);
 						recreated = true;
+					} catch (TableNotFoundException x) {
+						//Table exists in the cache but was dropped for some reason...
+						this.tablesD.remove(tableD.getNameAsString());
+						this.getTable(tableD.getNameAsString(), columnFamilies);
+						return;
 					} catch (IOException e) {
 						throw new DatabaseNotReachedException(e);
 					}
@@ -484,6 +493,12 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {
+		if (changed == null)
+			changed = new TreeMap<String, Map<String,byte[]>>();
+		if (removed == null)
+			removed = new TreeMap<String, Set<String>>();
+		if (increments == null)
+			increments = new TreeMap<String, Map<String,Number>>();
 		Set<String> families = new HashSet<String>(changed.keySet());
 		families.addAll(removed.keySet());
 		families.addAll(increments.keySet());
@@ -550,6 +565,13 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		} catch (IOException e) {
 			if (problem == null)
 				problem = e;
+		}
+		
+		if (problem instanceof TableNotFoundException) {
+			//Table was deleted for some reasons though the cache still knows it
+			this.tablesD.remove(Bytes.toString(t.getTableName()));
+			this.storeChanges(table, id, changed, removed, increments);
+			return;
 		}
 
 		if (problem != null)
@@ -658,8 +680,6 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	@Override
 	public boolean exists(String table, String row, String family)
 			throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
-			return false;
 		if (!this.hasColumnFamily(table, family))
 			return false;
 

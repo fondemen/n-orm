@@ -329,7 +329,9 @@ public abstract class ColumnFamily<T> {
 
 		Object pojo = this.getPOJO(false);
 		if (pojo != null && pojo != this)
-			this.updateFromPOJO(pojo);
+			synchronized(pojo) {
+				this.updateFromPOJO(pojo);
+			}
 	}
 	
 	public void storeToPOJO() {
@@ -339,7 +341,10 @@ public abstract class ColumnFamily<T> {
 		}
 
 		Object pojo = this.getPOJO(true);
-		if (pojo != null && pojo != this)
-			this.storeToPOJO(pojo);
+		if (pojo != null && pojo != this) {
+			synchronized(pojo) {
+				this.storeToPOJO(pojo);
+			}
+		}
 	}
 }
