@@ -196,7 +196,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			
 			File confd = new File(configurationFolder);
 			if (!confd.isDirectory())
-				throw new IOException("Cannot read HBase configuration folder " + confd);
+				System.err.println("Cannot read HBase configuration folder " + confd);
 			
 			for (String confFileName : confd.list(new FilenameFilter() {
 				
