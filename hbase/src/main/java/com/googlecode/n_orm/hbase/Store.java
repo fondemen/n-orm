@@ -242,11 +242,12 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	 * Those folders are supposed to have configuration files following the pattern *-site.xml. 
 	 */
 	public static Store getStore(String commaSeparatedConfigurationFolders) throws IOException {
-		synchronized (Store.class) {
+		synchronized(Store.class) {
 			Properties p = new Properties();
 			p.setProperty("commaSeparatedConfigurationFolders", commaSeparatedConfigurationFolders);
 			Store ret = knownStores.get(p);
 			if (ret == null) {
+				
 				Configuration conf = new Configuration();
 				ReportConf r = new ReportConf(conf);
 				for (String  configurationFolder : commaSeparatedConfigurationFolders.split(",")) {

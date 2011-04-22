@@ -11,7 +11,7 @@ import java.util.Map;
 public class HBase {
 	
 	private static Map<String, Store> knownStores = new HashMap<String, Store>();
-
+	
 	private static Class<?>[] parameters = new Class[] { URL.class };
 	private static RecursiveFileAction addJarAction = new RecursiveFileAction() {
 
@@ -44,15 +44,16 @@ public class HBase {
 	 * Get an HBase store according to a set of comma-separated configuration
 	 * folders. Those folders are supposed to have configuration files following
 	 * the pattern *-site.xml. Typically, one could state
-	 * "/etc/hadoop/conf,/usr/lib/hadoop,/etc/hbase/conf,/usr/lib/hbase/" as the configuration folder. Compared to
+	 * "/usr/lib/hadoop,/usr/lib/hbase" as the configuration folder. Compared to
 	 * {@link Store#getStore(String)}, it appends to the class path any jar
 	 * found under the configuration folder. As such, you must not supply HBase
 	 * jars in the CLASSPATH.
 	 */
 	public static Store getStore(String commaSeparatedConfigurationFolders)
 			throws IOException {
-		synchronized (HBase.class) {
+		synchronized(HBase.class) {
 			Store ret = knownStores.get(commaSeparatedConfigurationFolders);
+			
 			if (ret == null) {
 				for (String configurationFolder : commaSeparatedConfigurationFolders
 						.split(",")) {
