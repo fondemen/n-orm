@@ -240,27 +240,37 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	 * Those folders are supposed to have configuration files following the pattern *-site.xml. 
 	 */
 	public static Store getStore(String commaSeparatedConfigurationFolders) throws IOException {
-		Configuration conf = new Configuration();
-		ReportConf r = new ReportConf(conf);
-		for (String  configurationFolder : commaSeparatedConfigurationFolders.split(",")) {
+		synchronized(Store.class) {
+			Properties p = new Properties();
+			p.setProperty("commaSeparatedConfigurationFolders", commaSeparatedConfigurationFolders);
+			Store ret = knownStores.get(p);
 			
-			File confd = new File(configurationFolder);
-			if (!confd.isDirectory()) {
-				System.err.println("Cannot read HBase configuration folder " + confd);
-				continue;
+			if (ret == null) {
+				
+				Configuration conf = new Configuration();
+				ReportConf r = new ReportConf(conf);
+				for (String  configurationFolder : commaSeparatedConfigurationFolders.split(",")) {
+					
+					File confd = new File(configurationFolder);
+					if (!confd.isDirectory()) {
+						System.err.println("Cannot read HBase configuration folder " + confd);
+						continue;
+					}
+					
+					addConfAction.recursiveManageFile(confd, r);
+				}
+			
+				if (!r.foundPropertyFile)
+					throw new IOException("No configuration file found in the following folders " + commaSeparatedConfigurationFolders + " ; expecting some *-site.xml files");
+				if (!r.foundHBasePropertyFile)
+					throw new IOException("Could not find hbase-site.xml from folders " + commaSeparatedConfigurationFolders);
+				
+				ret = new Store();
+				ret.setConf(HBaseConfiguration.create(conf));
 			}
 			
-			addConfAction.recursiveManageFile(confd, r);
+			return ret;
 		}
-	
-		if (!r.foundPropertyFile)
-			throw new IOException("No configuration file found in the following folders " + commaSeparatedConfigurationFolders + " ; expecting some *-site.xml files");
-		if (!r.foundHBasePropertyFile)
-			throw new IOException("Could not find hbase-site.xml from folders " + commaSeparatedConfigurationFolders);
-		
-		Store ret = new Store();
-		ret.setConf(HBaseConfiguration.create(conf));
-		return ret;
 	}
 
 	private String host = "localhost";
