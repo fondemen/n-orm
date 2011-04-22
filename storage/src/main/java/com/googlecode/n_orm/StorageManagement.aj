@@ -357,6 +357,20 @@ public aspect StorageManagement {
 			throw x;
 		}
 	}
+	
+	public static <T extends PersistingElement> long countElements(Class<T> clazz, Constraint c) {
+		Store store = StoreSelector.getInstance().getStoreFor(clazz);
+		return store.count(PersistingMixin.getInstance().getTable(clazz), c);
+	}
+	
+//	/**
+//	 * WARNING: this function empties the cache for all elements of class clazz.
+//	 */
+//	public static <T extends PersistingElement> void truncateElements(Class<T> clazz, Constraint c) {
+//		Store store = StoreSelector.getInstance().getStoreFor(clazz);
+//		KeyManagement.getInstance().cleanupKnownPersistingElements();
+//		store.truncate(PersistingMixin.getInstance().getTable(clazz), c);
+//	}
 
 	public static <T extends PersistingElement> NavigableSet<T> findElementsToSet(final Class<T> clazz, Constraint c, final int limit, String... families) throws DatabaseNotReachedException {
 		CloseableIterator<T> found = findElement(clazz, c, limit, families);
@@ -365,6 +379,7 @@ public aspect StorageManagement {
 			while (found.hasNext()) {
 				ret.add(found.next());
 			}
+			assert ret.size() == Math.min(limit, countElements(clazz, c));
 			return ret;
 		} finally {
 			found.close();

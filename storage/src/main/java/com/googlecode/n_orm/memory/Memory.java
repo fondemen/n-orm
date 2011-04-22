@@ -2,6 +2,7 @@ package com.googlecode.n_orm.memory;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -13,6 +14,7 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.memory.Memory.Table;
 import com.googlecode.n_orm.memory.Memory.Table.Row;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily;
 import com.googlecode.n_orm.storeapi.Constraint;
@@ -301,9 +303,8 @@ public class Memory implements Store {
 		return ret;
 	}
 
-	@Override
-	public CloseableKeyIterator get(final String table, Constraint c, int limit, Set<String> families)
-			throws DatabaseNotReachedException {
+	private Set<com.googlecode.n_orm.storeapi.Row> getRows(final String table,
+			Constraint c, Integer limit, Set<String> families) {
 		Table t = this.getTable(table);
 		Set<String> res = this.matchingKeys(t.keySet(), c, limit);
 		Set<com.googlecode.n_orm.storeapi.Row> rows = new TreeSet<com.googlecode.n_orm.storeapi.Row>();
@@ -322,6 +323,14 @@ public class Memory implements Store {
 			}
 			rows.add(new RowResult(values, row));
 		}
+		return rows;
+	}
+
+	@Override
+	public CloseableKeyIterator get(final String table, Constraint c, int limit, Set<String> families)
+			throws DatabaseNotReachedException {
+		Set<com.googlecode.n_orm.storeapi.Row> rows = getRows(table, c, limit,
+				families);
 		final Iterator<com.googlecode.n_orm.storeapi.Row> ret = rows.iterator();
 		return new CloseableKeyIterator() {
 			
@@ -345,5 +354,20 @@ public class Memory implements Store {
 			}
 		}; 
 	}
+
+	@Override
+	public long count(String table, Constraint c)
+			throws DatabaseNotReachedException {
+		return this.getRows(table, c, null, null).size();
+	}
+
+//	@Override
+//	public void truncate(String table, Constraint c)
+//			throws DatabaseNotReachedException {
+//		Table t = this.getTable(table);
+//		for (String r : this.matchingKeys(t.keySet(), c, null)) {
+//			t.remove(r);
+//		}
+//	}
 
 }

@@ -156,10 +156,12 @@ public class BasicTest {
 		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
 		 b3.store();
 		 
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go();		 
+		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go();	
+		 long count = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().count();	 
 		 b2.delete();
 		 b3.delete();
-		 
+
+		 assertEquals(3, count);
 		 assertEquals(3, storeBooks.size());
 		 assertTrue(storeBooks.contains(bsut));
 		 assertTrue(storeBooks.contains(b2));
@@ -187,9 +189,13 @@ public class BasicTest {
 		 KeyManagement.getInstance().cleanupKnownPersistingElements();
 		 
 		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().go();		 
+		 long count = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().count();
 		 b2.delete();
 		 b3.delete();
+
 		 
+
+		 assertEquals(2, count);
 		 assertEquals(2, storeBooks.size());
 		 assertTrue(storeBooks.contains(bsut));
 		 assertTrue(storeBooks.contains(b2));
