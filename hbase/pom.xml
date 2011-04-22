@@ -19,7 +19,7 @@
 	</scm>
 	
 	<properties>
-		<hbase.version>0.90.0</hbase.version>
+		<hbase.version>0.90.2</hbase.version>
 	</properties>
 
 	<dependencies>
