@@ -8,10 +8,10 @@ mvn test
 
 To run the project on a running HBase, adapt file
 /src/test/tesources/com/googlecode/n_orm/sample/business/store.poperties
-so that it ponts to the correct HBase configuration.
+so that it points to the correct HBase configuration.
 You can then run mvn test again.
 
-You can perfer one of the variant presented
+You can prefer one of the variant presented
 (e.g. example-hbase-store.properties).
 To use it, just rename it store.properties.
 
