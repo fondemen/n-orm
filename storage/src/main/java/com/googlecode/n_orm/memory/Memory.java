@@ -358,7 +358,8 @@ public class Memory implements Store {
 	@Override
 	public long count(String table, Constraint c)
 			throws DatabaseNotReachedException {
-		return this.getRows(table, c, null, null).size();
+		Table t = this.getTable(table);
+		return this.matchingKeys(t.keySet(), c, null).size();
 	}
 
 //	@Override
