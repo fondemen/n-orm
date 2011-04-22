@@ -84,7 +84,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 
 	
 	/**
-	 * Runs the query to find . Any limit set by {@link ClassConstraintBuilder#withKey(String)} will be ignored.
+	 * Runs the query to find an element matching the query. Any limit set by {@link ClassConstraintBuilder#withKey(String)} will be ignored.
 	 * The element is not activated.
 	 * @return A (possibly null) element matching the query.
 	 * @throws DatabaseNotReachedException
@@ -99,6 +99,14 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 		} finally {
 			found.close();
 		}
+	}
+	
+	/**
+	 * Runs the query to find the number of matching elements.
+	 * Any limit set by {@link ClassConstraintBuilder#withKey(String)} will be ignored.
+	 */
+	public long count() throws DatabaseNotReachedException {
+		return StorageManagement.countElements(this.getClazz(), this.getConstraint());
 	}
 
 	public SearchableKeyConstraintBuilder<T> withKey(String key) {

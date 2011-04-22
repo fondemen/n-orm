@@ -12,11 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
-import java.util.NavigableSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -42,6 +40,7 @@ import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.mapreduce.Job;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PropertyManagement;
@@ -64,6 +63,27 @@ import com.googlecode.n_orm.storeapi.Row;
  * </code><br>  
  */
 public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
+
+	private final class EmptyIterator implements
+			com.googlecode.n_orm.storeapi.CloseableKeyIterator {
+		@Override
+		public void close() {
+		}
+
+		@Override
+		public boolean hasNext() {
+			return false;
+		}
+
+		@Override
+		public Row next() {
+			return null;
+		}
+
+		@Override
+		public void remove() {
+		}
+	}
 
 	private static final class CloseableIterator implements CloseableKeyIterator {
 		private final ResultScanner result;
@@ -297,23 +317,44 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		return table;
 	}
 
+	private void uncache(String tableName) {
+		//tableName = this.mangleTableName(tableName);
+		this.tablesD.remove(tableName);
+		this.tablesC.remove(tableName);
+	}
+
+	private void uncache(HTable t) {
+		String tableName = Bytes.toString(t.getTableName());
+		this.tablesD.remove(tableName);
+		this.tablesC.remove(tableName);
+	}
+
 	protected boolean hasTable(String name) throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
 		if (this.tablesD.containsKey(name))
 			return true;
 
+		return hasTableNoCache(name);
+	}
+
+	private boolean hasTableNoCache(String name) {
+		name = this.mangleTableName(name);
 		try {
-			return this.admin.tableExists(name);
+			boolean ret = this.admin.tableExists(name);
+			if (!ret &&this.tablesD.containsKey(name)) {
+				this.uncache(name);
+			}
+			return ret;
 		} catch (Exception e) {
 			throw new DatabaseNotReachedException(e);
 		}
 	}
 
-	protected HTable getTable(String name, Set<String> expectedFamilies)
+	protected HTable getTable(String name, String... expectedFamilies)
 			throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
-		boolean created = false, fromCache;
+		boolean created = false;
 		synchronized (this.tablesD) {
 			if (!this.tablesD.containsKey(name)) {
 				try {
@@ -330,18 +371,16 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						td = this.admin.getTableDescriptor(Bytes.toBytes(name));
 					}
 					this.tablesD.put(name, td);
-					fromCache = false;
 				} catch (IOException e) {
 					throw new DatabaseNotReachedException(e);
 				}
 			} else {
 				td = this.tablesD.get(name);
-				fromCache = true;
 			}
 		}
 
 		if (!created && expectedFamilies != null) {
-			this.enforceColumnFamiliesExists(td, expectedFamilies, fromCache);
+			this.enforceColumnFamiliesExists(td, expectedFamilies);
 		}
 
 		synchronized (this.tablesC) {
@@ -383,24 +422,25 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	}
 
 	private void enforceColumnFamiliesExists(HTableDescriptor tableD,
-			Set<String> columnFamilies, boolean descriptoFromCache) throws DatabaseNotReachedException {
+			String... columnFamilies) throws DatabaseNotReachedException {
 		assert tableD != null;
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(
-				columnFamilies.size());
+				columnFamilies.length);
 		synchronized (tableD) {
 			boolean recreated = false;
 			for (String cf : columnFamilies) {
 				byte[] cfname = Bytes.toBytes(cf);
 				if (!recreated && !tableD.hasFamily(cfname)) {
+					String tableName = tableD.getNameAsString();
 					try {
 						tableD = this.admin
 								.getTableDescriptor(tableD.getName());
-						this.tablesD.put(tableD.getNameAsString(), tableD);
+						this.tablesD.put(tableName, tableD);
 						recreated = true;
 					} catch (TableNotFoundException x) {
 						//Table exists in the cache but was dropped for some reason...
-						this.tablesD.remove(tableD.getNameAsString());
-						this.getTable(tableD.getNameAsString(), columnFamilies);
+						this.uncache(tableName);
+						this.getTable(tableName, columnFamilies);
 						return;
 					} catch (IOException e) {
 						throw new DatabaseNotReachedException(e);
@@ -431,7 +471,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	@Override
 	public Map<String, Map<String, byte[]>> get(String table, String id,
 			Set<String> families) throws DatabaseNotReachedException {
-		HTable t = this.getTable(table, families);
+		HTable t = this.getTable(table, families.toArray(new String[families.size()]));
 
 		Get g = new Get(Bytes.toBytes(id));
 		for (String family : families) {
@@ -504,7 +544,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		families.addAll(increments.keySet());
 		if (families.isEmpty())
 			families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
-		HTable t = this.getTable(table, families);
+		HTable t = this.getTable(table, families.toArray(new String[families.size()]));
 
 		byte[] row = Bytes.toBytes(id);
 
@@ -568,20 +608,16 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 		
 		if (problem instanceof TableNotFoundException) {
-			//Table was deleted for some reasons though the cache still knows it
-			this.tablesD.remove(Bytes.toString(t.getTableName()));
+			uncache(t);
 			this.storeChanges(table, id, changed, removed, increments);
-			return;
-		}
-
-		if (problem != null)
+		} else if (problem != null)
 			throw new DatabaseNotReachedException(problem);
 	}
 
 	@Override
 	public void delete(String table, String id)
 			throws DatabaseNotReachedException {
-		HTable t = this.getTable(table, null);
+		HTable t = this.getTable(table);
 
 		Delete rowDel = new Delete(Bytes.toBytes(id));
 		try {
@@ -591,27 +627,51 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 	}
 
-	// @Override
-	// public int count(String table) throws DatabaseNotReachedException {
-	// if (!this.hasTable(table))
-	// return 0;
-	//
-	// HTable t = this.getTable(table, null);
-	// Scan s = new Scan();
-	// s.setFilter(new FirstKeyOnlyFilter());
-	//
-	// try {
-	// int ret = 0;
-	// Iterator<?> res = t.getScanner(s).iterator();
-	// while(res.hasNext()) {
-	// ret++;
-	// res.next();
-	// }
-	// return ret;
-	// } catch (IOException e) {
-	// throw new DatabaseNotReachedException(e);
-	// }
-	// }
+	protected long count(String table, Scan s) throws DatabaseNotReachedException {
+		return this.countSimple(table, s);
+	}
+
+	protected long countSimple(String table, Scan s) throws DatabaseNotReachedException {
+		if (! this.hasTableNoCache(table))
+			return 0;
+		
+		HTable t = this.getTable(table);
+		ResultScanner r = null;
+		try {
+			int count = 0;
+			r = t.getScanner(s);
+			Iterator<Result> it = r.iterator();
+			while (it.hasNext()) {
+				it.next();
+				count++;
+			}
+			return count;
+		} catch (IOException e) {
+			throw new DatabaseNotReachedException(e);
+		} finally {
+			if (r != null)
+				r.close();
+		}
+	}
+	
+	protected long countMapRed(String table, Scan s) throws DatabaseNotReachedException {
+		if (!this.hasTableNoCache(table))
+			return 0;
+
+		String tableName = this.mangleTableName(table);
+		try {
+			Job count = RowCounter.createSubmittableJob(getConf(), tableName, s);
+			if(!count.waitForCompletion(false))
+				throw new DatabaseNotReachedException("Row count failed for table " + table);
+			return count.getCounters().findCounter(RowCounter.RowCounterMapper.Counters.ROWS).getValue();
+		} catch (IOException e) {
+			throw new DatabaseNotReachedException(e);
+		} catch (InterruptedException e) {
+			throw new DatabaseNotReachedException(e);
+		} catch (ClassNotFoundException e) {
+			throw new DatabaseNotReachedException(e);
+		}
+	}
 
 	// @Override
 	// public int count(String table, String row, String family) throws
@@ -683,7 +743,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		if (!this.hasColumnFamily(table, family))
 			return false;
 
-		HTable t = this.getTable(table, null);
+		HTable t = this.getTable(table);
 		Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));
 
 		try {
@@ -699,7 +759,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		if (!this.hasTable(table))
 			return false;
 
-		HTable t = this.getTable(table, null);
+		HTable t = this.getTable(table);
 		Get g = new Get(Bytes.toBytes(row));
 		g.setFilter(new FirstKeyOnlyFilter());
 
@@ -713,9 +773,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	@Override
 	public byte[] get(String table, String row, String family, String key)
 			throws DatabaseNotReachedException {
-		HashSet<String> fam = new HashSet<String>();
-		fam.add(family);
-		HTable t = this.getTable(table, fam);
+		HTable t = this.getTable(table, family);
 		Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
 				Bytes.toBytes(key));
 
@@ -738,9 +796,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	@Override
 	public Map<String, byte[]> get(String table, String id, String family,
 			Constraint c) throws DatabaseNotReachedException {
-		Set<String> families = new TreeSet<String>();
-		families.add(family);
-		HTable t = this.getTable(table, families);
+		HTable t = this.getTable(table, family);
 
 		Get g = new Get(Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
 
@@ -763,34 +819,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		return ret;
 	}
 
-	@Override
-	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(String table, Constraint c,
-			int limit, Set<String> families) throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
-			return new com.googlecode.n_orm.storeapi.CloseableKeyIterator() {
-
-				@Override
-				public void close() {
-				}
-
-				@Override
-				public boolean hasNext() {
-					return false;
-				}
-
-				@Override
-				public Row next() {
-					return null;
-				}
-
-				@Override
-				public void remove() {
-				}
-
-			};
-
-		HTable ht = this.getTable(table, null);
-
+	protected Scan getScan(Constraint c, String... families) throws DatabaseNotReachedException {
 		Scan s = new Scan();
 		if (c != null && c.getStartKey() != null)
 			s.setStartRow(Bytes.toBytes(c.getStartKey()));
@@ -799,7 +828,6 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			endb = Bytes.add(endb, new byte[] { 0 });
 			s.setStopRow(endb);
 		}
-		Filter filter = new PageFilter(limit);
 		
 		if (families != null) {
 			for (String fam : families) {
@@ -807,20 +835,91 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			}
 		} else {
 			//No family to load ; avoid getting all information in the row (that may be big)
-			FilterList f = new FilterList();
-			f.addFilter(new FirstKeyOnlyFilter());
-			f.addFilter(filter);
-			filter = f;
+			s.setFilter(new FirstKeyOnlyFilter());
 		}
-		s.setFilter(filter);
+		
+		return s;
+	}
 
+	@Override
+	public long count(String table, Constraint c) throws DatabaseNotReachedException {
+		return this.count(table, this.getScan(c));
+	}
+
+	@Override
+	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(String table, Constraint c,
+			 int limit, Set<String> families) throws DatabaseNotReachedException {
+		if (!this.hasTable(table))
+			return new EmptyIterator();
+
+		HTable ht = this.getTable(table);
+		
+		Scan s = this.getScan(c, families == null ? null : families.toArray(new String[families.size()]));
+		Filter filter = s.getFilter();
+		FilterList fl;
+		if (filter instanceof FilterList) {
+			fl = (FilterList)filter;
+			fl.addFilter(new PageFilter(limit));
+		} else {
+			s.setFilter(new PageFilter(limit));
+		}
+		
 		final ResultScanner r;
 		try {
 			r = ht.getScanner(s);
+		} catch (TableNotFoundException x) {
+			uncache(ht);
+			return new EmptyIterator();
 		} catch (IOException e) {
 			throw new DatabaseNotReachedException(e);
 		}
 		return new CloseableIterator(r, families != null);
+	}
+
+	public void truncate(String table, Constraint c) throws DatabaseNotReachedException {
+		this.truncate(table, this.getScan(c));
+	}
+	
+	protected void truncate(String table, Scan s) {
+		this.truncateSimple(table, s);
+	}
+	
+	protected void truncateSimple(String table, Scan s)  {
+		if (! this.hasTableNoCache(table))
+			return;
+		
+		HTable t = this.getTable(table);
+		ResultScanner r = null;
+		try {
+			r = t.getScanner(s);
+			Iterator<Result> it = r.iterator();
+			while (it.hasNext()) {
+				t.delete(new Delete(it.next().getRow()));
+			}
+		} catch (IOException e) {
+			throw new DatabaseNotReachedException(e);
+		} finally {
+			if (r != null)
+				r.close();
+		}
+	}
+	
+	protected void truncateMapReduce(String table, Scan s)  {
+		if (!this.hasTableNoCache(table))
+			return;
+
+		String tableName = this.mangleTableName(table);
+		try {
+			Job count = Truncator.createSubmittableJob(getConf(), tableName, s);
+			if(!count.waitForCompletion(false))
+				throw new DatabaseNotReachedException("Truncate failed for table " + table);
+		} catch (IOException e) {
+			throw new DatabaseNotReachedException(e);
+		} catch (InterruptedException e) {
+			throw new DatabaseNotReachedException(e);
+		} catch (ClassNotFoundException e) {
+			throw new DatabaseNotReachedException(e);
+		}
 	}
 
 }

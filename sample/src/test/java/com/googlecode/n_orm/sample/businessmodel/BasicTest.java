@@ -22,6 +22,7 @@ import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.cf.SetColumnFamily;
+import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 /**
  * Sample tests to learn how n-orm works.
@@ -154,11 +155,14 @@ public class BasicTest extends HBaseTestLauncher {
 		 Book b3 = new Book(new BookStore("rfgbuhfgj"), "testtitle3", new Date());
 		 b3.store();
 		 
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go();		 
+		 SearchableClassConstraintBuilder<Book> query = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
+		 Set<Book> storeBooks = query.go();
+		 long count = query.count();
 		 b2.delete();
 		 b3.delete();
-		 
-		 assertEquals(3, storeBooks.size());
+
+		 assertEquals(3, count);
+		 assertEquals(count, storeBooks.size());
 		 assertTrue(storeBooks.contains(bsut));
 		 assertTrue(storeBooks.contains(b2));
 		 assertTrue(storeBooks.contains(b3));
