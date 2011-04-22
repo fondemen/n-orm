@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.RetriesExhaustedException;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
@@ -217,12 +219,12 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			throw new IOException("Could not find hbase-site.xml from folders " + commaSeparatedConfigurationFolders);
 		
 		Store ret = new Store();
-		ret.setConf(HBaseConfiguration.create(conf));
+		ret.setConf(new HBaseConfiguration(conf));
 		return ret;
 	}
 
 	private String host = "localhost";
-	private int port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
+	private int port = 2181;
 	private Integer maxRetries = null;
 	private boolean wasStarted = false;
 	private Configuration config;
@@ -238,7 +240,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			return;
 
 		if (this.config == null) {
-			Configuration properties = HBaseConfiguration.create();
+			Configuration properties = new HBaseConfiguration();
 			properties.clear();
 
 			properties.set(HConstants.ZOOKEEPER_QUORUM, this.getHost());
@@ -254,7 +256,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 		if (this.admin == null)
 			try {
-				this.admin = new HBaseAdmin(this.config);
+				this.admin = new HBaseAdmin(new HBaseConfiguration(this.config));
 				if (!this.admin.isMasterRunning())
 					throw new DatabaseNotReachedException(
 							new MasterNotRunningException());
@@ -300,7 +302,11 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	public void setAdmin(HBaseAdmin admin) {
 		this.admin = admin;
-		this.setConf(admin.getConfiguration());
+		try {
+			Field confProp = HBaseAdmin.class.getDeclaredField("conf");
+			confProp.setAccessible(true);
+			this.setConf((Configuration)confProp.get(admin));
+		} catch (Exception x) {}
 	}
 	
 	protected String mangleTableName(String table) {
@@ -404,7 +410,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			HTable ret = this.tablesC.get(name);
 			if (ret == null) {
 				try {
-					ret = new HTable(this.config, name);
+					ret = new HTable((HBaseConfiguration)this.config, name);
 					this.cache(name, ret);
 					return ret;
 				} catch (IOException e) {
@@ -624,7 +630,14 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				problem = e;
 		}
 		
-		if (problem instanceof TableNotFoundException) {
+		if (problem instanceof RetriesExhaustedException) {
+			RetriesExhaustedException re = (RetriesExhaustedException)problem;
+			String message = re.getMessage();
+			if (message.contains("TableNotFoundException")) {
+				uncache(t);
+				this.storeChanges(table, id, changed, removed, increments);
+			}
+		} else if (problem instanceof TableNotFoundException) {
 			uncache(t);
 			this.storeChanges(table, id, changed, removed, increments);
 		} else if (problem != null)

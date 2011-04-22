@@ -15,7 +15,7 @@ public class HBaseLauncher extends StoreTestLauncher {
 	private static Properties hbaseProperties = null;
 
 	public static String hbaseHost = "localhost";
-	public static Integer hbasePort = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
+	public static Integer hbasePort = 2181;
 	public static Integer hbaseMaxRetries = 3;
 
 	public static HBaseTestingUtility hBaseServer = null;
@@ -44,7 +44,7 @@ public class HBaseLauncher extends StoreTestLauncher {
 					
 					hBaseServer.startMiniCluster(1);
 					hbaseHost = hBaseServer.getConfiguration().get(HConstants.ZOOKEEPER_QUORUM);
-					hbasePort = hBaseServer.getConfiguration().getInt("hbase.zookeeper.property.clientPort", HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT);
+					hbasePort = hBaseServer.getConfiguration().getInt("hbase.zookeeper.property.clientPort", 2181);
 					
 					hbaseStore = com.googlecode.n_orm.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
 					hbaseStore.setConf(hBaseServer.getConfiguration());

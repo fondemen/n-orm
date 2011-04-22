@@ -3,6 +3,7 @@ package com.googlecode.n_orm.hbase;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.HTable;
@@ -32,7 +33,7 @@ public class Truncator {
 		protected void setup(Context context) throws IOException,
 				InterruptedException {
 			super.setup(context);
-			this.table = new HTable(context.getConfiguration(), context.getConfiguration().get("table-deleted"));
+			this.table = new HTable(new HBaseConfiguration(context.getConfiguration()), context.getConfiguration().get("table-deleted"));
 		}
 
 
