@@ -78,6 +78,18 @@ public interface Store {
 	 * Deletes the given row
 	 */
 	void delete(String table, String id) throws DatabaseNotReachedException;
+
+	/**
+	 * Counts the number of element satisfying the constraint.
+	 */
+	long count(String table, Constraint c)
+			throws DatabaseNotReachedException;
+
+//	/**
+//	 * Deletes all elements satisfying the constraint
+//	 */
+//	void truncate(String table, Constraint c)
+//			throws DatabaseNotReachedException;
 	
 //	/**
 //	 * Counts the number of elements in the table.
