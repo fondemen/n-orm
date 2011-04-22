@@ -31,7 +31,7 @@ public aspect EventManagement {
 	}
 	
 	public void PersistingElement.removePersistingElementListener(PersistingElementListener listener) {
-		if (!this.hasListener(listener))
+		if (this.hasListener(listener))
 			this.listeners.remove(listener);
 	}
 	

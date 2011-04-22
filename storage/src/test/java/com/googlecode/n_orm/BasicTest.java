@@ -365,6 +365,17 @@ public class BasicTest {
 		 EasyMock.verify(listener);
 	 }
 
+	 @Test public void storeRemovedListener() {
+		 bsut.setNumber((short) (bsut.getNumber()+1)); //Makes a change so that the next store triggers a data store request
+		 
+		 PersistingElementListener listener = EasyMock.createStrictMock(PersistingElementListener.class);
+		 EasyMock.replay(listener);
+		 bsut.addPersistingElementListener(listener);
+		 bsut.removePersistingElementListener(listener);
+		 bsut.store();
+		 EasyMock.verify(listener);
+	 }
+
 	 @Test public void storeFailed2Listeners() {
 		 bsut.store(); //So that the next store does not trigger a data store request (nothing changed)
 
