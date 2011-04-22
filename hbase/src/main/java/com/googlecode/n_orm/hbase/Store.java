@@ -316,17 +316,34 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		
 		return table;
 	}
+	
+	private void cache(String tableName, HTableDescriptor descr) {
+		synchronized(this.tablesD) {
+			this.uncache(tableName);
+			this.tablesD.put(tableName, descr);
+		}
+	}
+	
+	private void cache(String tableName, HTable t) {
+		synchronized(this.tablesC) {
+			this.tablesC.put(tableName, t);
+		}
+	}
 
 	private void uncache(String tableName) {
 		//tableName = this.mangleTableName(tableName);
-		this.tablesD.remove(tableName);
-		this.tablesC.remove(tableName);
+		synchronized (this.tablesD) {
+			synchronized (this.tablesC) {
+				this.tablesD.remove(tableName);
+				this.tablesC.remove(tableName);
+			}
+			
+		}
 	}
 
 	private void uncache(HTable t) {
 		String tableName = Bytes.toString(t.getTableName());
-		this.tablesD.remove(tableName);
-		this.tablesC.remove(tableName);
+		this.uncache(tableName);
 	}
 
 	protected boolean hasTable(String name) throws DatabaseNotReachedException {
@@ -370,7 +387,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 					} else {
 						td = this.admin.getTableDescriptor(Bytes.toBytes(name));
 					}
-					this.tablesD.put(name, td);
+					this.cache(name, td);
 				} catch (IOException e) {
 					throw new DatabaseNotReachedException(e);
 				}
@@ -388,7 +405,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			if (ret == null) {
 				try {
 					ret = new HTable(this.config, name);
-					this.tablesC.put(name, ret);
+					this.cache(name, ret);
 					return ret;
 				} catch (IOException e) {
 					throw new DatabaseNotReachedException(e);
@@ -413,7 +430,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		synchronized (this.tablesD) {
 			try {
 				td = this.admin.getTableDescriptor(Bytes.toBytes(table));
-				this.tablesD.put(table, td);
+				this.cache(table, td);
 			} catch (IOException e) {
 				throw new DatabaseNotReachedException(e);
 			}
@@ -435,7 +452,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 					try {
 						tableD = this.admin
 								.getTableDescriptor(tableD.getName());
-						this.tablesD.put(tableName, tableD);
+						this.cache(tableName, tableD);
 						recreated = true;
 					} catch (TableNotFoundException x) {
 						//Table exists in the cache but was dropped for some reason...
