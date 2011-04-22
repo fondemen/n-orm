@@ -42,16 +42,21 @@ public class HBaseLoaderTest {
 
 	@Test(expected=IOException.class)
 	public void loadPropertiesMissingHbaseSite() throws IOException {
+		Store.getStore("/etc/conf1/");
+	}
+
+	@Test(expected=Test.None.class)
+	public void loadPropertiesRecursiveFindHbaseSite() throws IOException {
 		Store.getStore(testPath + "/etc/conf1/," + testPath + "/etc/conf2");
 	}
 
-	@Test(expected=IOException.class)
+	@Test(expected=Test.None.class)
 	public void loadPropertiesBadFolder() throws IOException {
 		Store.getStore(testPath + "/etcx/conf1/," + testPath + "/etc/conf2," + testPath + "/etc/conf2/conf3/");
 	}
 
 	@Test(expected=IOException.class)
 	public void loadPropertiesNoConf() throws IOException {
-		Store.getStore(testPath + "/etc/conf1/," + testPath + "/etc/conf4," + testPath + "/etc/conf2/conf3/");
+		Store.getStore("/etc/conf4");
 	}
 }

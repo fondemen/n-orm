@@ -2,6 +2,7 @@ package com.googlecode.n_orm.hbase;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -46,6 +47,7 @@ import org.apache.hadoop.mapreduce.Job;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.Row;
@@ -153,7 +155,56 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			result.close();
 		}
 	}
+	
+	private static class ReportConf extends Report {
+		private final Configuration conf;
+		public boolean foundPropertyFile = false;
+		public boolean foundHBasePropertyFile = false;
 
+		public ReportConf(Configuration conf) {
+			super();
+			this.conf = conf;
+		}
+
+		Configuration getConf() {
+			return conf;
+		}
+
+		boolean isFoundPropertyFile() {
+			return foundPropertyFile;
+		}
+
+		boolean isFoundHBasePropertyFile() {
+			return foundHBasePropertyFile;
+		}
+
+		@Override
+		public void fileHandled(File f) {
+			this.foundPropertyFile = true;
+			if (!this.foundHBasePropertyFile && f.getName().equals("hbase-site.xml"))
+				this.foundHBasePropertyFile = true;
+		}
+		
+	}
+
+	private static RecursiveFileAction addConfAction = new RecursiveFileAction() {
+		
+		@Override
+		public void manageFile(File f, Report r) {
+			try {
+				((ReportConf)r).getConf().addResource(new FileInputStream(f));
+				System.out.println("Getting HBase store: found configuration file " + f.getAbsolutePath());
+			} catch (FileNotFoundException e) {
+				System.err.println("Could not load configuration file " + f.getName());
+				e.printStackTrace();
+			}
+		}
+		
+		@Override
+		public boolean acceptFile(File file) {
+			return file.getName().endsWith("-site.xml");
+		}
+	};
 	protected static Map<Properties, Store> knownStores = new HashMap<Properties, Store>();
 
 	/**
@@ -191,31 +242,22 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	 * Those folders are supposed to have configuration files following the pattern *-site.xml. 
 	 */
 	public static Store getStore(String commaSeparatedConfigurationFolders) throws IOException {
-		boolean foundHbase = false, foundConfFile = false;
-		
 		Configuration conf = new Configuration();
+		ReportConf r = new ReportConf(conf);
 		for (String  configurationFolder : commaSeparatedConfigurationFolders.split(",")) {
 			
 			File confd = new File(configurationFolder);
-			if (!confd.isDirectory())
-				throw new IOException("Cannot read HBase configuration folder " + confd);
-			
-			for (String confFileName : confd.list(new FilenameFilter() {
-				
-				@Override
-				public boolean accept(File dir, String name) {
-					return name.endsWith("-site.xml");
-				}
-			})) {
-				conf.addResource(new FileInputStream(new File(confd, confFileName)));
-				foundHbase |= confFileName.equals("hbase-site.xml");
-				foundConfFile = true;
+			if (!confd.isDirectory()) {
+				System.err.println("Cannot read HBase configuration folder " + confd);
+				continue;
 			}
+			
+			addConfAction.recursiveManageFile(confd, r);
 		}
 	
-		if (!foundConfFile)
+		if (!r.foundPropertyFile)
 			throw new IOException("No configuration file found in the following folders " + commaSeparatedConfigurationFolders + " ; expecting some *-site.xml files");
-		if (! foundHbase)
+		if (!r.foundHBasePropertyFile)
 			throw new IOException("Could not find hbase-site.xml from folders " + commaSeparatedConfigurationFolders);
 		
 		Store ret = new Store();
