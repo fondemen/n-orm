@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 
 import org.apache.hadoop.conf.Configuration;
@@ -21,8 +22,12 @@ public class HBaseLoaderTest {
 		if (testPath == null) {
 			String clFilename = HBaseLoaderTest.class.getName().replace('.', '/')+".class";
 			URL res = ClassLoader.getSystemClassLoader().getResource(clFilename);
-			File clFile = new File(clFilename);
-			File file = new File(res.getPath());
+			File clFile = new File(clFilename), file;
+			try {
+			  file = new File(res.toURI());
+			} catch(URISyntaxException e) {
+			  file = new File(res.getPath());
+			}
 			do {
 				clFile = clFile.getParentFile();
 				file = file.getParentFile();
