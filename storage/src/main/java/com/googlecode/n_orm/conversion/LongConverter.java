@@ -2,7 +2,7 @@ package com.googlecode.n_orm.conversion;
 
 class LongConverter extends NaturalConverter<Long> {
 	public LongConverter() {
-		super(Long.class, long.class, Long.SIZE/Byte.SIZE);
+		super(Long.class, long.class, Long.SIZE/Byte.SIZE, 0l);
 	}
 
 	@Override

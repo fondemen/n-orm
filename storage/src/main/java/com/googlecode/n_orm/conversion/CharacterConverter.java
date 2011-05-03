@@ -5,7 +5,7 @@ class CharacterConverter extends PrimitiveConverter<Character> {
 	private final StringBuffer sbuf;
 
 	public CharacterConverter() {
-		super(Character.class, char.class, BYTE_SIZE, BYTE_SIZE, 1, 1);
+		super(Character.class, char.class, BYTE_SIZE, BYTE_SIZE, 1, 1, Character.MIN_VALUE);
 		 sbuf = new StringBuffer(1);
 		 sbuf.append(' ');
 	}

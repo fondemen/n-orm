@@ -4,7 +4,7 @@ class BooleanConverter extends PrimitiveConverter<Boolean> {
 	public static final String TRUE = "1";
 	public static final String FALSE = "0";
 	public BooleanConverter() {
-		super(Boolean.class, boolean.class, 1, 1, 1, 1);
+		super(Boolean.class, boolean.class, 1, 1, 1, 1, Boolean.FALSE);
 	}
 
 	@Override
