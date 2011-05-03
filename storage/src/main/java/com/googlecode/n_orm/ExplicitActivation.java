@@ -11,9 +11,10 @@ import java.util.Set;
 import com.googlecode.n_orm.PersistingElement;
 
 /**
- * Column families (i.e. properties of type {@link Map} or {@link Set}) must be activated explicitly using {@link PersistingElement#activate(String...)}.
- * By marking a column family with this annotation, an activation will always trigger an activation. However, be careful with this annotation for all elements in the column family will be activated regardless their number.
- * It is not useful to declare this annotation on a normal property or a key (including persisting properties or key) for they will be automatocally be activated.
+ * Prevents automatic activation of a property (including keys).
+ * Persisting properties (including keys) are automatically activated while using {@link PersistingElement#activate(String...)}.
+ * By marking a property with this annotation, an activation will not automatically trigger an activation.
+ * It is not useful to declare this annotation on a column family for they will not be automatically be activated anyway unless annotated with {@link ImplicitActivation}.
  * @see PersistingElement#activate(String...)
  */
 
