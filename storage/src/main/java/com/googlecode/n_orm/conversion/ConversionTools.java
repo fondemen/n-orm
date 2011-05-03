@@ -11,7 +11,7 @@ import com.googlecode.n_orm.PropertyManagement;
 public class ConversionTools {
 
 	private static enum ConversionKind {
-		FromBytes, ToBytes, FromString, ToString
+		FromBytes, ToBytes, FromString, ToString, Default
 	};
 
 	private static final Converter<?>[] converters;
@@ -47,6 +47,8 @@ public class ConversionTools {
 			return conv.canConvertFromString((String) o, type);
 		case ToString:
 			return conv.canConvertToString(o);
+		case Default:
+			return conv.canConvert(type);
 
 		default:
 			throw new IllegalArgumentException("Unknown conversion kind: "
@@ -66,6 +68,8 @@ public class ConversionTools {
 			return conv.fromString((String) o, type);
 		case ToString:
 			return conv.toString((T) o, (Class<? extends T>) type);
+		case Default:
+			return conv.getDefaultValue();
 		default:
 			throw new IllegalArgumentException("Unknown conversion kind: "
 					+ kind.name());
@@ -171,5 +175,9 @@ public class ConversionTools {
 
 		return (String) convertInternal(o, expected, ConversionKind.ToString,
 				"Cannot create a string representation for " + o);
+	}
+	
+	public static <T> T getDefaultValue(Class<T> expected) {
+		return (T) convertInternal(null, expected, ConversionKind.Default, null);
 	}
 }

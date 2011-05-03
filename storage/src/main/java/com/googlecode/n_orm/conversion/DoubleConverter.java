@@ -4,7 +4,7 @@ class DoubleConverter extends PrimitiveConverter<Double> {
 	public static final int BYTE_SIZE = Double.SIZE/Byte.SIZE;
 
 	public DoubleConverter() {
-		super(Double.class, double.class, BYTE_SIZE, BYTE_SIZE, 1, -1);
+		super(Double.class, double.class, BYTE_SIZE, BYTE_SIZE, 1, -1, 0.0d);
 	}
 
 	@Override

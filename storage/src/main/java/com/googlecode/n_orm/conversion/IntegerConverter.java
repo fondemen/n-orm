@@ -2,7 +2,7 @@ package com.googlecode.n_orm.conversion;
 
 class IntegerConverter extends NaturalConverter<Integer> {
 	public IntegerConverter() {
-		super(Integer.class, int.class, Integer.SIZE/Byte.SIZE);
+		super(Integer.class, int.class, Integer.SIZE/Byte.SIZE, 0);
 	}
 
 	@Override

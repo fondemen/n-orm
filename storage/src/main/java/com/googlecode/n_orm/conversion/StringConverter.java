@@ -8,6 +8,11 @@ class StringConverter extends SimpleConverter<String> {
 	}
 
 	@Override
+	public String getDefaultValue() {
+		return null;
+	}
+
+	@Override
 	public String fromString(String rep, Class<?> expected) {
 		return rep;
 	}

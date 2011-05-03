@@ -20,6 +20,11 @@ public class ArrayConverter extends Converter<Object> {
 	}
 
 	@Override
+	public Object getDefaultValue() {
+		return null;
+	}
+
+	@Override
 	public Object fromString(String rep, Class<?> expected) {
 		Class<?> clazz = expected.getComponentType();
 		if (clazz.isArray())
