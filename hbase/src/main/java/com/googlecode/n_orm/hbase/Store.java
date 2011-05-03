@@ -3,7 +3,6 @@ package com.googlecode.n_orm.hbase;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -308,7 +307,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 		if (this.admin == null)
 			try {
-				this.admin = new HBaseAdmin(this.config);
+				this.setAdmin(new HBaseAdmin(this.config));
 				if (!this.admin.isMasterRunning())
 					throw new DatabaseNotReachedException(
 							new MasterNotRunningException());
@@ -700,6 +699,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	protected long count(String table, Scan s) throws DatabaseNotReachedException {
 		return this.countSimple(table, s);
+		//return this.countMapRed(table, s);
 	}
 
 	protected long countSimple(String table, Scan s) throws DatabaseNotReachedException {
@@ -952,6 +952,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	}
 	
 	protected void truncate(String table, Scan s) {
+		//this.truncateMapReduce(table, s);
 		this.truncateSimple(table, s);
 	}
 	
