@@ -45,6 +45,8 @@ import org.apache.hadoop.mapreduce.Job;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
+import com.googlecode.n_orm.hbase.mapreduce.RowCounter;
+import com.googlecode.n_orm.hbase.mapreduce.Truncator;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.Row;
@@ -167,14 +169,6 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			return conf;
 		}
 
-		boolean isFoundPropertyFile() {
-			return foundPropertyFile;
-		}
-
-		boolean isFoundHBasePropertyFile() {
-			return foundHBasePropertyFile;
-		}
-
 		@Override
 		public void fileHandled(File f) {
 			this.foundPropertyFile = true;
@@ -223,7 +217,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				p.setProperty("maxRetries", maxRetries.toString());
 			Store ret = knownStores.get(p);
 			if (ret == null) {
-				ret = new Store();
+				ret = new Store(p);
 				ret.setHost(host);
 				ret.setPort(port);
 				if (maxRetries != null)
@@ -264,7 +258,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				if (!r.foundHBasePropertyFile)
 					throw new IOException("Could not find hbase-site.xml from folders " + commaSeparatedConfigurationFolders);
 				
-				ret = new Store();
+				ret = new Store(p);
 				ret.setConf(HBaseConfiguration.create(conf));
 				
 				knownStores.put(p, ret);
@@ -273,7 +267,12 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			return ret;
 		}
 	}
+	
+	public static Store getKnownStore(Properties properties) {
+		return knownStores.get(properties);
+	}
 
+	private final Properties launchProps;
 	private String host = "localhost";
 	private int port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
 	private Integer maxRetries = null;
@@ -283,7 +282,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
 	public Map<String, HTable> tablesC = new TreeMap<String, HTable>();
 
-	protected Store() {
+	protected Store(Properties properties) {
+		this.launchProps = properties;
 	}
 
 	public synchronized void start() throws DatabaseNotReachedException {
@@ -341,6 +341,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	public Configuration getConf() {
 		return this.config;
+	}
+
+	public Properties getLaunchProps() {
+		return launchProps;
 	}
 
 	public void setConf(Configuration configuration) {
@@ -731,7 +735,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 		String tableName = this.mangleTableName(table);
 		try {
-			Job count = RowCounter.createSubmittableJob(getConf(), tableName, s);
+			Job count = RowCounter.createSubmittableJob(this, tableName, s);
 			if(!count.waitForCompletion(false))
 				throw new DatabaseNotReachedException("Row count failed for table " + table);
 			return count.getCounters().findCounter(RowCounter.RowCounterMapper.Counters.ROWS).getValue();
@@ -982,7 +986,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 		String tableName = this.mangleTableName(table);
 		try {
-			Job count = Truncator.createSubmittableJob(getConf(), tableName, s);
+			Job count = Truncator.createSubmittableJob(this, tableName, s);
 			if(!count.waitForCompletion(false))
 				throw new DatabaseNotReachedException("Truncate failed for table " + table);
 		} catch (IOException e) {
