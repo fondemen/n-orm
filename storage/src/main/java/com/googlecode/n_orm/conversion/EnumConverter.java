@@ -14,6 +14,11 @@ class EnumConverter extends SimpleConverter<Object> {
 	}
 
 	@Override
+	public Object getDefaultValue() {
+		return null;
+	}
+
+	@Override
 	public Object fromString(String rep, Class<?> expected) {
 		return getEnumerated(ConversionTools.stringConverter.fromString(rep, String.class), expected);
 	}

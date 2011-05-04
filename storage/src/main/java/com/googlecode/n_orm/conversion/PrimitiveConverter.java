@@ -6,17 +6,19 @@ abstract class PrimitiveConverter<T> extends SimpleConverter<T> {
 	private final int maxByteSize; 
 	private final int minStringSize; 
 	private final int maxStringSize; 
+	private final T defaultValue;
 	
 	
 	public PrimitiveConverter(Class<T> clazz, Class<?> primitiveClazz,
 			int minByteSize, int maxByteSize, int minStringSize,
-			int maxStringSize) {
+			int maxStringSize, T defaultValue) {
 		super(clazz);
 		this.primitiveClazz = primitiveClazz;
 		this.minByteSize = minByteSize;
 		this.maxByteSize = maxByteSize;
 		this.minStringSize = minStringSize;
 		this.maxStringSize = maxStringSize;
+		this.defaultValue = defaultValue;
 	}
 
 	public Class<?> getPrimitiveClazz() {
@@ -37,6 +39,11 @@ abstract class PrimitiveConverter<T> extends SimpleConverter<T> {
 
 	public int getMaxStringSize() {
 		return maxStringSize;
+	}
+
+	@Override
+	public T getDefaultValue() {
+		return defaultValue;
 	}
 
 	@Override

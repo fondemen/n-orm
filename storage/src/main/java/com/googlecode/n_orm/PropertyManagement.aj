@@ -311,8 +311,7 @@ public aspect PropertyManagement {
 				if (p == null) {
 					if (!km.isKey(f)) {
 						Class<?> type = f.getType();
-						Object defaultValue = type.isArray() ? null : ConvertUtils.convert((Object)null, type); //ConvertUtils returns an empty array as a default value...
-						pm.candideSetValue(this.getOwner(), f, defaultValue);
+						pm.candideSetValue(this.getOwner(), f, ConversionTools.getDefaultValue(type));
 					} else {
 						p = new Property(this, f);
 						this.putElement(p.getName(), p);

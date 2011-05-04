@@ -11,6 +11,11 @@ class PersistingConverter extends Converter<PersistingElement> {
 	}
 
 	@Override
+	public PersistingElement getDefaultValue() {
+		return null;
+	}
+
+	@Override
 	public PersistingElement fromString(String rep, Class<?> expected) {
 		return (PersistingElement) keyManager.createElement(expected, rep);
 	}
