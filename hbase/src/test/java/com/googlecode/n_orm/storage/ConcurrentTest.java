@@ -1,14 +1,17 @@
 package com.googlecode.n_orm.storage;
 
- import static org.junit.Assert.*;
+ import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.HTable;
-import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.client.HConnection;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -44,6 +47,14 @@ public class ConcurrentTest {
 		}
 	}
 	
+	private void truncateTable(String table) throws IOException {
+
+		if (store1.getAdmin().tableExists(table)) {
+			store1.truncate(table, null);
+			assertEquals(0, store1.count(table, null));
+		}
+	}
+	
 	@Test
 	public void gettingEmptyObjectAndGetItFromBothStores() throws IOException {
 		this.deleteTable("t1");
@@ -73,5 +84,25 @@ public class ConcurrentTest {
 		assertTrue(store2.exists("t1", "idt1", "cf1"));
 
 		this.deleteTable("t1");
+	}
+	
+	@Test
+	public void acceptingConnectionTimeout() throws IOException, SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+		this.truncateTable("t1");
+		
+		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
+		change1.put("cf1", ch1);
+		ch1.put("k1", new byte[]{1, 2});
+		
+		HConnection cm = store1.getAdmin().getConnection();
+		Method closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
+		closeM.setAccessible(true);
+		closeM.invoke(cm, true);
+		
+		store1.storeChanges("t1", "idt1", change1 , null, null);
+		assertTrue(store2.exists("t1", "idt1", "cf1"));
+
+		this.truncateTable("t1");
 	}
 }

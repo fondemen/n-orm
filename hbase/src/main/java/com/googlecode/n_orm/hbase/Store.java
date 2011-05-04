@@ -403,6 +403,39 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		this.uncache(tableName);
 	}
 
+	protected synchronized void restart() {
+		synchronized(this.tablesD) {
+			this.tablesD.clear();
+			synchronized(this.tablesC) {
+				this.tablesC.clear();
+			}
+		}
+		this.config = HBaseConfiguration.create(this.config);
+		this.admin = null;
+		this.wasStarted = false;
+		this.start();
+	}
+	
+	private void handleProblem(Exception problem, String table) throws DatabaseNotReachedException {
+		if (problem instanceof DatabaseNotReachedException)
+			throw (DatabaseNotReachedException)problem;
+		
+		if (problem instanceof TableNotFoundException) {
+			table = this.mangleTableName(table);
+			if (this.tablesD.containsKey(table))
+				this.uncache(table);
+			else
+				throw new DatabaseNotReachedException(problem);
+		} else if (problem instanceof IOException) {
+			if (problem.getMessage().contains("closed")) {
+				restart();
+				return;
+			}
+			
+			throw new DatabaseNotReachedException(problem);
+		}
+	}
+
 	protected boolean hasTable(String name) throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
 		if (this.tablesD.containsKey(name))
@@ -511,13 +544,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 								.getTableDescriptor(tableD.getName());
 						this.cache(tableName, tableD);
 						recreated = true;
-					} catch (TableNotFoundException x) {
-						//Table exists in the cache but was dropped for some reason...
-						this.uncache(tableName);
+					} catch (Exception e) {
+						this.handleProblem(e, tableName);
 						this.getTable(tableName, columnFamilies);
 						return;
-					} catch (IOException e) {
-						throw new DatabaseNotReachedException(e);
 					}
 				}
 				if (!tableD.hasFamily(cfname)) {
@@ -651,41 +681,42 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			rowPut = new Put(row);
 			rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
 		}
-
-		IOException problem = null;
-
-		try {
-			if (rowPut != null)
-				t.put(rowPut);
-		} catch (IOException e) {
-			problem = e;
-		}
-		try {
-			if (rowDel != null)
-				t.delete(rowDel);
-		} catch (IOException e) {
-			if (problem == null)
-				problem = e;
-		}
-
-		try {
-			for (String fam : increments.keySet()) {
-				Map<String, Number> incr = increments.get(fam);
-				for (String key : incr.keySet()) {
-					t.incrementColumnValue(row, Bytes.toBytes(fam),
-							Bytes.toBytes(key), incr.get(key).longValue());
-				}
-			}
-		} catch (IOException e) {
-			if (problem == null)
-				problem = e;
-		}
 		
-		if (problem instanceof TableNotFoundException) {
-			uncache(t);
-			this.storeChanges(table, id, changed, removed, increments);
-		} else if (problem != null)
-			throw new DatabaseNotReachedException(problem);
+		List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2);
+		if (rowPut != null) actions.add(rowPut);
+		if (rowDel != null) actions.add(rowDel);
+		
+		if (! actions.isEmpty())
+			try {
+				t.batch(actions);
+			} catch (Exception e) {
+				this.handleProblem(e, table);
+				this.storeChanges(table, id, changed, removed, increments);
+			}
+
+		int maxTries = 3;
+		boolean done = false;
+		do {
+			maxTries--;
+			try {
+				for (String fam : increments.keySet()) {
+					Map<String, Number> incrs = increments.get(fam);
+					Iterator<Entry<String, Number>> incri = incrs.entrySet().iterator();
+					while (incri.hasNext()) {
+						Entry<String, Number> incr = incri.next();
+						t.incrementColumnValue(row, Bytes.toBytes(fam),
+								Bytes.toBytes(incr.getKey()), incr.getValue().longValue());
+						incri.remove();
+					}
+				}
+				done = true;
+			} catch (IOException e) {
+				if (maxTries > 0) {
+					this.handleProblem(e, table);
+				} else
+					throw new DatabaseNotReachedException(e);
+			}
+		} while (!done);
 	}
 
 	@Override
@@ -945,8 +976,9 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		} catch (TableNotFoundException x) {
 			uncache(ht);
 			return new EmptyIterator();
-		} catch (IOException e) {
-			throw new DatabaseNotReachedException(e);
+		} catch (Exception e) {
+			this.handleProblem(e, table);
+			return this.get(table, c, limit, families);
 		}
 		return new CloseableIterator(r, families != null);
 	}
