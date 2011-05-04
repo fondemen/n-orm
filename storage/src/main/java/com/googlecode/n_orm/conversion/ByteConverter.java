@@ -2,7 +2,7 @@ package com.googlecode.n_orm.conversion;
 
 class ByteConverter extends NaturalConverter<Byte> {
 	public ByteConverter() {
-		super(Byte.class, byte.class, Byte.SIZE/Byte.SIZE);
+		super(Byte.class, byte.class, Byte.SIZE/Byte.SIZE, (byte)0);
 	}
 
 	@Override

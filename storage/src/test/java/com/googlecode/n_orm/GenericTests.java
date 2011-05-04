@@ -9,7 +9,8 @@ import org.junit.runners.Suite.SuiteClasses;
 		BasicTest.class,
 		CollectionStorageTest.class,
 		PersistableSearchTest.class,
-		InheritanceTest.class
+		InheritanceTest.class,
+		EvolutionTest.class
 })
 
 public class GenericTests {

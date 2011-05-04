@@ -2,7 +2,7 @@ package com.googlecode.n_orm.conversion;
 
 class ShortConverter extends NaturalConverter<Short> {
 	public ShortConverter() {
-		super(Short.class, short.class, Short.SIZE/Byte.SIZE);
+		super(Short.class, short.class, Short.SIZE/Byte.SIZE, (short)0);
 	}
 
 	@Override

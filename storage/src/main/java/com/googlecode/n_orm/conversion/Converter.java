@@ -53,4 +53,6 @@ abstract class Converter<T> implements
 		return this.getClazz().getName()
 				.compareTo(rhs.getClazz().getName());
 	}
+
+	public abstract T getDefaultValue();
 }

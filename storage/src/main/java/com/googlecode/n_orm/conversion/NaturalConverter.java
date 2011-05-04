@@ -2,8 +2,8 @@ package com.googlecode.n_orm.conversion;
 
 abstract class NaturalConverter<T extends Number> extends PrimitiveConverter<T> {
 
-	public NaturalConverter(Class<T> clazz, Class<?> primitiveClazz, int byteSize) {
-		super(clazz, primitiveClazz, 1, byteSize, 1, byteSize*2);
+	public NaturalConverter(Class<T> clazz, Class<?> primitiveClazz, int byteSize, T defaultValue) {
+		super(clazz, primitiveClazz, 1, byteSize, 1, byteSize*2, defaultValue);
 	}
 
 	public long parseString(String rep) {

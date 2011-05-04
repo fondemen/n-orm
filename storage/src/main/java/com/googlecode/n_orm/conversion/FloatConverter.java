@@ -3,7 +3,7 @@ package com.googlecode.n_orm.conversion;
 class FloatConverter extends PrimitiveConverter<Float> {
 	public static final int BYTE_SIZE = Float.SIZE/Byte.SIZE;
 	public FloatConverter() {
-		super(Float.class, float.class, BYTE_SIZE, BYTE_SIZE, 1, -1);
+		super(Float.class, float.class, BYTE_SIZE, BYTE_SIZE, 1, -1, 0.0f);
 	}
 
 	@Override
