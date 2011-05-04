@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.hbase;
+package com.googlecode.n_orm.hbase.mapreduce;
 
 import java.io.IOException;
 
@@ -12,6 +12,8 @@ import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
+
+import com.googlecode.n_orm.hbase.Store;
 
 public class RowCounter {
 
@@ -34,16 +36,15 @@ public class RowCounter {
 		}
 	}
 
-	public static Job createSubmittableJob(Configuration conf, String tableName,
+	public static Job createSubmittableJob(Store s, String tableName,
 			Scan scan) throws IOException {
-		Job job = new Job(conf, NAME + "_" + tableName + "_" + scan.hashCode());
+		Job job = new Job(LocalFormat.prepareConf(s, null), NAME + "_" + tableName + "_" + scan.hashCode());
 		scan.setCaching(500);
-		job.setJarByClass(RowCounter.class);
 		scan.setFilter(new FirstKeyOnlyFilter());
-		job.setOutputFormatClass(NullOutputFormat.class);
 		TableMapReduceUtil.initTableMapperJob(tableName, scan,
 				RowCounterMapper.class, ImmutableBytesWritable.class,
-				Result.class, job);
+				Result.class, job, true);
+		LocalFormat.prepareJob(job);
 		job.setNumReduceTasks(0);
 		return job;
 	}
