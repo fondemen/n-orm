@@ -4,7 +4,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -14,6 +16,11 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+import java.util.logging.StreamHandler;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -112,7 +119,27 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			return file.getName().endsWith("-site.xml");
 		}
 	};
+
+	public static final Logger logger;
+	public static final Logger errorLogger;
+	
 	protected static Map<Properties, Store> knownStores = new HashMap<Properties, Store>();
+	
+	static {
+		logger = Logger.getLogger(Store.class.getName());
+		errorLogger = Logger.getLogger(Store.class.getName());
+		initSimpleLogger(logger, System.out);
+		initSimpleLogger(errorLogger, System.err);
+	}
+	
+	private static void initSimpleLogger(Logger logger, PrintStream out) {
+		StreamHandler handler = new StreamHandler(System.out, new SimpleFormatter());
+		logger.addHandler(handler);
+		for (Handler h : logger.getHandlers()) {
+			if (h != handler)
+				logger.removeHandler(h);
+		}
+	}
 
 	/**
 	 * For test purpose ; avoid using this.
@@ -133,12 +160,14 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				p.setProperty("maxRetries", maxRetries.toString());
 			Store ret = knownStores.get(p);
 			if (ret == null) {
+				logger.info("Creating store for " + host + ':' + port);
 				ret = new Store(p);
 				ret.setHost(host);
 				ret.setPort(port);
 				if (maxRetries != null)
 					ret.setMaxRetries(maxRetries);
 				knownStores.put(p, ret);
+				logger.info("Created store " + ret.hashCode() + " for " + host + ':' + port);
 			}
 			return ret;
 		}
@@ -155,14 +184,14 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			Store ret = knownStores.get(p);
 			
 			if (ret == null) {
-				
+				logger.info("Creating store for " + commaSeparatedConfigurationFolders);
 				Configuration conf = new Configuration();
 				ReportConf r = new ReportConf(conf);
 				for (String  configurationFolder : commaSeparatedConfigurationFolders.split(",")) {
 					
 					File confd = new File(configurationFolder);
 					if (!confd.isDirectory()) {
-						System.err.println("Cannot read HBase configuration folder " + confd);
+						errorLogger.config("Cannot read HBase configuration folder " + confd);
 						continue;
 					}
 					
@@ -178,6 +207,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				ret.setConf(HBaseConfiguration.create(conf));
 				
 				knownStores.put(p, ret);
+				logger.info("Created store " + ret.hashCode() + " for " + commaSeparatedConfigurationFolders);
 			}
 			
 			return ret;
@@ -205,6 +235,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	public synchronized void start() throws DatabaseNotReachedException {
 		if (this.wasStarted)
 			return;
+		
+		logger.info("Starting store " + this.hashCode());
 
 		if (this.config == null) {
 			Configuration properties = HBaseConfiguration.create();
@@ -223,13 +255,19 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 		if (this.admin == null)
 			try {
+				logger.fine("Connecting HBase admin for store " + this.hashCode());
 				this.setAdmin(new HBaseAdmin(this.config));
-				if (!this.admin.isMasterRunning())
-					throw new DatabaseNotReachedException(
-							new MasterNotRunningException());
+				logger.fine("Connected HBase admin for store " + this.hashCode());
+				if (!this.admin.isMasterRunning()) {
+					errorLogger.severe("No HBase master running for store " + this.hashCode());
+					throw new DatabaseNotReachedException(new MasterNotRunningException());
+				}
 			} catch (Exception e) {
+				errorLogger.severe("Could not cpnnect HBase for store " + this.hashCode() + " (" +e.getMessage() +')');
 				throw new DatabaseNotReachedException(e);
 			}
+			
+		logger.info("Started store " + this.hashCode());
 
 		this.wasStarted = true;
 	}
@@ -333,17 +371,20 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	}
 	
 	private void handleProblem(Exception problem, String table) throws DatabaseNotReachedException {
+		errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped", problem);
 		if (problem instanceof DatabaseNotReachedException)
 			throw (DatabaseNotReachedException)problem;
 		
 		if (problem instanceof TableNotFoundException) {
 			table = this.mangleTableName(table);
+			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", problem);
 			if (this.tablesD.containsKey(table))
 				this.uncache(table);
 			else
 				throw new DatabaseNotReachedException(problem);
 		} else if (problem instanceof IOException) {
 			if (problem.getMessage().contains("closed")) {
+				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", problem);
 				restart();
 				return;
 			}
@@ -364,11 +405,14 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		try {
 			return action.perform();
 		} catch (Exception e) {
+			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
 			table = this.handleProblemAndGetTable(e, tableName, expectedFamilies);
 			action.setTable(table);
 			try {
+				errorLogger.log(Level.INFO, "Retrying to perform again erroneous " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
 				return action.perform();
 			} catch (Exception f) {
+				errorLogger.log(Level.SEVERE, "Cannot recover from error while performing a" + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
 				throw new DatabaseNotReachedException(f);
 			}
 		}
@@ -402,8 +446,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		boolean created = false;
 		synchronized (this.tablesD) {
 			if (!this.tablesD.containsKey(name)) {
+				logger.fine("Unknown table " + name + " for store " + this.hashCode());
 				try {
 					if (!this.admin.tableExists(name)) {
+						logger.info("Table " + name + " not found ; creating with column families " + Arrays.toString(expectedFamilies));
 						td = new HTableDescriptor(name);
 						if (expectedFamilies != null) {
 							for (String fam : expectedFamilies) {
@@ -411,9 +457,11 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 							}
 						}
 						this.admin.createTable(td);
+						logger.info("Table " + name + " created with column families " + Arrays.toString(expectedFamilies));
 						created = true;
 					} else {
 						td = this.admin.getTableDescriptor(Bytes.toBytes(name));
+						logger.fine("Got descriptor for table " + name);
 					}
 					this.cache(name, td);
 				} catch (IOException e) {
@@ -424,7 +472,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			}
 		}
 
-		if (!created && expectedFamilies != null) {
+		if (!created && expectedFamilies != null && expectedFamilies.length>0) {
 			this.enforceColumnFamiliesExists(td, expectedFamilies);
 		}
 
@@ -432,10 +480,13 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			HTable ret = this.tablesC.get(name);
 			if (ret == null) {
 				try {
+					logger.fine("Creating accessor for table " + name);
 					ret = new HTable(this.config, name);
 					this.cache(name, ret);
+					logger.fine("Created accessor for table " + name);
 					return ret;
 				} catch (IOException e) {
+					errorLogger.log(Level.SEVERE, "Could not create accessor for table " + name, e);
 					throw new DatabaseNotReachedException(e);
 				}
 			}
@@ -469,18 +520,18 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	private void enforceColumnFamiliesExists(HTableDescriptor tableD,
 			String... columnFamilies) throws DatabaseNotReachedException {
 		assert tableD != null;
-		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(
-				columnFamilies.length);
+		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.length);
 		synchronized (tableD) {
 			boolean recreated = false;
 			for (String cf : columnFamilies) {
 				byte[] cfname = Bytes.toBytes(cf);
 				if (!recreated && !tableD.hasFamily(cfname)) {
 					String tableName = tableD.getNameAsString();
+					logger.fine("Table " + tableName + " is not known to have family " + cf + ": checking from HBase");
 					try {
-						tableD = this.admin
-								.getTableDescriptor(tableD.getName());
+						tableD = this.admin.getTableDescriptor(tableD.getName());
 					} catch (Exception e) {
+						errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
 						this.handleProblemAndGetTable(e, tableName, columnFamilies);
 						return;
 					}
@@ -495,13 +546,15 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			}
 			if (!toBeAdded.isEmpty()) {
 				try {
+					logger.info("Table " + tableD.getNameAsString() + " does have families " + toBeAdded.toString() + ": creating");
 					this.admin.disableTable(tableD.getName());
 					for (HColumnDescriptor hColumnDescriptor : toBeAdded) {
-						this.admin.addColumn(tableD.getName(),
-								hColumnDescriptor);
+						this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 					}
 					this.admin.enableTable(tableD.getName());
+					logger.info("Table " + tableD.getNameAsString() + " does have families " + toBeAdded.toString() + ": created");
 				} catch (IOException e) {
+					errorLogger.log(Level.SEVERE, "Could not create on table " + tableD.getNameAsString() + " families " + toBeAdded.toString(), e);
 					throw new DatabaseNotReachedException(e);
 				}
 
@@ -821,6 +874,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		if (! this.hasTableNoCache(table))
 			return;
 		
+		logger.info("Truncating table " + table);
+		
 		HTable t = this.getTable(table);
 		ScanAction action = new ScanAction(s);
 		ResultScanner r = this.tryPerform(action, t, table);
@@ -838,7 +893,9 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				t.delete(dels);
 				res = r.next(nbRows);
 			}
+			logger.info("Truncated table " + table);
 		} catch (IOException e) {
+			errorLogger.log(Level.INFO, "Could not truncate table " + table, e);
 			throw new DatabaseNotReachedException(e);
 		} finally {
 			if (r != null)
@@ -849,17 +906,25 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	protected void truncateMapReduce(String table, Scan s)  {
 		if (!this.hasTableNoCache(table))
 			return;
+		
+		logger.info("Truncating table " + table + " using map/reduce job");
 
 		String tableName = this.mangleTableName(table);
 		try {
 			Job count = Truncator.createSubmittableJob(this, tableName, s);
-			if(!count.waitForCompletion(false))
+			if(!count.waitForCompletion(false)) {
+				errorLogger.info("Could not truncate table with map/reduce " + table);
 				throw new DatabaseNotReachedException("Truncate failed for table " + table);
+			}
+			logger.info("Truncated table " + table + " using map/reduce job");
 		} catch (IOException e) {
+			errorLogger.log(Level.INFO, "Could not truncate table " + table, e);
 			throw new DatabaseNotReachedException(e);
 		} catch (InterruptedException e) {
+			errorLogger.log(Level.INFO, "Could not truncate table " + table, e);
 			throw new DatabaseNotReachedException(e);
 		} catch (ClassNotFoundException e) {
+			errorLogger.log(Level.INFO, "Could not truncate table " + table, e);
 			throw new DatabaseNotReachedException(e);
 		}
 	}
