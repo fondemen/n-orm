@@ -56,9 +56,14 @@ public class HBase {
 			Store ret = knownStores.get(commaSeparatedConfigurationFolders);
 			
 			if (ret == null) {
-				for (String configurationFolder : commaSeparatedConfigurationFolders
-						.split(",")) {
-					addJarAction.recursiveManageFile(new File(configurationFolder), null);
+				String[] files = commaSeparatedConfigurationFolders.split(",");
+				for (String configurationFolder : files) {
+					if (configurationFolder.startsWith("!"))
+						addJarAction.ignore(new File(configurationFolder.substring(1)));
+				}
+				for (String configurationFolder : files) {
+					if (!configurationFolder.startsWith("!"))
+						addJarAction.recursiveManageFile(new File(configurationFolder), null);
 				}
 				ret = Store.getStore(commaSeparatedConfigurationFolders);
 				knownStores.put(commaSeparatedConfigurationFolders, ret);

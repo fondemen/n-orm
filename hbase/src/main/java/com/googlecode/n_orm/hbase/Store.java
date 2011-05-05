@@ -187,15 +187,22 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				logger.info("Creating store for " + commaSeparatedConfigurationFolders);
 				Configuration conf = new Configuration();
 				ReportConf r = new ReportConf(conf);
-				for (String  configurationFolder : commaSeparatedConfigurationFolders.split(",")) {
-					
-					File confd = new File(configurationFolder);
-					if (!confd.isDirectory()) {
-						errorLogger.config("Cannot read HBase configuration folder " + confd);
-						continue;
+				String[] files = commaSeparatedConfigurationFolders.split(",");
+				for (String  configurationFolder : files) {
+					if (configurationFolder.startsWith("!"))
+						addConfAction.ignore(new File(configurationFolder.substring(1)));
+				}
+				for (String  configurationFolder : files) {
+					if (!configurationFolder.startsWith("!")) {
+						File confd = new File(configurationFolder);
+						if (!confd.isDirectory()) {
+							errorLogger.config("Cannot read HBase configuration folder " + confd);
+							continue;
+						}
+						
+
+						addConfAction.recursiveManageFile(confd, r);
 					}
-					
-					addConfAction.recursiveManageFile(confd, r);
 				}
 			
 				if (!r.foundPropertyFile)
