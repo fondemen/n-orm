@@ -2,8 +2,12 @@ package com.googlecode.n_orm.hbase;
 
 import java.io.File;
 import java.io.FilenameFilter;
+import java.util.Set;
+import java.util.TreeSet;
 
 public abstract class RecursiveFileAction {
+	
+	Set<File> toBeIgnored;
 	
 	public static abstract class Report {
 		public abstract void fileHandled(File f);
@@ -18,6 +22,12 @@ public abstract class RecursiveFileAction {
 		}
 	};
 	
+	public void ignore(File toBeIgnored) {
+		if (this.toBeIgnored == null)
+			this.toBeIgnored = new TreeSet<File>();
+		this.toBeIgnored.add(toBeIgnored);
+	}
+	
 	public abstract boolean acceptFile(File file);
 	
 	public abstract void manageFile(File f, Report r);
@@ -25,9 +35,11 @@ public abstract class RecursiveFileAction {
 
 
 	public void recursiveManageFile(File file, Report r) {
+		if (this.toBeIgnored != null && this.toBeIgnored.contains(file))
+			return;
+		
 		if (!file.canRead()) {
-			System.err
-					.println("WARNING: cannot read " + file.getAbsolutePath());
+			System.err.println("WARNING: cannot read " + file.getAbsolutePath());
 			return;
 		}
 
