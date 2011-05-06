@@ -16,6 +16,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.googlecode.n_orm.hbase.Store;
+import com.googlecode.n_orm.storage.HBaseLauncher;
+
 
 public class ConcurrentTest {
 	private static Store store1, store2;
@@ -57,13 +59,11 @@ public class ConcurrentTest {
 	
 	@Test
 	public void gettingEmptyObjectAndGetItFromBothStores() throws IOException {
-		this.deleteTable("t1");
+		this.truncateTable("t1");
 		
 		store1.storeChanges("t1", "idt1", null, null, null);
-		assertTrue(store1.exists("t1", "idt1"));
 		assertTrue(store2.exists("t1", "idt1"));
-		
-		this.deleteTable("t1");
+		assertTrue(store1.exists("t1", "idt1"));
 	}
 	
 	@Test
@@ -74,21 +74,19 @@ public class ConcurrentTest {
 		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
 		change1.put("cf1", ch1);
 		ch1.put("k1", new byte[]{1, 2});
-		store1.storeChanges("t1", "idt1", change1 , null, null);
-		store2.storeChanges("t1", "idt1", change1 , null, null);
+		store1.storeChanges("t1", "idt1", change1 , null, null); //Table should be created
+		store2.storeChanges("t1", "idt1", change1 , null, null); //Table should be discovered
 		assertTrue(store2.exists("t1", "idt1", "cf1"));
 		
 		this.deleteTable("t1");
 		
-		store1.storeChanges("t1", "idt1", change1 , null, null);
-		assertTrue(store2.exists("t1", "idt1", "cf1"));
-
-		this.deleteTable("t1");
+		store1.storeChanges("t1", "idt1", change1 , null, null); //Table should be re-discovered
+		store2.storeChanges("t1", "idt1", change1 , null, null); //Table should be re-discovered
+		assertTrue(store2.exists("t1", "idt1", "cf1")); 
 	}
 	
-	@Test
+	@Test(expected=Test.None.class)
 	public void acceptingConnectionTimeout() throws IOException, SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
-		this.truncateTable("t1");
 		
 		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
 		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
@@ -101,8 +99,27 @@ public class ConcurrentTest {
 		closeM.invoke(cm, true);
 		
 		store1.storeChanges("t1", "idt1", change1 , null, null);
-		assertTrue(store2.exists("t1", "idt1", "cf1"));
+	}
+	
+	@Test
+	public void acceptingOutsideColumnFamilyAddition() throws IOException {
 
-		this.truncateTable("t1");
+		this.deleteTable("t1");
+		
+		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
+		change1.put("cf1", ch1);
+		ch1.put("k1", new byte[]{1, 2});
+		store1.storeChanges("t1", "idt1", change1 , null, null);
+		store2.storeChanges("t1", "idt1", change1 , null, null);
+		
+		Map<String, Map<String, byte[]>> change2 = new TreeMap<String, Map<String,byte[]>>();
+		TreeMap<String, byte[]> ch2 = new TreeMap<String, byte[]>();
+		change1.put("cf2", ch2);
+		ch2.put("k1", new byte[]{1, 2});
+		
+		store1.storeChanges("t1", "idt1", change2 , null, null); //CF cf2 should be added to table
+		store2.storeChanges("t1", "idt1", change2 , null, null); //CF cf2 should be discovered as added to table
+		assertTrue(store2.exists("t1", "idt1", "cf2"));
 	}
 }
