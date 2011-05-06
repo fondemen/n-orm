@@ -115,7 +115,7 @@ public class ConcurrentTest {
 		
 		Map<String, Map<String, byte[]>> change2 = new TreeMap<String, Map<String,byte[]>>();
 		TreeMap<String, byte[]> ch2 = new TreeMap<String, byte[]>();
-		change1.put("cf2", ch2);
+		change2.put("cf2", ch2);
 		ch2.put("k1", new byte[]{1, 2});
 		
 		store1.storeChanges("t1", "idt1", change2 , null, null); //CF cf2 should be added to table
