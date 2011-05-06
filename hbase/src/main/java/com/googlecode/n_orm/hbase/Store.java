@@ -544,13 +544,13 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			}
 			if (!toBeAdded.isEmpty()) {
 				try {
-					logger.info("Table " + tableD.getNameAsString() + " does have families " + toBeAdded.toString() + ": creating");
+					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": creating");
 					this.admin.disableTable(tableD.getName());
 					for (HColumnDescriptor hColumnDescriptor : toBeAdded) {
 						this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 					}
 					this.admin.enableTable(tableD.getName());
-					logger.info("Table " + tableD.getNameAsString() + " does have families " + toBeAdded.toString() + ": created");
+					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": created");
 				} catch (IOException e) {
 					errorLogger.log(Level.SEVERE, "Could not create on table " + tableD.getNameAsString() + " families " + toBeAdded.toString(), e);
 					throw new DatabaseNotReachedException(e);
