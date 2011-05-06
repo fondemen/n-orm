@@ -8,6 +8,17 @@ import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * The HBase store found according to its configuration folder.
+ * An example store.properties file is:<br><code>
+ * class=com.googlecode.n_orm.hbase.Store<br>
+ * static-accessor=getStore<br>
+ * 1=/usr/lib/hadoop-0.20/conf/,/usr/lib/hbase/conf/,!/usr/lib/hadoop/example-confs
+ * </code><br>
+ * Given files are explored recursively ignoring files given with a ! prefix.
+ * Difference with {@link Store} is that jar found in the given folders are added to the classpath so that you don't need to include the HBase client jars in your application.
+ * However, if your application is ran within a servlet container (Tomcat, JBoss...), you should care excluding servlet and jsp APIs whom HBase depends on... 
+ */
 public class HBase {
 
 	private static Map<String, Store> knownStores = new HashMap<String, Store>();
@@ -56,15 +67,9 @@ public class HBase {
 			Store ret = knownStores.get(commaSeparatedConfigurationFolders);
 			
 			if (ret == null) {
-				String[] files = commaSeparatedConfigurationFolders.split(",");
-				for (String configurationFolder : files) {
-					if (configurationFolder.startsWith("!"))
-						addJarAction.ignore(new File(configurationFolder.substring(1)));
-				}
-				for (String configurationFolder : files) {
-					if (!configurationFolder.startsWith("!"))
-						addJarAction.recursiveManageFile(new File(configurationFolder), null);
-				}
+				addJarAction.clear();
+				addJarAction.addFiles(commaSeparatedConfigurationFolders);
+				addJarAction.explore(null);
 				ret = Store.getStore(commaSeparatedConfigurationFolders);
 				knownStores.put(commaSeparatedConfigurationFolders, ret);
 			}
