@@ -67,14 +67,16 @@ import com.googlecode.n_orm.storeapi.Constraint;
  * An example store.properties file is:<br><code>
  * class=com.googlecode.n_orm.hbase.Store<br>
  * static-accessor=getStore<br>
- * 1=/usr/lib/hadoop-0.20/conf/,/usr/lib/hbase/conf/
+ * 1=/usr/lib/hadoop-0.20/conf/,/usr/lib/hbase/conf/,!/usr/lib/hadoop/example-confs
  * </code><br>
+ * Given files are explored recursively ignoring files given with a ! prefix.
+ * Compared to {@link HBase}, no jar found in those is added to classpath.
  * For test purpose, you can also directly reach an HBase instance thanks to one of its zookeeper host and client port:<br><code>
  * class=com.googlecode.n_orm.hbase.Store<br>
  * static-accessor=getStore<br>
  * 1=localhost<br>
  * 2=2181
- * </code><br>  
+ * </code><br>
  */
 public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
@@ -114,6 +116,14 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			}
 		}
 		
+		@Override
+		public void addExploredFile(File toBeExplored) {
+			if (! toBeExplored.isDirectory())
+				errorLogger.config("Cannot read HBase configuration folder " + toBeExplored);
+			else
+				super.addExploredFile(toBeExplored);
+		}
+
 		@Override
 		public boolean acceptFile(File file) {
 			return file.getName().endsWith("-site.xml");
@@ -187,23 +197,9 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				logger.info("Creating store for " + commaSeparatedConfigurationFolders);
 				Configuration conf = new Configuration();
 				ReportConf r = new ReportConf(conf);
-				String[] files = commaSeparatedConfigurationFolders.split(",");
-				for (String  configurationFolder : files) {
-					if (configurationFolder.startsWith("!"))
-						addConfAction.ignore(new File(configurationFolder.substring(1)));
-				}
-				for (String  configurationFolder : files) {
-					if (!configurationFolder.startsWith("!")) {
-						File confd = new File(configurationFolder);
-						if (!confd.isDirectory()) {
-							errorLogger.config("Cannot read HBase configuration folder " + confd);
-							continue;
-						}
-						
-
-						addConfAction.recursiveManageFile(confd, r);
-					}
-				}
+				addConfAction.clear();
+				addConfAction.addFiles(commaSeparatedConfigurationFolders);
+				addConfAction.explore(r);
 			
 				if (!r.foundPropertyFile)
 					throw new IOException("No configuration file found in the following folders " + commaSeparatedConfigurationFolders + " ; expecting some *-site.xml files");
@@ -357,11 +353,6 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			}
 			
 		}
-	}
-
-	private void uncache(HTable t) {
-		String tableName = Bytes.toString(t.getTableName());
-		this.uncache(tableName);
 	}
 
 	protected synchronized void restart() {
