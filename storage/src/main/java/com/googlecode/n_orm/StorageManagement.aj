@@ -389,7 +389,7 @@ public aspect StorageManagement {
 			while (found.hasNext()) {
 				ret.add(found.next());
 			}
-			assert ret.size() == Math.min(limit, countElements(clazz, c));
+			//assert ret.size() == Math.min(limit, countElements(clazz, c));
 			return ret;
 		} finally {
 			found.close();
