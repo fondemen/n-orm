@@ -3,14 +3,11 @@ package com.googlecode.n_orm.cf;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Arrays;
-import java.util.ConcurrentModificationException;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-
 
 import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -19,7 +16,6 @@ import com.googlecode.n_orm.IncrementManagement;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.Transient;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
 
@@ -331,27 +327,7 @@ public abstract class ColumnFamily<T> {
 
 		Object pojo = this.getPOJO(false);
 		if (pojo != null && pojo != this) {
-			int maxRetries = 10;
-			ConcurrentModificationException cme = null;
-			do {
-				try {
-					synchronized (getOwner()) {
-						synchronized(pojo) {
-							this.updateFromPOJO(pojo);
-						}
-					}
-					cme = null;
-				} catch (ConcurrentModificationException x) {
-					cme = x;
-					try {
-						Thread.sleep(100);
-					} catch (InterruptedException e) {
-					}
-				}
-				maxRetries--;
-			} while (cme != null && maxRetries>=0);
-			if (cme != null)
-				throw cme;
+			this.updateFromPOJO(pojo);
 		}
 	}
 	
@@ -363,27 +339,7 @@ public abstract class ColumnFamily<T> {
 
 		Object pojo = this.getPOJO(true);
 		if (pojo != null && pojo != this) {
-			int maxRetries = 10;
-			ConcurrentModificationException cme = null;
-			do {
-				try {
-					synchronized (getOwner()) {
-						synchronized(pojo) {
-							this.storeToPOJO(pojo);
-						}
-					}
-					cme = null;
-				} catch (ConcurrentModificationException x) {
-					cme = x;
-					try {
-						Thread.sleep(100);
-					} catch (InterruptedException e) {
-					}
-				}
-				maxRetries--;
-			} while (cme != null && maxRetries>=0);
-			if (cme != null)
-				throw cme;
+			this.storeToPOJO(pojo);
 		}
 	}
 }
