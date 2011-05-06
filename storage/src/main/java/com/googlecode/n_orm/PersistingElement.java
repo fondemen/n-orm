@@ -2,6 +2,7 @@ package com.googlecode.n_orm;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -120,6 +121,23 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * </p><p>To choose a store, you need to supply in the classpath a properties file depending on the nature of the data store you want to use.
 	 * This property file is to be found in the class path. For a persisting element of a class in package foo.bar, the property file is searched as foo/bar/store.propetries in the complete classpath (in the declared order), then as foo/store.properties, and then directly store.properties.
 	 * To know how to define the properties file, please refer to your data store supplier. An (naive) example is the {@link com.googlecode.n_orm.memory.Memory} data store.
+	 * </p>
+	 * <p>
+	 * <b>WARNING:</b> any column family change would raise a {@link java.util.ConcurrentModificationException} during this period in case application is multi-threaded (such as in a web-application).
+	 * In the latter case, the store is retried at most 1s per problematic column family.
+	 * To solve this issue store calls should be performed within a synchronized section on this or on changed column family:<br>
+	 * <code>
+	 * synchronized(element.myFamily) { <i>//or merely synchronized(element)<br>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;element.myFamily.add(something);<br>
+	 * }
+	 * </code><br>
+	 * Another way to avoid such problem is to use an instance of {@link ColumnFamily} as a column family (but then this cannot be serialized):<br>
+	 * <code>
+	 * &#64;Persisting class Foo {<br>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;...<br>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;public Map<BarK,BarV> element = new MapColumnFamily();<br>
+	 * }
+	 * </code>
 	 * </p>
 	 * @throws DatabaseNotReachedException in case the store cannot store this persisting object (e.g. cannot connect to database)
 	 * @see #getIdentifier()

@@ -234,6 +234,12 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 			} else {
 				this.add(element);
 			}
+			if (this.slow) {
+				try {
+					Thread.sleep(50);
+				} catch (InterruptedException e) {
+				}
+			}
 		}
 		
 		for (String key : keys) {
@@ -254,5 +260,14 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 		Set<T> pojoS = (Set<T>)pojo;
 		
 		pojoS.add(element);
+	}
+	
+	private boolean slow = false;
+	
+	/**
+	 * For test purpose...
+	 */
+	void goSlow() {
+		this.slow = true;
 	}
 }
