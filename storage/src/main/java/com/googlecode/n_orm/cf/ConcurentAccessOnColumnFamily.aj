@@ -16,8 +16,10 @@ public aspect ConcurentAccessOnColumnFamily {
 				}
 				cme = null;
 			} catch (ConcurrentModificationException x) {
-				if (cme == null)
+				if (cme == null) {
 					System.err.println("Got a ConcurrentModificationException; please protect your changes to column families within a synchronized section. Retrying for the next 500 ms.");
+					x.printStackTrace();
+				}
 				cme = x;
 				try {
 					Thread.sleep(100);
