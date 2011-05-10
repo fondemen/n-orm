@@ -387,4 +387,29 @@ public class BasicTest {
 		 bsut.store();
 		 EasyMock.verify(listener, listener2);
 	 }
+	 
+	 @Test(timeout=500)
+	 public void concurrentTest() throws InterruptedException {
+		 final BookStore bs = StorageManagement.findElements().ofClass(BookStore.class).withKey("hashcode").setTo("testbookstore").any();
+		 final BookStore bs2 = StorageManagement.findElements().ofClass(BookStore.class).withKey("hashcode").setTo("testbookstore").any();
+		 assertSame(bs, bs2);
+		 final BookStore[] bsth = new BookStore[1];
+		 
+		 Thread t = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				 bsth[0] = StorageManagement.findElements().ofClass(BookStore.class).withKey("hashcode").setTo("testbookstore").any();
+			}
+		}, "inside");
+		 t.start();
+		 
+		 do {
+			 Thread.sleep(50);
+		 } while(t.isAlive());
+
+		 assertNotSame(bssut, bsth[0]);
+		 assertNotSame(bs, bsth[0]);
+		 assertEquals(bssut, bsth[0]);
+	 }
 }
