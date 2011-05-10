@@ -114,7 +114,8 @@ public class PersistableSearchTest {
 		checkOrder(res);
 	}
 	
-	@Test public void search1SutWithFirstKey() throws DatabaseNotReachedException {
+	@Test(timeout=500)//timeout makes the process execute in another thread ; for some reason, cache is not cleaned in this particular case
+	public void search1SutWithFirstKey() throws DatabaseNotReachedException {
 		Set<SUTClass> ress = StorageManagement.findElementsToSet(SUTClass.class, new Constraint(SUTClass.class, null, "key1", 49, 55), 1, (String[])null);
 		assertEquals(1, ress.size());
 		SUTClass res = ress.iterator().next();
