@@ -1,8 +1,13 @@
 package com.googlecode.n_orm.cache;
 
 import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.Map.Entry;
 import java.util.logging.Logger;
 
@@ -22,7 +27,8 @@ public class Cache {
 	
 	private static final CacheManager cacheManager = CacheManager.create();
 	private static final Map<Thread, Cache> perThreadCaches;
-	private static final Thread cacheCleaner;
+	private static final Timer cacheCleanerTimer;
+	private static final TimerTask cacheCleaner;
 	
 	static {
 		perThreadCaches = Collections.synchronizedMap(new LinkedHashMap<Thread, Cache>(16, 0.75f, true) {
@@ -39,30 +45,26 @@ public class Cache {
 			}
 			
 		});
-		cacheCleaner = new Thread(new Runnable() {
+		cacheCleaner = new TimerTask() {
 			
 			@Override
 			public void run() {
-				synchronized (cacheCleaner) {
-					while(true) {
-						try {
-							cacheCleaner.wait(periodBetweenCacheCleanupSeconds);
-						} catch (InterruptedException e) {
-							e.printStackTrace();
+				List<Cache> dead = new LinkedList<Cache>();
+				synchronized (perThreadCaches) {
+					for (Entry<Thread, Cache> entry : perThreadCaches.entrySet()) {
+						if (!entry.getValue().isValid()) {
+							dead.add(entry.getValue());
 						}
-						for (Entry<Thread, Cache> entry : perThreadCaches.entrySet()) {
-							if (!entry.getValue().isValid()) {
-								perThreadCaches.remove(entry.getKey());
-								entry.getValue().close();
-							}
-						}
-						cacheCleaner.notify();
+					}
+					for (Cache cache : dead) {
+						perThreadCaches.remove(cache.thread);
+						cache.close();
 					}
 				}
 			}
-		}, "cache-cleaner");
-		cacheCleaner.setDaemon(true);
-		cacheCleaner.start();
+		};
+		cacheCleanerTimer = new Timer("per-thread cache cleaner", true);
+		cacheCleanerTimer.schedule(cacheCleaner, new Date(), periodBetweenCacheCleanupSeconds);
 		logger.info("Per-thread caching system started.");
 	}
 	
@@ -86,12 +88,8 @@ public class Cache {
 		return periodBetweenCacheCleanupSeconds;
 	}
 
-	static void setPeriodBetweenCacheCleanupSeconds(
-			int periodBetweenCacheCleanupSeconds) {
-		synchronized(cacheCleaner) {
-			Cache.periodBetweenCacheCleanupSeconds = periodBetweenCacheCleanupSeconds;
-			cacheCleaner.notify();
-		}
+	static void runCacheCleanup() {
+		cacheCleaner.run();
 	}
 
 	static void waitNextCleanup() throws InterruptedException {
@@ -198,6 +196,8 @@ public class Cache {
 	
 	public void reset() {
 		this.cache.removeAll();
+		assert this.size() == 0;
+		logger.finer("Reseted cache for thread " + this.thread + " with id " + this.cache.getName());
 	}
 	
 	public boolean isClosed() {
@@ -207,10 +207,9 @@ public class Cache {
 	protected void close() {
 		if (this.closed)
 			return;
-		this.reset();
 		cacheManager.removeCache(this.cache.getName());
 		this.closed = true;
-		logger.info("Logger stopped for thread " + this.thread + " with id " + this.cache.getName());
+		logger.info("Cache stopped for thread " + this.thread + " with id " + this.cache.getName());
 	}
 
 	@Override

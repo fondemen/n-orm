@@ -2,12 +2,16 @@ package com.googlecode.n_orm.cache;
 
 import static org.junit.Assert.*;
 
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.googlecode.n_orm.BookStore;
 import com.googlecode.n_orm.StorageManagement;
 
 public class CacheTest {
+	
+	static int originalCleanupPeriod;
 	
 	@Test
 	public void  cacheOnceObjectCreated() {
@@ -17,12 +21,10 @@ public class CacheTest {
 		assertSame(bs,Cache.getCache().getKnownPersistingElement(bs.getFullIdentifier()));
 	}
 
-	@Test
+	@Test(timeout=11000)
 	public void cacheCleanup() throws InterruptedException {
 		int max = Cache.getMaxElementsInCache();
 		Cache.setMaxElementsInCache(2);
-		int cleanupPeriod = Cache.getPeriodBetweenCacheCleanupSeconds();
-		Cache.setPeriodBetweenCacheCleanupSeconds(1);
 		try {
 			final AssertionError[] error = new AssertionError [1];
 			final BookStore bs = new BookStore("testbookstore");
@@ -68,13 +70,12 @@ public class CacheTest {
 					throw error[0];
 			} while (t.isAlive());
 			
-			Cache.waitNextCleanup();
+			Cache.runCacheCleanup();
 
 			assertNull(Cache.findCache(t));
 			assertFalse(Cache.knowsCache(t));
 		} finally {
 			Cache.setMaxElementsInCache(max);
-			Cache.setPeriodBetweenCacheCleanupSeconds(cleanupPeriod);
 		}
 		
 	}
