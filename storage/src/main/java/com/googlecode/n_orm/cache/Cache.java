@@ -1,108 +1,124 @@
 package com.googlecode.n_orm.cache;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.logging.Logger;
 
-import net.sf.ehcache.CacheException;
 import net.sf.ehcache.CacheManager;
-import net.sf.ehcache.Ehcache;
 import net.sf.ehcache.Element;
 import net.sf.ehcache.config.CacheConfiguration;
-import net.sf.ehcache.event.CacheEventListener;
-import net.sf.ehcache.store.LruPolicy;
 import net.sf.ehcache.store.MemoryStoreEvictionPolicy;
 
 import com.googlecode.n_orm.PersistingElement;
 
 public class Cache {
 	private static Logger logger = Logger.getLogger(Cache.class.getName());
+
+	private static int timeToLiveSeconds = 60;
+	private static int maxElementsInCache = 10000;
+	private static int periodBetweenCacheCleanupSeconds = 10000;
 	
-	private static CacheManager cacheManager = CacheManager.create();
-	private static net.sf.ehcache.Cache perThreadCaches;
+	private static final CacheManager cacheManager = CacheManager.create();
+	private static final Map<Thread, Cache> perThreadCaches;
+	private static final Thread cacheCleaner;
 	
 	static {
-		perThreadCaches = new net.sf.ehcache.Cache(
-			     new CacheConfiguration("thread-caches", 10000)
-			       .memoryStoreEvictionPolicy(MemoryStoreEvictionPolicy.LRU)
-			       .overflowToDisk(false)
-			       .eternal(false)
-			       .timeToLiveSeconds(120)
-			       .timeToIdleSeconds(120)
-			       .diskPersistent(false)
-			       .diskExpiryThreadIntervalSeconds(0)
-			       .statistics(false));
-		cacheManager.addCache(perThreadCaches);
-		perThreadCaches.setMemoryStoreEvictionPolicy(new LruPolicy() {
-			public static final String NAME = "Alive";
-			
+		perThreadCaches = Collections.synchronizedMap(new LinkedHashMap<Thread, Cache>(16, 0.75f, true) {
+
+			private static final long serialVersionUID = -5467869874569876546l;
+	
 			@Override
-			public String getName() {
-				return NAME;
+			protected boolean removeEldestEntry(Entry<Thread, Cache> entry) {
+				if (!entry.getValue().isValid()) {
+					entry.getValue().close();
+					return true;
+				}
+				return false;
 			}
 			
-			@Override
-			public boolean compare(Element element1, Element element2) {
-				return ((Cache)element1.getValue()).isValid() ?
-						false
-					:	(((Cache)element2.getValue()).isValid() ?
-								true 
-							:	super.compare(element1, element2));
-					
-			}
 		});
-		perThreadCaches.getCacheEventNotificationService().registerListener(new CacheEventListener() {
+		cacheCleaner = new Thread(new Runnable() {
 			
 			@Override
-			public void notifyRemoveAll(Ehcache cache) {
+			public void run() {
+				synchronized (cacheCleaner) {
+					while(true) {
+						try {
+							cacheCleaner.wait(periodBetweenCacheCleanupSeconds);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+						for (Entry<Thread, Cache> entry : perThreadCaches.entrySet()) {
+							if (!entry.getValue().isValid()) {
+								perThreadCaches.remove(entry.getKey());
+								entry.getValue().close();
+							}
+						}
+						cacheCleaner.notify();
+					}
+				}
 			}
-			
-			@Override
-			public void notifyElementUpdated(Ehcache cache, Element element)
-					throws CacheException {
-			}
-			
-			@Override
-			public void notifyElementRemoved(Ehcache cache, Element element)
-					throws CacheException {
-				((Cache)element.getValue()).close();
-			}
-			
-			@Override
-			public void notifyElementPut(Ehcache cache, Element element)
-					throws CacheException {
-			}
-			
-			@Override
-			public void notifyElementExpired(Ehcache cache, Element element) {
-			}
-			
-			@Override
-			public void notifyElementEvicted(Ehcache cache, Element element) {
-			}
-			
-			@Override
-			public void dispose() {
-			}
-			
-			@Override
-			public Object clone() throws CloneNotSupportedException {
-				throw new CloneNotSupportedException();
-			}
-		});
+		}, "cache-cleaner");
+		cacheCleaner.setDaemon(true);
+		cacheCleaner.start();
 		logger.info("Per-thread caching system started.");
 	}
 	
+	static int getTimeToLiveSeconds() {
+		return timeToLiveSeconds;
+	}
+
+	static void setTimeToLiveSeconds(int timeToLiveSeconds) {
+		Cache.timeToLiveSeconds = timeToLiveSeconds;
+	}
+
+	static int getMaxElementsInCache() {
+		return maxElementsInCache;
+	}
+
+	static void setMaxElementsInCache(int maxElementsInCache) {
+		Cache.maxElementsInCache = maxElementsInCache;
+	}
+
+	static int getPeriodBetweenCacheCleanupSeconds() {
+		return periodBetweenCacheCleanupSeconds;
+	}
+
+	static void setPeriodBetweenCacheCleanupSeconds(
+			int periodBetweenCacheCleanupSeconds) {
+		synchronized(cacheCleaner) {
+			Cache.periodBetweenCacheCleanupSeconds = periodBetweenCacheCleanupSeconds;
+			cacheCleaner.notify();
+		}
+	}
+
+	static void waitNextCleanup() throws InterruptedException {
+		synchronized(cacheCleaner) {
+			cacheCleaner.wait();
+		}
+	}
+	
+	static boolean knowsCache(Thread thread) {
+		return cacheManager.cacheExists(getThreadId(thread));
+	}
+	
+	static Cache findCache(Thread thread) {
+		return perThreadCaches.get(thread);
+	}
+	
 	public static Cache getCache() {
-		Element res = perThreadCaches.get(Thread.currentThread());
-		if (res != null && !((Cache)res.getObjectValue()).isValid()) {
+		Cache res = perThreadCaches.get(Thread.currentThread());
+		if (res != null && !res.isValid()) {
 			perThreadCaches.remove(res);
-			((Cache)res.getObjectValue()).close();
-			res = null;
+			res.close();
 		}
 		if (res == null) {
-			res = new Element(Thread.currentThread(), new Cache());
-			perThreadCaches.put(res);
+			res = new Cache();
+			perThreadCaches.put(res.thread, res);
 		}
-		return (Cache) res.getObjectValue();
+		return res;
 	}
 	
 	public static String getThreadId() {
@@ -115,16 +131,17 @@ public class Cache {
 	
 	private final net.sf.ehcache.Cache cache;
 	private final Thread thread;
+	private boolean closed = false;
 
 	private Cache() {
 		this.thread = Thread.currentThread();
 		this.cache = new net.sf.ehcache.Cache(
-			     new CacheConfiguration(getThreadId(this.thread), 10000)
+			     new CacheConfiguration(getThreadId(this.thread), maxElementsInCache)
 			       .memoryStoreEvictionPolicy(MemoryStoreEvictionPolicy.LRU)
 			       .overflowToDisk(false)
 			       .eternal(false)
-			       .timeToLiveSeconds(60)
-			       .timeToIdleSeconds(30)
+			       .timeToLiveSeconds(timeToLiveSeconds)
+			       .timeToIdleSeconds(timeToLiveSeconds)
 			       .diskPersistent(false)
 			       .diskExpiryThreadIntervalSeconds(0)
 			       .statistics(false));
@@ -137,6 +154,7 @@ public class Cache {
 	}
 	
 	protected void checkThread() {
+		assert !this.closed;
 		if (this.thread != Thread.currentThread())
 			throw new IllegalStateException(Thread.currentThread().toString() + " with id " + Thread.currentThread().getId() + " is not allowed to acccess cache for " + (this.thread.isAlive() ? "alive" : "dead") + " " + this.thread + " with id " + this.thread.getId());
 	}
@@ -174,12 +192,24 @@ public class Cache {
 		return this.getKnownPersistingElement(identifier + clazz.getName());
 	}
 	
+	public int size() {
+		return this.cache.getKeysWithExpiryCheck().size();
+	}
+	
 	public void reset() {
 		this.cache.removeAll();
 	}
 	
+	public boolean isClosed() {
+		return this.closed;
+	}
+	
 	protected void close() {
+		if (this.closed)
+			return;
+		this.reset();
 		cacheManager.removeCache(this.cache.getName());
+		this.closed = true;
 		logger.info("Logger stopped for thread " + this.thread + " with id " + this.cache.getName());
 	}
 
