@@ -123,9 +123,10 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * To know how to define the properties file, please refer to your data store supplier. An (naive) example is the {@link com.googlecode.n_orm.memory.Memory} data store.
 	 * </p>
 	 * <p>
-	 * <b>WARNING:</b> any column family change would raise a {@link java.util.ConcurrentModificationException} during this period in case application is multi-threaded (such as in a web-application).
-	 * In the latter case, the store is retried at most 1s per problematic column family.
-	 * To solve this issue store calls should be performed within a synchronized section on this or on changed column family:<br>
+	 * <b>WARNING:</b> any column family change would raise a {@link java.util.ConcurrentModificationException} during this period in case application is multi-threaded and this element is explicitly shared by threads.
+	 * In the latter case, the store is retried at most 0.5s per problematic column family.
+	 * Simplest solution is to search this element in each thread using {@link StorageManagement.getElement(Class, String)}.<br>
+	 * A cleaner mean to solve this issue store calls should be performed within a synchronized section on this or on changed column family:<br>
 	 * <code>
 	 * synchronized(element.myFamily) { <i>//or merely synchronized(element)<br>
 	 * &nbsp;&nbsp;&nbsp;&nbsp;element.myFamily.add(something);<br>

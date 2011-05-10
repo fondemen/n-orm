@@ -21,6 +21,7 @@ import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.cache.Cache;
 import com.googlecode.n_orm.conversion.ArrayConverter;
 import com.googlecode.n_orm.conversion.ConversionTools;
 
@@ -165,6 +166,7 @@ public aspect KeyManagement {
 				if (ret instanceof PersistingElement) {
 					((PersistingElement)ret).identifier = ident;
 					((PersistingElement)ret).getFullIdentifier();
+					km.register((PersistingElement) ret);
 				}
 			}
 			return ret;
@@ -212,24 +214,20 @@ public aspect KeyManagement {
 	}
 	
 	private Map<Class<?>, List<Field>> typeKeys = new HashMap<Class<?>, List<Field>>();
-	
-	//The list of persisting elements stored with their full identifier as key.
-	private transient WeakHashMap<String, PersistingElement> knownElements = new WeakHashMap<String, PersistingElement>();
 
 	private transient String PersistingElement.identifier;
 	private transient String PersistingElement.fullIdentifier;
 	
 	public void register(PersistingElement element) {
-		if (element.exists == null || Boolean.TRUE.equals(element.exists))
-			this.knownElements.put(element.getFullIdentifier(), element);
+		Cache.getCache().register(element);
 	}
 	
 	public void unregister(PersistingElement element) {
-		this.knownElements.remove(element.getFullIdentifier());
+		Cache.getCache().unregister(element);
 	}
 	
 	public PersistingElement getKnownPersistingElement(String fullIdentifier) {
-		return this.knownElements.get(fullIdentifier);
+		return Cache.getCache().getKnownPersistingElement(fullIdentifier);
 	}
 	
 	public PersistingElement getKnownPersistingElement(String identifier, Class<? extends PersistingElement> clazz) {
@@ -238,7 +236,7 @@ public aspect KeyManagement {
 	
 	//For test purpose
 	public void cleanupKnownPersistingElements() {
-		this.knownElements.clear();
+		Cache.getCache().reset();
 	}
 	
 	after(PersistingElement self) returning: execution(void PersistingElement+.delete()) && this(self) {

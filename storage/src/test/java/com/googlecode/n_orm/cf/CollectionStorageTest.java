@@ -1,8 +1,6 @@
 package com.googlecode.n_orm.cf;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.util.Calendar;
 import java.util.ConcurrentModificationException;
@@ -24,6 +22,7 @@ import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.MemoryStoreTestLauncher;
 import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreTestLauncher;
 
 
@@ -495,6 +494,57 @@ public class CollectionStorageTest {
 				try {
 					Thread.sleep(100);
 					sut.updateFromPOJO();
+				} catch(Exception x) {
+					failed[0] = x;
+				}
+				
+				done[0] = true;
+			}
+		});
+		t1.setPriority(Thread.MIN_PRIORITY);
+		((SetColumnFamily<?>)sut.getColumnFamily(sut.elements)).goSlow();
+		t1.start();
+		while(!done[0])
+			Thread.sleep(100);
+		if (failed[0] != null)
+			throw failed[0];
+	}
+	
+	@Test(expected=Test.None.class, timeout=5000)
+	public void concurrentChangeAndUpdateFromSearchOnCF() throws Exception {
+		sut.store();
+		sut.elements.add(new Element(456, "dummy"));
+		final boolean [] done = {false};
+		final Exception [] failed = {null};
+		final Thread t2 = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				Container sutT = StorageManagement.findElements().ofClass(Container.class).andActivate("elements").withId(sut.getIdentifier());
+				assertNotSame(sut, sutT);
+				((SetColumnFamily<?>)sutT.getColumnFamily(sutT.elements)).goSlow();
+				int i = 4536;
+				while (!done[0]) {
+					i++;
+					sutT.elements.add(new Element(i, "dummy"));
+					i++;
+					sutT.elements.add(new Element(i, "dummy"));
+					sutT.elements.remove(new Element(i-1, "dummy"));
+				}
+			}
+		});
+		t2.setPriority(Thread.MAX_PRIORITY);
+		Thread t1 = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				Container sutT = StorageManagement.findElements().ofClass(Container.class).andActivate("elements").withId(sut.getIdentifier());
+				assertNotSame(sut, sutT);
+				((SetColumnFamily<?>)sutT.getColumnFamily(sutT.elements)).goSlow();
+				t2.start();
+				try {
+					Thread.sleep(100);
+					sutT.updateFromPOJO();
 				} catch(Exception x) {
 					failed[0] = x;
 				}
