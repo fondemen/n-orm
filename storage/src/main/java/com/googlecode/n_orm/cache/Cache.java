@@ -144,7 +144,7 @@ public class Cache {
 			       .diskExpiryThreadIntervalSeconds(0)
 			       .statistics(false));
 		cacheManager.addCache(this.cache);
-		logger.info("Cache started for " + this.thread + " with id " + this.cache.getName());
+		logger.fine("Cache started for " + this.thread + " with id " + this.cache.getName());
 	}
 	
 	boolean isValid() {
@@ -209,7 +209,7 @@ public class Cache {
 			return;
 		cacheManager.removeCache(this.cache.getName());
 		this.closed = true;
-		logger.info("Cache stopped for thread " + this.thread + " with id " + this.cache.getName());
+		logger.fine("Cache stopped for thread " + this.thread + " with id " + this.cache.getName());
 	}
 
 	@Override
