@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 
 import org.apache.hadoop.conf.Configuration;
@@ -21,8 +22,12 @@ public class HBaseLoaderTest {
 		if (testPath == null) {
 			String clFilename = HBaseLoaderTest.class.getName().replace('.', '/')+".class";
 			URL res = ClassLoader.getSystemClassLoader().getResource(clFilename);
-			File clFile = new File(clFilename);
-			File file = new File(res.getPath());
+			File clFile = new File(clFilename), file;
+			try {
+			  file = new File(res.toURI());
+			} catch(URISyntaxException e) {
+			  file = new File(res.getPath());
+			}
 			do {
 				clFile = clFile.getParentFile();
 				file = file.getParentFile();
@@ -38,6 +43,15 @@ public class HBaseLoaderTest {
 		assertEquals("2", conf.get("dummy.prop.two"));
 		assertEquals("dummyval12", conf.get("dummy12.prop"));
 		assertEquals("dummy2val", conf.get("dummy2.prop"));
+	}
+
+	@Test
+	public void loadPropertiesWithIgnore() throws IOException {
+		Configuration conf = Store.getStore(testPath + "/etc/conf1/," + testPath + "!/etc/conf2," + testPath + "/etc/conf2/conf3/").getConf();
+		assertEquals("dummyval", conf.get("dummy.prop.one"));
+		assertEquals("2", conf.get("dummy.prop.two"));
+		assertEquals("dummyval12", conf.get("dummy12.prop"));
+		assertNull(conf.get("dummy2.prop"));
 	}
 
 	@Test(expected=IOException.class)

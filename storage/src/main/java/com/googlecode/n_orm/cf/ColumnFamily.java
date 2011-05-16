@@ -9,7 +9,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-
 import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.DecrementException;
@@ -17,7 +16,6 @@ import com.googlecode.n_orm.IncrementManagement;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.Transient;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
 
@@ -328,10 +326,9 @@ public abstract class ColumnFamily<T> {
 		}
 
 		Object pojo = this.getPOJO(false);
-		if (pojo != null && pojo != this)
-			synchronized(pojo) {
-				this.updateFromPOJO(pojo);
-			}
+		if (pojo != null && pojo != this) {
+			this.updateFromPOJO(pojo);
+		}
 	}
 	
 	public void storeToPOJO() {
@@ -342,9 +339,7 @@ public abstract class ColumnFamily<T> {
 
 		Object pojo = this.getPOJO(true);
 		if (pojo != null && pojo != this) {
-			synchronized(pojo) {
-				this.storeToPOJO(pojo);
-			}
+			this.storeToPOJO(pojo);
 		}
 	}
 }

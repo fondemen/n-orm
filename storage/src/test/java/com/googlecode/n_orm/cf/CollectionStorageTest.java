@@ -1,9 +1,9 @@
-package com.googlecode.n_orm;
+package com.googlecode.n_orm.cf;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
+import java.util.Calendar;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -13,15 +13,17 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.ImplicitActivation;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.Indexed;
 import com.googlecode.n_orm.Key;
+import com.googlecode.n_orm.KeyManagement;
+import com.googlecode.n_orm.MemoryStoreTestLauncher;
 import com.googlecode.n_orm.Persisting;
-import com.googlecode.n_orm.cf.ColumnFamily;
-import com.googlecode.n_orm.cf.MapColumnFamily;
-import com.googlecode.n_orm.cf.SetColumnFamily;
+import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.StoreTestLauncher;
 
 
 
@@ -368,5 +370,194 @@ public class CollectionStorageTest {
 		sut.activateIfNotAlready("elements");
 		
 		assertTrue(sut.elements.contains(e));
+	}
+	
+	@Test(expected=ConcurrentModificationException.class, timeout=5000)
+	public void concurrentChangeAndUpdateUnsynchronized() throws Exception {
+		sut.elements.add(new Element(456, "dummy"));
+		final boolean [] done = {false};
+		final Exception [] failed = {null};
+		final Thread t2 = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				int i = 4536;
+				Calendar d = Calendar.getInstance();
+				d.add(Calendar.MILLISECOND, 3000);
+				while (!done[0] && Calendar.getInstance().before(d)) {
+					i++;
+					sut.elements.add(new Element(i, "dummy"));
+					i++;
+					sut.elements.add(new Element(i, "dummy"));
+					sut.elements.remove(new Element(i-1, "dummy"));
+				}
+			}
+		});
+		t2.setPriority(Thread.MAX_PRIORITY);
+		Thread t1 = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				t2.start();
+				try {
+					Thread.sleep(100);
+					sut.updateFromPOJO();
+				} catch(Exception x) {
+					failed[0] = x;
+				}
+				
+				done[0] = true;
+			}
+		});
+		t1.setPriority(Thread.MIN_PRIORITY);
+		((SetColumnFamily<?>)sut.getColumnFamily(sut.elements)).goSlow();
+		t1.start();
+		while(!done[0])
+			Thread.sleep(100);
+		if (failed[0] != null)
+			throw failed[0];
+	}
+	
+	@Test(expected=Test.None.class, timeout=5000)
+	public void concurrentChangeAndUpdateSynchronizedOnSut() throws Exception {
+		sut.elements.add(new Element(456, "dummy"));
+		final boolean [] done = {false};
+		final Exception [] failed = {null};
+		final Thread t2 = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				int i = 4536;
+				while (!done[0]) {
+					synchronized(sut) { //would actually solve the problem
+					i++;
+					sut.elements.add(new Element(i, "dummy"));
+					i++;
+					sut.elements.add(new Element(i, "dummy"));
+					sut.elements.remove(new Element(i-1, "dummy"));
+					}
+				}
+			}
+		});
+		t2.setPriority(Thread.MAX_PRIORITY);
+		Thread t1 = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				t2.start();
+				try {
+					Thread.sleep(100);
+					sut.updateFromPOJO();
+				} catch(Exception x) {
+					failed[0] = x;
+				}
+				
+				done[0] = true;
+			}
+		});
+		t1.setPriority(Thread.MIN_PRIORITY);
+		((SetColumnFamily<?>)sut.getColumnFamily(sut.elements)).goSlow();
+		t1.start();
+		while(!done[0])
+			Thread.sleep(100);
+		if (failed[0] != null)
+			throw failed[0];
+	}
+	
+	@Test(expected=Test.None.class, timeout=5000)
+	public void concurrentChangeAndUpdateSynchronizedOnCF() throws Exception {
+		sut.elements.add(new Element(456, "dummy"));
+		final boolean [] done = {false};
+		final Exception [] failed = {null};
+		final Thread t2 = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				int i = 4536;
+				while (!done[0]) {
+					synchronized(sut.elements) { //would actually solve the problem
+					i++;
+					sut.elements.add(new Element(i, "dummy"));
+					i++;
+					sut.elements.add(new Element(i, "dummy"));
+					sut.elements.remove(new Element(i-1, "dummy"));
+					}
+				}
+			}
+		});
+		t2.setPriority(Thread.MAX_PRIORITY);
+		Thread t1 = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				t2.start();
+				try {
+					Thread.sleep(100);
+					sut.updateFromPOJO();
+				} catch(Exception x) {
+					failed[0] = x;
+				}
+				
+				done[0] = true;
+			}
+		});
+		t1.setPriority(Thread.MIN_PRIORITY);
+		((SetColumnFamily<?>)sut.getColumnFamily(sut.elements)).goSlow();
+		t1.start();
+		while(!done[0])
+			Thread.sleep(100);
+		if (failed[0] != null)
+			throw failed[0];
+	}
+	
+	@Test(expected=Test.None.class, timeout=5000)
+	public void concurrentChangeAndUpdateFromSearchOnCF() throws Exception {
+		sut.store();
+		sut.elements.add(new Element(456, "dummy"));
+		final boolean [] done = {false};
+		final Exception [] failed = {null};
+		final Thread t2 = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				Container sutT = StorageManagement.findElements().ofClass(Container.class).andActivate("elements").withId(sut.getIdentifier());
+				assertNotSame(sut, sutT);
+				((SetColumnFamily<?>)sutT.getColumnFamily(sutT.elements)).goSlow();
+				int i = 4536;
+				while (!done[0]) {
+					i++;
+					sutT.elements.add(new Element(i, "dummy"));
+					i++;
+					sutT.elements.add(new Element(i, "dummy"));
+					sutT.elements.remove(new Element(i-1, "dummy"));
+				}
+			}
+		});
+		t2.setPriority(Thread.MAX_PRIORITY);
+		Thread t1 = new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				Container sutT = StorageManagement.findElements().ofClass(Container.class).andActivate("elements").withId(sut.getIdentifier());
+				assertNotSame(sut, sutT);
+				((SetColumnFamily<?>)sutT.getColumnFamily(sutT.elements)).goSlow();
+				t2.start();
+				try {
+					Thread.sleep(100);
+					sutT.updateFromPOJO();
+				} catch(Exception x) {
+					failed[0] = x;
+				}
+				
+				done[0] = true;
+			}
+		});
+		t1.setPriority(Thread.MIN_PRIORITY);
+		((SetColumnFamily<?>)sut.getColumnFamily(sut.elements)).goSlow();
+		t1.start();
+		while(!done[0])
+			Thread.sleep(100);
+		if (failed[0] != null)
+			throw failed[0];
 	}
 }

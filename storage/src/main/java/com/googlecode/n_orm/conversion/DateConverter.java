@@ -8,6 +8,11 @@ class DateConverter extends SimpleConverter<Date> {
 	}
 
 	@Override
+	public Date getDefaultValue() {
+		return null;
+	}
+
+	@Override
 	public Date fromString(String rep, Class<?> expected) {
 		return new Date(ConversionTools.longConverter.parseString(rep));
 	}

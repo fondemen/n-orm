@@ -22,7 +22,6 @@ import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Row;
-import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.cf.ColumnFamily;
@@ -39,6 +38,14 @@ public aspect StorageManagement {
 	private transient boolean PersistingElement.isStoring = false;
 	private transient Collection<Class<? extends PersistingElement>> PersistingElement.persistingSuperClasses = null;
 	
+	public boolean PersistingElement.isKnownAsExistingInStore() {
+		return this.exists == Boolean.TRUE;
+	}
+	
+	public boolean PersistingElement.isKnownAsNotExistingInStore() {
+		return this.exists == Boolean.FALSE;
+	}
+	
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
 		this.getStore().delete(this.getTable(), this.getIdentifier());
 		Collection<Class<? extends PersistingElement>> psc = this.getPersistingSuperClasses();
@@ -48,6 +55,7 @@ public aspect StorageManagement {
 				this.getStore().delete(px.getTable(cls), this.getFullIdentifier());
 			}
 		}
+		this.exists= Boolean.FALSE;
 	}
 	
 	public void PersistingElement.store() throws DatabaseNotReachedException {
@@ -389,7 +397,7 @@ public aspect StorageManagement {
 			while (found.hasNext()) {
 				ret.add(found.next());
 			}
-			assert ret.size() == Math.min(limit, countElements(clazz, c));
+			//assert ret.size() == Math.min(limit, countElements(clazz, c));
 			return ret;
 		} finally {
 			found.close();

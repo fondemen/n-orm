@@ -2,8 +2,14 @@ package com.googlecode.n_orm.hbase;
 
 import java.io.File;
 import java.io.FilenameFilter;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
 
 public abstract class RecursiveFileAction {
+	
+	private final Collection<File> toBeIgnored;
+	private final Collection<File> toBeExplored;
 	
 	public static abstract class Report {
 		public abstract void fileHandled(File f);
@@ -18,16 +24,64 @@ public abstract class RecursiveFileAction {
 		}
 	};
 	
+	public RecursiveFileAction() {
+		toBeIgnored = new LinkedList<File>();
+		toBeExplored = new LinkedList<File>();
+	}
+	
+	public void addIgnoredFile(File toBeIgnored) {
+		this.toBeIgnored.add(toBeIgnored);
+	}
+	
+	public void clearIgnoredFiles() {
+		this.toBeIgnored.clear();
+	}
+	
+	public void addExploredFile(File toBeExplored) {
+		this.toBeExplored.add(toBeExplored);
+	}
+	
+	public void clear() {
+		this.toBeIgnored.clear();
+		this.toBeExplored.clear();
+	}
+	
+	public void addFiles(String... files) {
+		for (String file : files) {
+			if (file.startsWith("!"))
+				this.addIgnoredFile(new File(file.substring(1)));
+			else
+				this.addExploredFile(new File(file));
+		}
+	}
+		
+	public void addFiles(String comaSeparatedFiles) {
+		this.addFiles(comaSeparatedFiles.split(","));
+	}
+	
+	public void explore(Report r) {
+		Iterator<File> exi = this.toBeExplored.iterator();
+		while (exi.hasNext()) {
+			File f = exi.next();
+			if (!this.toBeIgnored.contains(f)) {
+				this.recursiveManageFile(f, r);
+			}
+			exi.remove();
+		}
+	}
+	
 	public abstract boolean acceptFile(File file);
 	
 	public abstract void manageFile(File f, Report r);
 	
+	
 
-
-	public void recursiveManageFile(File file, Report r) {
+	protected void recursiveManageFile(File file, Report r) {
+		if (this.toBeIgnored.contains(file))
+			return;
+		
 		if (!file.canRead()) {
-			System.err
-					.println("WARNING: cannot read " + file.getAbsolutePath());
+			System.err.println("WARNING: cannot read " + file.getAbsolutePath());
 			return;
 		}
 

@@ -10,6 +10,11 @@ class KeyedElementConverter extends Converter<Object> {
 	}
 
 	@Override
+	public Object getDefaultValue() {
+		return null;
+	}
+
+	@Override
 	public Object fromString(String rep, Class<?> expected) {
 		return keyManager.createElement(expected, rep);
 	}
