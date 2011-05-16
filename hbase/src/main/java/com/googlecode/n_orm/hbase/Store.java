@@ -46,6 +46,7 @@ import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
+import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 
@@ -375,9 +376,16 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		if (problem instanceof DatabaseNotReachedException)
 			throw (DatabaseNotReachedException)problem;
 		
-		if (problem instanceof TableNotFoundException) {
+		if ((problem instanceof TableNotFoundException) || problem.getMessage().contains(TableNotFoundException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", problem);
+			if (this.tablesD.containsKey(table))
+				this.uncache(table);
+			else
+				throw new DatabaseNotReachedException(problem);
+		} else if ((problem instanceof NoSuchColumnFamilyException) || problem.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
+			table = this.mangleTableName(table);
+			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", problem);
 			if (this.tablesD.containsKey(table))
 				this.uncache(table);
 			else
