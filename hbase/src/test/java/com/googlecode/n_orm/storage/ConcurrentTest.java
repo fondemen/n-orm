@@ -11,7 +11,9 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.HConnection;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -121,5 +123,35 @@ public class ConcurrentTest {
 		store1.storeChanges("t1", "idt1", change2 , null, null); //CF cf2 should be added to table
 		store2.storeChanges("t1", "idt1", change2 , null, null); //CF cf2 should be discovered as added to table
 		assertTrue(store2.exists("t1", "idt1", "cf2"));
+	}
+	
+	@Test(timeout=60000)
+	public void acceptingOutsideColumnFamilyRemoval() throws IOException, InterruptedException {
+		
+		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
+		change1.put("cf1", ch1);
+		ch1.put("k1", new byte[]{1, 2});
+		store1.storeChanges("t1", "idt1", change1 , null, null);
+		
+		byte[] tblNameBytes = Bytes.toBytes("t1");
+		HTableDescriptor td = store1.getAdmin().getTableDescriptor(tblNameBytes);
+		td.removeFamily(Bytes.toBytes("cf1"));
+		store1.getAdmin().disableTable(tblNameBytes);
+		store1.getAdmin().modifyTable(tblNameBytes, td);
+		store1.getAdmin().enableTable(tblNameBytes);
+		synchronized(this) {
+			do {
+				this.wait(500);
+			} while (store1.getAdmin().getTableDescriptor(tblNameBytes).hasFamily(Bytes.toBytes("cf1")));
+		}
+		
+		Map<String, Map<String, byte[]>> change2 = new TreeMap<String, Map<String,byte[]>>();
+		TreeMap<String, byte[]> ch2 = new TreeMap<String, byte[]>();
+		change2.put("cf1", ch2);
+		ch2.put("k1", new byte[]{1, 2, 3});
+		
+		store1.storeChanges("t1", "idt1", change2 , null, null); //CF cf2 should be added again to table
+		assertTrue(store1.exists("t1", "idt1", "cf1"));
 	}
 }
