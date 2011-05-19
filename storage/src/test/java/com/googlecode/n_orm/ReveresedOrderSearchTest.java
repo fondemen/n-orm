@@ -51,7 +51,17 @@ public class ReveresedOrderSearchTest {
 			PersistingElement f1 = clazz.newInstance(); key.set(f1, k1); f1.store();
 			PersistingElement f2 = clazz.newInstance(); key.set(f2, k2); f2.store();
 			PersistingElement f3 = clazz.newInstance(); key.set(f3, k3); f3.store();
-			
+
+			if (key.getAnnotation(Key.class).reverted()) {
+				assertTrue(f2.compareTo(f1) <= 0);
+				assertTrue(f3.compareTo(f2) <= 0);
+				assertTrue(f3.compareTo(f1) <= 0);
+			} else {
+				assertTrue(f1.compareTo(f2) <= 0);
+				assertTrue(f2.compareTo(f3) <= 0);
+				assertTrue(f1.compareTo(f3) <= 0);
+			}
+				
 			CloseableIterator<? extends PersistingElement> found = StorageManagement.findElements().ofClass(clazz).withKey("bar").greaterOrEqualsThan(k2).withAtMost(100).elements().iterate();
 			try {
 				assertTrue(found.hasNext());
@@ -76,10 +86,10 @@ public class ReveresedOrderSearchTest {
 		doTest(FooStd.class, 10000l, 20000l, 30000l);
 	}
 	
-	@Test(expected=UnreversibleTypeException.class)
-	public void revertedKeySearchString() {
-		FooRevString f1 = new FooRevString(); f1.bar = "dsuiozkcjzio"; f1.store();
-	}
+//	@Test(expected=UnreversibleTypeException.class)
+//	public void revertedKeySearchString() {
+//		FooRevString f1 = new FooRevString(); f1.bar = "dsuiozkcjzio"; f1.store();
+//	}
 	
 	@Test
 	public void revertedKeySearchDate() {
