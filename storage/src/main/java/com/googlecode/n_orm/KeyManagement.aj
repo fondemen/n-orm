@@ -24,6 +24,7 @@ import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cache.Cache;
 import com.googlecode.n_orm.conversion.ArrayConverter;
 import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.conversion.UnreversibleTypeException;
 
 
 
@@ -92,21 +93,23 @@ public aspect KeyManagement {
 		}
 		
 		public <U> U detect(Class<U> type) {
-			U ret = this.detectLast(type);
+			U ret = this.detectLast(type, false);
 			if (! this.isEmpty()) {
 				throw new IllegalArgumentException("Could not analyze the complete string: " + this.rest + " left over while analyzing " + this.ident + " as a " + type + " instance.");
 			}
 			return ret;
 		}
 		
-		protected <U> U detectLast(Class<U> expected) {
+		protected <U> U detectLast(Class<U> expected, boolean revert) {
 			if (expected.isArray()) {
+				if  (revert) throw new IllegalArgumentException("Cannot revert an array such as " + expected.getName());
 				return detectLastArray(expected);
 			} else {
 				if (km.detectKeys(expected).size() > 0) {
+					if (revert) throw new IllegalArgumentException("Cannot revert a keyed element such as " + expected.getName());
 					return detectLastKeyedElement(expected);
 				} else {
-					return detectLastSimpleElement(expected);
+					return detectLastSimpleElement(expected, revert);
 				}
 			}
 		}
@@ -117,7 +120,7 @@ public aspect KeyManagement {
 			String restSav = this.rest;
 			do {
 				try {
-					elements.addFirst(this.detectLast(componentType));
+					elements.addFirst(this.detectLast(componentType, false));
 					restSav = this.rest;
 				} catch (Exception x) {
 					this.rest = restSav;
@@ -152,7 +155,11 @@ public aspect KeyManagement {
 			List<Field> keys = km.detectKeys(actualType);
 			Object [] vals = new Object[keys.size()];
 			for (int i = vals.length-1; i >= 0; i--) {
-				vals[i] = this.detectLast(keys.get(i).getType());
+				try {
+					vals[i] = this.detectLast(keys.get(i).getType(), keys.get(i).getAnnotation(Key.class).reverted());
+				} catch (UnreversibleTypeException x) {
+					throw new UnreversibleTypeException("Key " + keys.get(i) + " cannot be reverted", x.getType(), x);
+				}
 				if (i > 0)
 					this.checkLast(keySeparator);
 			}
@@ -172,10 +179,12 @@ public aspect KeyManagement {
 			return ret;
 		}
 		
-		private <U> U detectLastSimpleElement(Class<U> expected) {
+		private <U> U detectLastSimpleElement(Class<U> expected, boolean revert) {
 			if (rest.endsWith(keyEndSeparator))
 				throw new IllegalArgumentException("Detecting complex type at the end of " + this.rest + " while expecting element of simple type " + expected);
-			return ConversionTools.convertFromString(expected, this.detectLastSimpleId());
+			return revert ?
+					ConversionTools.convertFromStringReverted(expected, this.detectLastSimpleId())
+					: ConversionTools.convertFromString(expected, this.detectLastSimpleId());
 		}
 		
 		protected String detectLastSimpleId() {
@@ -247,7 +256,7 @@ public aspect KeyManagement {
 		try {
 			return new DecomposableString(id).detect(expectedType);
 		} catch (Exception x) {
-			throw new IllegalArgumentException("Cannot create instance of " + expectedType + " with id " + id, x);
+			throw new IllegalArgumentException("Cannot create instance of " + expectedType + " with id " + id + ": " + x.getMessage(), x);
 		}
 	}
 	
@@ -386,7 +395,10 @@ public aspect KeyManagement {
 						throw new IllegalStateException("A key cannot be null as it is the case for key " + key + " of " + element);
 //					if (key.getType().isArray() && Array.getLength(o) == 0)
 //						throw new IllegalStateException("An array key cannot be empty as it is the case for key " + key + " of " + element);
-					ret.append(ConversionTools.convertToString(o, key.getType()));
+					if (key.getAnnotation(Key.class).reverted())
+						ret.append(ConversionTools.convertToStringReverted(o, key.getType()));
+					else
+						ret.append(ConversionTools.convertToString(o, key.getType()));
 				}
 				ret.append(KEY_END_SEPARATOR);
 			}

@@ -3,6 +3,7 @@ package com.googlecode.n_orm.conversion;
 import java.util.Date;
 
 class DateConverter extends SimpleConverter<Date> {
+
 	public DateConverter() {
 		super(Date.class);
 	}
@@ -20,6 +21,16 @@ class DateConverter extends SimpleConverter<Date> {
 	@Override
 	public String toString(Date obj) {
 		return ConversionTools.longConverter.unparseString(obj.getTime());
+	}
+	
+	@Override
+	public Object fromStringReverted(String rep, Class<?> type) {
+		return new Date(-ConversionTools.longConverter.parseString(rep));
+	}
+
+	@Override
+	public String toStringReverted(Date obj, Class<? extends Date> expected) {
+		return ConversionTools.longConverter.unparseString(-obj.getTime());
 	}
 
 	@Override
