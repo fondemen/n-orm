@@ -39,4 +39,9 @@ class BooleanConverter extends PrimitiveConverter<Boolean> {
 	    return rep;
 	}
 
+	@Override
+	public Boolean revert(Boolean obj) {
+		return obj ? Boolean.FALSE : Boolean.TRUE;
+	}
+
 }

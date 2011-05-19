@@ -4,6 +4,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.Date;
 
 
 import com.googlecode.n_orm.Persisting;
@@ -24,4 +25,15 @@ public @interface Key {
 	 * The order of the element that must differ from order of other keys.
 	 */
 	public int order() default 1;
+	
+	/**
+	 * Whether the key should be stored in an inverted way ; supported types are integer (long, {@link Long}, etc), boolean, and {@link Date}.
+	 * A search is always performed according to a start key and continues using ascending order ({@link StorageManagement#findElements()}).
+	 * Inverting a key changes the order of elements.<br>
+	 * An example is {@link java.util.Date} keys, as in the following class:<br>
+	 * <code>public class Foo { @Key public Date bar; }</code><br>
+	 * Searching Foos like in <code>StorageManagement.findElements().ofClass(FooStd.class).withKey("bar").greaterOrEqualsThan(d).withAtMost(100).elements().iterate()</code>
+	 * will iterate over elements whose key <code>bar</code> is later or equals than date <code>d</code>. Reverting the key, those elements would be elements earlier or equal than <code>d</code>.
+	 */
+	public boolean reverted() default false;
 }

@@ -11,7 +11,7 @@ import com.googlecode.n_orm.PropertyManagement;
 public class ConversionTools {
 
 	private static enum ConversionKind {
-		FromBytes, ToBytes, FromString, ToString, Default
+		FromBytes, ToBytes, FromString, ToString, FromStringReverted, ToStringReverted, Default
 	};
 
 	private static final Converter<?>[] converters;
@@ -44,8 +44,10 @@ public class ConversionTools {
 		case ToBytes:
 			return conv.canConvertToBytes(o);
 		case FromString:
+		case FromStringReverted:
 			return conv.canConvertFromString((String) o, type);
 		case ToString:
+		case ToStringReverted:
 			return conv.canConvertToString(o);
 		case Default:
 			return conv.canConvert(type);
@@ -68,6 +70,10 @@ public class ConversionTools {
 			return conv.fromString((String) o, type);
 		case ToString:
 			return conv.toString((T) o, (Class<? extends T>) type);
+		case FromStringReverted:
+			return conv.fromStringReverted((String) o, type);
+		case ToStringReverted:
+			return conv.toStringReverted((T) o, (Class<? extends T>) type);
 		case Default:
 			return conv.getDefaultValue();
 		default:
@@ -148,6 +154,16 @@ public class ConversionTools {
 				ConversionKind.FromString, "Cannot create a " + type
 						+ " from string " + representation);
 	}
+
+	@SuppressWarnings("unchecked")
+	public static <U> U convertFromStringReverted(Class<U> type, String representation) {
+		if (representation == null)
+			return null;
+
+		return (U) convertInternal(representation, type,
+				ConversionKind.FromStringReverted, "Cannot create a " + type
+						+ " from reverted string " + representation);
+	}
 	
 	public static  byte[] convert(Object o) {
 		return convert(o, o == null ? Object.class : o.getClass());
@@ -175,6 +191,15 @@ public class ConversionTools {
 
 		return (String) convertInternal(o, expected, ConversionKind.ToString,
 				"Cannot create a string representation for " + o);
+	}
+
+	public static String convertToStringReverted(Object o, Class<?> expected) {
+
+		if (o == null)
+			return null;
+
+		return (String) convertInternal(o, expected, ConversionKind.ToStringReverted,
+				"Cannot create a reverted string representation for " + o);
 	}
 	
 	public static <T> T getDefaultValue(Class<T> expected) {

@@ -68,4 +68,18 @@ abstract class PrimitiveConverter<T> extends SimpleConverter<T> {
 		super.checkInstance(obj, expected);
 	}
 	
+	public T revert(T obj) {
+		throw new UnreversibleTypeException(obj.getClass());
+	}
+
+	@Override
+	public Object fromStringReverted(String rep, Class<?> type) {
+		return this.revert(this.fromString(rep, type));
+	}
+
+	@Override
+	public String toStringReverted(T obj, Class<? extends T> expected) {
+		return this.toString(this.revert(obj), expected);
+	}
+	
 }
