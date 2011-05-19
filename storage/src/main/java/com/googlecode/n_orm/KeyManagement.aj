@@ -62,6 +62,8 @@ public aspect KeyManagement {
 	//declare error: PersistingElement+ && hasField(@Key double *) : "Floating values not supported in keys..."; //AJ 1.6.9 style
 	declare error: set(@Key final * *.*) : "A key should not be final";
 	
+	declare error: set(@Key(reverted=true) (!java.util.Date && !boolean && !Boolean && !byte && !Byte && !short && !Short &&!int && !Integer && !long && !Long) *.*) : "Can only revert boolean, natural or java.util.Date keys";
+	
 	private static class DecomposableString {
 		private static final String keySeparator;
 		private static final String arraySeparator;
