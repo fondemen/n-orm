@@ -24,4 +24,9 @@ class ShortConverter extends NaturalConverter<Short> {
 	public byte[] toBytes(Short obj) {
 		return this.unparseBytes(obj);
 	}
+
+	@Override
+	public Short revert(Short obj) {
+		return (short) -obj;
+	}
 }

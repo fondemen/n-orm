@@ -24,4 +24,9 @@ class ByteConverter extends NaturalConverter<Byte> {
 	public byte[] toBytes(Byte obj) {
 		return this.unparseBytes(obj);
 	}
+
+	@Override
+	public Byte revert(Byte obj) {
+		return (byte) -obj;
+	}
 }

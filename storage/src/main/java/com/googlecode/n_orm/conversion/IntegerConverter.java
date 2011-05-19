@@ -24,4 +24,9 @@ class IntegerConverter extends NaturalConverter<Integer> {
 	public byte[] toBytes(Integer obj) {
 		return this.unparseBytes(obj);
 	}
+
+	@Override
+	public Integer revert(Integer obj) {
+		return -obj;
+	}
 }
