@@ -16,7 +16,6 @@ import org.aspectj.lang.reflect.FieldSignature;
 
 import com.googlecode.n_orm.ColumnFamiliyManagement;
 import com.googlecode.n_orm.Incrementing;
-import com.googlecode.n_orm.Indexed;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cf.ColumnFamily;
@@ -220,12 +219,9 @@ public aspect ColumnFamiliyManagement {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private ColumnFamily<?> createColumnFamily(PersistingElement self, Field field, Object oldCf) {
 		PropertyManagement pm = PropertyManagement.getInstance();
-		Indexed index = field.getAnnotation(Indexed.class);
 		ColumnFamily<?> acf;
 		ParameterizedType collType = (ParameterizedType) field.getGenericType();
 		if (Map.class.isAssignableFrom(field.getType())) {
-			if (index != null)
-				throw new IllegalArgumentException("Map " + field + " cannot declare annotation " + Indexed.class);
 			Class<?> keyClass = (Class<?>)collType.getActualTypeArguments()[0], valueClass = (Class<?>)collType.getActualTypeArguments()[1];
 			acf = new MapColumnFamily(keyClass, valueClass, field, field.getName(), self);
 			if (oldCf != null) {
@@ -234,11 +230,9 @@ public aspect ColumnFamiliyManagement {
 				}
 			}
 		} else {
-			if (index == null)
-				throw new IllegalArgumentException("Field " + field + " must declare annotation " + Indexed.class);
 			Class<?> elementClass = (Class<?>)collType.getActualTypeArguments()[0];
 			try {
-				acf = new SetColumnFamily(elementClass, field, self, index.field());
+				acf = new SetColumnFamily(elementClass, field, self);
 				if (oldCf != null) {
 					for (Object e : (Set<?>)oldCf) {
 						((SetColumnFamily)acf).add(e);

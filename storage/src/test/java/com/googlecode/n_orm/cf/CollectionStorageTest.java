@@ -17,7 +17,6 @@ import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.ImplicitActivation;
 import com.googlecode.n_orm.Incrementing;
-import com.googlecode.n_orm.Indexed;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.MemoryStoreTestLauncher;
@@ -92,7 +91,7 @@ public class CollectionStorageTest {
 	public static class Container {
 		private static final long serialVersionUID = 6300245095742806502L;
 		@Key public String key;
-		@Indexed(field="key") @ImplicitActivation public Set<Element> elements = new HashSet<CollectionStorageTest.Element>();
+		@ImplicitActivation public Set<Element> elements = new HashSet<CollectionStorageTest.Element>();
 		@Incrementing public Map<String, Integer> elementsInc = new HashMap<String, Integer>();
 		public long prop;
 		
@@ -141,17 +140,6 @@ public class CollectionStorageTest {
 		assertEquals(MapColumnFamily.class, sut.getColumnFamily(sut.elementsInc).getClass());
 	}
 	
-	@Persisting
-	public static class ContainerNotIndexed{
-		private static final long serialVersionUID = -5893974957978021103L;
-		@Key public String key = "key";
-		public Set<Element> elements = null;
-	}
-	@Test(expected=IllegalArgumentException.class)
-	public void notIndexed() {
-		new ContainerNotIndexed();
-	}
-	
 	@SuppressWarnings("unchecked")
 	@Test
 	public void autoActivation() throws DatabaseNotReachedException {
@@ -177,7 +165,7 @@ public class CollectionStorageTest {
 	@Test
 	public void storeRetrieveElementsFrom3To65() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
-		((ColumnFamily<Element>)copy.getColumnFamily("elements")).activate("E3", "E65");
+		((ColumnFamily<Element>)copy.getColumnFamily("elements")).activate(new Element("E3"), new Element("E65"));
 		this.assertHadAQuery();
 		assertEquals(4, copy.elements.size());
 		this.assertHadNoQuery();
@@ -191,7 +179,7 @@ public class CollectionStorageTest {
 	@Test
 	public void storeRetrieveElementsFrom7ToEnd() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
-		((ColumnFamily<Element>)copy.getColumnFamily(copy.elements)).activate("E7", null);
+		((ColumnFamily<Element>)copy.getColumnFamily(copy.elements)).activate(new Element("E7"), null);
 		this.assertHadAQuery();
 		assertEquals(3, copy.elements.size());
 		this.assertHadNoQuery();
@@ -205,7 +193,7 @@ public class CollectionStorageTest {
 	@Test
 	public void storeRetrieveElementsUpTo4() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
-		((ColumnFamily<Element>)copy.getColumnFamily("elements")).activate(null, "E4");
+		((ColumnFamily<Element>)copy.getColumnFamily("elements")).activate(null, new Element("E4"));
 		this.assertHadAQuery();
 		assertEquals(5, copy.elements.size());
 		this.assertHadNoQuery();
@@ -222,9 +210,9 @@ public class CollectionStorageTest {
 		Container copy = new Container(sut.key);
 		copy.activate("elements");
 		this.assertHadAQuery();
-		copy.elements.remove(new Element("E4"));
+		assertTrue(copy.elements.remove(new Element("E4")));
 		copy.updateFromPOJO();
-		assertTrue(((ColumnFamily<Element>)copy.getColumnFamily("elements")).wasDeleted("E4"));
+		assertTrue(((ColumnFamily<Element>)copy.getColumnFamily("elements")).wasDeleted(KeyManagement.getInstance().createIdentifier(new Element("E4"), null)));
 		this.assertHadNoQuery();
 	}
 
@@ -233,7 +221,7 @@ public class CollectionStorageTest {
 	public static class AddonlyContainer {
 		private static final long serialVersionUID = -8766880305630431989L;
 		@Key public String key;
-		@Indexed(field="key") @AddOnly public Set<Element> elements = null;
+		@AddOnly public Set<Element> elements = null;
 
 		public AddonlyContainer(String key) {
 			this.key = key;
