@@ -304,11 +304,6 @@ public abstract class ColumnFamily<T> {
 		if (this.increments != null)
 			this.increments.clear();
 	}
-
-	@Override
-	public int hashCode() {
-		return this.name.hashCode();
-	}
 	
 	public Object getPOJO(boolean createIfNull) {
 		Object pojo = PropertyManagement.getInstance().candideReadValue(this.getOwner(), this.getProperty());
