@@ -15,7 +15,7 @@ import com.googlecode.n_orm.PersistingElement;
  * For maps, it's the element at a given key that must not decrement.
  * Regarding storage, it's not the actual value that is sent when invoking {@link PersistingElement#store()}, but the difference.
  * The situation is illustrated by the following example:<br><code>
- * &#64;{@link Persisting} public class MyClass {@Incrementing public int anInt;}<br>
+ * &#64;{@link Persisting} public class MyClass {&#64;Incrementing public int anInt;}<br>
  * <br>
  * MyClass mc1 = new MyClass(); mc1.anInt = 3; mc1.store();<br>
  * MyClass mc2 = new MyClass(); mc2.anInt = 2; mc2.store();<br>

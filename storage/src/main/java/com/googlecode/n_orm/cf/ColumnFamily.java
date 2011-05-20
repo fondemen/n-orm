@@ -217,7 +217,7 @@ public abstract class ColumnFamily<T> {
 
 	/**
 	 * Removes an element to the column family given its key.
-	 * For this element not to appear anymore in the datastore, the owner object must be called the {@link #PersistingElement.store()} method.
+	 * For this element not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
 	 */
 	public void removeKey(String key) {
 		if (this.isAddOnly())

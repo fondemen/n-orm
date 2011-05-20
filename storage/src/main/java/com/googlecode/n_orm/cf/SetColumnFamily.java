@@ -99,7 +99,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 
 	/**
 	 * Adds an element to the column family.
-	 * For this element to appear in the datastore, the owner object must be called the {@link #PersistingElement.store()} method
+	 * For this element to appear in the datastore, the owner object must be called the {@link PersistingElement#store()} method
 	 */
 	@Override
 	public boolean add(T o) {
@@ -161,7 +161,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 
 	/**
 	 * Removes an element to the column family.
-	 * For this element not to appear anymore in the datastore, the owner object must be called the {@link #PersistingElement.store()} method.
+	 * For this element not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
@@ -194,7 +194,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 
 	/**
 	 * Adds elements to the column family.
-	 * For those elements to appear in the datastore, the owner object must be called the {@link #PersistingElement.store()} method
+	 * For those elements to appear in the datastore, the owner object must be called the {@link PersistingElement#store()} method
 	 */
 	@Override
 	public boolean addAll(Collection<? extends T> c) {
@@ -209,7 +209,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 
 	/**
 	 * Removes elements to the column family.
-	 * For those elements to appear in the datastore, the owner object must be called the {@link #PersistingElement.store()} method.
+	 * For those elements to appear in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
 	 */
 	@Override
 	public boolean removeAll(Collection<?> c) {
@@ -224,7 +224,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	/**
 	 * Retains only the elements in this collection that are contained in the specified collection of activated elements.
 	 * In other words, removes from this collection all of its elements that are not contained in the specified collection.
-	 * For those elements not to appear anymore in the datastore, the owner object must be called the {@link #PersistingElement.store()} method.
+	 * For those elements not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
 	 */
 	@Override
 	public boolean retainAll(Collection<?> c) {
@@ -241,7 +241,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 
 	/**
 	 * Removes all activated elements from the column family.
-	 * For those activated elements not to appear anymore in the datastore, the owner object must be called the {@link #PersistingElement.store()} method.
+	 * For those activated elements not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
 	 */
 	@Override
 	public void clear() {
