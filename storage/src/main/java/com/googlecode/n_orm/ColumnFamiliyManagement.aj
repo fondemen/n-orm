@@ -246,6 +246,7 @@ public aspect ColumnFamiliyManagement {
 	}
 	
 	after(ColumnFamily cf) returning : execution(ColumnFamily.new(..)) && target(cf) {
-		cf.getOwner().addColumnFamily(cf);
+		if (cf.getOwner() != null)
+			cf.getOwner().addColumnFamily(cf);
 	}
 }
