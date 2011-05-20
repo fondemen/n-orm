@@ -170,7 +170,7 @@ public abstract class ColumnFamily<T> {
 	 * Checks whether this column family is empty in the data store.
 	 */
 	public boolean isEmptyInStore() throws DatabaseNotReachedException {
-		return this.getOwner().getStore().exists(this.ownerTable, this.getOwner().getIdentifier(), this.getName());
+		return !this.getOwner().getStore().exists(this.ownerTable, this.getOwner().getIdentifier(), this.getName());
 	}
 
 	public boolean containsKey(String key) {
