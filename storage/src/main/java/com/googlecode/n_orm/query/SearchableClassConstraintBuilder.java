@@ -60,7 +60,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	
 	/**
 	 * Find the element with the given id.
-	 * Any limit set by {@link ClassConstraintBuilder#withKey(String)} will be ignored.
+	 * Any limit set by {@link #withAtMost(int)} will be ignored.
 	 * Specified column families are activated if not already (i.e. this element is already known by this thread) (see {@link PersistingElement#activateIfNotAlready(String...)}) ; you should rather perform an {@link PersistingElement#activate(String...)} without specifying any column family with {@link #andActivate(String...)} to force activation.
 	 * @param id non printable character string
 	 * @return element with given id and class ; null if not found
@@ -74,7 +74,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	}
 	
 	/**
-	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link ClassConstraintBuilder#withKey(String)}.
+	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link #withAtMost(int)}.
 	 * Elements are not activated, but their keys are all loaded into memory.
 	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
 	 * @throws DatabaseNotReachedException
@@ -86,7 +86,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	}
 	
 	/**
-	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link ClassConstraintBuilder#withKey(String)}.
+	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link #withAtMost(int)}.
 	 * Elements are not activated.
 	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
 	 * @throws DatabaseNotReachedException
@@ -99,7 +99,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 
 	
 	/**
-	 * Runs the query to find an element matching the query. Any limit set by {@link ClassConstraintBuilder#withKey(String)} will be ignored.
+	 * Runs the query to find an element matching the query. Any limit set by {@link #withAtMost(int)} will be ignored.
 	 * The element is not activated.
 	 * @return A (possibly null) element matching the query.
 	 * @throws DatabaseNotReachedException
@@ -118,7 +118,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	
 	/**
 	 * Runs the query to find the number of matching elements.
-	 * Any limit set by {@link ClassConstraintBuilder#withKey(String)} will be ignored.
+	 * Any limit set by {@link #withAtMost(int)} will be ignored.
 	 */
 	public long count() throws DatabaseNotReachedException {
 		return StorageManagement.countElements(this.getClazz(), this.getConstraint());
