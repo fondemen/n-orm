@@ -109,6 +109,10 @@ public class CollectionStorageTest {
 	public void setupSut() throws DatabaseNotReachedException {
 		this.resetQueryCount();
 		sut = new Container("key");
+		assertTrue(sut.getColumnFamily(sut.elements).isEmptyInStore());
+		this.assertHadAQuery();
+		assertTrue(sut.getColumnFamily(sut.elements).isEmptyInStore());
+		this.assertHadAQuery();
 		sut.activate("elements");
 		this.assertHadAQuery();
 		for(int i = 1 ; i <= 10; ++i) {
@@ -116,12 +120,19 @@ public class CollectionStorageTest {
 			sut.elementsInc.put("E" + i, i);
 		}
 		sut.store();
-		KeyManagement.getInstance().cleanupKnownPersistingElements();
 		this.assertHadAQuery();
+		assertFalse(sut.getColumnFamily(sut.elements).isEmptyInStore());
+		this.assertHadAQuery();
+		assertFalse(sut.getColumnFamily(sut.elements).isEmptyInStore());
+		this.assertHadAQuery();
+		KeyManagement.getInstance().cleanupKnownPersistingElements(); //Simulates a new session
 	}
 
 	@After public void deleteSut() throws DatabaseNotReachedException {
 		sut.delete();
+		assertFalse(sut.existsInStore());
+		assertTrue(sut.getColumnFamily(sut.elements).isEmptyInStore());
+		assertTrue(sut.getColumnFamily(sut.elements).isEmptyInStore());
 	}
 	
 	@Test
