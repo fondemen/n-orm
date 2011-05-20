@@ -9,7 +9,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.Indexed;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.StorageManagement;
@@ -125,8 +124,8 @@ public class InheritanceTest {
 	 public static class AncestorContainer {
 		@Key public Ancestor[] aak;
 		public Ancestor[] aap;
-		@Indexed(field="key") public SetColumnFamily<Ancestor> ac = null;
-		@Indexed(field="key") public SetColumnFamily<AncestorKeyed> ack = null;
+		public SetColumnFamily<Ancestor> ac = null;
+		public SetColumnFamily<AncestorKeyed> ack = null;
 		public MapColumnFamily<Ancestor, String> akm = null;
 		public MapColumnFamily<String, Ancestor> avm = null;
 		public AncestorContainer(Ancestor... aak) {
