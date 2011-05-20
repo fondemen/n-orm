@@ -50,10 +50,10 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 
 		@Override
 		public void remove() {
-			if (current != null) {
-				SetColumnFamily.this.removeKey(current);
-				current = null;
-			}
+			if (current == null)
+				throw new IllegalStateException("Should beiterating over an element ; either removing before calling next, or removing twice.");
+			SetColumnFamily.this.removeKey(current);
+			current = null;
 		}
 		
 	}
@@ -136,6 +136,8 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 		try {
 			id = this.getIndex((T)o);
 		} catch (ClassCastException x) {
+			return false;
+		} catch (IllegalArgumentException x) {
 			return false;
 		}
 		
@@ -229,13 +231,14 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	@Override
 	public boolean retainAll(Collection<?> c) {
 		boolean ret = false;
-		for (Object object : c) {
-			if (this.contains(object)) {
-				ret = this.remove(object);
-				assert ret;
+		Iterator<T> it = this.iterator();
+		while (it.hasNext()) {
+			if (! c.contains(it.next())) {
+				it.remove();
+				ret = true;
 			}
 		}
-		return true;
+		return ret;
 	}
 
 
@@ -271,6 +274,16 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	@Override
 	public <T> T[] toArray(T[] a) {
 		return this.collection.keySet().toArray(a);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		return obj != null && obj instanceof Set && this.containsAll((Set)obj) && ((Set)obj).containsAll(this);
+	}
+
+	@Override
+	public int hashCode() {
+		return this.getKeys().hashCode();
 	}
 
 	@SuppressWarnings("unchecked")
