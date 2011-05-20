@@ -1,5 +1,11 @@
 package com.googlecode.n_orm;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -13,16 +19,8 @@ import java.util.TreeSet;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.googlecode.n_orm.Indexed;
-import com.googlecode.n_orm.Key;
-import com.googlecode.n_orm.Persisting;
-import com.googlecode.n_orm.PojoTest.SimpleElement;
-import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.cf.SetColumnFamily;
-
-
-import static org.junit.Assert.*;
 
 
 public class PojoTest {
@@ -34,7 +32,7 @@ public class PojoTest {
 	public static class SimpleElement {
 		private static final long serialVersionUID = -6353654986364855413L;
 		@Key public String key;
-		@Indexed(field="key") Set<SimpleElement> elementsSet = new TreeSet<PojoTest.SimpleElement>();
+		Set<SimpleElement> elementsSet = new TreeSet<PojoTest.SimpleElement>();
 		Map<String, SimpleElement> elementsMap = new TreeMap<String, PojoTest.SimpleElement>();
 	}
 

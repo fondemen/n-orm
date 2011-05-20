@@ -8,48 +8,93 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
 
-import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.DecrementException;
+import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.conversion.ConversionTools;
 
+/**
+ * Column family for sets.
+ * Elements are stored using their identifier as key (see {@link PersistingElement#getIdentifier()} and {@link PersistingElement#getFullIdentifier()}), and an empty byte array as value.
+ * Elements stored in this set should not be mutable, as they are referred to using their key, that is if it changes afterwards, it's its key value that is actually used to be stored.
+ * This Set does not support null values.
+ * Elements are not actually stored in a real Set, its only their key that is stored by this set. However, retrieving an element from this set is still efficient thanks to the cache (see {@link KeyManagement#createElement(Class, String)}.
+ */
+public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
+	/**
+	 * The actual value used in the data store;
+	 */
+	private static final byte [] value = new byte[0];
+	
+	private class SetColumnFamilyIterator implements Iterator<T> {
+		
+		private final Iterator<String> elements;
+		private String current;
+		
+		public SetColumnFamilyIterator(Iterator<String> elements) {
+			this.elements = elements;
+		}
 
-public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
-	private final Field index;
+		@Override
+		public boolean hasNext() {
+			return elements.hasNext();
+		}
+
+		@Override
+		public T next() {
+			this.current = elements.next();
+			return KeyManagement.getInstance().createElement(getSetElementClazz(), this.current);
+		}
+
+		@Override
+		public void remove() {
+			if (current != null) {
+				SetColumnFamily.this.removeKey(current);
+				current = null;
+			}
+		}
+		
+	}
+	
+	/**
+	 * SetColumnFamily inherits ColumnFamily<byte[]> so {@link #getClazz()} returns byte[].class ; this method returns the actual type of expected elements.
+	 */
+	private final Class<T> setElementClazz;
 	
 	public SetColumnFamily() {
-		index = null;
+		setElementClazz = null;
 	}
 
 	public SetColumnFamily(Class<T> clazz, Field property,
-			PersistingElement owner, String index) throws SecurityException, NoSuchFieldException {
-		this(clazz, property, property.getName(), owner, PropertyManagement.getInstance().getProperty(clazz, index));
+			PersistingElement owner) throws SecurityException, NoSuchFieldException {
+		this(clazz, property, property.getName(), owner);
 	}
 
 	public SetColumnFamily(Class<T> clazz, Field property, String name,
-			PersistingElement owner, Field index) {
-		super(clazz, property, name, owner);
-		this.index = index;
+			PersistingElement owner) {
+		super(byte[].class, property, name, owner);
+		this.setElementClazz = clazz;
 	}
 	
+	public Class<T> getSetElementClazz() {
+		return setElementClazz;
+	}
+
 	@Override
 	public Serializable getSerializableVersion() {
-		return new HashSet<T>(this.collection.values());
+		return new HashSet<T>(this);
 	}
 
 	protected String getIndex(T object) {
-		return PropertyManagement.getInstance().candideReadValue(object, this.index).toString();
+		return ConversionTools.convertToString(object, this.getSetElementClazz());
 	}
-	
-	@Override
-	public T getFromStore(String key) throws DatabaseNotReachedException {
-		T ret = super.getFromStore(key);
 
-		if (ret != null && !this.getIndex(ret).equals(key))
-			throw new Error("Found element with key " + key + " with a different key " + this.getIndex(ret) + " (row '" + this.ownerTable +"'/'" + this.owner.getIdentifier() + "'/'"+ this.name + ")");
-		
-		return ret;
+	@Override
+	protected byte[] preparePut(String key, byte[] rep) {
+		assert rep.length == 0;
+		return rep;
 	}
 
 	/**
@@ -59,14 +104,25 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	@Override
 	public boolean add(T o) {
 		if (o == null)
-			return false;
-		String index = this.getIndex(o);
+			throw new NullPointerException("Set collection family " + this.getName() + " for persisting " + this.getOwner() + " does not support null values.");
+		String index;
 		try {
-			putElement(index, o);
+			index = this.getIndex(o);
+		} catch (IllegalArgumentException x) {
+			throw x;
+		} catch (Exception x) {
+			throw new IllegalArgumentException("Cannot extract representation for " + o + ": " + x.getMessage(), x);
+		}
+		try {
+			if (this.containsKey(index))
+				return false;
+			putElement(index, value);
 			return true;
 		} catch (DecrementException e) {
 			assert false;
 			throw new IllegalStateException(e);
+		} finally {
+			this.contains(o);
 		}
 	}
 
@@ -112,10 +168,14 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	public boolean remove(Object o) {
 		String index = this.getIndex((T) o);
 		try {
+			if (!this.containsKey(index))
+				return false;
 			this.removeKey(index);
 			return true;
 		} catch (RuntimeException x) {
 			return false;
+		} finally {
+			assert ! this.contains(o);
 		}
 	}
 
@@ -138,11 +198,12 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	 */
 	@Override
 	public boolean addAll(Collection<? extends T> c) {
+		boolean ret = false;
 		for (T t : c) {
-			if (!this.add(t))
-				return false;
+			if (this.add(t))
+				ret = true;
 		};
-		return true;
+		return ret;
 	}
 
 
@@ -152,10 +213,12 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	 */
 	@Override
 	public boolean removeAll(Collection<?> c) {
+		boolean ret = false;
 		for (Object t : c) {
-			this.remove(t);
+			if (this.remove(t))
+				ret = true;
 		};
-		return true;
+		return ret;
 	}
 
 	/**
@@ -165,9 +228,12 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	 */
 	@Override
 	public boolean retainAll(Collection<?> c) {
+		boolean ret = false;
 		for (Object object : c) {
-			if (this.contains(object))
-				this.remove(object);
+			if (this.contains(object)) {
+				ret = this.remove(object);
+				assert ret;
+			}
 		}
 		return true;
 	}
@@ -187,7 +253,7 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	 */
 	@Override
 	public Iterator<T> iterator() {
-		return this.collection.values().iterator();
+		return new SetColumnFamilyIterator(new TreeSet<String>(this.collection.keySet()).iterator());
 	}
 
 	/**
@@ -195,7 +261,7 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	 */
 	@Override
 	public Object[] toArray() {
-		return this.collection.values().toArray();
+		return this.collection.keySet().toArray();
 	}
 
 	/**
@@ -204,17 +270,17 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	@SuppressWarnings("hiding")
 	@Override
 	public <T> T[] toArray(T[] a) {
-		return this.collection.values().toArray(a);
+		return this.collection.keySet().toArray(a);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public void activate(Object from, Object to)
 			throws DatabaseNotReachedException {
-		if (! this.clazz.isInstance(from))
-			throw new IllegalArgumentException(from.toString() + " is not compatible with " + this.clazz);
-		if (! this.clazz.isInstance(to))
-			throw new IllegalArgumentException(to.toString() + " is not compatible with " + this.clazz);
+		if (from != null && ! this.getSetElementClazz().isInstance(from))
+			throw new IllegalArgumentException(from.toString() + " is not compatible with " + this.getSetElementClazz());
+		if (to != null && ! this.getSetElementClazz().isInstance(to))
+			throw new IllegalArgumentException(to.toString() + " is not compatible with " + this.getSetElementClazz());
 		super.activate(this.getIndex((T) from), this.getIndex((T) to));
 	}
 
@@ -227,14 +293,10 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 		Set<T> pojoS = (Set<T>)pojo;
 		for (T element : pojoS) {
 			String key = this.getIndex(element);
-			if (keys.remove(key)) {
-				T known = this.getElement(key);
-				if (known == null || this.hasChanged(key, known, element))
-					this.add(element);
-			} else {
+			if (!keys.remove(key)) {
 				this.add(element);
 			}
-			if (this.slow) {
+			if (this.slow) { //For test purpose
 				try {
 					Thread.sleep(50);
 				} catch (InterruptedException e) {
@@ -255,11 +317,11 @@ public class SetColumnFamily<T> extends ColumnFamily<T> implements Set<T> {
 	}
 
 	@Override
-	protected void addToPOJO(Object pojo, String key, T element) {
+	protected void addToPOJO(Object pojo, String key, byte[] element) {
 		@SuppressWarnings("unchecked")
 		Set<T> pojoS = (Set<T>)pojo;
-		
-		pojoS.add(element);
+		T actualElement = KeyManagement.getInstance().createElement(this.getSetElementClazz(), key);
+		pojoS.add(actualElement);
 	}
 	
 	private boolean slow = false;

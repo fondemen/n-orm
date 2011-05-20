@@ -222,10 +222,11 @@ public abstract class ColumnFamily<T> {
 	public void removeKey(String key) {
 		if (this.isAddOnly())
 			throw new IllegalStateException("This collection does not accepts removal.");
-		if (this.collection.containsKey(key))
+		if (this.collection.containsKey(key)) {
 			this.collection.remove(key);
-		assert this.changes != null && this.increments == null;
-		this.changes.put(key, ChangeKind.DELETE);
+			assert this.changes != null && this.increments == null;
+			this.changes.put(key, ChangeKind.DELETE);
+		}
 	}
 
 

@@ -254,6 +254,11 @@ public aspect KeyManagement {
 		this.unregister(self);
 	}
 	
+	/**
+	 * Creates an element of the expected type with the given id.
+	 * Id may be a simple id or a full id (including reference to the actual type).
+	 * Elements are cached using a per-thread cache (see {@link Cache}).
+	 */
 	public <T> T createElement(Class<T> expectedType, String id) {
 		try {
 			return new DecomposableString(id).detect(expectedType);
@@ -381,7 +386,7 @@ public aspect KeyManagement {
 	}
 	
 	public String createIdentifier(Object element, Class<?> expected) {
-		if (! expected.isInstance(element))
+		if (expected != null && ! expected.isInstance(element))
 			throw new ClassCastException("Element " + element + " of class " + element.getClass() + " is not compatible with " + expected);
 		try {
 			StringBuffer ret = new StringBuffer();
@@ -405,7 +410,7 @@ public aspect KeyManagement {
 				ret.append(KEY_END_SEPARATOR);
 			}
 			
-			if (!element.getClass().equals(expected)) {
+			if (expected != null && !element.getClass().equals(expected)) {
 				ret.append(element.getClass().getName());
 			}
 			
