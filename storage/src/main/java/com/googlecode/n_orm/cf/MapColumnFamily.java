@@ -186,6 +186,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 				int i = 0;
 				for (K element : this) {
 					a[i] = (U)element;
+					i++
 				}
 				return a;
 			}
