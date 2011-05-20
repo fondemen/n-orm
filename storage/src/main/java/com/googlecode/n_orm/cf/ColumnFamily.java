@@ -188,6 +188,8 @@ public abstract class ColumnFamily<T> {
 	}
 
 	public void putElement(String key, T element) throws DecrementException {
+		if (key == null || element == null)
+			throw new NullPointerException();
 		T old = this.collection.put(key, element);
 		if (this.increments != null) {
 			Number oVal = (Number) old;
