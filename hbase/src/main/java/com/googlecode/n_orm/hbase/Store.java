@@ -46,6 +46,8 @@ import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
+import org.apache.hadoop.hbase.io.hfile.Compression;
+import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
@@ -79,6 +81,7 @@ import com.googlecode.n_orm.storeapi.Constraint;
  * static-accessor=getStore<br>
  * 1=localhost<br>
  * 2=2181
+ * compression=gz &#35;can be 'none', 'gz', or 'lzo' ; by default 'none' 
  * </code><br>
  */
 public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
@@ -234,6 +237,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
 	public Map<String, HTable> tablesC = new TreeMap<String, HTable>();
 
+	private Algorithm compression;
+
 	protected Store(Properties properties) {
 		this.launchProps = properties;
 	}
@@ -297,6 +302,19 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	public void setMaxRetries(int maxRetries) {
 		this.maxRetries = Integer.valueOf(maxRetries);
+	}
+
+	public String getCompression() {
+		if (compression == null)
+			return null;
+		return compression.getName();
+	}
+
+	public void setCompression(String compression) {
+		if (compression == null) {
+			this.compression = null;
+		} else
+			this.compression = Compression.getCompressionAlgorithmByName(compression);
 	}
 
 	public Configuration getConf() {
@@ -461,7 +479,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						td = new HTableDescriptor(name);
 						if (expectedFamilies != null) {
 							for (String fam : expectedFamilies) {
-								td.addFamily(new HColumnDescriptor(fam));
+								HColumnDescriptor famD = new HColumnDescriptor(fam);
+								if (this.compression != null)
+									famD.setCompressionType(this.compression);
+								td.addFamily(famD);
 							}
 						}
 						this.admin.createTable(td);
@@ -548,6 +569,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				}
 				if (!tableD.hasFamily(cfname)) {
 					HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
+					if (this.compression != null)
+						newFamily.setCompressionType(this.compression);
 					toBeAdded.add(newFamily);
 					tableD.addFamily(newFamily);
 				}
