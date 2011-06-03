@@ -1,9 +1,11 @@
 package com.googlecode.n_orm.cf;
 
 import java.io.Serializable;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -16,6 +18,8 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> {
 	protected final Class<K> keyClazz;
 	protected final boolean keyIsString;
+	private Set<Entry<K, T>> entries = null;
+	private Set<K> keys = null;
 
 	public MapColumnFamily() {
 		keyClazz = null;
@@ -82,369 +86,355 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 
 	@Override
 	public Set<K> keySet() {
-		return new Set<K>() {
+		if (this.keys == null) {
+			this.keys = new Set<K>() {
 
-			@Override
-			public boolean add(K e) {
-				throw new UnsupportedOperationException();
-			}
+				@Override
+				public boolean add(K e) {
+					throw new UnsupportedOperationException();
+				}
 
-			@Override
-			public boolean addAll(Collection<? extends K> c) {
-				throw new UnsupportedOperationException();
-			}
+				@Override
+				public boolean addAll(Collection<? extends K> c) {
+					throw new UnsupportedOperationException();
+				}
 
-			@Override
-			public void clear() {
-				MapColumnFamily.this.clear();
-			}
+				@Override
+				public void clear() {
+					MapColumnFamily.this.clear();
+				}
 
-			@Override
-			public boolean contains(Object o) {
-				return MapColumnFamily.this.containsKey(o);
-			}
+				@Override
+				public boolean contains(Object o) {
+					return MapColumnFamily.this.containsKey(o);
+				}
 
-			@Override
-			public boolean containsAll(Collection<?> c) {
-				for (Object k : c) {
-					if (! this.contains(k))
+				@Override
+				public boolean containsAll(Collection<?> c) {
+					for (Object k : c) {
+						if (!this.contains(k))
+							return false;
+					}
+					return true;
+				}
+
+				@Override
+				public boolean isEmpty() {
+					return this.size() == 0;
+				}
+
+				@Override
+				public Iterator<K> iterator() {
+					final Iterator<String> it = collection.keySet().iterator();
+					return new Iterator<K>() {
+
+						@Override
+						public boolean hasNext() {
+							return it.hasNext();
+						}
+
+						@Override
+						public K next() {
+							return fromKey(it.next());
+						}
+
+						@Override
+						public void remove() {
+							throw new UnsupportedOperationException();
+						}
+					};
+				}
+
+				@Override
+				public boolean remove(Object o) {
+					if (!this.contains(o))
 						return false;
+					MapColumnFamily.this.remove(o);
+					return true;
 				}
-				return true;
-			}
 
-			@Override
-			public boolean isEmpty() {
-				return this.size() == 0;
-			}
-
-			@Override
-			public Iterator<K> iterator() {
-				final Iterator<String> it = collection.keySet().iterator();
-				return new Iterator<K>() {
-
-					@Override
-					public boolean hasNext() {
-						return it.hasNext();
+				@Override
+				public boolean removeAll(Collection<?> c) {
+					boolean ret = false;
+					for (Object k : c) {
+						if (this.remove(k))
+							ret = true;
 					}
+					return ret;
+				}
 
-					@Override
-					public K next() {
-						return fromKey(it.next());
+				@Override
+				public boolean retainAll(Collection<?> c) {
+					boolean ret = false;
+					for (K key : new HashSet<K>(this)) {
+						if (!c.contains(key)) {
+							this.remove(key);
+							ret = true;
+						}
 					}
+					return ret;
+				}
 
-					@Override
-					public void remove() {
-						throw new UnsupportedOperationException();
+				@Override
+				public int size() {
+					return MapColumnFamily.this.size();
+				}
+
+				@Override
+				public Object[] toArray() {
+					return this.toArray(new Object[this.size()]);
+				}
+
+				@SuppressWarnings("unchecked")
+				@Override
+				public <U> U[] toArray(U[] a) {
+					if (a.length < this.size())
+						a = (U[]) Array.newInstance(a.getClass().getComponentType(), this.size());
+					int i = 0;
+					for (K element : this) {
+						a[i] = (U) element;
+						i++;
 					}
-				};
-			}
-
-			@Override
-			public boolean remove(Object o) {
-				if (!this.contains(o))
-					return false;
-				MapColumnFamily.this.remove(o);
-				return true;
-			}
-
-			@Override
-			public boolean removeAll(Collection<?> c) {
-				boolean ret = false;
-				for (Object k : c) {
-					if (this.remove(k))
-						ret = true;
+					if (a.length > i)
+						a[i] = null;
+					return a;
 				}
-				return ret;
-			}
 
-			@Override
-			public boolean retainAll(Collection<?> c) {
-				boolean ret = false;
-				for (K key : this) {
-					if (!c.contains(key)) {
-						this.remove(key);
-						ret = true;
+				@Override
+				public boolean equals(Object obj) {
+					return obj != null && (obj instanceof Set)
+							&& this.hashCode() == obj.hashCode();
+				}
+
+				@Override
+				public int hashCode() {
+					int h = 0;
+					Iterator<K> i = iterator();
+					while (i.hasNext()) {
+						K obj = i.next();
+						if (obj != null)
+							h += obj.hashCode();
 					}
+					return h;
 				}
-				return ret;
-			}
 
-			@Override
-			public int size() {
-				return MapColumnFamily.this.size();
-			}
-
-			@Override
-			public Object[] toArray() {
-				return this.toArray(new Object[this.size()]);
-			}
-
-			@SuppressWarnings("unchecked")
-			@Override
-			public <U> U[] toArray(U[] a) {
-				int i = 0;
-				for (K element : this) {
-					a[i] = (U)element;
-					i++;
-				}
-				return a;
-			}
-
-			@Override
-			public boolean equals(Object obj) {
-				return obj != null && (obj instanceof Set) && this.hashCode() == obj.hashCode();
-			}
-
-			@Override
-			public int hashCode() {
-				int h = 0;
-				Iterator<K> i = iterator();
-				while (i.hasNext()) {
-					K obj = i.next();
-					if (obj != null)
-						h += obj.hashCode();
-				}
-				return h;
-			}
-			
-		};
+			};
+		}
+		return this.keys;
 	}
 
 	@Override
 	public Set<java.util.Map.Entry<K, T>> entrySet() {
-		// Set<java.util.Map.Entry<K, T>> ret = new
-		// HashSet<java.util.Map.Entry<K, T>>();
-		// for (final java.util.Map.Entry<String, T> key :
-		// this.collection.entrySet()) {
-		// ret.add(new Map.Entry<K, T>() {
-		//
-		// @Override
-		// public K getKey() {
-		// return MapColumnFamily.this.fromKey(key.getKey());
-		// }
-		//
-		// @Override
-		// public T getValue() {
-		// return key.getValue();
-		// }
-		//
-		// @Override
-		// public T setValue(T value) {
-		// T ret = MapColumnFamily.this.put(getKey(), value);
-		// if (ret == null ? key.getValue() == null : ret == key.getValue())
-		// key.setValue(value);
-		// return ret;
-		// }
-		//
-		// public int hashCode() {
-		// return (getKey() == null ? 0 : getKey().hashCode()) ^
-		// (getValue() == null ? 0 : getValue().hashCode());
-		// }
-		//
-		// @Override
-		// public boolean equals(Object obj) {
-		// return obj == this || (obj != null && (obj instanceof Map.Entry<?,
-		// ?>)
-		// && (getKey() == null ? ((Map.Entry<?, ?>)obj).getKey() == null :
-		// getKey().equals(((Map.Entry<?, ?>)obj).getKey()))
-		// && (getValue() == null ? ((Map.Entry<?, ?>)obj).getValue() == null :
-		// getValue().equals(((Map.Entry<?, ?>)obj).getValue())));
-		// }
-		//
-		// @Override
-		// public String toString() {
-		// return this.getKey().toString() + '=' + this.getValue().toString();
-		// }
-		// });
-		// }
-		// return ret;
-		return new Set<Entry<K, T>>() {
+		if (this.entries == null) {
+			this.entries = new Set<Entry<K, T>>() {
 
-			@Override
-			public boolean add(java.util.Map.Entry<K, T> e) {
-				return put(e.getKey(), e.getValue()) != null;
-			}
-
-			@Override
-			public boolean addAll(
-					Collection<? extends java.util.Map.Entry<K, T>> es) {
-				boolean ret = false;
-				for (Entry<K, T> entry : es) {
-					if (this.add(entry))
-						ret = true;
+				@Override
+				public boolean add(java.util.Map.Entry<K, T> e) {
+					return ! e.getValue().equals(put(e.getKey(), e.getValue()));
 				}
-				return ret;
-			}
 
-			@Override
-			public void clear() {
-				MapColumnFamily.this.clear();
-			}
+				@Override
+				public boolean addAll(
+						Collection<? extends java.util.Map.Entry<K, T>> es) {
+					boolean ret = false;
+					for (Entry<K, T> entry : es) {
+						if (this.add(entry))
+							ret = true;
+					}
+					return ret;
+				}
 
-			@Override
-			public boolean contains(Object rhs) {
-				if (rhs == null || !(rhs instanceof Entry))
-					return false;
-				Object key = ((Entry) rhs).getKey();
-				Object val = ((Entry) rhs).getValue();
-				T elt = MapColumnFamily.this.get(key);
-				return elt != null && val != null && elt.equals(val);
-			}
+				@Override
+				public void clear() {
+					MapColumnFamily.this.clear();
+				}
 
-			@Override
-			public boolean containsAll(Collection<?> entries) {
-				for (Object entry : entries) {
-					if (!this.contains(entry))
+				@Override
+				public boolean contains(Object rhs) {
+					if (rhs == null || !(rhs instanceof Entry))
 						return false;
+					Object key = ((Entry) rhs).getKey();
+					Object val = ((Entry) rhs).getValue();
+					T elt = MapColumnFamily.this.get(key);
+					return elt != null && val != null && elt.equals(val);
 				}
-				return true;
-			}
 
-			@Override
-			public boolean isEmpty() {
-				return MapColumnFamily.this.isEmpty();
-			}
-
-			@Override
-			public Iterator<java.util.Map.Entry<K, T>> iterator() {
-				final Iterator<Entry<String, T>> it = MapColumnFamily.this.collection
-						.entrySet().iterator();
-				return new Iterator<Map.Entry<K, T>>() {
-
-					@Override
-					public boolean hasNext() {
-						return it.hasNext();
+				@Override
+				public boolean containsAll(Collection<?> entries) {
+					for (Object entry : entries) {
+						if (!this.contains(entry))
+							return false;
 					}
-
-					@Override
-					public java.util.Map.Entry<K, T> next() {
-						final Entry<String, T> entry = it.next();
-						return new Entry<K, T>() {
-
-							@Override
-							public K getKey() {
-								return MapColumnFamily.this.fromKey(entry
-										.getKey());
-							}
-
-							@Override
-							public T getValue() {
-								return entry.getValue();
-							}
-
-							@Override
-							public T setValue(T value) {
-								throw new UnsupportedOperationException();
-							}
-
-							public int hashCode() {
-								return (getKey() == null ? 0 : getKey()
-										.hashCode())
-										^ (getValue() == null ? 0 : getValue()
-												.hashCode());
-							}
-
-							@Override
-							public boolean equals(Object obj) {
-								return obj == this
-										|| (obj != null
-												&& (obj instanceof Map.Entry<?, ?>)
-												&& (getKey() == null ? ((Map.Entry<?, ?>) obj)
-														.getKey() == null
-														: getKey()
-																.equals(((Map.Entry<?, ?>) obj)
-																		.getKey())) && (getValue() == null ? ((Map.Entry<?, ?>) obj)
-												.getValue() == null
-												: getValue().equals(
-														((Map.Entry<?, ?>) obj)
-																.getValue())));
-							}
-
-							@Override
-							public String toString() {
-								return this.getKey().toString() + '='
-										+ this.getValue().toString();
-							}
-						};
-					}
-
-					@Override
-					public void remove() {
-						throw new UnsupportedOperationException();
-					}
-				};
-			}
-
-			@Override
-			public boolean remove(Object elt) {
-				if (this.contains(elt)) {
-					MapColumnFamily.this.remove(((Entry) elt).getKey());
 					return true;
 				}
-				return false;
-			}
 
-			@Override
-			public boolean removeAll(Collection<?> elts) {
-				boolean ret = false;
-				for (Object entry : elts) {
-					if (this.remove(entry))
-						ret = true;
+				@Override
+				public boolean isEmpty() {
+					return MapColumnFamily.this.isEmpty();
 				}
-				return ret;
-			}
 
-			@Override
-			public boolean retainAll(Collection<?> elts) {
-				throw new UnsupportedOperationException();
-			}
+				@Override
+				public Iterator<java.util.Map.Entry<K, T>> iterator() {
+					final Iterator<Entry<String, T>> it = MapColumnFamily.this.collection
+							.entrySet().iterator();
+					return new Iterator<Map.Entry<K, T>>() {
 
-			@Override
-			public int size() {
-				return MapColumnFamily.this.size();
-			}
+						@Override
+						public boolean hasNext() {
+							return it.hasNext();
+						}
 
-			@Override
-			public Object[] toArray() {
-				return this.toArray(new Object[this.size()]);
-			}
+						@Override
+						public java.util.Map.Entry<K, T> next() {
+							final Entry<String, T> entry = it.next();
+							return new Entry<K, T>() {
 
-			@SuppressWarnings("unchecked")
-			@Override
-			public <U> U[] toArray(U[] ret) {
-				int i = 0;
-				Iterator<java.util.Map.Entry<K, T>> it = this.iterator();
-				while (it.hasNext()) {
-					ret[i] = (U) it.next();
-					i++;
+								@Override
+								public K getKey() {
+									return MapColumnFamily.this.fromKey(entry
+											.getKey());
+								}
+
+								@Override
+								public T getValue() {
+									return entry.getValue();
+								}
+
+								@Override
+								public T setValue(T value) {
+									if (this.equals(value))
+										throw new IllegalArgumentException();
+									return MapColumnFamily.this.put(getKey(), value);
+								}
+
+								public int hashCode() {
+									return (getKey() == null ? 0 : getKey()
+											.hashCode())
+											^ (getValue() == null ? 0
+													: getValue().hashCode());
+								}
+
+								@Override
+								public boolean equals(Object obj) {
+									return obj == this
+											|| (obj != null
+													&& (obj instanceof Map.Entry<?, ?>)
+													&& (getKey() == null ? ((Map.Entry<?, ?>) obj)
+															.getKey() == null
+															: getKey()
+																	.equals(((Map.Entry<?, ?>) obj)
+																			.getKey())) && (getValue() == null ? ((Map.Entry<?, ?>) obj)
+													.getValue() == null
+													: getValue()
+															.equals(((Map.Entry<?, ?>) obj)
+																	.getValue())));
+								}
+
+								@Override
+								public String toString() {
+									return this.getKey().toString() + '='
+											+ this.getValue().toString();
+								}
+							};
+						}
+
+						@Override
+						public void remove() {
+							throw new UnsupportedOperationException();
+						}
+					};
 				}
-				return ret;
-			}
 
-			@Override
-			public boolean equals(Object obj) {
-				if (obj == this)
-					return true;
-				if (obj == null || !(obj instanceof Set))
+				@Override
+				public boolean remove(Object elt) {
+					if (this.contains(elt)) {
+						MapColumnFamily.this.remove(((Entry) elt).getKey());
+						return true;
+					}
 					return false;
-				return this.containsAll((Set<?>) obj)
-						&& ((Set<?>) obj).containsAll(this);
-			}
-
-			@Override
-			public int hashCode() {
-				int h = 0;
-				Iterator<Entry<K, T>> i = iterator();
-				while (i.hasNext()) {
-					Entry<K, T> obj = i.next();
-					if (obj != null)
-						h += obj.hashCode();
 				}
-				return h;
-			}
 
-		};
+				@Override
+				public boolean removeAll(Collection<?> elts) {
+					boolean ret = false;
+					for (Object entry : elts) {
+						if (this.remove(entry))
+							ret = true;
+					}
+					return ret;
+				}
+
+				@Override
+				public boolean retainAll(Collection<?> elts) {
+					throw new UnsupportedOperationException();
+				}
+
+				@Override
+				public int size() {
+					return MapColumnFamily.this.size();
+				}
+
+				@Override
+				public Object[] toArray() {
+					return this.toArray(new Object[this.size()]);
+				}
+
+				@SuppressWarnings("unchecked")
+				@Override
+				public <U> U[] toArray(U[] ret) {
+					if (ret.length < this.size())
+						ret = (U[]) Array.newInstance(ret.getClass().getComponentType(), this.size());
+					int i = 0;
+					Iterator<java.util.Map.Entry<K, T>> it = this.iterator();
+					while (it.hasNext()) {
+						ret[i] = (U) it.next();
+						i++;
+					}
+					if (ret.length > i)
+						ret[i] = null;
+					return ret;
+				}
+
+				@Override
+				public boolean equals(Object obj) {
+					if (obj == this)
+						return true;
+					if (obj == null || !(obj instanceof Set))
+						return false;
+					return this.hashCode() == obj.hashCode();
+				}
+
+				@Override
+				public int hashCode() {
+					int h = 0;
+					Iterator<Entry<K, T>> i = iterator();
+					while (i.hasNext()) {
+						Entry<K, T> obj = i.next();
+						if (obj != null)
+							h += obj.hashCode();
+					}
+					return h;
+				}
+				
+				@Override
+				public String toString() {
+					StringBuffer ret = new StringBuffer();
+					ret.append('[');
+					boolean fst = true;
+					for (Entry<K, T> e : this) {
+						if (fst)
+							fst = false;
+						else
+							ret.append(',');
+						ret.append(e.toString());
+					}
+					ret.append(']');
+					return ret.toString();
+				}
+
+			};
+		}
+		return this.entries;
 	}
 
 	@SuppressWarnings("unchecked")

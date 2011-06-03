@@ -196,9 +196,7 @@ public abstract class ColumnFamily<T> {
 			Number nVal = (Number) element;
 			this.increments.put(key, IncrementManagement.getInstance().getActualIncrement(nVal, oVal, this.getIncrement(key), this.getProperty()));
 		} else {
-			if (element == null)
-				this.removeKey(key);
-			else if (old == null || this.hasChanged(key, old, element))
+			if (old == null || this.hasChanged(key, old, element))
 				this.changes.put(key, ChangeKind.SET);
 		}
 	}
@@ -236,7 +234,12 @@ public abstract class ColumnFamily<T> {
 	 * Finds an cached element according to its key.
 	 */
 	public T getElement(String key) {
-		T ret = this.collection.get(key);
+		T ret;
+		try {
+			ret = this.collection.get(key);
+		} catch (Exception x) {
+			return null;
+		}
 		if (ret != null)
 			return ret;
 		if (this.changes != null && this.changes.containsKey(key)) {
