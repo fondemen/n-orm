@@ -2,6 +2,7 @@ package com.googlecode.n_orm;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.List;
@@ -69,7 +70,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	/**
 	 * The list of all {@link ColumnFamily} held by this persisting element.
 	 */
-	Set<ColumnFamily<?>> getColumnFamilies();
+	Collection<ColumnFamily<?>> getColumnFamilies(); //Can't be a Set as CFs are either Sets or Maps whose equals or hashCode must compare collection contents only 
 	
 	/**
 	 * The the {@link ColumnFamily} held by this persisting element with the given name.

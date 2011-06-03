@@ -5,12 +5,14 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.aspectj.lang.reflect.FieldSignature;
 
@@ -60,9 +62,9 @@ public aspect ColumnFamiliyManagement {
 		this.getColumnFamiliesInt().put(cf.getName(), cf);
 	}
 	
-	public Set<ColumnFamily<?>> PersistingElement.getColumnFamilies() {
+	public Collection<ColumnFamily<?>> PersistingElement.getColumnFamilies() {
 		this.getPropertiesColumnFamily();
-		return new HashSet<ColumnFamily<?>>(this.getColumnFamiliesInt().values());
+		return Collections.unmodifiableCollection(this.getColumnFamiliesInt().values());
 	}
 	
 	public ColumnFamily<?> PersistingElement.getColumnFamily(String name) throws UnknownColumnFamily {

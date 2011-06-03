@@ -78,7 +78,7 @@ public aspect StorageManagement {
 			Map<String,Number> propsIncrs = this.getIncrements();
 			if (!propsIncrs.isEmpty())
 				increments.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, propsIncrs);
-			Set<ColumnFamily<?>> families = this.getColumnFamilies();
+			Collection<ColumnFamily<?>> families = this.getColumnFamilies();
 			for (ColumnFamily<?> family : families) {
 				Set<String> changedKeys = family.changedKeySet();
 				if (!changedKeys.isEmpty()) {
