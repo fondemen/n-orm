@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.storage;
+package com.googlecode.n_orm.hbase;
 
  import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -13,12 +13,14 @@ import java.util.TreeMap;
 
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.HConnection;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.googlecode.n_orm.hbase.HBaseLauncher;
 import com.googlecode.n_orm.hbase.Store;
-import com.googlecode.n_orm.storage.HBaseLauncher;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 
 public class ConcurrentTest {
@@ -54,8 +56,8 @@ public class ConcurrentTest {
 	private void truncateTable(String table) throws IOException {
 
 		if (store1.getAdmin().tableExists(table)) {
-			store1.truncate(table, null);
-			assertEquals(0, store1.count(table, null));
+			store1.truncate(table, (Constraint)null);
+			assertEquals(0, store1.count(table, (Constraint)null));
 		}
 	}
 	

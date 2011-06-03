@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.storage;
+package com.googlecode.n_orm.hbase;
 
 import static org.junit.Assert.assertEquals;
 
@@ -31,8 +31,8 @@ public class CountTest {
 	public void truncateTestTable() throws IOException {
 
 		if (store.getAdmin().tableExists(testTable)) {
-			store.truncate(testTable, null);
-			assertEquals(0, store.count(testTable, null));
+			store.truncate(testTable, (Constraint)null);
+			assertEquals(0, store.count(testTable, (Constraint)null));
 		}
 	}
 	
@@ -46,7 +46,7 @@ public class CountTest {
 
 	@Test
 	public void inexistingTable() throws IOException {
-		assertEquals(0l, store.count("huidhzidxeozd", null));
+		assertEquals(0l, store.count("huidhzidxeozd", (Constraint)null));
 		
 	}
 
@@ -58,14 +58,14 @@ public class CountTest {
 		change.put("fam", famChange );
 		store.storeChanges(testTable, "testid", change , null, null);
 		store.delete(testTable, "testid");
-		assertEquals(0l, store.count(testTable, null));
+		assertEquals(0l, store.count(testTable, (Constraint)null));
 		
 	}
 
 	@Test
 	public void oneEmpty() {
 		store.storeChanges(testTable, "testid", null, null, null);
-		assertEquals(1l, store.count(testTable, null));
+		assertEquals(1l, store.count(testTable, (Constraint)null));
 		
 	}
 
@@ -78,7 +78,7 @@ public class CountTest {
 		change.put("fam1", famChange );
 		change.put("fam2", famChange );
 		store.storeChanges(testTable, "testid", change , null, null);
-		assertEquals(1l, store.count(testTable, null));
+		assertEquals(1l, store.count(testTable, (Constraint)null));
 		
 	}
 	
@@ -90,7 +90,7 @@ public class CountTest {
 		change.put("fam", famChange );
 		store.storeChanges(testTable, "testid", change , null, null);
 		store.storeChanges(testTable, "testid2", null , null, null);
-		assertEquals(2l, store.count(testTable, null));
+		assertEquals(2l, store.count(testTable, (Constraint)null));
 	}
 	
 	@Test
@@ -98,7 +98,7 @@ public class CountTest {
 		for(int i = 0 ; i < 100; ++i) {
 			store.storeChanges(testTable, "testid"+i, null , null, null);
 		}
-		assertEquals(100l, store.count(testTable, null));
+		assertEquals(100l, store.count(testTable, (Constraint)null));
 	}
 	
 	@Test

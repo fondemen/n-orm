@@ -12,6 +12,11 @@ import java.util.Iterator;
 import java.util.NavigableSet;
 import java.util.Set;
 
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hdfs.server.common.Storage;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
@@ -19,9 +24,13 @@ import org.junit.Test;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingMixin;
+import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.cf.SetColumnFamily;
+import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 /**
@@ -318,6 +327,22 @@ public class BasicTest extends HBaseTestLauncher {
 		assertEquals(bsut.getBookStore(), b2.getBookStore());
 		//As such:
 		assertEquals(bsut, b2);
+	 }
+	 
+	 @Test
+	 public void compression() throws IOException {
+		//src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties defines the HBase store
+		com.googlecode.n_orm.storeapi.Store ast = StoreSelector.getInstance().getStoreFor(Book.class);
+		if (! (ast instanceof Store)) //In case you've changed the default store
+			return;
+		Store st = (Store) ast;
+		//src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties defines the compression property
+		assertEquals("gz", st.getCompression());
+		//Checking with HBase that the property column family is actually stored in GZ
+		HTableDescriptor td = st.getAdmin().getTableDescriptor(Bytes.toBytes(PersistingMixin.getInstance().getTable(Book.class) /*could be bsut.getTable()*/));
+		//Getting the property CF descriptor
+		HColumnDescriptor pd = td.getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		assertEquals(Algorithm.GZ, pd.getCompression());
 	 }
 
 }
