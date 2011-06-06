@@ -1,5 +1,6 @@
 package com.googlecode.n_orm;
 
+import java.beans.PropertyDescriptor;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.beanutils.ConvertUtils;
+import org.apache.commons.beanutils.PropertyUtils;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
@@ -132,9 +134,9 @@ public aspect StoreSelector {
 			else
 				ret = storeClass.newInstance();
 			
-			for (Field property : PropertyManagement.getInstance().getProperties(storeClass)) {
-				if (properties.containsKey(property.getName())) {
-					PropertyManagement.getInstance().setValue(ret, property, ConvertUtils.convert(properties.getProperty(property.getName()), property.getType()));
+			for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(storeClass)) {
+				if (PropertyUtils.isWriteable(ret, property.getName()) && properties.containsKey(property.getName())) {
+					PropertyUtils.setProperty(ret, property.getName(), ConvertUtils.convert(properties.getProperty(property.getName()), property.getPropertyType()));
 				}
 			}
 			
