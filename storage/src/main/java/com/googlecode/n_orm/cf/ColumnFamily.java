@@ -11,7 +11,7 @@ import java.util.TreeSet;
 
 import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.DecrementException;
+import com.googlecode.n_orm.IncrementException;
 import com.googlecode.n_orm.IncrementManagement;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.PersistingElement;
@@ -187,7 +187,7 @@ public abstract class ColumnFamily<T> {
 		return false;
 	}
 
-	public void putElement(String key, T element) throws DecrementException {
+	public void putElement(String key, T element) throws IncrementException {
 		if (key == null || element == null)
 			throw new NullPointerException();
 		T old = this.collection.put(key, element);
