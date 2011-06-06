@@ -4,9 +4,13 @@
 	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>sample</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+	<name>Sample n-orm project</name>
 	<description>Simple starter project.</description>
 	<properties>
 		<java.version>1.6</java.version>
+		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
+		<plugin.aspectj.version>1.3.1</plugin.aspectj.version>
+		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
 	</properties>
 	<build>
 		<plugins>
@@ -29,7 +33,7 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>aspectj-maven-plugin</artifactId>
-				<version>1.3</version>
+				<version>${plugin.aspectj.version}</version>
 				<configuration>
 					<source>${java.version}</source>
 					<target>${java.version}</target>
@@ -63,21 +67,15 @@
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
-			<type>jar</type>
-			<scope>compile</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.googlecode.n_orm</groupId>
-			<artifactId>storage</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>${n-orm.version}</version>
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
+		
 		<dependency>
-			<groupId>org.aspectj</groupId>
-			<artifactId>aspectjrt</artifactId>
-			<version>1.6.7</version>
+			<groupId>com.googlecode.n_orm</groupId>
+			<artifactId>storage</artifactId>
+			<version>${n-orm.version}</version>
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
