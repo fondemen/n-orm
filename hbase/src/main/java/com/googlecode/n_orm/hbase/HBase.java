@@ -7,11 +7,20 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Constraint;
 
 /**
  * The HBase store found according to its configuration folder.
  * An example store.properties file is:<br><code>
- * class=com.googlecode.n_orm.hbase.Store<br>
+ * class=com.googlecode.n_orm.hbase.HBase<br>
  * static-accessor=getStore<br>
  * 1=/usr/lib/hadoop-0.20/conf/,/usr/lib/hbase/conf/,!/usr/lib/hadoop/example-confs
  * compression=gz &#35;can be 'none', 'gz', or 'lzo' ; by default 'none' 
@@ -20,9 +29,9 @@ import java.util.Map;
  * Difference with {@link Store} is that jar found in the given folders are added to the classpath so that you don't need to include the HBase client jars in your application.
  * However, if your application is ran within a servlet container (Tomcat, JBoss...), you should care excluding servlet and jsp APIs whom HBase depends on... 
  */
-public class HBase {
+public class HBase extends Store {
 
-	private static Map<String, Store> knownStores = new HashMap<String, Store>();
+	private static Map<String, HBase> knownStores = new HashMap<String, HBase>();
 	
 	private static Class<?>[] parameters = new Class[] { URL.class };
 	private static RecursiveFileAction addJarAction = new RecursiveFileAction() {
@@ -65,17 +74,23 @@ public class HBase {
 			throws IOException {
 		synchronized(HBase.class) {
 		
-			Store ret = knownStores.get(commaSeparatedConfigurationFolders);
+			HBase ret = knownStores.get(commaSeparatedConfigurationFolders);
 			
 			if (ret == null) {
 				addJarAction.clear();
 				addJarAction.addFiles(commaSeparatedConfigurationFolders);
 				addJarAction.explore(null);
-				ret = Store.getStore(commaSeparatedConfigurationFolders);
+				Properties props = new Properties();
+				props.setProperty("commaSeparatedConfigurationFolders", commaSeparatedConfigurationFolders);
+				ret = new HBase(props);
 				knownStores.put(commaSeparatedConfigurationFolders, ret);
 			}
 			
 			return ret;
 		}
+	}
+
+	protected HBase(Properties properties) {
+		super(properties);
 	}
 }

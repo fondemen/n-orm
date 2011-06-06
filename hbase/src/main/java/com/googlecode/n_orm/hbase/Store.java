@@ -81,7 +81,7 @@ import com.googlecode.n_orm.storeapi.Constraint;
  * static-accessor=getStore<br>
  * 1=localhost<br>
  * 2=2181
- * compression=gz &#35;can be 'none', 'gz', or 'lzo' ; by default 'none' 
+ * compression=gz &#35;can be 'none', 'gz', or 'lzo' ; default value is null, which represents 'none' 
  * </code><br>
  */
 public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
