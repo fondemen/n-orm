@@ -7,15 +7,6 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-
-import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
-import com.googlecode.n_orm.storeapi.Constraint;
 
 /**
  * The HBase store found according to its configuration folder.
@@ -29,9 +20,9 @@ import com.googlecode.n_orm.storeapi.Constraint;
  * Difference with {@link Store} is that jar found in the given folders are added to the classpath so that you don't need to include the HBase client jars in your application.
  * However, if your application is ran within a servlet container (Tomcat, JBoss...), you should care excluding servlet and jsp APIs whom HBase depends on... 
  */
-public class HBase extends Store {
+public class HBase {
 
-	private static Map<String, HBase> knownStores = new HashMap<String, HBase>();
+	private static Map<String, Store> knownStores = new HashMap<String, Store>();
 	
 	private static Class<?>[] parameters = new Class[] { URL.class };
 	private static RecursiveFileAction addJarAction = new RecursiveFileAction() {
@@ -74,23 +65,17 @@ public class HBase extends Store {
 			throws IOException {
 		synchronized(HBase.class) {
 		
-			HBase ret = knownStores.get(commaSeparatedConfigurationFolders);
+			Store ret = knownStores.get(commaSeparatedConfigurationFolders);
 			
 			if (ret == null) {
 				addJarAction.clear();
 				addJarAction.addFiles(commaSeparatedConfigurationFolders);
 				addJarAction.explore(null);
-				Properties props = new Properties();
-				props.setProperty("commaSeparatedConfigurationFolders", commaSeparatedConfigurationFolders);
-				ret = new HBase(props);
+				ret = Store.getStore(commaSeparatedConfigurationFolders);
 				knownStores.put(commaSeparatedConfigurationFolders, ret);
 			}
 			
 			return ret;
 		}
-	}
-
-	protected HBase(Properties properties) {
-		super(properties);
 	}
 }

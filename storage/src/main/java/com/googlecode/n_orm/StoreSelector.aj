@@ -134,7 +134,7 @@ public aspect StoreSelector {
 			else
 				ret = storeClass.newInstance();
 			
-			for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(storeClass)) {
+			for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(ret)) {
 				if (PropertyUtils.isWriteable(ret, property.getName()) && properties.containsKey(property.getName())) {
 					PropertyUtils.setProperty(ret, property.getName(), ConvertUtils.convert(properties.getProperty(property.getName()), property.getPropertyType()));
 				}
