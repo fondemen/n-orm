@@ -6,11 +6,12 @@ import java.util.Map;
 
 import org.aspectj.lang.reflect.FieldSignature;
 
-import com.googlecode.n_orm.DecrementException;
+import com.googlecode.n_orm.IncrementException;
 import com.googlecode.n_orm.IncrementManagement;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.Incrementing.Mode;
 import com.googlecode.n_orm.PropertyManagement.Property;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.MapColumnFamily;
@@ -40,11 +41,17 @@ public aspect IncrementManagement {
 	}
 
 	public Number getActualIncrement(Number val,
-			Number oldVal, Number previousIncrement, Field prop) throws DecrementException {
+			Number oldVal, Number previousIncrement, Field prop) throws IncrementException {
 		long value = toLong(val, prop);
 		long oldValue = toLong(oldVal, prop);
-		if (oldValue > value)
-			throw new DecrementException("Property " + prop + " can only increase with time ; trying to decrement it of " + (oldValue-value));
+		Incrementing inca = prop.getAnnotation(Incrementing.class);
+		if (inca != null) {
+			if (inca.mode().equals(Mode.IncrementOnly) && oldValue > value)
+				throw new IncrementException(prop, false, oldValue-value);
+
+			if (inca.mode().equals(Mode.DecrementOnly) && oldValue < value)
+				throw new IncrementException(prop, true, value-oldValue);
+		}
 		Number increment = previousIncrement;
 		if (increment == null)
 			increment = 0l;

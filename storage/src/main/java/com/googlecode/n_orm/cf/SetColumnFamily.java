@@ -9,7 +9,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.DecrementException;
+import com.googlecode.n_orm.IncrementException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
@@ -118,7 +118,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 				return false;
 			putElement(index, value);
 			return true;
-		} catch (DecrementException e) {
+		} catch (IncrementException e) {
 			assert false;
 			throw new IllegalStateException(e);
 		} finally {
