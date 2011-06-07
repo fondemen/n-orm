@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.storage;
+package com.googlecode.n_orm.hbase;
 
 import org.junit.BeforeClass;
 import org.junit.runner.RunWith;

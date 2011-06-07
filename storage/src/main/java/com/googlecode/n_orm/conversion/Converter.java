@@ -55,4 +55,12 @@ abstract class Converter<T> implements
 	}
 
 	public abstract T getDefaultValue();
+
+	public Object fromStringReverted(String rep, Class<?> type) {
+		throw new UnreversibleTypeException(type);
+	}
+
+	public String toStringReverted(T obj, Class<? extends T> expected) {
+		throw new UnreversibleTypeException(expected);
+	}
 }

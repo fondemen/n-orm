@@ -58,10 +58,26 @@ public class Constraint {
 	 * @param checkKeys to check whether all keys with a lower category is given a value
 	 */
 	public Constraint(Class<?> clazz, Map<Field, Object> values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {
-		
+		if (searchedKey == null != (startValue == null && endValue == null)) {
+			if (searchedKey == null)
+				throw new IllegalArgumentException("No searched key defined while either start key (" + startValue + ") or end key (" + endValue + ") is provided.");
+			else
+				throw new IllegalArgumentException("Searched key is " + searchedKey + " but neither start value nor end value is provided.");
+		}
 		String fixedPart = getPrefix(clazz, values, searchedKey, checkKeys);
-		this.startKey = createStart(fixedPart, startValue == null ? null : ConversionTools.convertToString(startValue, searchedKey.getType()));
-		this.endKey = createEnd(fixedPart, endValue == null ? null : ConversionTools.convertToString(endValue, searchedKey.getType()), true);
+		String start, end;
+		if (searchedKey == null) {
+			start = null;
+			end = null;
+		} else if (searchedKey.getAnnotation(Key.class).reverted()) {
+			start = ConversionTools.convertToStringReverted(startValue, searchedKey.getType());
+			end = ConversionTools.convertToStringReverted(endValue, searchedKey.getType());
+		} else {
+			start = ConversionTools.convertToString(startValue, searchedKey.getType());
+			end = ConversionTools.convertToString(endValue, searchedKey.getType());
+		}
+		this.startKey = createStart(fixedPart, startValue == null ? null : start);
+		this.endKey = createEnd(fixedPart, endValue == null ? null : end, true);
 	}
 
 	/**
@@ -113,7 +129,10 @@ public class Constraint {
 				if (checkKeys)
 					throw new IllegalArgumentException("In order to select an element of class " + clazz + ", you must supply a value for " + f);
 			} else {
-				fixedPartb.append(ConversionTools.convertToString(values.get(keys.get(i)), f.getType()));
+				String rep = f.getAnnotation(Key.class).reverted() ?
+							ConversionTools.convertToStringReverted(values.get(keys.get(i)), f.getType())
+						:	ConversionTools.convertToString(values.get(keys.get(i)), f.getType());
+				fixedPartb.append(rep);
 				if (allKeysThere && i == length-1)
 					fixedPartb.append(KeyManagement.KEY_END_SEPARATOR);
 				else

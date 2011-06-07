@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.util.Properties;
 
 import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.hbase.HBaseLauncher;
 import com.googlecode.n_orm.hbase.Store;
-import com.googlecode.n_orm.storage.HBaseLauncher;
 
 public class HBaseTestLauncher {
 	//The following is unecessary for production code: all information is available in the nearest store.properties

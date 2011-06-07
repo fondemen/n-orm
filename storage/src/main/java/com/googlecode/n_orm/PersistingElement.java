@@ -2,6 +2,7 @@ package com.googlecode.n_orm;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.List;
@@ -45,7 +46,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	Store getStore();
 
 	/**
-	 * The table used to store this persisting element as declared by the {@link Persisiting#table()} annotation.
+	 * The table used to store this persisting element as declared by the {@link Persisting#table()} annotation.
 	 * If the persisting element inherits another persisting element, only the table for the instanciated class is shown.
 	 */
 	String getTable();
@@ -69,7 +70,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	/**
 	 * The list of all {@link ColumnFamily} held by this persisting element.
 	 */
-	Set<ColumnFamily<?>> getColumnFamilies();
+	Collection<ColumnFamily<?>> getColumnFamilies(); //Can't be a Set as CFs are either Sets or Maps whose equals or hashCode must compare collection contents only 
 	
 	/**
 	 * The the {@link ColumnFamily} held by this persisting element with the given name.
@@ -125,7 +126,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * <p>
 	 * <b>WARNING:</b> any column family change would raise a {@link java.util.ConcurrentModificationException} during this period in case application is multi-threaded and this element is explicitly shared by threads.
 	 * In the latter case, the store is retried at most 0.5s per problematic column family.
-	 * Simplest solution is to search this element in each thread using {@link StorageManagement.getElement(Class, String)}.<br>
+	 * Simplest solution is to search this element in each thread using {@link StorageManagement#getElement(Class, String)}.<br>
 	 * A cleaner mean to solve this issue store calls should be performed within a synchronized section on this or on changed column family:<br>
 	 * <code>
 	 * synchronized(element.myFamily) { <i>//or merely synchronized(element)<br>
@@ -164,7 +165,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * Erases changes done in properties and column families.
 	 * Properties that are persisting elements are also activated.
 	 * Column families annotated with {@link ImplicitActivation} are also activated.
-	 * Use {@link #activateIfNotAlready()} in case you want to avoid re-activating already activated elements of this persisting elements.
+	 * Use {@link #activateIfNotAlready(String...)} in case you want to avoid re-activating already activated elements of this persisting elements.
 	 * @param families names of the families to activate even if they are not annotated with {@link ImplicitActivation} (see {@link #getColumnFamily(String)})
 	 * @throws IllegalArgumentException in case a given column family does not exists
 	 */
@@ -184,7 +185,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @param name name of the column family
 	 * @throws UnknownColumnFamily in case this column family does not exist
 	 * @throws DatabaseNotReachedException
-	 * @see {@link #getColumnFamily(String)}
+	 * @see #getColumnFamily(String)
 	 */
 	void activateColumnFamily(String name) throws UnknownColumnFamily, DatabaseNotReachedException;
 
@@ -195,7 +196,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @param to the maximal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
 	 * @throws UnknownColumnFamily in case this column family does not exist
 	 * @throws DatabaseNotReachedException
-	 * @see {@link #getColumnFamily(String)}
+	 * @see #getColumnFamily(String)
 	 */
 	void activateColumnFamily(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
@@ -205,7 +206,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @param name name of the column family
 	 * @throws UnknownColumnFamily in case this column family does not exist
 	 * @throws DatabaseNotReachedException
-	 * @see {@link #getColumnFamily(String)}
+	 * @see #getColumnFamily(String)
 	 */
 	void activateColumnFamilyIfNotAlready(String name) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
@@ -217,7 +218,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @param to the maximal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
 	 * @throws UnknownColumnFamily in case this column family does not exist
 	 * @throws DatabaseNotReachedException
-	 * @see {@link #getColumnFamily(String)}
+	 * @see #getColumnFamily(String)
 	 */
 	void activateColumnFamilyIfNotAlready(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
 	

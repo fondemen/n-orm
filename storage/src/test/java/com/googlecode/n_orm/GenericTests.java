@@ -12,6 +12,7 @@ import com.googlecode.n_orm.cf.CollectionStorageTest;
 		CollectionStorageTest.class,
 		PersistableSearchTest.class,
 		InheritanceTest.class,
+		ReveresedOrderSearchTest.class,
 		EvolutionTest.class
 })
 

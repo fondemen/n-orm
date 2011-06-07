@@ -2,8 +2,8 @@ package com.googlecode.n_orm.sample.businessmodel;
 
 import java.util.Date;
 import java.util.Set;
+import java.util.TreeSet;
 
-import com.googlecode.n_orm.Indexed;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.StorageManagement;
@@ -19,8 +19,7 @@ public class BookStore {
 	private String address;
 	
 	//The following is a column family
-	@Indexed(field="title") //To state what is the index of the elements; here title is an attribute of Book
-	private Set<Book> toBeOrdered = null; //will be set automatically 
+	private Set<Book> toBeOrdered = new TreeSet<Book>();
 
 	//Necessary for serialization capabilities
 	public BookStore() {}

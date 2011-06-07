@@ -11,7 +11,7 @@ import java.util.TreeSet;
 
 import com.googlecode.n_orm.AddOnly;
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.DecrementException;
+import com.googlecode.n_orm.IncrementException;
 import com.googlecode.n_orm.IncrementManagement;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.PersistingElement;
@@ -170,7 +170,7 @@ public abstract class ColumnFamily<T> {
 	 * Checks whether this column family is empty in the data store.
 	 */
 	public boolean isEmptyInStore() throws DatabaseNotReachedException {
-		return this.getOwner().getStore().exists(this.ownerTable, this.getOwner().getIdentifier(), this.getName());
+		return !this.getOwner().getStore().exists(this.ownerTable, this.getOwner().getIdentifier(), this.getName());
 	}
 
 	public boolean containsKey(String key) {
@@ -187,16 +187,16 @@ public abstract class ColumnFamily<T> {
 		return false;
 	}
 
-	public void putElement(String key, T element) throws DecrementException {
+	public void putElement(String key, T element) throws IncrementException {
+		if (key == null || element == null)
+			throw new NullPointerException();
 		T old = this.collection.put(key, element);
 		if (this.increments != null) {
 			Number oVal = (Number) old;
 			Number nVal = (Number) element;
 			this.increments.put(key, IncrementManagement.getInstance().getActualIncrement(nVal, oVal, this.getIncrement(key), this.getProperty()));
 		} else {
-			if (element == null)
-				this.removeKey(key);
-			else if (old == null || this.hasChanged(key, old, element))
+			if (old == null || this.hasChanged(key, old, element))
 				this.changes.put(key, ChangeKind.SET);
 		}
 	}
@@ -217,15 +217,16 @@ public abstract class ColumnFamily<T> {
 
 	/**
 	 * Removes an element to the column family given its key.
-	 * For this element not to appear anymore in the datastore, the owner object must be called the {@link #PersistingElement.store()} method.
+	 * For this element not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
 	 */
 	public void removeKey(String key) {
 		if (this.isAddOnly())
 			throw new IllegalStateException("This collection does not accepts removal.");
-		if (this.collection.containsKey(key))
+		if (this.collection.containsKey(key)) {
 			this.collection.remove(key);
-		assert this.changes != null && this.increments == null;
-		this.changes.put(key, ChangeKind.DELETE);
+			assert this.changes != null && this.increments == null;
+			this.changes.put(key, ChangeKind.DELETE);
+		}
 	}
 
 
@@ -233,7 +234,12 @@ public abstract class ColumnFamily<T> {
 	 * Finds an cached element according to its key.
 	 */
 	public T getElement(String key) {
-		T ret = this.collection.get(key);
+		T ret;
+		try {
+			ret = this.collection.get(key);
+		} catch (Exception x) {
+			return null;
+		}
 		if (ret != null)
 			return ret;
 		if (this.changes != null && this.changes.containsKey(key)) {
@@ -302,11 +308,6 @@ public abstract class ColumnFamily<T> {
 			this.changes.clear();
 		if (this.increments != null)
 			this.increments.clear();
-	}
-
-	@Override
-	public int hashCode() {
-		return this.name.hashCode();
 	}
 	
 	public Object getPOJO(boolean createIfNull) {

@@ -6,7 +6,7 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 
 
-public class PutAction extends Action<Object> {
+class PutAction extends Action<Void> {
 	
 	private final Put put;
 
@@ -20,7 +20,7 @@ public class PutAction extends Action<Object> {
 	}
 
 	@Override
-	public Result perform() throws IOException {
+	public Void perform() throws IOException {
 		this.getTable().put(this.getPut());
 		return null;
 	}

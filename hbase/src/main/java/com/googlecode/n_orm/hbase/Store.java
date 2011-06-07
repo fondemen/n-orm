@@ -35,6 +35,7 @@ import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -47,6 +48,9 @@ import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
+import org.apache.hadoop.hbase.io.hfile.Compression;
+import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
+import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 
@@ -58,6 +62,7 @@ import com.googlecode.n_orm.hbase.actions.Action;
 import com.googlecode.n_orm.hbase.actions.DeleteAction;
 import com.googlecode.n_orm.hbase.actions.ExistsAction;
 import com.googlecode.n_orm.hbase.actions.GetAction;
+import com.googlecode.n_orm.hbase.actions.IncrementAction;
 import com.googlecode.n_orm.hbase.actions.ScanAction;
 import com.googlecode.n_orm.hbase.actions.PutAction;
 import com.googlecode.n_orm.storeapi.Constraint;
@@ -76,6 +81,7 @@ import com.googlecode.n_orm.storeapi.Constraint;
  * static-accessor=getStore<br>
  * 1=localhost<br>
  * 2=2181
+ * compression=gz &#35;can be 'none', 'gz', or 'lzo' ; default value is null, which represents 'none' 
  * </code><br>
  */
 public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
@@ -229,6 +235,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
 	public Map<String, HTable> tablesC = new TreeMap<String, HTable>();
 
+	private Algorithm compression;
+
 	protected Store(Properties properties) {
 		this.launchProps = properties;
 	}
@@ -292,6 +300,19 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	public void setMaxRetries(int maxRetries) {
 		this.maxRetries = Integer.valueOf(maxRetries);
+	}
+
+	public String getCompression() {
+		if (compression == null)
+			return null;
+		return compression.getName();
+	}
+
+	public void setCompression(String compression) {
+		if (compression == null) {
+			this.compression = null;
+		} else
+			this.compression = Compression.getCompressionAlgorithmByName(compression);
 	}
 
 	public Configuration getConf() {
@@ -375,9 +396,16 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		if (problem instanceof DatabaseNotReachedException)
 			throw (DatabaseNotReachedException)problem;
 		
-		if (problem instanceof TableNotFoundException || problem.getMessage().contains(TableNotFoundException.class.getName())) {
+		if ((problem instanceof TableNotFoundException) || problem.getMessage().contains(TableNotFoundException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", problem);
+			if (this.tablesD.containsKey(table))
+				this.uncache(table);
+			else
+				throw new DatabaseNotReachedException(problem);
+		} else if ((problem instanceof NoSuchColumnFamilyException) || problem.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
+			table = this.mangleTableName(table);
+			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", problem);
 			if (this.tablesD.containsKey(table))
 				this.uncache(table);
 			else
@@ -453,7 +481,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						td = new HTableDescriptor(name);
 						if (expectedFamilies != null) {
 							for (String fam : expectedFamilies) {
-								td.addFamily(new HColumnDescriptor(fam));
+								HColumnDescriptor famD = new HColumnDescriptor(fam);
+								if (this.compression != null)
+									famD.setCompressionType(this.compression);
+								td.addFamily(famD);
 							}
 						}
 						this.admin.createTable(td);
@@ -540,6 +571,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				}
 				if (!tableD.hasFamily(cfname)) {
 					HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
+					if (this.compression != null)
+						newFamily.setCompressionType(this.compression);
 					toBeAdded.add(newFamily);
 					tableD.addFamily(newFamily);
 				}
@@ -621,15 +654,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {
-		if (changed == null)
-			changed = new TreeMap<String, Map<String,byte[]>>();
-		if (removed == null)
-			removed = new TreeMap<String, Set<String>>();
-		if (increments == null)
-			increments = new TreeMap<String, Map<String,Number>>();
-		Set<String> families = new HashSet<String>(changed.keySet());
-		families.addAll(removed.keySet());
-		families.addAll(increments.keySet());
+		Set<String> families = new HashSet<String>();
+		if (changed !=null) families.addAll(changed.keySet());
+		if (removed != null) families.addAll(removed.keySet());
+		if (increments != null) families.addAll(increments.keySet());
 		if (families.isEmpty())
 			families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 		
@@ -637,9 +665,11 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		HTable t = this.getTable(table, famAr);
 
 		byte[] row = Bytes.toBytes(id);
+		
+
+		List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2);
 
 		Put rowPut = null;
-
 		if (changed != null && !changed.isEmpty()) {
 			rowPut = new Put(row);
 			for (String family : changed.keySet()) {
@@ -649,6 +679,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 					rowPut.add(cf, Bytes.toBytes(key), toPut.get(key));
 				}
 			}
+			actions.add(rowPut);
 		}
 
 		Delete rowDel = null;
@@ -661,11 +692,25 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				}
 
 			}
+			actions.add(rowDel);
+		}
+		
+		Increment rowInc = null;
+		if (increments != null && !increments.isEmpty()) {
+			rowInc = new Increment(row);
+			for (Entry<String, Map<String, Number>> incrs : increments.entrySet()) {
+				for (Entry<String, Number> inc : incrs.getValue().entrySet()) {
+					rowInc.addColumn(Bytes.toBytes(incrs.getKey()), Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
+				}
+			}
+			//Can't add that to actions :(
 		}
 
-		if (rowPut == null && (increments == null || increments.isEmpty())) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
+		//An empty object is to be stored...
+		if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
 			rowPut = new Put(row);
 			rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
+			actions.add(rowPut);
 		}
 		
 		if (rowPut != null) {
@@ -679,30 +724,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			this.tryPerform(act, t, table, famAr);
 			t = act.getTable();
 		}
-
-		int maxTries = 3;
-		boolean done = false;
-		do {
-			maxTries--;
-			try {
-				for (String fam : increments.keySet()) {
-					Map<String, Number> incrs = increments.get(fam);
-					Iterator<Entry<String, Number>> incri = incrs.entrySet().iterator();
-					while (incri.hasNext()) {
-						Entry<String, Number> incr = incri.next();
-						t.incrementColumnValue(row, Bytes.toBytes(fam),
-								Bytes.toBytes(incr.getKey()), incr.getValue().longValue());
-						incri.remove();
-					}
-				}
-				done = true;
-			} catch (IOException e) {
-				if (maxTries > 0) {
-					t = this.handleProblemAndGetTable(e, table, famAr);
-				} else
-					throw new DatabaseNotReachedException(e);
-			}
-		} while (!done);
+		
+		if (rowInc != null) {
+			this.tryPerform(new IncrementAction(rowInc), t, table, famAr);
+		}
 	}
 
 	@Override
@@ -871,8 +896,9 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			while (res != null && res.length != 0) {
 				dels.clear();
 				for (Result result : res) {
-					t.delete(new Delete(result.getRow()));
+					dels.add(new Delete(result.getRow()));
 				}
+				t.delete(dels);
 				res = r.next(nbRows);
 			}
 			logger.info("Truncated table " + table);
