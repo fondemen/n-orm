@@ -35,7 +35,6 @@ import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
-import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -62,7 +61,6 @@ import com.googlecode.n_orm.hbase.actions.Action;
 import com.googlecode.n_orm.hbase.actions.DeleteAction;
 import com.googlecode.n_orm.hbase.actions.ExistsAction;
 import com.googlecode.n_orm.hbase.actions.GetAction;
-import com.googlecode.n_orm.hbase.actions.IncrementAction;
 import com.googlecode.n_orm.hbase.actions.ScanAction;
 import com.googlecode.n_orm.hbase.actions.PutAction;
 import com.googlecode.n_orm.storeapi.Constraint;
@@ -665,11 +663,9 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		HTable t = this.getTable(table, famAr);
 
 		byte[] row = Bytes.toBytes(id);
-		
-
-		List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2);
 
 		Put rowPut = null;
+
 		if (changed != null && !changed.isEmpty()) {
 			rowPut = new Put(row);
 			for (String family : changed.keySet()) {
@@ -679,7 +675,6 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 					rowPut.add(cf, Bytes.toBytes(key), toPut.get(key));
 				}
 			}
-			actions.add(rowPut);
 		}
 
 		Delete rowDel = null;
@@ -692,25 +687,12 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				}
 
 			}
-			actions.add(rowDel);
-		}
-		
-		Increment rowInc = null;
-		if (increments != null && !increments.isEmpty()) {
-			rowInc = new Increment(row);
-			for (Entry<String, Map<String, Number>> incrs : increments.entrySet()) {
-				for (Entry<String, Number> inc : incrs.getValue().entrySet()) {
-					rowInc.addColumn(Bytes.toBytes(incrs.getKey()), Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
-				}
-			}
-			//Can't add that to actions :(
 		}
 
 		//An empty object is to be stored...
-		if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
+		if (rowPut == null && (increments == null || increments.isEmpty())) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
 			rowPut = new Put(row);
 			rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
-			actions.add(rowPut);
 		}
 		
 		if (rowPut != null) {
@@ -724,9 +706,31 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			this.tryPerform(act, t, table, famAr);
 			t = act.getTable();
 		}
-		
-		if (rowInc != null) {
-			this.tryPerform(new IncrementAction(rowInc), t, table, famAr);
+
+		if (increments != null) {
+			int maxTries = 3;
+			boolean done = false;
+			do {
+				maxTries--;
+				try {
+					for (String fam : increments.keySet()) {
+						Map<String, Number> incrs = increments.get(fam);
+						Iterator<Entry<String, Number>> incri = incrs.entrySet().iterator();
+						while (incri.hasNext()) {
+							Entry<String, Number> incr = incri.next();
+							t.incrementColumnValue(row, Bytes.toBytes(fam),
+									Bytes.toBytes(incr.getKey()), incr.getValue().longValue());
+							incri.remove();
+						}
+					}
+					done = true;
+				} catch (IOException e) {
+					if (maxTries > 0) {
+						t = this.handleProblemAndGetTable(e, table, famAr);
+					} else
+						throw new DatabaseNotReachedException(e);
+				}
+			} while (!done);
 		}
 	}
 
@@ -891,7 +895,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 		try {
 			final int nbRows = 100;
-			List<Delete> dels = new ArrayList<Delete>(nbRows);
+			ArrayList<Delete> dels = new ArrayList<Delete>(nbRows);
 			Result [] res = r.next(nbRows);
 			while (res != null && res.length != 0) {
 				dels.clear();

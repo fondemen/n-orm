@@ -3,10 +3,9 @@ package com.googlecode.n_orm.hbase.actions;
 import java.io.IOException;
 
 import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
 
 
-class PutAction extends Action<Void> {
+public class PutAction extends Action<Void> {
 	
 	private final Put put;
 
