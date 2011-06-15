@@ -586,7 +586,12 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": creating");
 					this.admin.disableTable(tableD.getName());
 					for (HColumnDescriptor hColumnDescriptor : toBeAdded) {
-						this.admin.addColumn(tableD.getName(),hColumnDescriptor);
+						try {
+							this.admin.addColumn(tableD.getName(),hColumnDescriptor);
+						} catch (TableNotFoundException x) {
+							this.handleProblem(x, tableD.getNameAsString());
+							this.admin.addColumn(tableD.getName(),hColumnDescriptor);
+						}
 					}
 					this.admin.enableTable(tableD.getName());
 					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": created");
