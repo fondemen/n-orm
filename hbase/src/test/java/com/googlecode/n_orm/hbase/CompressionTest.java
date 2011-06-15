@@ -80,4 +80,22 @@ public class CompressionTest {
 		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		assertEquals(Algorithm.LZO, propFamD.getCompression());
 	}
+	
+	@Test
+	public void testRecoveryCompressionDefinedWithFirst() throws IOException {
+		
+		store.setCompression("gz-or-none");
+		store.storeChanges(testTable, "row", null, null, null);
+		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		assertEquals(Algorithm.GZ, propFamD.getCompression());
+	}
+	
+	@Test
+	public void testRecoveryCompressionDefinedWithSecond() throws IOException {
+		
+		store.setCompression("dummy-or-gz");
+		store.storeChanges(testTable, "row", null, null, null);
+		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		assertEquals(Algorithm.GZ, propFamD.getCompression());
+	}
 }
