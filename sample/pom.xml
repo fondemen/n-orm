@@ -9,7 +9,7 @@
 	<properties>
 		<java.version>1.6</java.version>
 		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
-		<hbase.version>0.90.2</hbase.version>
+		<hbase.version>0.90.0</hbase.version>
 		<plugin.aspectj.version>1.3.1</plugin.aspectj.version>
 		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
 	</properties>
