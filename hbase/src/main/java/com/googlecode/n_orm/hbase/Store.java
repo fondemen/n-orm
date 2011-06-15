@@ -81,7 +81,7 @@ import com.googlecode.n_orm.storeapi.Constraint;
  * static-accessor=getStore<br>
  * 1=localhost<br>
  * 2=2181
- * compression=gz &#35;can be 'none', 'gz', or 'lzo' ; default value is null, which represents 'none' 
+ * compression=gz &#35;can be 'none', 'gz', 'lzo', 'lzo-or-gz' (gz if lzo is not available), or 'lzo-or-none' (none if lzo is not available); by default 'none' 
  * </code><br>
  */
 public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
@@ -313,8 +313,14 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	public void setCompression(String compression) {
 		if (compression == null) {
 			this.compression = null;
-		} else
-			this.compression = Compression.getCompressionAlgorithmByName(compression);
+		} else {
+			for (String cmp : compression.split("-or-")) {
+				if (org.apache.hadoop.hbase.util.CompressionTest.testCompression(cmp)) {
+					this.compression = Compression.getCompressionAlgorithmByName(cmp);
+					break;
+				}
+			}
+		}
 	}
 
 	public Configuration getConf() {
