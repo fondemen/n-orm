@@ -64,6 +64,7 @@ public class BasicTest {
 			bsut = new Book(bssut, new Date(1234567890), new Date(1234567890));
 			bsut.setNumber((short)12);
 			bsut.store();
+			assertTrue(bsut.getPropertiesColumnFamily().isActivated());
 		}
 	}
 	

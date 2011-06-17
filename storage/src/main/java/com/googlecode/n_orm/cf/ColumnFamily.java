@@ -98,6 +98,10 @@ public abstract class ColumnFamily<T> {
 	public boolean isActivated() {
 		return activated;
 	}
+
+	public void setActivated() {
+		activated = true;
+	}
 	
 	public void assertIsActivated(String messageToDescribeTheContextOfTheCheck) throws IllegalStateException {
 		if (! this.isActivated())

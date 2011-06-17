@@ -18,6 +18,7 @@ import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.SimpleStorageTest.SimpleElement;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory;
 
@@ -473,11 +474,18 @@ public class SimpleStorageTest {
 	
 	@Test
 	public void multipleActivations() {
-		sut1.activateIfNotAlready();
+		SimpleElement sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activateIfNotAlready();
 		hadAQuery();
-		sut1.activateIfNotAlready();
+		sut.activateIfNotAlready();
 		assertFalse(Memory.INSTANCE.hadAQuery());
-		sut1.activate();
+		sut.activate();
 		hadAQuery();
+	}
+	
+	@Test
+	public void activationAfterStore() {
+		sut1.activateIfNotAlready();
+		hadNoQuery();
 	}
 }
