@@ -618,6 +618,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 
 		Result r = this.tryPerform(new GetAction(g), null, table, families.toArray(new String[families.size()]));
+		if (r.isEmpty())
+			return null;
 		
 		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String, byte[]>>();
 		if (!r.isEmpty()) {
@@ -839,6 +841,9 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 
 		Result r = this.tryPerform(new GetAction(g), null, table, family);
+		if (r.isEmpty())
+			return null;
+		
 		Map<String, byte[]> ret = new HashMap<String, byte[]>();
 		if (!r.isEmpty()) {
 			for (KeyValue kv : r.list()) {

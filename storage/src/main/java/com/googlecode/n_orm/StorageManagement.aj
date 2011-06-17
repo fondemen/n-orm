@@ -246,12 +246,17 @@ public aspect StorageManagement {
 
 	private void PersistingElement.activateFromRawData(Set<String> toBeActivated,
 			Map<String, Map<String, byte[]>> rawData) {
+		assert ! toBeActivated.isEmpty();
+		this.exists = rawData != null;
+		
 		toBeActivated = new TreeSet<String>(toBeActivated);//Avoiding changing the initial collection
 		
-		for (Entry<String, Map<String, byte[]>> families : rawData.entrySet()) {
-			this.getColumnFamily(families.getKey()).rebuild(families.getValue());
-			boolean removed = toBeActivated.remove(families.getKey());
-			assert removed : "Got unexpected column family " + families.getKey() + " from raw data for " + this;
+		if (rawData != null) {
+			for (Entry<String, Map<String, byte[]>> families : rawData.entrySet()) {
+				this.getColumnFamily(families.getKey()).rebuild(families.getValue());
+				boolean removed = toBeActivated.remove(families.getKey());
+				assert removed : "Got unexpected column family " + families.getKey() + " from raw data for " + this;
+			}
 		}
 		
 		if (!toBeActivated.isEmpty()) {
@@ -299,6 +304,15 @@ public aspect StorageManagement {
 			}
 		}
 		return toBeActivated;
+	}
+	
+	public boolean PersistingElement.exists() throws DatabaseNotReachedException {
+		if (this.exists == null) {
+			this.existsInStore();
+			assert this.exists != null;
+		}
+		
+		return this.exists;
 	}
 	
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {

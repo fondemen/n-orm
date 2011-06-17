@@ -78,12 +78,15 @@ public class BasicTest {
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
 		 assertEquals("bookstore name", p.getName());
+		 assertTrue( p.exists());
+		 assertTrue( p.existsInStore());
 	 }
 	 
 	 @Test public void unknownBookStoreRetrieve() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("gdcfknueghficlnehfuci");
 		 p.activate();
 		 assertNull(p.getName());
+		 assertFalse( p.exists());
 		 assertFalse( p.existsInStore());
 	 }
 	 
@@ -412,4 +415,30 @@ public class BasicTest {
 		 assertNotSame(bs, bsth[0]);
 		 assertEquals(bssut, bsth[0]);
 	 }
+		
+	@Persisting
+	public static class EmptyClass {
+		@Key public String key;
+	}
+	
+	@Test
+	public void exists() {
+		EmptyClass sut = new EmptyClass();
+		sut.key = "dummy key";
+		assertFalse(sut.exists());
+		sut.store();
+		assertTrue(sut.exists());
+
+		EmptyClass sut2 = new EmptyClass();
+		sut2.key = sut.key;
+		sut2.activate();
+		assertTrue(sut2.exists());
+		
+		sut.delete();
+		assertFalse(sut.exists());
+
+		//Sadly: assertTrue(sut2.exists());
+		assertFalse(sut2.existsInStore()); //Triggers a database query
+		assertFalse(sut2.exists());
+	}
 }
