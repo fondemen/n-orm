@@ -247,7 +247,10 @@ public aspect StorageManagement {
 	private void PersistingElement.activateFromRawData(Set<String> toBeActivated,
 			Map<String, Map<String, byte[]>> rawData) {
 		assert ! toBeActivated.isEmpty();
-		this.exists = rawData != null;
+		if (rawData == null)
+			this.exists = Boolean.FALSE;
+		else if (!rawData.isEmpty())
+			this.exists = Boolean.TRUE;
 		
 		toBeActivated = new TreeSet<String>(toBeActivated);//Avoiding changing the initial collection
 		
