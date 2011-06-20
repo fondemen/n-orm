@@ -154,6 +154,14 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	void delete() throws DatabaseNotReachedException;
 	
 	/**
+	 * Checks whether the row representing this persisting element is known to exist in the store avoiding as much as possible to query the data store.
+	 * A persisting element is said to exist if it has been stored, if it was successfully activated, or if a previous invocation of {@link #exists()} or {@link #existsInStore()}  returned true.
+	 * A persisting element is said not to exist if it has never been stored, if it has been unsuccessfully activated (i.e. the data store didn't return any information about the element), or if a previous invocation of {@link #exists()} or {@link #existsInStore()}  returned false.
+	 * In other situations, the data store is queried using {@link #existsInStore()}.
+	 */
+	boolean exists() throws DatabaseNotReachedException;
+	
+	/**
 	 * Checks whether the row representing this persisting element exists in the store.
 	 * Rows used to store this element in table  for its super-classes are not tested.
 	 * @see #store()

@@ -100,51 +100,24 @@ public class CompressionTest {
 	}
 
 	public static boolean testCompression(String codec) {
-		codec = codec.toLowerCase();
-
-		Compression.Algorithm a;
-
-		try {
-			a = Compression.getCompressionAlgorithmByName(codec);
-		} catch (IllegalArgumentException e) {
-			return false;
-		}
-
-		try {
-			testCompression(a);
-			return true;
-		} catch (IOException ignored) {
-			return false;
-		}
+		return Store.testCompression(codec);
 	}
-
-	private final static Boolean[] compressionTestResults = new Boolean[Compression.Algorithm
-			.values().length];
-	static {
-		for (int i = 0; i < compressionTestResults.length; ++i) {
-			compressionTestResults[i] = null;
-		}
+	
+	@Test
+	public void testRecoveryCompressionDefinedWithFirst() throws IOException {
+		
+		store.setCompression("gz-or-none");
+		store.storeChanges(testTable, "row", null, null, null);
+		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		assertEquals(Algorithm.GZ, propFamD.getCompression());
 	}
-
-	public static void testCompression(Compression.Algorithm algo)
-			throws IOException {
-		if (compressionTestResults[algo.ordinal()] != null) {
-			if (compressionTestResults[algo.ordinal()]) {
-				return; // already passed test, dont do it again.
-			} else {
-				// failed.
-				throw new IOException("Compression algorithm '"
-						+ algo.getName() + "'" + " previously failed test.");
-			}
-		}
-
-		try {
-			Compressor c = algo.getCompressor();
-			algo.returnCompressor(c);
-			compressionTestResults[algo.ordinal()] = true; // passes
-		} catch (Throwable t) {
-			compressionTestResults[algo.ordinal()] = false; // failure
-			throw new IOException(t);
-		}
+	
+	@Test
+	public void testRecoveryCompressionDefinedWithSecond() throws IOException {
+		
+		store.setCompression("dummy-or-gz");
+		store.storeChanges(testTable, "row", null, null, null);
+		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		assertEquals(Algorithm.GZ, propFamD.getCompression());
 	}
 }

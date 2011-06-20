@@ -78,6 +78,7 @@ public class BasicTest extends HBaseTestLauncher {
 	public void deleteBookstore() throws DatabaseNotReachedException {
 		if (bssut != null) {
 			bssut.delete();
+			assertFalse(bssut.exists());  //No data store request should be issued as activate was successful
 			bssut = null;
 		}
 	}
@@ -86,13 +87,14 @@ public class BasicTest extends HBaseTestLauncher {
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
 		 assertEquals("turing str. 41", p.getAddress());
+		 assertTrue(p.exists()); //No data store request should be issued as activate was successful
 	 }
 	 
 	 @Test public void unknownBookStoreRetrieve() throws DatabaseNotReachedException {
 		 BookStore p = new BookStore("gdcfknueghficlnehfuci");
 		 p.activate();
 		 assertNull(p.getAddress());
-		 assertFalse( p.existsInStore());
+		 assertFalse( p.exists()); //No data store request should be issued as activate was successful
 	 }
 	 
 	 @Test public void bookStoreSetNull() throws DatabaseNotReachedException {
@@ -109,6 +111,7 @@ public class BasicTest extends HBaseTestLauncher {
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
 		 assertNull(p.getAddress());
+		 assertFalse(p.exists()); //No data store request should be issued as activate was unsuccessful
 	 }
 	
 	 @Test public void bookStoreAccessFromBook() throws DatabaseNotReachedException {
