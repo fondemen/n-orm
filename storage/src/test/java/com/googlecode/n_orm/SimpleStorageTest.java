@@ -18,6 +18,7 @@ import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.SimpleStorageTest.SimpleElement;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory;
 
@@ -112,6 +113,42 @@ public class SimpleStorageTest {
 		assertFalse(unknown.existsInStore());
 		hadAQuery();
 	}
+	
+	@Test
+	public void inexistingUnknown() throws DatabaseNotReachedException {
+		SimpleElement unknown = new SimpleElement("guhkguilnu", new String [] {"gbuyikgnui", "yuihju"});
+		hadNoQuery();
+		assertFalse(unknown.exists());
+		hadAQuery();
+		assertFalse(unknown.exists());
+		hadNoQuery();
+		assertFalse(unknown.exists());
+		hadNoQuery();
+	}
+	
+	@Test
+	public void inexistingTestExisted() throws DatabaseNotReachedException {
+		SimpleElement unknown = new SimpleElement("guhkguilnu", new String [] {"gbuyikgnui", "yuihju"});
+		hadNoQuery();
+		assertFalse(unknown.existsInStore());
+		hadAQuery();
+		assertFalse(unknown.exists());
+		hadNoQuery();
+		assertFalse(unknown.exists());
+		hadNoQuery();
+	}
+	
+	@Test
+	public void inexistingTestActivated() throws DatabaseNotReachedException {
+		SimpleElement unknown = new SimpleElement("guhkguilnu", new String [] {"gbuyikgnui", "yuihju"});
+		hadNoQuery();
+		unknown.activate();
+		hadAQuery();
+		assertFalse(unknown.exists());
+		hadNoQuery();
+		assertFalse(unknown.exists());
+		hadNoQuery();
+	}
 
 	@Test
 	public void getSutTable() {
@@ -133,6 +170,8 @@ public class SimpleStorageTest {
 		Memory.INSTANCE.resetQueries();
 		this.sut1.store();
 		hadAQuery();
+		assertTrue(this.sut1.exists());
+		hadNoQuery();
 		assertEquals("another prop1 value", ConversionTools.convert(String.class, Memory.INSTANCE.get(
 				this.sut1.getTable(), this.sut1.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "prop1")));
@@ -180,6 +219,8 @@ public class SimpleStorageTest {
 		hadNoQuery();
 		sut2.activate();
 		hadAQuery();
+		assertTrue(sut2.exists());
+		hadNoQuery();
 		assertFalse(sut2.hasChanged());
 		assertEquals("pro1value", sut2.prop1);
 		hadNoQuery();
@@ -433,11 +474,18 @@ public class SimpleStorageTest {
 	
 	@Test
 	public void multipleActivations() {
-		sut1.activateIfNotAlready();
+		SimpleElement sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activateIfNotAlready();
 		hadAQuery();
-		sut1.activateIfNotAlready();
+		sut.activateIfNotAlready();
 		assertFalse(Memory.INSTANCE.hadAQuery());
-		sut1.activate();
+		sut.activate();
 		hadAQuery();
+	}
+	
+	@Test
+	public void activationAfterStore() {
+		sut1.activateIfNotAlready();
+		hadNoQuery();
 	}
 }

@@ -137,7 +137,7 @@ public class Memory implements Store {
 	public Map<String, byte[]> get(String table, String id, String family) {
 		Table t = this.getTable(table);
 		if (!t.containsKey(id))
-			return new TreeMap<String, byte[]>();
+			return null;
 		return this.getTable(table).get(id).get(family);
 	}
 	
@@ -146,7 +146,7 @@ public class Memory implements Store {
 			Constraint c) throws DatabaseNotReachedException {
 		Table t = this.getTable(table);
 		if (!t.containsKey(id))
-			return new TreeMap<String, byte[]>();
+			return null;
 		ColumnFamily cf = this.getTable(table).get(id).get(family);
 		
 		Map<String, byte[]> ret = new TreeMap<String, byte[]>();
@@ -289,7 +289,7 @@ public class Memory implements Store {
 
 		Table t = this.getTable(table);
 		if (t == null || !t.containsKey(id))
-			return new TreeMap<String, Map<String, byte[]>>();
+			return null;
 		Row row = t.get(id);
 		
 		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String,byte[]>>();

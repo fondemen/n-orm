@@ -81,7 +81,7 @@ import com.googlecode.n_orm.storeapi.Constraint;
  * static-accessor=getStore<br>
  * 1=localhost<br>
  * 2=2181
- * compression=gz &#35;can be 'none', 'gz', or 'lzo' ; default value is null, which represents 'none' 
+ * compression=gz &#35;can be 'none', 'gz', 'lzo', 'lzo-or-gz' (gz if lzo is not available), or 'lzo-or-none' (none if lzo is not available); by default 'none' 
  * </code><br>
  */
 public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
@@ -313,8 +313,14 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	public void setCompression(String compression) {
 		if (compression == null) {
 			this.compression = null;
-		} else
-			this.compression = Compression.getCompressionAlgorithmByName(compression);
+		} else {
+			for (String cmp : compression.split("-or-")) {
+				if (org.apache.hadoop.hbase.util.CompressionTest.testCompression(cmp)) {
+					this.compression = Compression.getCompressionAlgorithmByName(cmp);
+					break;
+				}
+			}
+		}
 	}
 
 	public Configuration getConf() {
@@ -578,9 +584,19 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			if (!toBeAdded.isEmpty()) {
 				try {
 					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": creating");
-					this.admin.disableTable(tableD.getName());
+					try {
+						this.admin.disableTable(tableD.getName());
+					} catch (TableNotFoundException x) {
+						this.handleProblem(x, tableD.getNameAsString());
+						this.admin.disableTable(tableD.getName());
+					}
 					for (HColumnDescriptor hColumnDescriptor : toBeAdded) {
-						this.admin.addColumn(tableD.getName(),hColumnDescriptor);
+						try {
+							this.admin.addColumn(tableD.getName(),hColumnDescriptor);
+						} catch (TableNotFoundException x) {
+							this.handleProblem(x, tableD.getNameAsString());
+							this.admin.addColumn(tableD.getName(),hColumnDescriptor);
+						}
 					}
 					this.admin.enableTable(tableD.getName());
 					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": created");
@@ -602,6 +618,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 
 		Result r = this.tryPerform(new GetAction(g), null, table, families.toArray(new String[families.size()]));
+		if (r.isEmpty())
+			return null;
 		
 		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String, byte[]>>();
 		if (!r.isEmpty()) {
@@ -823,6 +841,9 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 
 		Result r = this.tryPerform(new GetAction(g), null, table, family);
+		if (r.isEmpty())
+			return null;
+		
 		Map<String, byte[]> ret = new HashMap<String, byte[]>();
 		if (!r.isEmpty()) {
 			for (KeyValue kv : r.list()) {

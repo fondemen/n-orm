@@ -2,6 +2,7 @@ package com.googlecode.n_orm;
 
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -149,6 +150,7 @@ public aspect StorageManagement {
 				propsIncrs.clear();
 				for(ColumnFamily<?> family : families) {
 					family.clearChanges();
+					family.setActivated();
 				}
 				
 				//Storing in persisting superclasses
@@ -246,12 +248,20 @@ public aspect StorageManagement {
 
 	private void PersistingElement.activateFromRawData(Set<String> toBeActivated,
 			Map<String, Map<String, byte[]>> rawData) {
+		assert ! toBeActivated.isEmpty();
+		if (rawData == null)
+			this.exists = Boolean.FALSE;
+		else if (!rawData.isEmpty())
+			this.exists = Boolean.TRUE;
+		
 		toBeActivated = new TreeSet<String>(toBeActivated);//Avoiding changing the initial collection
 		
-		for (Entry<String, Map<String, byte[]>> families : rawData.entrySet()) {
-			this.getColumnFamily(families.getKey()).rebuild(families.getValue());
-			boolean removed = toBeActivated.remove(families.getKey());
-			assert removed : "Got unexpected column family " + families.getKey() + " from raw data for " + this;
+		if (rawData != null) {
+			for (Entry<String, Map<String, byte[]>> families : rawData.entrySet()) {
+				this.getColumnFamily(families.getKey()).rebuild(families.getValue());
+				boolean removed = toBeActivated.remove(families.getKey());
+				assert removed : "Got unexpected column family " + families.getKey() + " from raw data for " + this;
+			}
 		}
 		
 		if (!toBeActivated.isEmpty()) {
@@ -285,6 +295,7 @@ public aspect StorageManagement {
 		toBeActivated.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 		
 		Set<String> cfs = new TreeSet<String>();
+		cfs.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 		for (Field cff : cfm.detectColumnFamilies(clazz)) {
 			if (cff.getAnnotation(ImplicitActivation.class) != null)
 				toBeActivated.add(cff.getName());
@@ -299,6 +310,15 @@ public aspect StorageManagement {
 			}
 		}
 		return toBeActivated;
+	}
+	
+	public boolean PersistingElement.exists() throws DatabaseNotReachedException {
+		if (this.exists == null) {
+			this.existsInStore();
+			assert this.exists != null;
+		}
+		
+		return this.exists;
 	}
 	
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {
@@ -337,10 +357,30 @@ public aspect StorageManagement {
 					Row data = keys.next();
 					try {
 						T elt = ConversionTools.convertFromString(clazz, data.getKey());
-						((PersistingElement)elt).exists = true;
+						((PersistingElement)elt).exists = Boolean.TRUE;
 						//assert (toBeActivated == null) == ((data.getValues() == null)  || (data.getValues().entrySet().isEmpty())); //may be false (e.g. no properties)
 						if (toBeActivated != null) { //the element should be activated
-							elt.activateFromRawData(toBeActivated, data.getValues());
+							Set<String> tba = toBeActivated, missingCf = null;
+							Set<String> dataKeys = data.getValues().keySet();
+							if (! dataKeys.containsAll(toBeActivated)) {
+								missingCf = new TreeSet<String>(toBeActivated);
+								missingCf.removeAll(dataKeys);
+								tba = new TreeSet<String>(toBeActivated);
+								tba.retainAll(dataKeys);
+								Iterator<String> mci = missingCf.iterator();
+								while (mci.hasNext()) {
+									if (elt.getColumnFamily(mci.next()).isActivated())
+										mci.remove();
+								}
+							}
+							
+							if (!tba.isEmpty()) {
+								elt.activateFromRawData(tba, data.getValues());
+							}
+							
+							if (missingCf != null && !missingCf.isEmpty()) {
+								elt.activate(missingCf.toArray(new String[missingCf.size()]));
+							}
 						}
 						return elt;
 					} finally {
