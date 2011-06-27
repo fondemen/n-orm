@@ -14,14 +14,11 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import org.apache.commons.beanutils.ConvertUtils;
-import org.apache.commons.beanutils.ConvertUtilsBean;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.aspectj.lang.SoftException;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.ExplicitActivation;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
@@ -45,10 +42,11 @@ public aspect PropertyManagement {
 	
 //	declare error: set(!@Transient !static !transient (!Collection+ && !java.io.Serializable+) PersistingElement+.*) : "Non serializable field ; may break element's serialization";
 
-	declare warning: get(@ExplicitActivation transient * PersistingElement+.*)
-		|| get(@Transient @ExplicitActivation static * PersistingElement+.*)
-		|| get(@ExplicitActivation static * PersistingElement+.*)
+	declare warning: get(@ImplicitActivation transient * PersistingElement+.*)
+		|| get(@Transient @ImplicitActivation static * PersistingElement+.*)
+		|| get(@ImplicitActivation static * PersistingElement+.*)
 		: "This field is not persitent, thus cannot be auto-activated";
+	declare warning: get(@ImplicitActivation (!(PersistingElement+ || Map+ || Set+ || ColumnFamily+)) PersistingElement+.*) : "Such field cannot be activated automatically ; such annotation can be applied to column families and properties with a persisting type";
 	declare warning: set(@Transient transient * PersistingElement+.*) : "There is no need to annotate a transient field with @Transient";
 
 	public static final String PROPERTY_COLUMNFAMILY_NAME = "props";
@@ -171,7 +169,7 @@ public aspect PropertyManagement {
 			if (this.getField() != null) {
 				if (this.getValue() != null
 						&& PropertyManagement.getInstance().isPropertyType(this.getField().getType())
-						&& !this.getField().isAnnotationPresent(ExplicitActivation.class)) {
+						&& this.getField().isAnnotationPresent(ImplicitActivation.class)) {
 					Object val = this.getValue();
 					if (val instanceof PersistingElement)
 						((PersistingElement) this.getValue()).activateIfNotAlready();

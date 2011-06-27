@@ -6,7 +6,6 @@ import org.junit.After;
 import org.junit.Test;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.ExplicitActivation;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.Persisting;
@@ -40,8 +39,8 @@ public class RelationalStorageTest {
 	}
 	
 	public static class NotOnlyKeysElement {
-		@Key public String prop1;
-		public String prop3;
+		@Key @ImplicitActivation public String prop1;
+		public @ImplicitActivation String prop3;
 		public NotOnlyKeysElement(String prop1) {
 			super();
 			this.prop1 = prop1;
@@ -52,7 +51,7 @@ public class RelationalStorageTest {
 	}
 	
 	public static class Composed1Element {
-		@Key private  SimpleElement key;
+		@Key @ImplicitActivation private  SimpleElement key;
 		public Composed1Element(SimpleElement key) {
 			super();
 			this.key = key;
@@ -69,8 +68,8 @@ public class RelationalStorageTest {
 	}
 	
 	public static class Composed2Elements {
-		@Key private  SimpleElement key1;
-		@Key(order=2) private  Composed1Element key2;
+		@Key @ImplicitActivation private  SimpleElement key1;
+		@Key(order=2) @ImplicitActivation private  Composed1Element key2;
 		public Composed2Elements(SimpleElement key1, Composed1Element key2) {
 			this.key1 = key1;
 			this.key2 = key2;
@@ -90,8 +89,8 @@ public class RelationalStorageTest {
 	}
 	
 	public static class Composed3Elements {
-		@Key private  Composed2Elements key1;
-		@Key(order=2) private  Composed2Elements key2;
+		@Key @ImplicitActivation private  Composed2Elements key1;
+		@Key(order=2) @ImplicitActivation private  Composed2Elements key2;
 		public Composed3Elements(Composed2Elements key1, Composed2Elements key2) {
 			this.key1 = key1;
 			this.key2 = key2;
@@ -113,8 +112,8 @@ public class RelationalStorageTest {
 	}
 	
 	@Persisting(table="PC") public static class PersistingComposed {
-		@Key public  String key;
-		public Composed3Elements value;
+		@Key @ImplicitActivation public  String key;
+		public @ImplicitActivation Composed3Elements value;
 		public PersistingComposed(String key) {
 			super();
 			this.key = key;
@@ -144,7 +143,7 @@ public class RelationalStorageTest {
 	}
 	@Persisting(table="Outside") public static class PersistingOutside {
 		@Key public  String key;
-		public PersistingInside val;
+		public @ImplicitActivation PersistingInside val;
 		public PersistingOutside(String key) {
 			super();
 			this.key = key;
@@ -181,7 +180,7 @@ public class RelationalStorageTest {
 	
 	@Persisting(table="Outside") public static class PersistingOutsideExplicit {
 		@Key public  String key;
-		@ExplicitActivation public PersistingInside val;
+		public PersistingInside val;
 		public PersistingOutsideExplicit(String key) {
 			super();
 			this.key = key;
@@ -189,10 +188,13 @@ public class RelationalStorageTest {
 	}
 	@Test public void notExplicitForeignKey() throws DatabaseNotReachedException {
 		PersistingInside in = new PersistingInside("inside");
+		in.delete();
 		in.val = "value";
 		PersistingOutsideExplicit out = new PersistingOutsideExplicit("outside");
 		out.val = in;
 		out.store();
+		assertFalse(Memory.INSTANCE.getTable("Inside").containsKey("inside" + ke));
+		in.store();
 		assertTrue(Memory.INSTANCE.getTable("Inside").containsKey("inside" + ke));
 		
 		KeyManagement.getInstance().cleanupKnownPersistingElements();
@@ -208,11 +210,11 @@ public class RelationalStorageTest {
 
 	@Persisting public static class Ref1 {
 		@Key public String k;
-		public Ref2 ref;
+		public @ImplicitActivation Ref2 ref;
 	}
 	@Persisting public static class Ref2 {
 		@Key public String k;
-		public Ref1 ref;
+		public @ImplicitActivation Ref1 ref;
 	}
 	@Test(expected=Test.None.class) public void storingCircularDeps() {
 		Ref1 sut1 = new Ref1(); sut1.k = "k1";
