@@ -14,7 +14,6 @@ import java.util.WeakHashMap;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.ExplicitActivation;
 import com.googlecode.n_orm.ImplicitActivation;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.Persisting;
@@ -174,7 +173,7 @@ public aspect StorageManagement {
 			
 			//Store depending properties
 			for (Field prop : pm.getProperties(this.getClass())) {
-				if (pm.isPersistingPropertyType(prop.getType())) {
+				if (pm.isPersistingPropertyType(prop.getType()) && prop.isAnnotationPresent(ImplicitActivation.class)) {
 					Object kVal = pm.candideReadValue(this, prop);
 					if (kVal != null)
 						((PersistingElement)kVal).store();
