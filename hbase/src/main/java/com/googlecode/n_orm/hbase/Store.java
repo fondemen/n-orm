@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -395,38 +396,38 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		this.start();
 	}
 	
-	private void handleProblem(Exception problem, String table) throws DatabaseNotReachedException {
-		errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped", problem);
-		if (problem instanceof DatabaseNotReachedException)
-			throw (DatabaseNotReachedException)problem;
+	private void handleProblem(Throwable e, String table) throws DatabaseNotReachedException {
+		errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped", e);
+		if (e instanceof DatabaseNotReachedException)
+			throw (DatabaseNotReachedException)e;
 		
-		if ((problem instanceof TableNotFoundException) || problem.getMessage().contains(TableNotFoundException.class.getSimpleName())) {
+		if ((e instanceof TableNotFoundException) || e.getMessage().contains(TableNotFoundException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
-			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", problem);
+			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", e);
 			if (this.tablesD.containsKey(table))
 				this.uncache(table);
 			else
-				throw new DatabaseNotReachedException(problem);
-		} else if ((problem instanceof NoSuchColumnFamilyException) || problem.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
+				throw new DatabaseNotReachedException(e);
+		} else if ((e instanceof NoSuchColumnFamilyException) || e.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
-			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", problem);
+			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", e);
 			if (this.tablesD.containsKey(table))
 				this.uncache(table);
 			else
-				throw new DatabaseNotReachedException(problem);
-		} else if (problem instanceof IOException) {
-			if (problem.getMessage().contains("closed")) {
-				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", problem);
+				throw new DatabaseNotReachedException(e);
+		} else if (e instanceof IOException) {
+			if (e.getMessage().contains("closed")) {
+				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
 				restart();
 				return;
 			}
 			
-			throw new DatabaseNotReachedException(problem);
+			throw new DatabaseNotReachedException(e);
 		}
 	}
 	
-	private HTable handleProblemAndGetTable(Exception problem, String table, String... families) throws DatabaseNotReachedException {
-		this.handleProblem(problem, table);
+	private HTable handleProblemAndGetTable(Throwable e, String table, String... families) throws DatabaseNotReachedException {
+		this.handleProblem(e, table);
 		return this.getTable(table, families);
 	}
 	
@@ -436,8 +437,12 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		action.setTable(table);
 		try {
 			return action.perform();
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
+			
+			if (e instanceof UndeclaredThrowableException)
+				e = ((UndeclaredThrowableException)e).getCause();
+			
 			table = this.handleProblemAndGetTable(e, tableName, expectedFamilies);
 			action.setTable(table);
 			try {
@@ -499,6 +504,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						logger.fine("Got descriptor for table " + name);
 					}
 					this.cache(name, td);
+				} catch (UndeclaredThrowableException x) {
+					throw new DatabaseNotReachedException(x.getCause());
 				} catch (IOException e) {
 					throw new DatabaseNotReachedException(e);
 				}
