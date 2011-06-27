@@ -7,8 +7,8 @@ package com.googlecode.n_orm;
 public class DatabaseNotReachedException extends RuntimeException {
 	private static final long serialVersionUID = -2698947883988453416L;
 
-	public DatabaseNotReachedException(Exception cause) {
-		super("Could not reach database: " + cause, cause);
+	public DatabaseNotReachedException(Throwable throwable) {
+		super("Could not reach database: " + throwable, throwable);
 	}
 
 	public DatabaseNotReachedException(String cause) {
