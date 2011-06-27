@@ -2,6 +2,7 @@ package com.googlecode.n_orm.sample.businessmodel;
 
 import java.util.Date;
 
+import com.googlecode.n_orm.ImplicitActivation;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 
@@ -9,7 +10,7 @@ import com.googlecode.n_orm.Persisting;
 @Persisting
 public class Book {
 	private static final long serialVersionUID = -7771403847590578122L;
-	@Key(order=1) private BookStore bookStore;
+	@Key(order=1) @ImplicitActivation private BookStore bookStore; //ImplicitActivation makes the bookStore being activated/stored as soon as the book is activated/stored
 	@Key(order=2) private String title;
 	@Key(order=3) private Date receptionDate;
 	private short number;
