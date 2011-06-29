@@ -31,8 +31,7 @@ public aspect IncrementManagement {
 	declare error: set(@Incrementing (!long && !int && !short && !byte
 										&& !MapColumnFamily && !Map) *.*)
 			: "Only naturals or maps of naturals may be incremented";
-	declare error: set(@Incrementing @Key * *.*): "Keys (that must be final) cannot be incremented";
-	declare error: set(@Incrementing * (!PersistingElement+).*) : "Incrementing properties must appear in persisting classes";
+	declare warning: set(@Incrementing @Key * *.*): "Keys (that identify a persisting element) should not be incremented";
 	
 	private transient Map<String, Number> PersistingElement.increments = new HashMap<String, Number>();
 	
