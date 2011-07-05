@@ -53,6 +53,13 @@ public class ConcurrentTest {
 		}
 	}
 	
+	private void disableTable(String table) throws IOException {
+
+		if (store1.getAdmin().tableExists(table)) {
+			store1.getAdmin().disableTable(table);
+		}
+	}
+	
 	private void truncateTable(String table) throws IOException {
 
 		if (store1.getAdmin().tableExists(table)) {
@@ -83,6 +90,25 @@ public class ConcurrentTest {
 		assertTrue(store2.exists("t1", "idt1", "cf1"));
 		
 		this.deleteTable("t1");
+		
+		store1.storeChanges("t1", "idt1", change1 , null, null); //Table should be re-discovered
+		store2.storeChanges("t1", "idt1", change1 , null, null); //Table should be re-discovered
+		assertTrue(store2.exists("t1", "idt1", "cf1")); 
+	}
+	
+	@Test
+	public void acceptingOutsideTableDisable() throws IOException {
+		this.deleteTable("t1");
+		
+		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
+		change1.put("cf1", ch1);
+		ch1.put("k1", new byte[]{1, 2});
+		store1.storeChanges("t1", "idt1", change1 , null, null); //Table should be created
+		store2.storeChanges("t1", "idt1", change1 , null, null); //Table should be discovered
+		assertTrue(store2.exists("t1", "idt1", "cf1"));
+		
+		this.disableTable("t1");
 		
 		store1.storeChanges("t1", "idt1", change1 , null, null); //Table should be re-discovered
 		store2.storeChanges("t1", "idt1", change1 , null, null); //Table should be re-discovered
