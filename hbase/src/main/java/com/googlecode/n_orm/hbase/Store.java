@@ -30,6 +30,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
@@ -408,6 +409,18 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				this.uncache(table);
 			else
 				throw new DatabaseNotReachedException(e);
+		} else if ((e instanceof NotServingRegionException) || e.getMessage().contains(NotServingRegionException.class.getSimpleName())) {
+			table = this.mangleTableName(table);
+			
+			try {
+				if (this.admin.tableExists(table) && this.admin.isTableDisabled(table)) {
+					errorLogger.log(Level.INFO, "It seems that table " + table + " was disabled ; enabling", e);
+					this.admin.enableTable(table);
+				} else
+					throw new DatabaseNotReachedException(e);
+			} catch (IOException f) {
+				throw new DatabaseNotReachedException(f);
+			}
 		} else if ((e instanceof NoSuchColumnFamilyException) || e.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", e);
