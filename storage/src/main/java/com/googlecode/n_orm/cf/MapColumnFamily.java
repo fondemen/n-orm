@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.Map.Entry;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
@@ -62,7 +63,11 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 
 	@Override
 	public int hashCode() {
-		return collection.hashCode();
+		int h = 0;
+		Iterator<Entry<K,T>> i = entrySet().iterator();
+		while (i.hasNext())
+			h += i.next().hashCode();
+		return h;
 	}
 
 	@Override

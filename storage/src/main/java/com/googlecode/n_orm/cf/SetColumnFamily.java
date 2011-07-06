@@ -1,10 +1,13 @@
 package com.googlecode.n_orm.cf;
 
 import java.io.Serializable;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -264,16 +267,28 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	 */
 	@Override
 	public Object[] toArray() {
-		return this.collection.keySet().toArray();
+		return this.toArray(new Object[this.size()]);
 	}
 
 	/**
 	 * Supplies an array that contains activated values only.
 	 */
-	@SuppressWarnings("hiding")
+	@SuppressWarnings("unchecked")
 	@Override
-	public <T> T[] toArray(T[] a) {
-		return this.collection.keySet().toArray(a);
+	public <U> U[] toArray(U[] a) {
+		if (a.length < this.size())
+			a = (U[]) Array.newInstance(a.getClass().getComponentType(), this.size());
+		Iterator<T> it = this.iterator();
+		int i = 0;
+		while (it.hasNext()) {
+			a[i] = (U) it.next();
+			i++;
+		}
+		while (i < a.length) {
+			a[i] = null;
+			i++;
+		}
+		return a;
 	}
 
 	@Override
@@ -283,7 +298,12 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 
 	@Override
 	public int hashCode() {
-		return this.getKeys().hashCode();
+		int ret = 0;
+		Iterator<T> it = this.iterator();
+		while (it.hasNext()) {
+			ret += it.next().hashCode();
+		}
+		return ret;
 	}
 
 	@SuppressWarnings("unchecked")
