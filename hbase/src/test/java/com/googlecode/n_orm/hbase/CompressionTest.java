@@ -70,15 +70,11 @@ public class CompressionTest {
 	
 	@Test
 	public void testLzoCompressionDefined() throws IOException {
-		if (!org.apache.hadoop.hbase.util.CompressionTest.testCompression("lzo")) {
-			System.err.println("TEST WARNING: no LZO compression enabled");
-			return;
-		}
-		
 		store.setCompression("lzo");
 		store.storeChanges(testTable, "row", null, null, null);
 		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
-		assertEquals(Algorithm.LZO, propFamD.getCompression());
+		Algorithm cmp = propFamD.getCompression();
+		assertTrue(cmp.equals(Algorithm.LZO) || cmp.equals(Algorithm.NONE)) ;
 	}
 	
 	@Test
