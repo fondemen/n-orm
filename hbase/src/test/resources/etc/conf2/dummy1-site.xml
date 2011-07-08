@@ -1,0 +1,6 @@
+<configuration>
+	<property>
+		<name>dummy2.prop</name>
+		<value>dummy2val</value>
+	</property>
+</configuration>
