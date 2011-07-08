@@ -140,6 +140,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	public static final Logger logger;
 	public static final Logger errorLogger;
+	private static List<String> unavailableCompressors = new ArrayList<String>();
 	
 	protected static Map<Properties, Store> knownStores = new HashMap<Properties, Store>();
 	
@@ -317,9 +318,14 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			this.compression = null;
 		} else {
 			for (String cmp : compression.split("-or-")) {
-				if (org.apache.hadoop.hbase.util.CompressionTest.testCompression(cmp)) {
+				if (unavailableCompressors.contains(cmp))
+					continue;
+				try {
 					this.compression = Compression.getCompressionAlgorithmByName(cmp);
 					break;
+				} catch (Exception x) {
+					unavailableCompressors.add(cmp);
+					logger.warning("Could not use compression " + cmp);
 				}
 			}
 		}
