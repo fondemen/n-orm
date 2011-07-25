@@ -241,6 +241,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	public Map<String, HTable> tablesC = new TreeMap<String, HTable>();
 
 	private Algorithm compression;
+	private boolean forceCompression = false;
 
 	protected Store(Properties properties) {
 		this.launchProps = properties;
@@ -293,7 +294,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	@Override
 	public void setHost(String url) {
 		this.host = url;
-	}// }
+	}
 
 	public int getPort() {
 		return port;
@@ -329,6 +330,14 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				}
 			}
 		}
+	}
+
+	public boolean isForceCompression() {
+		return forceCompression;
+	}
+
+	public void setForceCompression(boolean forceCompression) {
+		this.forceCompression = forceCompression;
 	}
 
 	public Configuration getConf() {
@@ -582,6 +591,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			String... columnFamilies) throws DatabaseNotReachedException {
 		assert tableD != null;
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.length);
+		List<HColumnDescriptor> toBeCompressed = new ArrayList<HColumnDescriptor>(columnFamilies.length);
 		synchronized (tableD) {
 			boolean recreated = false;
 			for (String cf : columnFamilies) {
@@ -605,11 +615,19 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						newFamily.setCompressionType(this.compression);
 					toBeAdded.add(newFamily);
 					tableD.addFamily(newFamily);
+				} else {
+					HColumnDescriptor family = tableD.getFamily(cfname);
+					if (this.compression != null && this.forceCompression && !family.getCompressionType().equals(this.compression)) {
+						toBeCompressed.add(family);
+					}
 				}
 			}
-			if (!toBeAdded.isEmpty()) {
+			if (!toBeAdded.isEmpty() || !toBeCompressed.isEmpty()) {
 				try {
-					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": creating");
+					if (!toBeAdded.isEmpty())
+						logger.info("Table " + tableD.getNameAsString() + " is missing families " + toBeAdded.toString() + ": creating");
+					if (!toBeCompressed.isEmpty())
+						logger.info("Table " + tableD.getNameAsString() + " compressed with " + this.compression + " has the wrong compressor for families " + toBeCompressed.toString() + ": altering");
 					try {
 						this.admin.disableTable(tableD.getName());
 					} catch (TableNotFoundException x) {
@@ -623,6 +641,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 							this.handleProblem(x, tableD.getNameAsString());
 							this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 						}
+					}
+					for (HColumnDescriptor hColumnDescriptor : toBeCompressed) {
+						hColumnDescriptor.setCompressionType(this.compression);
+						this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
 					}
 					this.admin.enableTable(tableD.getName());
 					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": created");

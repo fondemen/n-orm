@@ -70,13 +70,38 @@ public class CompressionTest {
 	}
 	
 	@Test
-	@Ignore //Can't be sure its enabled across the cluster
+	@Ignore //No way to test LZO compression on an HBase cluster ; including that one for tests
 	public void testLzoCompressionDefined() throws IOException {
 		store.setCompression("lzo");
 		store.storeChanges(testTable, "row", null, null, null);
 		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		Algorithm cmp = propFamD.getCompression();
 		assertTrue(cmp.equals(Algorithm.LZO) || cmp.equals(Algorithm.NONE)) ;
+	}
+	
+	@Test
+	public void testNoneThenGzCompressionDefinedNotForced() throws IOException {
+		store.setCompression("none");
+		store.storeChanges(testTable, "row", null, null, null);
+		store.setCompression("gz");
+		store.storeChanges(testTable, "row", null, null, null);
+		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		assertEquals(Algorithm.NONE, propFamD.getCompression());
+	}
+	
+	@Test
+	public void testNoneThenGzCompressionDefinedForced() throws IOException {
+		try {
+			store.setForceCompression(true);
+			store.setCompression("none");
+			store.storeChanges(testTable, "row", null, null, null);
+			store.setCompression("gz");
+			store.storeChanges(testTable, "row", null, null, null);
+			HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+			assertEquals(Algorithm.GZ, propFamD.getCompression());
+		} finally {
+			store.setForceCompression(false);
+		}
 	}
 	
 	@Test
