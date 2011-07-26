@@ -21,6 +21,7 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
@@ -58,7 +59,7 @@ public class BasicTest extends HBaseTestLauncher {
 		if (changed || bsut == null) {
 			bsut = new Book(bssut, "testtitle", new Date(1234567890));
 			bsut.setNumber((short)12);
-			bsut.store();
+			bsut.store(); //There is no need to store bssut here thanks to the @ImplicitActivation annotation on the Book.bookStore field
 		}
 	}
 	
@@ -78,7 +79,7 @@ public class BasicTest extends HBaseTestLauncher {
 	public void deleteBookstore() throws DatabaseNotReachedException {
 		if (bssut != null) {
 			bssut.delete();
-			assertFalse(bssut.exists());  //No data store request should be issued as activate was successful
+			assertFalse(bssut.exists());
 			bssut = null;
 		}
 	}
@@ -126,39 +127,43 @@ public class BasicTest extends HBaseTestLauncher {
 	 @Test(expected=Test.None.class) public void bookWithNoBookStore() {
 		 Book b = new Book(null, "testtitle", new Date(1234567890));
 		 b.setReceptionDate(null);
+		 //No exception even though b is not "complete" (i.e. has not all its keys attributed) as not activate/store/exists requests are issued
 	 }
 	 
 	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStoreSet() {
 		 Book b = new Book(bssut, "testtitle", new Date(1234567890));
 		 b.setReceptionDate(null);
 		 b.activate();
+		 //b is not "complete" (i.e. has not all its keys attributed)
 	 }
 	 
 	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStoreStored() {
 		 new Book(null, "testtitle", new Date(1234567890)).store();
+		 //b is not "complete" (i.e. has not all its keys attributed) since all keys have to be non null
 	 }
 	 
 	 @Test(expected=IllegalStateException.class) public void bookWithNoBookStoreActivated() {
 		 new Book(null, "testtitle", new Date(1234567890)).activate();
+		 //b is not "complete" (i.e. has not all its keys attributed) since all keys have to be non null
 	 }
 	
 	 @Test public void unactivatedBookStoreAccessFromBook() throws DatabaseNotReachedException {
-		 BookStore p = new BookStore("testbookstore");
-		 Book v = new Book(p, "testtitle", new Date(1234567890));
-		 assertSame(p, v.getBookStore());
-		 assertNull(v.getBookStore().getAddress());
-		 assertNull(p.getAddress());
+		 BookStore bs = new BookStore("testbookstore");
+		 Book b = new Book(bs, "testtitle", new Date(1234567890));
+		 assertSame(bs, b.getBookStore());
+		 assertNull(b.getBookStore().getAddress());
+		 assertNull(bs.getAddress());
 	 }
 	
 	 @Test public void bookStoreDeletionAndthenAccess() throws DatabaseNotReachedException {
 		 deleteBookstore();
 		 this.storeSUTs();
-		 BookStore p = new BookStore("testbookstore");
-		 Book v = new Book(p, "testtitle", new Date(1234567890));
-		 v.activate();
-		 assertSame(p, v.getBookStore());
-		 assertEquals("turing str. 41", v.getBookStore().getAddress());
-		 assertEquals("turing str. 41", p.getAddress());
+		 BookStore bs = new BookStore("testbookstore");
+		 Book b = new Book(bs, "testtitle", new Date(1234567890));
+		 b.activate();
+		 assertSame(bs, b.getBookStore());
+		 assertEquals("turing str. 41", b.getBookStore().getAddress());
+		 assertEquals("turing str. 41", bs.getAddress());
 	 }
 	 
 	 @Test public void searchAllBooks() throws DatabaseNotReachedException {
@@ -170,6 +175,8 @@ public class BasicTest extends HBaseTestLauncher {
 		 SearchableClassConstraintBuilder<Book> query = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
 		 Set<Book> storeBooks = query.go();
 		 long count = query.count();
+		 
+		 //Postamble before assertion so that it is always ran
 		 b2.delete();
 		 b3.delete();
 
@@ -182,10 +189,14 @@ public class BasicTest extends HBaseTestLauncher {
 		 checkOrder(storeBooks);
 	 }
 
+	 /**
+	  * Checks that a list is actually ordered
+	  */
 	public void checkOrder(Set<? extends PersistingElement> elements) {
 		PersistingElement last = null;
 		 for (PersistingElement elt : elements) {
 			if (last != null) assertTrue(last.compareTo(elt) <= 0);
+			//Comparison actually compares keys ; not that compareTo, equals, hashKey and toString are redefined depending on the key
 			last = elt;
 		}
 	}
@@ -200,9 +211,15 @@ public class BasicTest extends HBaseTestLauncher {
 		 //Simulates a new session by emptying elements cache
 		 KeyManagement.getInstance().cleanupKnownPersistingElements();
 		 
-		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(1000).elements().go();		 
+		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class)
+		 										.withKey("bookStore").setTo(bssut)
+		 										.withAtMost(1000).elements()
+		 										.go(); //go is easier to write this test, but you should prefer iterate instead as it requests the data store clever
+
+		 //Postamble before assertion so that it is always ran
 		 b2.delete();
 		 b3.delete();
+		 StorageManagement.findElements().ofClass(BookStore.class).withKey("name").setTo("rfgbuhfgj").any().delete();
 		 
 		 assertEquals(2, storeBooks.size());
 		 assertTrue(storeBooks.contains(bsut));
@@ -214,7 +231,7 @@ public class BasicTest extends HBaseTestLauncher {
 		 
 		 assertEquals(0, storeBooks.last().getNumber());
 		 assertFalse((short)0 == b2.getNumber()); //Just to test the test is well written
-		 assertNull(storeBooks.last().getBookStore().getAddress()); //Activation is (automatically) propagated to simple persisting elements ; here, no activation required
+		 assertNull(storeBooks.last().getBookStore().getAddress()); //Activation is (automatically) propagated to simple persisting elements thanks to the @ImplicitActivation annotation on Book.bookStore ; here, no explicit activation required
 		 assertNotNull(bssut.getAddress()); //Just to test the test is well written
 		 
 		 checkOrder(storeBooks);
@@ -230,21 +247,20 @@ public class BasicTest extends HBaseTestLauncher {
 		 NavigableSet<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class)
 		 									.withKey("bookStore").setTo(bssut)
 		 									.withAtMost(1000).elements()
-		 									.andActivate().go();		 
+		 									.andActivate().go(); //go is easier to write this test, but you should prefer iterate instead as it requests the data store clever
+
+		 //Postamble before assertion so that it is always ran
 		 b2.delete();
 		 b3.delete();
-		 
-		 assertEquals(2, storeBooks.size());
-		 assertTrue(storeBooks.contains(bsut));
-		 assertTrue(storeBooks.contains(b2));
-		 assertFalse(storeBooks.contains(b3));
 
+		 //Reminder
+		 assertEquals(2, storeBooks.size());
 		 assertEquals(bsut, storeBooks.first());//bsut has a lower title
 		 assertEquals(b2, storeBooks.last());
 		 
-		 assertEquals(b2.getNumber(), storeBooks.last().getNumber());
+		 assertEquals(b2.getNumber(), storeBooks.last().getNumber()); //The found elements are activated at same time the request is issued
 		 assertFalse((short)0 == b2.getNumber()); //Just to test the test is well written
-		 assertEquals(bssut.getAddress(), storeBooks.last().getBookStore().getAddress()); //Activation is (automatically) propagated to simple persisting elements
+		 assertEquals(bssut.getAddress(), storeBooks.last().getBookStore().getAddress()); //Activation is (automatically) propagated to simple persisting elements thanks to the @ImplicitActivation annotation on Book.bookStore
 		 assertNotNull(bssut.getAddress()); //Just to test the test is well written
 		 
 		 checkOrder(storeBooks);
@@ -254,39 +270,53 @@ public class BasicTest extends HBaseTestLauncher {
 		 Book b2 = new Book(bssut, "testtitle2", new Date());
 		 b2.store();
 		 
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withKey("title").greaterOrEqualsThan("testtitle1").withAtMost(1000).elements().go();		 
+		 CloseableIterator<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class)
+		 							.withKey("bookStore").setTo(bssut)
+		 							.withKey("title").greaterOrEqualsThan("testtitle1")
+		 							.withAtMost(1000).elements().iterate();
+		 
+		 //Postamble before assertion so that it is always ran
 		 b2.delete();
 		 
-		 assertEquals(1, storeBooks.size());
-		 assertFalse(storeBooks.contains(bsut));
-		 assertTrue(storeBooks.contains(b2));
+		 assertTrue(storeBooks.hasNext());
+		 Book found = storeBooks.next();
+		 assertFalse(storeBooks.hasNext());
 		 
-		 Iterator<Book> ib = storeBooks.iterator();
-		 Book fb = ib.next();
-		 assertEquals(b2, fb);
+		 assertEquals(b2, found);
+		 
+		 storeBooks.close(); //Avoid forgetting closing iterators !
 	 }
 	 
 	 @Test public void searchBookWithMaxTitle() throws DatabaseNotReachedException {
 		 Book b2 = new Book(bssut, "testtitle2", new Date());
 		 b2.store();
 		 
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withKey("title").lessOrEqualsThan("testtitle1").withAtMost(1000).elements().go();		 
+		 CloseableIterator<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class)
+		 							.withKey("bookStore").setTo(bssut)
+		 							.withKey("title").lessOrEqualsThan("testtitle1")
+		 							.withAtMost(1000).elements().iterate(); //go is easier to write this test, but you should prefer iterate instead as it requests the data store clever
+		 
+		 //Postamble before assertion so that it is always ran
 		 b2.delete();
 		 
-		 assertEquals(1, storeBooks.size());
-		 assertTrue(storeBooks.contains(bsut));
-		 assertFalse(storeBooks.contains(b2));
+		 assertTrue(storeBooks.hasNext());
+		 Book found = storeBooks.next();
+		 assertFalse(storeBooks.hasNext());
 		 
-		 Iterator<Book> ib = storeBooks.iterator();
-		 Book fb = ib.next();
-		 assertEquals(bsut, fb);
+		 assertEquals(bsut, found);
+		 
+		 storeBooks.close(); //Avoid forgetting closing iterators !
 	 }
 	 
 	 @Test public void searchBookWithBookstoreKey() throws DatabaseNotReachedException {
 		 Book b2 = new Book(bssut, "testtitle2", new Date());
 		 b2.store();
 		 
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").isAnElement().withKey("name").greaterOrEqualsThan("test").and().withAtMost(1000).elements().go();		 
+		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class)
+		 							.withKey("bookStore").isAnElement().withKey("name").greaterOrEqualsThan("test")
+		 							.and().withAtMost(1000).elements().go(); //go is easier to write this test, but you should prefer iterate instead as it requests the data store clever		 
+		 
+		 //Postamble before assertion so that it is always ran
 		 b2.delete();
 		 
 		 assertEquals(2, storeBooks.size());
@@ -298,7 +328,7 @@ public class BasicTest extends HBaseTestLauncher {
 		 Novel n = new Novel(bssut, "noveltitle", new Date());
 		 n.store();
 
-		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go();		 
+		 Set<Book> storeBooks = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements().go(); //go is easier to write this test, but you should prefer iterate instead as it requests the data store clever		 
 		 
 		 assertEquals(2, storeBooks.size());
 		 assertTrue(storeBooks.contains(bsut));
@@ -339,13 +369,15 @@ public class BasicTest extends HBaseTestLauncher {
 		if (! (ast instanceof Store)) //In case you've changed the default store
 			return;
 		Store st = (Store) ast;
-		//src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties defines the compression property
-		assertEquals("gz", st.getCompression());
+		//According to src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties, can be LZO (if available) or GZ
+		assertTrue(st.getCompression().equals("lzo") || st.getCompression().equals("gz"));
 		//Checking with HBase that the property column family is actually stored in GZ
 		HTableDescriptor td = st.getAdmin().getTableDescriptor(Bytes.toBytes(PersistingMixin.getInstance().getTable(Book.class) /*could be bsut.getTable()*/));
 		//Getting the property CF descriptor
 		HColumnDescriptor pd = td.getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
-		assertEquals(Algorithm.GZ, pd.getCompression());
+		//According to src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties, can be LZO (if available) or GZ
+		Algorithm comp = pd.getCompression();
+		assertTrue(comp.equals(Algorithm.LZO) || comp.equals(Algorithm.GZ));
 	 }
 
 }

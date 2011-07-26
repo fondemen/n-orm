@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
@@ -138,6 +140,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	public static final Logger logger;
 	public static final Logger errorLogger;
+	private static List<String> unavailableCompressors = new ArrayList<String>();
 	
 	protected static Map<Properties, Store> knownStores = new HashMap<Properties, Store>();
 	
@@ -174,17 +177,13 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			p.setProperty("port", Integer.toString(port));
 			if (maxRetries != null)
 				p.setProperty("maxRetries", maxRetries.toString());
-			Store ret = knownStores.get(p);
-			if (ret == null) {
-				logger.info("Creating store for " + host + ':' + port);
-				ret = new Store(p);
-				ret.setHost(host);
-				ret.setPort(port);
-				if (maxRetries != null)
-					ret.setMaxRetries(maxRetries);
-				knownStores.put(p, ret);
-				logger.info("Created store " + ret.hashCode() + " for " + host + ':' + port);
-			}
+			logger.info("Creating store for " + host + ':' + port);
+			Store ret = new Store(p);
+			ret.setHost(host);
+			ret.setPort(port);
+			if (maxRetries != null)
+				ret.setMaxRetries(maxRetries);
+			logger.info("Created store " + ret.hashCode() + " for " + host + ':' + port);
 			return ret;
 		}
 	}
@@ -197,27 +196,23 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		synchronized(Store.class) {
 			Properties p = new Properties();
 			p.setProperty("commaSeparatedConfigurationFolders", commaSeparatedConfigurationFolders);
-			Store ret = knownStores.get(p);
 			
-			if (ret == null) {
-				logger.info("Creating store for " + commaSeparatedConfigurationFolders);
-				Configuration conf = new Configuration();
-				ReportConf r = new ReportConf(conf);
-				addConfAction.clear();
-				addConfAction.addFiles(commaSeparatedConfigurationFolders);
-				addConfAction.explore(r);
+			logger.info("Creating store for " + commaSeparatedConfigurationFolders);
+			Configuration conf = new Configuration();
+			ReportConf r = new ReportConf(conf);
+			addConfAction.clear();
+			addConfAction.addFiles(commaSeparatedConfigurationFolders);
+			addConfAction.explore(r);
+		
+			if (!r.foundPropertyFile)
+				throw new IOException("No configuration file found in the following folders " + commaSeparatedConfigurationFolders + " ; expecting some *-site.xml files");
+			if (!r.foundHBasePropertyFile)
+				throw new IOException("Could not find hbase-site.xml from folders " + commaSeparatedConfigurationFolders);
 			
-				if (!r.foundPropertyFile)
-					throw new IOException("No configuration file found in the following folders " + commaSeparatedConfigurationFolders + " ; expecting some *-site.xml files");
-				if (!r.foundHBasePropertyFile)
-					throw new IOException("Could not find hbase-site.xml from folders " + commaSeparatedConfigurationFolders);
-				
-				ret = new Store(p);
-				ret.setConf(HBaseConfiguration.create(conf));
-				
-				knownStores.put(p, ret);
-				logger.info("Created store " + ret.hashCode() + " for " + commaSeparatedConfigurationFolders);
-			}
+			Store ret = new Store(p);
+			ret.setConf(HBaseConfiguration.create(conf));
+			
+			logger.info("Created store " + ret.hashCode() + " for " + commaSeparatedConfigurationFolders);
 			
 			return ret;
 		}
@@ -238,9 +233,11 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	public Map<String, HTable> tablesC = new TreeMap<String, HTable>();
 
 	private Algorithm compression;
+	private boolean forceCompression = false;
 
 	protected Store(Properties properties) {
 		this.launchProps = properties;
+		knownStores.put(properties, this);
 	}
 
 	public synchronized void start() throws DatabaseNotReachedException {
@@ -290,7 +287,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	@Override
 	public void setHost(String url) {
 		this.host = url;
-	}// }
+	}
 
 	public int getPort() {
 		return port;
@@ -315,12 +312,25 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			this.compression = null;
 		} else {
 			for (String cmp : compression.split("-or-")) {
-				if (org.apache.hadoop.hbase.util.CompressionTest.testCompression(cmp)) {
+				if (unavailableCompressors.contains(cmp))
+					continue;
+				try {
 					this.compression = Compression.getCompressionAlgorithmByName(cmp);
 					break;
+				} catch (Exception x) {
+					unavailableCompressors.add(cmp);
+					logger.warning("Could not use compression " + cmp);
 				}
 			}
 		}
+	}
+
+	public boolean isForceCompression() {
+		return forceCompression;
+	}
+
+	public void setForceCompression(boolean forceCompression) {
+		this.forceCompression = forceCompression;
 	}
 
 	public Configuration getConf() {
@@ -395,38 +405,50 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		this.start();
 	}
 	
-	private void handleProblem(Exception problem, String table) throws DatabaseNotReachedException {
-		errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped", problem);
-		if (problem instanceof DatabaseNotReachedException)
-			throw (DatabaseNotReachedException)problem;
+	private void handleProblem(Throwable e, String table) throws DatabaseNotReachedException {
+		errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped", e);
+		if (e instanceof DatabaseNotReachedException)
+			throw (DatabaseNotReachedException)e;
 		
-		if ((problem instanceof TableNotFoundException) || problem.getMessage().contains(TableNotFoundException.class.getSimpleName())) {
+		if ((e instanceof TableNotFoundException) || e.getMessage().contains(TableNotFoundException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
-			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", problem);
+			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", e);
 			if (this.tablesD.containsKey(table))
 				this.uncache(table);
 			else
-				throw new DatabaseNotReachedException(problem);
-		} else if ((problem instanceof NoSuchColumnFamilyException) || problem.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
+				throw new DatabaseNotReachedException(e);
+		} else if ((e instanceof NotServingRegionException) || e.getMessage().contains(NotServingRegionException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
-			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", problem);
+			
+			try {
+				if (this.admin.tableExists(table) && this.admin.isTableDisabled(table)) {
+					errorLogger.log(Level.INFO, "It seems that table " + table + " was disabled ; enabling", e);
+					this.admin.enableTable(table);
+				} else
+					throw new DatabaseNotReachedException(e);
+			} catch (IOException f) {
+				throw new DatabaseNotReachedException(f);
+			}
+		} else if ((e instanceof NoSuchColumnFamilyException) || e.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
+			table = this.mangleTableName(table);
+			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", e);
 			if (this.tablesD.containsKey(table))
 				this.uncache(table);
 			else
-				throw new DatabaseNotReachedException(problem);
-		} else if (problem instanceof IOException) {
-			if (problem.getMessage().contains("closed")) {
-				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", problem);
+				throw new DatabaseNotReachedException(e);
+		} else if (e instanceof IOException) {
+			if (e.getMessage().contains("closed")) {
+				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
 				restart();
 				return;
 			}
 			
-			throw new DatabaseNotReachedException(problem);
+			throw new DatabaseNotReachedException(e);
 		}
 	}
 	
-	private HTable handleProblemAndGetTable(Exception problem, String table, String... families) throws DatabaseNotReachedException {
-		this.handleProblem(problem, table);
+	private HTable handleProblemAndGetTable(Throwable e, String table, String... families) throws DatabaseNotReachedException {
+		this.handleProblem(e, table);
 		return this.getTable(table, families);
 	}
 	
@@ -436,8 +458,12 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		action.setTable(table);
 		try {
 			return action.perform();
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
+			
+			if (e instanceof UndeclaredThrowableException)
+				e = ((UndeclaredThrowableException)e).getCause();
+			
 			table = this.handleProblemAndGetTable(e, tableName, expectedFamilies);
 			action.setTable(table);
 			try {
@@ -499,6 +525,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						logger.fine("Got descriptor for table " + name);
 					}
 					this.cache(name, td);
+				} catch (UndeclaredThrowableException x) {
+					throw new DatabaseNotReachedException(x.getCause());
 				} catch (IOException e) {
 					throw new DatabaseNotReachedException(e);
 				}
@@ -556,13 +584,17 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			String... columnFamilies) throws DatabaseNotReachedException {
 		assert tableD != null;
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.length);
+		List<HColumnDescriptor> toBeCompressed = new ArrayList<HColumnDescriptor>(columnFamilies.length);
 		synchronized (tableD) {
 			boolean recreated = false;
 			for (String cf : columnFamilies) {
 				byte[] cfname = Bytes.toBytes(cf);
-				if (!recreated && !tableD.hasFamily(cfname)) {
+				HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
+				boolean familyExists = family != null;
+				boolean hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
+				if (!recreated && (!familyExists || !hasCorrectCompressor)) {
 					String tableName = tableD.getNameAsString();
-					logger.fine("Table " + tableName + " is not known to have family " + cf + ": checking from HBase");
+					logger.fine("Table " + tableName + " is not known to have family " + cf + " propertly configured: checking from HBase");
 					try {
 						tableD = this.admin.getTableDescriptor(tableD.getName());
 					} catch (Exception e) {
@@ -570,20 +602,28 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						this.handleProblemAndGetTable(e, tableName, columnFamilies);
 						return;
 					}
+					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
+					familyExists = family != null;
+					hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
 					this.cache(tableName, tableD);
 					recreated = true;
 				}
-				if (!tableD.hasFamily(cfname)) {
+				if (!familyExists) {
 					HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
 					if (this.compression != null)
 						newFamily.setCompressionType(this.compression);
 					toBeAdded.add(newFamily);
 					tableD.addFamily(newFamily);
+				} else if (!hasCorrectCompressor) {
+					toBeCompressed.add(family);
 				}
 			}
-			if (!toBeAdded.isEmpty()) {
+			if (!toBeAdded.isEmpty() || !toBeCompressed.isEmpty()) {
 				try {
-					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": creating");
+					if (!toBeAdded.isEmpty())
+						logger.info("Table " + tableD.getNameAsString() + " is missing families " + toBeAdded.toString() + ": creating");
+					if (!toBeCompressed.isEmpty())
+						logger.info("Table " + tableD.getNameAsString() + " compressed with " + this.compression + " has the wrong compressor for families " + toBeCompressed.toString() + ": altering");
 					try {
 						this.admin.disableTable(tableD.getName());
 					} catch (TableNotFoundException x) {
@@ -597,6 +637,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 							this.handleProblem(x, tableD.getNameAsString());
 							this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 						}
+					}
+					for (HColumnDescriptor hColumnDescriptor : toBeCompressed) {
+						hColumnDescriptor.setCompressionType(this.compression);
+						this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
 					}
 					this.admin.enableTable(tableD.getName());
 					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": created");

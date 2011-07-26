@@ -42,7 +42,7 @@ Different data stores are possible, especially column-oriented data stores such 
 		<dependency>
 			<groupId>commons-collections</groupId>
 			<artifactId>commons-collections-testframework</artifactId>
-			<version>3.2</version>
+			<version>3.2.1</version>
 			<type>jar</type>
 			<scope>test</scope>
 		</dependency>
