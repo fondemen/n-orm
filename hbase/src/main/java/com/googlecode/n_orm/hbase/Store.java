@@ -596,9 +596,12 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			boolean recreated = false;
 			for (String cf : columnFamilies) {
 				byte[] cfname = Bytes.toBytes(cf);
-				if (!recreated && !tableD.hasFamily(cfname)) {
+				HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
+				boolean familyExists = family != null;
+				boolean hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
+				if (!recreated && (!familyExists || !hasCorrectCompressor)) {
 					String tableName = tableD.getNameAsString();
-					logger.fine("Table " + tableName + " is not known to have family " + cf + ": checking from HBase");
+					logger.fine("Table " + tableName + " is not known to have family " + cf + " propertly configured: checking from HBase");
 					try {
 						tableD = this.admin.getTableDescriptor(tableD.getName());
 					} catch (Exception e) {
@@ -606,20 +609,20 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						this.handleProblemAndGetTable(e, tableName, columnFamilies);
 						return;
 					}
+					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
+					familyExists = family != null;
+					hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
 					this.cache(tableName, tableD);
 					recreated = true;
 				}
-				if (!tableD.hasFamily(cfname)) {
+				if (!familyExists) {
 					HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
 					if (this.compression != null)
 						newFamily.setCompressionType(this.compression);
 					toBeAdded.add(newFamily);
 					tableD.addFamily(newFamily);
-				} else {
-					HColumnDescriptor family = tableD.getFamily(cfname);
-					if (this.compression != null && this.forceCompression && !family.getCompressionType().equals(this.compression)) {
-						toBeCompressed.add(family);
-					}
+				} else if (!hasCorrectCompressor) {
+					toBeCompressed.add(family);
 				}
 			}
 			if (!toBeAdded.isEmpty() || !toBeCompressed.isEmpty()) {
