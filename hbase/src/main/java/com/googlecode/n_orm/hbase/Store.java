@@ -177,17 +177,13 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			p.setProperty("port", Integer.toString(port));
 			if (maxRetries != null)
 				p.setProperty("maxRetries", maxRetries.toString());
-			Store ret = knownStores.get(p);
-			if (ret == null) {
-				logger.info("Creating store for " + host + ':' + port);
-				ret = new Store(p);
-				ret.setHost(host);
-				ret.setPort(port);
-				if (maxRetries != null)
-					ret.setMaxRetries(maxRetries);
-				knownStores.put(p, ret);
-				logger.info("Created store " + ret.hashCode() + " for " + host + ':' + port);
-			}
+			logger.info("Creating store for " + host + ':' + port);
+			Store ret = new Store(p);
+			ret.setHost(host);
+			ret.setPort(port);
+			if (maxRetries != null)
+				ret.setMaxRetries(maxRetries);
+			logger.info("Created store " + ret.hashCode() + " for " + host + ':' + port);
 			return ret;
 		}
 	}
@@ -200,27 +196,23 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		synchronized(Store.class) {
 			Properties p = new Properties();
 			p.setProperty("commaSeparatedConfigurationFolders", commaSeparatedConfigurationFolders);
-			Store ret = knownStores.get(p);
 			
-			if (ret == null) {
-				logger.info("Creating store for " + commaSeparatedConfigurationFolders);
-				Configuration conf = new Configuration();
-				ReportConf r = new ReportConf(conf);
-				addConfAction.clear();
-				addConfAction.addFiles(commaSeparatedConfigurationFolders);
-				addConfAction.explore(r);
+			logger.info("Creating store for " + commaSeparatedConfigurationFolders);
+			Configuration conf = new Configuration();
+			ReportConf r = new ReportConf(conf);
+			addConfAction.clear();
+			addConfAction.addFiles(commaSeparatedConfigurationFolders);
+			addConfAction.explore(r);
+		
+			if (!r.foundPropertyFile)
+				throw new IOException("No configuration file found in the following folders " + commaSeparatedConfigurationFolders + " ; expecting some *-site.xml files");
+			if (!r.foundHBasePropertyFile)
+				throw new IOException("Could not find hbase-site.xml from folders " + commaSeparatedConfigurationFolders);
 			
-				if (!r.foundPropertyFile)
-					throw new IOException("No configuration file found in the following folders " + commaSeparatedConfigurationFolders + " ; expecting some *-site.xml files");
-				if (!r.foundHBasePropertyFile)
-					throw new IOException("Could not find hbase-site.xml from folders " + commaSeparatedConfigurationFolders);
-				
-				ret = new Store(p);
-				ret.setConf(HBaseConfiguration.create(conf));
-				
-				knownStores.put(p, ret);
-				logger.info("Created store " + ret.hashCode() + " for " + commaSeparatedConfigurationFolders);
-			}
+			Store ret = new Store(p);
+			ret.setConf(HBaseConfiguration.create(conf));
+			
+			logger.info("Created store " + ret.hashCode() + " for " + commaSeparatedConfigurationFolders);
 			
 			return ret;
 		}
@@ -245,6 +237,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	protected Store(Properties properties) {
 		this.launchProps = properties;
+		knownStores.put(properties, this);
 	}
 
 	public synchronized void start() throws DatabaseNotReachedException {
@@ -596,9 +589,12 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			boolean recreated = false;
 			for (String cf : columnFamilies) {
 				byte[] cfname = Bytes.toBytes(cf);
-				if (!recreated && !tableD.hasFamily(cfname)) {
+				HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
+				boolean familyExists = family != null;
+				boolean hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
+				if (!recreated && (!familyExists || !hasCorrectCompressor)) {
 					String tableName = tableD.getNameAsString();
-					logger.fine("Table " + tableName + " is not known to have family " + cf + ": checking from HBase");
+					logger.fine("Table " + tableName + " is not known to have family " + cf + " propertly configured: checking from HBase");
 					try {
 						tableD = this.admin.getTableDescriptor(tableD.getName());
 					} catch (Exception e) {
@@ -606,20 +602,20 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						this.handleProblemAndGetTable(e, tableName, columnFamilies);
 						return;
 					}
+					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
+					familyExists = family != null;
+					hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
 					this.cache(tableName, tableD);
 					recreated = true;
 				}
-				if (!tableD.hasFamily(cfname)) {
+				if (!familyExists) {
 					HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
 					if (this.compression != null)
 						newFamily.setCompressionType(this.compression);
 					toBeAdded.add(newFamily);
 					tableD.addFamily(newFamily);
-				} else {
-					HColumnDescriptor family = tableD.getFamily(cfname);
-					if (this.compression != null && this.forceCompression && !family.getCompressionType().equals(this.compression)) {
-						toBeCompressed.add(family);
-					}
+				} else if (!hasCorrectCompressor) {
+					toBeCompressed.add(family);
 				}
 			}
 			if (!toBeAdded.isEmpty() || !toBeCompressed.isEmpty()) {
