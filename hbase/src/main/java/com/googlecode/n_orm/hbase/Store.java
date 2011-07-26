@@ -234,6 +234,9 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	private Algorithm compression;
 	private boolean forceCompression = false;
+	
+	private boolean countMapRed = false;
+	private boolean truncateMapRed = false;
 
 	protected Store(Properties properties) {
 		this.launchProps = properties;
@@ -331,6 +334,22 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	public void setForceCompression(boolean forceCompression) {
 		this.forceCompression = forceCompression;
+	}
+
+	public boolean isCountMapRed() {
+		return countMapRed;
+	}
+
+	public void setCountMapRed(boolean countMapRed) {
+		this.countMapRed = countMapRed;
+	}
+
+	public boolean isTruncateMapRed() {
+		return truncateMapRed;
+	}
+
+	public void setTruncateMapRed(boolean truncateMapRed) {
+		this.truncateMapRed = truncateMapRed;
 	}
 
 	public Configuration getConf() {
@@ -792,8 +811,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	}
 
 	protected long count(String table, Scan s) throws DatabaseNotReachedException {
-		return this.countSimple(table, s);
-		//return this.countMapRed(table, s);
+		if (this.isCountMapRed())
+			return this.countMapRed(table, s);
+		else
+			return this.countSimple(table, s);
 	}
 
 	protected long countSimple(String table, Scan s) throws DatabaseNotReachedException {
@@ -950,8 +971,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	}
 	
 	protected void truncate(String table, Scan s) {
-		//this.truncateMapReduce(table, s);
-		this.truncateSimple(table, s);
+		if (this.isTruncateMapRed())
+			this.truncateMapReduce(table, s);
+		else
+			this.truncateSimple(table, s);
 	}
 	
 	protected void truncateSimple(String table, Scan s)  {
