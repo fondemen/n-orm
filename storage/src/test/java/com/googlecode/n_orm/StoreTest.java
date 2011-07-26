@@ -46,4 +46,8 @@ public class StoreTest {
 		assertSame(DummyStore.INSTANCE, s);
 		assertTrue(((DummyStore)s).isStarted());
 	}
+	
+	@Test public void testSameStore() {
+		assertSame(new com.googlecode.n_orm.simplestoragefile.Element().getStore(), new com.googlecode.n_orm.simplestoragefile.Element2().getStore());
+	}
 }
