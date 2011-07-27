@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * The HBase store found according to its configuration folder.
@@ -19,6 +21,8 @@ import java.net.URLClassLoader;
  * However, if your application is ran within a servlet container (Tomcat, JBoss...), you should care excluding servlet and jsp APIs whom HBase depends on... 
  */
 public class HBase {
+
+	private static Map<String, Store> knownStores = new HashMap<String, Store>();
 	
 	private static Class<?>[] parameters = new Class[] { URL.class };
 	private static RecursiveFileAction addJarAction = new RecursiveFileAction() {
@@ -60,11 +64,18 @@ public class HBase {
 	public static Store getStore(String commaSeparatedConfigurationFolders)
 			throws IOException {
 		synchronized(HBase.class) {
+		
+			Store ret = knownStores.get(commaSeparatedConfigurationFolders);
 			
-			addJarAction.clear();
-			addJarAction.addFiles(commaSeparatedConfigurationFolders);
-			addJarAction.explore(null);
-			return Store.getStore(commaSeparatedConfigurationFolders);
+			if (ret == null) {
+				addJarAction.clear();
+				addJarAction.addFiles(commaSeparatedConfigurationFolders);
+				addJarAction.explore(null);
+				ret = Store.getStore(commaSeparatedConfigurationFolders);
+				knownStores.put(commaSeparatedConfigurationFolders, ret);
+			}
+			
+			return ret;
 		}
 	}
 }
