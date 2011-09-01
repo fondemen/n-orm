@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
@@ -36,6 +37,7 @@ import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.HTablePool;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -238,7 +240,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	private Configuration config;
 	private HBaseAdmin admin;
 	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
-	public Map<String, HTable> tablesC = new TreeMap<String, HTable>();
+	public HTablePool tablesC;
 
 	private Algorithm compression;
 	private boolean forceCompression = false;
@@ -284,6 +286,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				errorLogger.severe("Could not cpnnect HBase for store " + this.hashCode() + " (" +e.getMessage() +')');
 				throw new DatabaseNotReachedException(e);
 			}
+		
+		this.tablesC = new HTablePool(this.getConf(), Integer.MAX_VALUE);
 			
 		logger.info("Started store " + this.hashCode());
 
@@ -400,30 +404,17 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			this.tablesD.put(tableName, descr);
 		}
 	}
-	
-	private void cache(String tableName, HTable t) {
-		synchronized(this.tablesC) {
-			this.tablesC.put(tableName, t);
-		}
-	}
 
 	private void uncache(String tableName) {
 		//tableName = this.mangleTableName(tableName);
 		synchronized (this.tablesD) {
-			synchronized (this.tablesC) {
-				this.tablesD.remove(tableName);
-				this.tablesC.remove(tableName);
-			}
-			
+			this.tablesD.remove(tableName);
 		}
 	}
 
 	protected synchronized void restart() {
 		synchronized(this.tablesD) {
 			this.tablesD.clear();
-			synchronized(this.tablesC) {
-				this.tablesC.clear();
-			}
 		}
 		this.config = HBaseConfiguration.create(this.config);
 		this.admin = null;
@@ -431,17 +422,25 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		this.start();
 	}
 	
-	private void handleProblem(Throwable e, String table) throws DatabaseNotReachedException {
-		errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped", e);
+	private void handleProblem(Throwable e, String table, String... expectedFamilies) throws DatabaseNotReachedException {		
+		while (e instanceof UndeclaredThrowableException)
+			e = ((UndeclaredThrowableException)e).getCause();
+		
 		if (e instanceof DatabaseNotReachedException)
 			throw (DatabaseNotReachedException)e;
 		
 		if ((e instanceof TableNotFoundException) || e.getMessage().contains(TableNotFoundException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", e);
-			if (this.tablesD.containsKey(table))
+			HTableDescriptor td = this.tablesD.get(table);
+			if (td != null) {
 				this.uncache(table);
-			else
+				Set<String> expectedFams = new TreeSet<String>(Arrays.asList(expectedFamilies));
+				for (HColumnDescriptor cd : td.getColumnFamilies()) {
+					expectedFams.add(cd.getNameAsString());
+				}
+				this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
+			} else
 				throw new DatabaseNotReachedException(e);
 		} else if ((e instanceof NotServingRegionException) || e.getMessage().contains(NotServingRegionException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
@@ -458,9 +457,15 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		} else if ((e instanceof NoSuchColumnFamilyException) || e.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", e);
-			if (this.tablesD.containsKey(table))
+			HTableDescriptor td = this.tablesD.get(table);
+			if (td != null) {
 				this.uncache(table);
-			else
+				Set<String> expectedFams = new TreeSet<String>(Arrays.asList(expectedFamilies));
+				for (HColumnDescriptor cd : td.getColumnFamilies()) {
+					expectedFams.add(cd.getNameAsString());
+				}
+				this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
+			} else
 				throw new DatabaseNotReachedException(e);
 		} else if (e instanceof IOException) {
 			if (e.getMessage().contains("closed")) {
@@ -473,25 +478,33 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		}
 	}
 	
-	private HTable handleProblemAndGetTable(Throwable e, String table, String... families) throws DatabaseNotReachedException {
-		this.handleProblem(e, table);
-		return this.getTable(table, families);
+	protected <R> R tryPerform(Action<R> action, String tableName, String... expectedFamilies) throws DatabaseNotReachedException {
+		HTable table = this.getTable(tableName, expectedFamilies);
+		try {
+			return this.tryPerform(action, table, expectedFamilies);
+		} finally {
+			this.returnTable(action.getTable());
+		}
+		
 	}
 	
-	protected <R> R tryPerform(Action<R> action, HTable table, String tableName, String... expectedFamilies) throws DatabaseNotReachedException {
-		if (table == null)
-			table = this.getTable(tableName, expectedFamilies);
+	/**
+	 * Performs an action. Table should be replaced by action.getTable() as it can change in case of problem handling (like a connection lost).
+	 */
+	protected <R> R tryPerform(Action<R> action, HTable table, String... expectedFamilies) throws DatabaseNotReachedException {	
 		action.setTable(table);
 		try {
 			return action.perform();
 		} catch (Throwable e) {
 			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
 			
-			if (e instanceof UndeclaredThrowableException)
-				e = ((UndeclaredThrowableException)e).getCause();
-			
-			table = this.handleProblemAndGetTable(e, tableName, expectedFamilies);
-			action.setTable(table);
+			String tableName = Bytes.toString(table.getTableName());
+			HTablePool tp = this.tablesC;
+			this.handleProblem(e, tableName, expectedFamilies);
+			if (tp != this.tablesC) { //Store was restarted ; we should get a new table client
+				table = this.getTable(tableName, expectedFamilies);
+				action.setTable(table);
+			}
 			try {
 				errorLogger.log(Level.INFO, "Retrying to perform again erroneous " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
 				return action.perform();
@@ -522,9 +535,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			throw new DatabaseNotReachedException(e);
 		}
 	}
-
-	protected HTable getTable(String name, String... expectedFamilies)
-			throws DatabaseNotReachedException {
+	
+	protected HTableDescriptor getTableDescriptor(String name, String... expectedFamilies) {
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
 		boolean created = false;
@@ -537,10 +549,13 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						td = new HTableDescriptor(name);
 						if (expectedFamilies != null) {
 							for (String fam : expectedFamilies) {
-								HColumnDescriptor famD = new HColumnDescriptor(fam);
-								if (this.compression != null)
-									famD.setCompressionType(this.compression);
-								td.addFamily(famD);
+								byte [] famB = Bytes.toBytes(fam);
+								if (!td.hasFamily(famB)) {
+									HColumnDescriptor famD = new HColumnDescriptor(fam);
+									if (this.compression != null)
+										famD.setCompressionType(this.compression);
+									td.addFamily(famD);
+								}
 							}
 						}
 						this.admin.createTable(td);
@@ -564,23 +579,22 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		if (!created && expectedFamilies != null && expectedFamilies.length>0) {
 			this.enforceColumnFamiliesExists(td, expectedFamilies);
 		}
+		
+		return td;
+	}
 
-		synchronized (this.tablesC) {
-			HTable ret = this.tablesC.get(name);
-			if (ret == null) {
-				try {
-					logger.fine("Creating accessor for table " + name);
-					ret = new HTable(this.config, name);
-					this.cache(name, ret);
-					logger.fine("Created accessor for table " + name);
-					return ret;
-				} catch (IOException e) {
-					errorLogger.log(Level.SEVERE, "Could not create accessor for table " + name, e);
-					throw new DatabaseNotReachedException(e);
-				}
-			}
-			return ret;
-		}
+	protected HTable getTable(String name, String... expectedFamilies)
+			throws DatabaseNotReachedException {
+		name = this.mangleTableName(name);
+		
+		//Checking that this table actually exists with the expected column families
+		this.getTableDescriptor(name, expectedFamilies);
+		
+		return (HTable)this.tablesC.getTable(name);
+	}
+	
+	protected void returnTable(HTable table) {
+		this.tablesC.putTable(table);
 	}
 
 	protected boolean hasColumnFamily(String table, String family)
@@ -625,7 +639,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						tableD = this.admin.getTableDescriptor(tableD.getName());
 					} catch (Exception e) {
 						errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
-						this.handleProblemAndGetTable(e, tableName, columnFamilies);
+						this.handleProblem(e, tableName);
+						this.getTableDescriptor(tableName, columnFamilies);
 						return;
 					}
 					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
@@ -687,7 +702,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			g.addFamily(Bytes.toBytes(family));
 		}
 
-		Result r = this.tryPerform(new GetAction(g), null, table, families.toArray(new String[families.size()]));
+		Result r = this.tryPerform(new GetAction(g), table, families.toArray(new String[families.size()]));
 		if (r.isEmpty())
 			return null;
 		
@@ -750,63 +765,73 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		String[] famAr = families.toArray(new String[families.size()]);
 		HTable t = this.getTable(table, famAr);
 
-		byte[] row = Bytes.toBytes(id);
-		
-
-		List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2);
-
-		Put rowPut = null;
-		if (changed != null && !changed.isEmpty()) {
-			rowPut = new Put(row);
-			for (String family : changed.keySet()) {
-				byte[] cf = Bytes.toBytes(family);
-				Map<String, byte[]> toPut = changed.get(family);
-				for (String key : toPut.keySet()) {
-					rowPut.add(cf, Bytes.toBytes(key), toPut.get(key));
+		try {
+			byte[] row = Bytes.toBytes(id);
+			
+	
+			List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2);
+	
+			Put rowPut = null;
+			if (changed != null && !changed.isEmpty()) {
+				rowPut = new Put(row);
+				for (String family : changed.keySet()) {
+					byte[] cf = Bytes.toBytes(family);
+					Map<String, byte[]> toPut = changed.get(family);
+					for (String key : toPut.keySet()) {
+						rowPut.add(cf, Bytes.toBytes(key), toPut.get(key));
+					}
 				}
+				actions.add(rowPut);
 			}
-			actions.add(rowPut);
-		}
-
-		Delete rowDel = null;
-		if (removed != null && !removed.isEmpty()) {
-			rowDel = new Delete(row);
-			for (String family : removed.keySet()) {
-				byte[] cf = Bytes.toBytes(family);
-				for (String key : removed.get(family)) {
-					rowDel.deleteColumns(cf, Bytes.toBytes(key));
+	
+			Delete rowDel = null;
+			if (removed != null && !removed.isEmpty()) {
+				rowDel = new Delete(row);
+				for (String family : removed.keySet()) {
+					byte[] cf = Bytes.toBytes(family);
+					for (String key : removed.get(family)) {
+						rowDel.deleteColumns(cf, Bytes.toBytes(key));
+					}
+	
 				}
-
+				actions.add(rowDel);
 			}
-			actions.add(rowDel);
-		}
-		
-		Increment rowInc = null;
-		if (increments != null && !increments.isEmpty()) {
-			rowInc = new Increment(row);
-			for (Entry<String, Map<String, Number>> incrs : increments.entrySet()) {
-				for (Entry<String, Number> inc : incrs.getValue().entrySet()) {
-					rowInc.addColumn(Bytes.toBytes(incrs.getKey()), Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
+			
+			Increment rowInc = null;
+			if (increments != null && !increments.isEmpty()) {
+				rowInc = new Increment(row);
+				for (Entry<String, Map<String, Number>> incrs : increments.entrySet()) {
+					for (Entry<String, Number> inc : incrs.getValue().entrySet()) {
+						rowInc.addColumn(Bytes.toBytes(incrs.getKey()), Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
+					}
 				}
+				//Can't add that to actions :(
 			}
-			//Can't add that to actions :(
-		}
-
-		//An empty object is to be stored...
-		if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
-			rowPut = new Put(row);
-			rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
-			actions.add(rowPut);
-		}
-		
-		if (! actions.isEmpty()) {
-			BatchAction act = new BatchAction(actions);
-			this.tryPerform(act, t, table, famAr);
-			t = act.getTable();
-		}
-		
-		if (rowInc != null) {
-			this.tryPerform(new IncrementAction(rowInc), t, table, famAr);
+	
+			//An empty object is to be stored...
+			if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
+				rowPut = new Put(row);
+				rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
+				actions.add(rowPut);
+			}
+			
+			
+			Action<?> act;
+			
+			if (! actions.isEmpty()) {
+				act = new BatchAction(actions);
+				this.tryPerform(act, t, famAr);
+				t = act.getTable();
+			}
+			
+			if (rowInc != null) {
+				act = new IncrementAction(rowInc);
+				this.tryPerform(act, t, famAr);
+				t = act.getTable();
+			}
+		} finally {
+			if (t != null)
+				this.returnTable(t);
 		}
 	}
 
@@ -814,7 +839,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 	public void delete(String table, String id)
 			throws DatabaseNotReachedException {
 		Delete rowDel = new Delete(Bytes.toBytes(id));
-		this.tryPerform(new DeleteAction(rowDel), null, table);
+		this.tryPerform(new DeleteAction(rowDel), table);
 	}
 
 	protected long count(String table, Scan s) throws DatabaseNotReachedException {
@@ -828,7 +853,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		if (! this.hasTableNoCache(table))
 			return 0;
 		
-		ResultScanner r = this.tryPerform(new ScanAction(s), null, table);
+		ResultScanner r = this.tryPerform(new ScanAction(s), table);
 		int count = 0;
 		try {
 			Iterator<Result> it = r.iterator();
@@ -870,7 +895,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 		Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));
 		g.setFilter(new FirstKeyOnlyFilter());
-		return this.tryPerform(new ExistsAction(g), null, table);
+		return this.tryPerform(new ExistsAction(g), table);
 	}
 
 	@Override
@@ -881,7 +906,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 
 		Get g = new Get(Bytes.toBytes(row));
 		g.setFilter(new FirstKeyOnlyFilter());
-		return this.tryPerform(new ExistsAction(g), null, table);
+		return this.tryPerform(new ExistsAction(g), table);
 	}
 
 	@Override
@@ -890,7 +915,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
 				Bytes.toBytes(key));
 
-		Result result = this.tryPerform(new GetAction(g), null, table, family);
+		Result result = this.tryPerform(new GetAction(g), table, family);
 		
 		if (result.isEmpty())
 			return null;
@@ -912,7 +937,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			g.setFilter(createFamilyConstraint(c, false));
 		}
 
-		Result r = this.tryPerform(new GetAction(g), null, table, family);
+		Result r = this.tryPerform(new GetAction(g), table, family);
 		if (r.isEmpty())
 			return null;
 		
@@ -969,7 +994,7 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			s.setFilter(new PageFilter(limit));
 		}
 		
-		ResultScanner r = this.tryPerform(new ScanAction(s), null, table, famAr);
+		ResultScanner r = this.tryPerform(new ScanAction(s), table, famAr);
 		return new CloseableIterator(r, families != null);
 	}
 
@@ -1012,6 +1037,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 			errorLogger.log(Level.INFO, "Could not truncate table " + table, e);
 			throw new DatabaseNotReachedException(e);
 		} finally {
+			this.returnTable(t);
+			
 			if (r != null)
 				r.close();
 		}
