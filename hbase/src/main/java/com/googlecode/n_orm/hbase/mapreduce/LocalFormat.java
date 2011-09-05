@@ -30,6 +30,7 @@ public class LocalFormat {
 	}
 	
 	public static void prepareJob(Job job) {
+		job.setJarByClass(Store.class);
 		job.setInputFormatClass(LocalInputFormat.class);
 		if (job.getConfiguration().get(LocalOutputFormat.OUTPUTWRITER_CLASS) != null)
 			job.setOutputFormatClass(LocalOutputFormat.class);
