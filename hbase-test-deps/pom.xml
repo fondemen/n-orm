@@ -13,8 +13,8 @@
 	<packaging>pom</packaging>
 
 	<properties>
-		<hbase.version>0.90.2</hbase.version>
-		<hadoop.version>0.20.2</hadoop.version>
+		<hbase.version>0.90.3</hbase.version>
+		<hadoop.version>0.20-append-r1056497</hadoop.version>
 	</properties>
 
 	<dependencies>
@@ -63,10 +63,10 @@
 
 	<profiles>
 		<profile>
-			<id>hbase-cdh3u0</id>
+			<id>hbase-cdh3u1</id>
 			<properties>
-				<hbase.version>0.90.1-cdh3u0</hbase.version>
-				<hadoop.version>0.20.2-cdh3u0</hadoop.version>
+				<hbase.version>0.90.3-cdh3u1</hbase.version>
+				<hadoop.version>0.20.2-cdh3u1</hadoop.version>
 			</properties>
 
 			<repositories>
