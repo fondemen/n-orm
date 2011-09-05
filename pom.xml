@@ -212,9 +212,6 @@
 		<profile>
 			<id>with-sample</id>
 			<modules>
-				<module>parent-aspect</module>
-				<module>hbase-test-deps</module>
-				<module>hbase</module>
 				<module>sample</module>
 			</modules>
 		</profile>
@@ -233,6 +230,14 @@
 					<url>file:/opt/nexus/./../sonatype-work/nexus/storage/snapshots/</url>
 				</snapshotRepository>
 			</distributionManagement>
+		</profile>
+
+		<profile>
+			<id>cdh</id>
+			<modules>
+				<module>hbase-test-deps/cdh-pom.xml</module>
+				<module>hbase/cdh-pom.xml</module>
+			</modules>
 		</profile>
 	</profiles>
 </project>

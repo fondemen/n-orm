@@ -19,7 +19,8 @@
 	</scm>
 	
 	<properties>
-		<hbase.version>0.90.3</hbase.version>
+		<hbase.version>0.90.3-cdh3u1</hbase.version>
+		<hadoop.version>0.20.2-cdh3u1</hadoop.version>
 	</properties>
 
 	<dependencies>
@@ -74,7 +75,28 @@
 		</site>
 	</distributionManagement>
 
+	<repositories>
+
+		<repository>
+			<id>cdh.releases.repo</id>
+			<url>https://repository.cloudera.com/content/repositories/releases</url>
+			<name>CDH Releases Repository</name>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>cdh.snapshots.repo</id>
+			<url>https://repository.cloudera.com/content/repositories/snapshots/</url>
+			<name>CDH Snapshots Repository</name>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
+
 	<profiles>
+
 		<profile>
 			<id>coverage</id>
 
