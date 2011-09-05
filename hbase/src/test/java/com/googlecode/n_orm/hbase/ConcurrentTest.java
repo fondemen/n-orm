@@ -1,6 +1,7 @@
 package com.googlecode.n_orm.hbase;
 
- import static org.junit.Assert.assertEquals;
+ import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
@@ -121,6 +122,7 @@ public class ConcurrentTest {
 	
 	@Test(expected=Test.None.class)
 	public void acceptingConnectionTimeout() throws IOException, SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+		store1.delete("t1", "idt1");
 		
 		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
 		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
@@ -133,6 +135,17 @@ public class ConcurrentTest {
 		closeM.invoke(cm, true);
 		
 		store1.storeChanges("t1", "idt1", change1 , null, null);
+		assertTrue(store1.exists("t1", "idt1", "cf1"));
+		
+		cm = store1.getAdmin().getConnection();
+		closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
+		closeM.setAccessible(true);
+		closeM.invoke(cm, true);
+		
+		store1.delete("t1", "idt1");
+		assertFalse(store1.exists("t1", "idt1", "cf1"));
+		
+		store1.restart();
 	}
 	
 	@Test
