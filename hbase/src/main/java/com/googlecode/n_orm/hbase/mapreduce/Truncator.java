@@ -12,6 +12,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper.Context;
 
 import com.googlecode.n_orm.hbase.Store;
 
@@ -19,39 +20,38 @@ public class Truncator {
 
 	static final String NAME = "truncator";
 	public static class TruncatorMapper extends
-			TableMapper<ImmutableBytesWritable, Delete> {
+			TableMapper<ImmutableBytesWritable, Void> {
+		private HTable table;
+		
+		@Override
+		protected void setup(Context context) throws IOException,
+				InterruptedException {
+			super.setup(context);
+			LocalFormat lf = new LocalFormat();
+			lf.setConf(context.getConfiguration());
+			this.table = lf.getTable();
+		}
+
+		@Override
+		protected void cleanup(Context context) throws IOException,
+				InterruptedException {
+			this.table.flushCommits();
+			super.cleanup(context);
+		}
+
 		@Override
 		public void map(ImmutableBytesWritable row, Result values,
 				Context context) throws IOException {
 			for (@SuppressWarnings("unused")
 			KeyValue value : values.list()) {
-				Delete d = new Delete(row.get());
-				try {
-					context.write(row, d);
-					break;
-				} catch (InterruptedException e) {
-				}
+				this.table.delete(new Delete(row.get()));
 			}
 		}
-	}
-	
-	public static final class DeleteWriter extends LocalTableRecordWriter<Delete> {
-
-		public DeleteWriter(HTable table) {
-			super(table);
-		}
-
-		@Override
-		public void write(ImmutableBytesWritable row, Delete delete)
-				throws IOException, InterruptedException {
-			this.getTable().delete(delete);
-		}
-		
 	}
 
 	public static Job createSubmittableJob(Store s,
 			String tableName, Scan scan) throws IOException {
-		Configuration conf = LocalFormat.prepareConf(s, DeleteWriter.class);
+		Configuration conf = LocalFormat.prepareConf(s, null);
 		Job job = new Job(conf, NAME + "_" + tableName + "_" + scan.hashCode());
 		scan.setCaching(500);
 		TableMapReduceUtil.initTableMapperJob(tableName, scan,
