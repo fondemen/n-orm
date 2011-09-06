@@ -54,6 +54,7 @@ public class Truncator {
 		Configuration conf = LocalFormat.prepareConf(s, null);
 		Job job = new Job(conf, NAME + "_" + tableName + "_" + scan.hashCode());
 		scan.setCaching(500);
+		scan.setCacheBlocks(false);
 		TableMapReduceUtil.initTableMapperJob(tableName, scan,
 				TruncatorMapper.class, ImmutableBytesWritable.class,
 				Delete.class, job, true);
