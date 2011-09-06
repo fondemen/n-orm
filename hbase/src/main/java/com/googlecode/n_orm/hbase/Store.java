@@ -920,7 +920,7 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 				try {
 					t.flushCommits();
 					HRegionLocation rloc = t.getRegionLocation(ident);
-					this.getAdmin().getConnection().getHRegionConnection(rloc.getServerAddress()).flushRegion(rloc.getRegionInfo());
+					this.getAdmin().getConnection().getHRegionConnection(rloc.getServerAddress()).compactRegion(rloc.getRegionInfo(), true);
 				} catch (Exception e) {
 					logger.log(Level.WARNING, "Could not flush table " + table + " after deleting " + id, e);
 				}
