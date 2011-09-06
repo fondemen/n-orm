@@ -328,24 +328,26 @@ public aspect PropertyManagement {
 	private Map<Class<?>, Set<Field>> typeProperties = new HashMap<Class<?>, Set<Field>>();
 
 	public Set<Field> getProperties(Class<?> type) {
-		if (!this.typeProperties.containsKey(type)) {
-			Set<Field> ret = new HashSet<Field>(Arrays.asList(type
-					.getDeclaredFields()));
-			Class<?> supertype = type.getSuperclass();
-			if (supertype != null)
-				ret.addAll(this.getProperties(supertype));
-			for (Field f : new ArrayList<Field>(ret)) {
-				Class<?> ft = f.getType();
-				if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) != 0
-						|| f.isAnnotationPresent(Transient.class)
-						|| Collection.class.isAssignableFrom(ft)
-						|| Map.class.isAssignableFrom(ft)
-						|| ColumnFamily.class.isAssignableFrom(ft))
-					ret.remove(f);
+		synchronized(typeProperties) {
+			if (!this.typeProperties.containsKey(type)) {
+				Set<Field> ret = new HashSet<Field>(Arrays.asList(type
+						.getDeclaredFields()));
+				Class<?> supertype = type.getSuperclass();
+				if (supertype != null)
+					ret.addAll(this.getProperties(supertype));
+				for (Field f : new ArrayList<Field>(ret)) {
+					Class<?> ft = f.getType();
+					if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) != 0
+							|| f.isAnnotationPresent(Transient.class)
+							|| Collection.class.isAssignableFrom(ft)
+							|| Map.class.isAssignableFrom(ft)
+							|| ColumnFamily.class.isAssignableFrom(ft))
+						ret.remove(f);
+				}
+				this.typeProperties.put(type, ret);
 			}
-			this.typeProperties.put(type, ret);
+			return this.typeProperties.get(type);
 		}
-		return this.typeProperties.get(type);
 	}
 	
 	public Field getProperty(Class<?> type, String name) {
