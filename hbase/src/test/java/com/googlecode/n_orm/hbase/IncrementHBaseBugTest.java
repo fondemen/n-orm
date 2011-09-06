@@ -154,7 +154,7 @@ public class IncrementHBaseBugTest {
 		elt.ival++;
 		elt.store();
 
-		store.getAdmin().flush(testTable);
+		store.getAdmin().flush(elt.getTable());
 		elt.delete();
 
 		elt = new SimpleStorageTest.IncrementingElement(this.testKey);
