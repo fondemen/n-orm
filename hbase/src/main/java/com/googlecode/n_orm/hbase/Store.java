@@ -898,6 +898,7 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 				//In case the sent object has incrementing columns, table MUST be flushed (HBase bug HBASE-3725)
 				//See https://issues.apache.org/jira/browse/HBASE-3725
 				try {
+					t.flushCommits();
 					HRegionLocation rloc = t.getRegionLocation(ident);
 					this.getAdmin().getConnection().getHRegionConnection(rloc.getServerAddress()).flushRegion(rloc.getRegionInfo());
 				} catch (Exception e) {
