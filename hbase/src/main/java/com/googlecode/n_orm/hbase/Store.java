@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -475,6 +476,9 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 				this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
 			} else
 				throw new DatabaseNotReachedException(e);
+		} else if ((e instanceof ConnectException) || e.getMessage().contains(ConnectException.class.getSimpleName())) {
+			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
+			restart();
 		} else if (e instanceof IOException) {
 			if (e.getMessage().contains("closed")) {
 				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
