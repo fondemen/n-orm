@@ -21,6 +21,7 @@ import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.storeapi.TypeAwareStore;
 
 /**
  * Persisting elements are elements that can be stored and retrieved from a {@link Store}.
@@ -43,7 +44,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	/**
 	 * The store used for this persisting element.
 	 */
-	Store getStore();
+	TypeAwareStore getStore();
 
 	/**
 	 * The table used to store this persisting element as declared by the {@link Persisting#table()} annotation.
