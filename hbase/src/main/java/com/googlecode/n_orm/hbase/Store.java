@@ -52,6 +52,7 @@ import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
+import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.io.hfile.Compression;
@@ -251,7 +252,8 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 	private HBaseAdmin admin;
 	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
 	public HTablePool tablesC;
-
+	
+	private Integer scanCaching = null;
 	private Algorithm compression;
 	private boolean forceCompression = false;
 	
@@ -323,6 +325,14 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 
 	public void setMaxRetries(int maxRetries) {
 		this.maxRetries = Integer.valueOf(maxRetries);
+	}
+
+	public Integer getScanCaching() {
+		return scanCaching;
+	}
+
+	public void setScanCaching(Integer scanCaching) {
+		this.scanCaching = scanCaching;
 	}
 
 	public String getCompression() {
@@ -1030,6 +1040,8 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 
 	protected Scan getScan(Constraint c, String... families) throws DatabaseNotReachedException {
 		Scan s = new Scan();
+		if (this.scanCaching != null)
+			s.setCaching(this.getScanCaching());
 		if (c != null && c.getStartKey() != null)
 			s.setStartRow(Bytes.toBytes(c.getStartKey()));
 		if (c != null && c.getEndKey() != null) {
@@ -1044,7 +1056,7 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 			}
 		} else {
 			//No family to load ; avoid getting all information in the row (that may be big)
-			s.setFilter(new FirstKeyOnlyFilter());
+			s.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
 		}
 		
 		return s;
