@@ -861,7 +861,7 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 		PropertyManagement pm = PropertyManagement.getInstance();
 		for (Field field : pm.getProperties(clazz)) {
 			if (field.isAnnotationPresent(Incrementing.class)) {
-				hasIncrements &= true;
+				hasIncrements = true;
 				break;
 			}
 		}
@@ -869,7 +869,7 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 			ColumnFamiliyManagement cf = ColumnFamiliyManagement.getInstance();
 			for (Field field : cf.getColumnFamilies(clazz)) {
 				if (field.isAnnotationPresent(Incrementing.class)) {
-					hasIncrements &= true;
+					hasIncrements = true;
 					break;
 				}
 			}
