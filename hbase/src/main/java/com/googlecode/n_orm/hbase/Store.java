@@ -39,6 +39,7 @@ import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.HConnectionManager;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.HTablePool;
 import org.apache.hadoop.hbase.client.Increment;
@@ -478,6 +479,7 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 				throw new DatabaseNotReachedException(e);
 		} else if ((e instanceof ConnectException) || e.getMessage().contains(ConnectException.class.getSimpleName())) {
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
+			HConnectionManager.deleteConnection(this.config, true);
 			restart();
 		} else if (e instanceof IOException) {
 			if (e.getMessage().contains("closed")) {
@@ -860,6 +862,9 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 	@Override
 	public void delete(PersistingElement elt, String table, String id)
 			throws DatabaseNotReachedException {
+		if (!this.hasTable(table))
+			return;
+		
 		boolean hasIncrements = false;
 		Class<? extends PersistingElement> clazz = elt.getClass();
 		PropertyManagement pm = PropertyManagement.getInstance();
@@ -885,7 +890,8 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 	@Override
 	public void delete(String table, String id)
 			throws DatabaseNotReachedException {
-
+		if (!this.hasTable(table))
+			return;
 		this.delete(table, id, true);
 	}
 
