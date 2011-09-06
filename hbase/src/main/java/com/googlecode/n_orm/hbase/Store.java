@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.reflect.Field;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,6 +29,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
@@ -56,8 +58,12 @@ import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 
+import com.googlecode.n_orm.ColumnFamiliyManagement;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.EmptyCloseableIterator;
+import com.googlecode.n_orm.Incrementing;
+import com.googlecode.n_orm.KeyManagement;
+import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.hbase.actions.Action;
@@ -66,10 +72,12 @@ import com.googlecode.n_orm.hbase.actions.DeleteAction;
 import com.googlecode.n_orm.hbase.actions.ExistsAction;
 import com.googlecode.n_orm.hbase.actions.GetAction;
 import com.googlecode.n_orm.hbase.actions.IncrementAction;
+import com.googlecode.n_orm.hbase.actions.PutAction;
 import com.googlecode.n_orm.hbase.actions.ScanAction;
 import com.googlecode.n_orm.hbase.mapreduce.RowCounter;
 import com.googlecode.n_orm.hbase.mapreduce.Truncator;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
 
 /**
  * The HBase store found according to its configuration folder.
@@ -88,7 +96,7 @@ import com.googlecode.n_orm.storeapi.Constraint;
  * compression=gz &#35;can be 'none', 'gz', 'lzo', 'lzo-or-gz' (gz if lzo is not available), or 'lzo-or-none' (none if lzo is not available); by default 'none' 
  * </code><br>
  */
-public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
+public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm.storeapi.GenericStore {
 
 	private static class ReportConf extends Report {
 		private final Configuration conf;
@@ -759,8 +767,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 		if (changed !=null) families.addAll(changed.keySet());
 		if (removed != null) families.addAll(removed.keySet());
 		if (increments != null) families.addAll(increments.keySet());
-		if (families.isEmpty())
-			families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		
+		families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 		
 		String[] famAr = families.toArray(new String[families.size()]);
 		HTable t = this.getTable(table, famAr);
@@ -781,7 +789,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						rowPut.add(cf, Bytes.toBytes(key), toPut.get(key));
 					}
 				}
-				actions.add(rowPut);
+				if (rowPut.getFamilyMap().isEmpty())
+					rowPut = null;
+				else
+					actions.add(rowPut);
 			}
 	
 			Delete rowDel = null;
@@ -794,7 +805,10 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 					}
 	
 				}
-				actions.add(rowDel);
+				if (rowDel.getFamilyMap().isEmpty())
+					rowDel = null;
+				else
+					actions.add(rowDel);
 			}
 			
 			Increment rowInc = null;
@@ -805,6 +819,8 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 						rowInc.addColumn(Bytes.toBytes(incrs.getKey()), Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
 					}
 				}
+				if (rowInc.getFamilyMap().isEmpty())
+					rowInc = null;
 				//Can't add that to actions :(
 			}
 	
@@ -834,12 +850,63 @@ public class Store implements com.googlecode.n_orm.storeapi.GenericStore {
 				this.returnTable(t);
 		}
 	}
+	
+	
+
+	@Override
+	public void delete(PersistingElement elt, String table, String id)
+			throws DatabaseNotReachedException {
+		boolean hasIncrements = false;
+		Class<? extends PersistingElement> clazz = elt.getClass();
+		PropertyManagement pm = PropertyManagement.getInstance();
+		for (Field field : pm.getProperties(clazz)) {
+			if (field.isAnnotationPresent(Incrementing.class)) {
+				hasIncrements &= true;
+				break;
+			}
+		}
+		if (!hasIncrements) {
+			ColumnFamiliyManagement cf = ColumnFamiliyManagement.getInstance();
+			for (Field field : cf.detectColumnFamilies(clazz)) {
+				if (field.isAnnotationPresent(Incrementing.class)) {
+					hasIncrements &= true;
+					break;
+				}
+			}
+		}
+		
+		this.delete(table, id, hasIncrements);
+	}
 
 	@Override
 	public void delete(String table, String id)
 			throws DatabaseNotReachedException {
-		Delete rowDel = new Delete(Bytes.toBytes(id));
-		this.tryPerform(new DeleteAction(rowDel), table);
+
+		this.delete(table, id, true);
+	}
+
+	public void delete(String table, String id, boolean flush)
+			throws DatabaseNotReachedException {
+
+		HTable t = this.getTable(table);
+		try {
+			byte[] ident = Bytes.toBytes(id);
+			Delete rowDel = new Delete(ident);
+			this.tryPerform(new DeleteAction(rowDel), t);
+			
+			if (flush) {
+				//In case the sent object has incrementing columns, table MUST be flushed (HBase bug HBASE-3725)
+				//See https://issues.apache.org/jira/browse/HBASE-3725
+				try {
+					HRegionLocation rloc = t.getRegionLocation(ident);
+					this.getAdmin().getConnection().getHRegionConnection(rloc.getServerAddress()).flushRegion(rloc.getRegionInfo());
+				} catch (Exception e) {
+					logger.log(Level.WARNING, "Could not flush table " + table + " after deleting " + id, e);
+				}
+			}
+		} finally {
+			this.returnTable(t);
+		}
 	}
 
 	protected long count(String table, Scan s) throws DatabaseNotReachedException {
