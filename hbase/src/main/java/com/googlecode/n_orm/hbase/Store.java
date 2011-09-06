@@ -867,7 +867,7 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 		}
 		if (!hasIncrements) {
 			ColumnFamiliyManagement cf = ColumnFamiliyManagement.getInstance();
-			for (Field field : cf.detectColumnFamilies(clazz)) {
+			for (Field field : cf.getColumnFamilies(clazz)) {
 				if (field.isAnnotationPresent(Incrementing.class)) {
 					hasIncrements &= true;
 					break;
