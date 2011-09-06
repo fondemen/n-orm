@@ -19,6 +19,8 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.storeapi.TypeAwareStore;
+import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
 import com.googlecode.n_orm.StoreSelector;
 
 public aspect StoreSelector {
@@ -55,19 +57,24 @@ public aspect StoreSelector {
 	private Map<String, StoreProperties> classStores = new TreeMap<String, StoreProperties>();
 	private Map<String, StoreProperties> packageStores = new TreeMap<String, StoreProperties>();
 	
-	private transient Store PersistingElement.store = null;
+	private transient TypeAwareStore PersistingElement.store = null;
 	
-	public Store PersistingElement.getStore() {
+	public TypeAwareStore PersistingElement.getStore() {
 		if (this.store == null)
 			try {
-				this.store = StoreSelector.getInstance().getStoreFor(this.getClass());
+				Store s = StoreSelector.getInstance().getStoreFor(this.getClass());
+				if (s instanceof TypeAwareStore) {
+					this.store= (TypeAwareStore)s;
+				} else {
+					this.store = TypeAwareStoreWrapper.getWrapper(s);
+				}
 			} catch (DatabaseNotReachedException x) {
 				throw new IllegalStateException(x);
 			}
 		return this.store;
 	}
 	
-	public void PersistingElement.setStore(Store store) {
+	public void PersistingElement.setStore(TypeAwareStore store) {
 		if (this.store != null)
 			throw new IllegalStateException("A store is already registered for object " + (this.getIdentifier() == null ? "" : this.getIdentifier()) + " of class " + this.getClass().getName());
 		this.store = store;
