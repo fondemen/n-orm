@@ -120,7 +120,7 @@ public aspect ColumnFamiliyManagement {
 	/**
 	 * Finds in a class the fields that are column families
 	 */
-	public Set<Field> detectColumnFamilies(Class<? extends PersistingElement> clazz) {
+	public Set<Field> getColumnFamilies(Class<? extends PersistingElement> clazz) {
 		synchronized (typeColumnFamilies) {
 			Set<Field> ret = this.typeColumnFamilies.get(clazz);
 			if (ret == null) {

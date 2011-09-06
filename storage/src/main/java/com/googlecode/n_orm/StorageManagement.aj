@@ -295,7 +295,7 @@ public aspect StorageManagement {
 		
 		Set<String> cfs = new TreeSet<String>();
 		cfs.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
-		for (Field cff : cfm.detectColumnFamilies(clazz)) {
+		for (Field cff : cfm.getColumnFamilies(clazz)) {
 			if (cff.getAnnotation(ImplicitActivation.class) != null)
 				toBeActivated.add(cff.getName());
 			cfs.add(cff.getName());
