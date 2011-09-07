@@ -25,11 +25,14 @@
 					<excludes>
 						<!-- excluding business model as it must be compiled using AspectJ -->
 						<exclude>**/*.java</exclude>
-						<!-- no need to exclude tests as no persisting class is defined there -->
 					</excludes>
+					<testExcludes>
+						<!-- Excluding HBaseTestLauncher as we'll use the Memory store -->
+						<excludes>**/HBase*.java</excludes>
+					</testExcludes>
 				</configuration>
 			</plugin>
-			
+
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>aspectj-maven-plugin</artifactId>
@@ -49,12 +52,20 @@
 					<execution>
 						<goals>
 							<goal>compile</goal>       <!-- use this goal to weave all your main classes -->
-							<!--  goal>test-compile</goal -->  <!-- use this goal to weave all your test classes -->
+							<!-- goal>test-compile</goal -->  <!-- use this goal to weave all your test classes -->
 						</goals>
 					</execution>
 				</executions>
 			</plugin>
 		</plugins>
+
+		<!-- Using store that points to the Memory store instead of the default 
+			HBase store.properties from src/main/resources -->
+		<testResources>
+			<testResource>
+				<directory>src/test/memory-resources</directory>
+			</testResource>
+		</testResources>
 	</build>
 	<dependencies>
 		<dependency>
@@ -71,7 +82,7 @@
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
