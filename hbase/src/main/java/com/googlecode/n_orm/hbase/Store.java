@@ -869,66 +869,68 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 	
 	
 
-	@Override
-	public void delete(PersistingElement elt, String table, String id)
-			throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
-			return;
-		
-		boolean hasIncrements = false;
-		Class<? extends PersistingElement> clazz = elt.getClass();
-		PropertyManagement pm = PropertyManagement.getInstance();
-		for (Field field : pm.getProperties(clazz)) {
-			if (field.isAnnotationPresent(Incrementing.class)) {
-				hasIncrements = true;
-				break;
-			}
-		}
-		if (!hasIncrements) {
-			ColumnFamiliyManagement cf = ColumnFamiliyManagement.getInstance();
-			for (Field field : cf.getColumnFamilies(clazz)) {
-				if (field.isAnnotationPresent(Incrementing.class)) {
-					hasIncrements = true;
-					break;
-				}
-			}
-		}
-		
-		this.delete(table, id, hasIncrements);
-	}
+//	@Override
+//	public void delete(PersistingElement elt, String table, String id)
+//			throws DatabaseNotReachedException {
+//		if (!this.hasTable(table))
+//			return;
+//		
+//		boolean hasIncrements = false;
+//		Class<? extends PersistingElement> clazz = elt.getClass();
+//		PropertyManagement pm = PropertyManagement.getInstance();
+//		for (Field field : pm.getProperties(clazz)) {
+//			if (field.isAnnotationPresent(Incrementing.class)) {
+//				hasIncrements = true;
+//				break;
+//			}
+//		}
+//		if (!hasIncrements) {
+//			ColumnFamiliyManagement cf = ColumnFamiliyManagement.getInstance();
+//			for (Field field : cf.getColumnFamilies(clazz)) {
+//				if (field.isAnnotationPresent(Incrementing.class)) {
+//					hasIncrements = true;
+//					break;
+//				}
+//			}
+//		}
+//		
+//		this.delete(table, id, hasIncrements);
+//	}
 
 	@Override
 	public void delete(String table, String id)
 			throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return;
-		this.delete(table, id, true);
+//		this.delete(table, id, true);
+		Delete d = new Delete(Bytes.toBytes(id));
+		this.tryPerform(new DeleteAction(d), table);
 	}
 
-	public void delete(String table, String id, boolean flush)
-			throws DatabaseNotReachedException {
-
-		HTable t = this.getTable(table);
-		try {
-			byte[] ident = Bytes.toBytes(id);
-			Delete rowDel = new Delete(ident);
-			this.tryPerform(new DeleteAction(rowDel), t);
-			
-			if (flush) {
-				//In case the sent object has incrementing columns, table MUST be flushed (HBase bug HBASE-3725)
-				//See https://issues.apache.org/jira/browse/HBASE-3725
-				try {
-					t.flushCommits();
-					HRegionLocation rloc = t.getRegionLocation(ident);
-					this.getAdmin().getConnection().getHRegionConnection(rloc.getServerAddress()).flushRegion(rloc.getRegionInfo());
-				} catch (Exception e) {
-					logger.log(Level.WARNING, "Could not flush table " + table + " after deleting " + id, e);
-				}
-			}
-		} finally {
-			this.returnTable(t);
-		}
-	}
+//	public void delete(String table, String id, boolean flush)
+//			throws DatabaseNotReachedException {
+//
+//		HTable t = this.getTable(table);
+//		try {
+//			byte[] ident = Bytes.toBytes(id);
+//			Delete rowDel = new Delete(ident);
+//			this.tryPerform(new DeleteAction(rowDel), t);
+//			
+//			if (flush) {
+//				//In case the sent object has incrementing columns, table MUST be flushed (HBase bug HBASE-3725)
+//				//See https://issues.apache.org/jira/browse/HBASE-3725
+//				try {
+//					t.flushCommits();
+//					HRegionLocation rloc = t.getRegionLocation(ident);
+//					this.getAdmin().getConnection().getHRegionConnection(rloc.getServerAddress()).flushRegion(rloc.getRegionInfo());
+//				} catch (Exception e) {
+//					logger.log(Level.WARNING, "Could not flush table " + table + " after deleting " + id, e);
+//				}
+//			}
+//		} finally {
+//			this.returnTable(t);
+//		}
+//	}
 
 	protected long count(String table, Scan s) throws DatabaseNotReachedException {
 		if (this.isCountMapRed())

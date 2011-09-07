@@ -11,9 +11,11 @@ To run the project on a running HBase, adapt file
 so that it points to the correct HBase configuration.
 You can then run mvn test again.
 
-You can prefer one of the variant presented
-(e.g. example-hbase-store.properties).
-To use it, just rename it store.properties.
+To test the project using the simple (naive) memory store:
+mvn test -f example-memory-pom.xml
+
+For production, you can prefer the variant presented
+(e.g. src/main/resources/com/googlecode/n_orm/sample/business/store.poperties).
 
 Files store.properties may appear anywhere in the classpath,
 anywhere in the package hierarchy.

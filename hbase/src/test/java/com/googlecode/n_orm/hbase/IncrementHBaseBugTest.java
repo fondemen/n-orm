@@ -13,6 +13,7 @@ import org.apache.hadoop.hbase.HConstants;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.googlecode.n_orm.BookStore;
@@ -99,6 +100,7 @@ public class IncrementHBaseBugTest {
 	 * There is a bug in HBase that make incrementing properties being retrieved even if they were deleted...
 	 * @throws Exception
 	 */
+	@Ignore
 	@Test
 	public void testDeleteWithFlush() throws Exception {
 		Map<String, Map<String, Number>> all_incrs = new TreeMap<String, Map<String,Number>>();
@@ -145,7 +147,8 @@ public class IncrementHBaseBugTest {
 		elt.activate();
 		assertEquals(1, elt.ival);
 	}
-	
+
+	@Ignore
 	@Test
 	public void testWithElementWithFlush() throws IOException, InterruptedException {
 		SimpleStorageTest.IncrementingElement elt = new SimpleStorageTest.IncrementingElement(this.testKey);
