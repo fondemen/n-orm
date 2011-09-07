@@ -7,8 +7,16 @@ import org.junit.Before;
 import org.junit.Test;
 
 
-public class ReceiveSellTest extends HBaseTestLauncher {
+public class ReceiveSellTest {
 
+	static {
+		try {
+			ClassLoader.getSystemClassLoader().loadClass("com.googlecode.n_orm.sample.businessmodel.HBaseTestLauncher");
+		} catch (ClassNotFoundException e) {
+			//We are not using HBase ; no need to prepare it
+		}
+	}
+	
 	private BookStore sut;
 	
 	@Before
