@@ -40,6 +40,7 @@ public class RowCounter {
 			Scan scan) throws IOException {
 		Job job = new Job(LocalFormat.prepareConf(s, null), NAME + "_" + tableName + "_" + scan.hashCode());
 		scan.setCaching(500);
+		scan.setCacheBlocks(false);
 		scan.setFilter(new FirstKeyOnlyFilter());
 		TableMapReduceUtil.initTableMapperJob(tableName, scan,
 				RowCounterMapper.class, ImmutableBytesWritable.class,
