@@ -47,12 +47,12 @@ public aspect StorageManagement {
 	}
 	
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
-		this.getStore().delete(this.getTable(), this.getIdentifier());
+		this.getStore().delete(this, this.getTable(), this.getIdentifier());
 		Collection<Class<? extends PersistingElement>> psc = this.getPersistingSuperClasses();
 		if (!psc.isEmpty()) {
 			PersistingMixin px = PersistingMixin.getInstance();
 			for (Class<? extends PersistingElement> cls : psc) {
-				this.getStore().delete(px.getTable(cls), this.getFullIdentifier());
+				this.getStore().delete(this, px.getTable(cls), this.getFullIdentifier());
 			}
 		}
 		this.exists= Boolean.FALSE;
@@ -144,7 +144,7 @@ public aspect StorageManagement {
 			
 			if (!(this.exists == Boolean.TRUE && changed.isEmpty() && deleted.isEmpty() && increments.isEmpty())) {
 				
-				this.getStore().storeChanges(this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
+				this.getStore().storeChanges(this, this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
 	
 				propsIncrs.clear();
 				for(ColumnFamily<?> family : families) {
@@ -166,7 +166,7 @@ public aspect StorageManagement {
 //					changed.put(CLASS_COLUMN_FAMILY, classColumn);
 					String ident = this.getFullIdentifier();
 					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
-						this.getStore().storeChanges(px.getTable(sc), ident, changed, deleted, increments);
+						this.getStore().storeChanges(this, px.getTable(sc), ident, changed, deleted, increments);
 					}
 				}
 			}
@@ -240,7 +240,7 @@ public aspect StorageManagement {
 		Set<String> toBeActivated = getActualFamiliesToBeActivated(force, families);
 		
 		if (! toBeActivated.isEmpty()) {
-			Map<String, Map<String, byte[]>> rawData = this.getStore().get(this.getTable(), this.getIdentifier(), toBeActivated);
+			Map<String, Map<String, byte[]>> rawData = this.getStore().get(this, this.getTable(), this.getIdentifier(), toBeActivated);
 			activateFromRawData(toBeActivated, rawData);
 		}
 	}
@@ -295,7 +295,7 @@ public aspect StorageManagement {
 		
 		Set<String> cfs = new TreeSet<String>();
 		cfs.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
-		for (Field cff : cfm.detectColumnFamilies(clazz)) {
+		for (Field cff : cfm.getColumnFamilies(clazz)) {
 			if (cff.getAnnotation(ImplicitActivation.class) != null)
 				toBeActivated.add(cff.getName());
 			cfs.add(cff.getName());
@@ -321,7 +321,7 @@ public aspect StorageManagement {
 	}
 	
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {
-		boolean ret = this.getStore().exists(this.getTable(), this.getIdentifier());
+		boolean ret = this.getStore().exists(this, this.getTable(), this.getIdentifier());
 		this.exists = ret ? Boolean.TRUE : Boolean.FALSE;
 		return ret;
 	}

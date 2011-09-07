@@ -122,7 +122,7 @@ public abstract class ColumnFamily<T> {
 		this.owner.checkIsValid();
 		String id = this.owner.getIdentifier();
 		assert id != null;
-		Map<String, byte[]> elements = c == null ? this.owner.getStore().get(this.ownerTable, id, this.name) : this.owner.getStore().get(this.ownerTable, id, this.name, c);
+		Map<String, byte[]> elements = c == null ? this.owner.getStore().get(this.owner, this.property, this.ownerTable, id, this.name) : this.owner.getStore().get(this.owner, this.property, this.ownerTable, id, this.name, c);
 		this.rebuild(elements);
 	}
 
@@ -174,7 +174,7 @@ public abstract class ColumnFamily<T> {
 	 * Checks whether this column family is empty in the data store.
 	 */
 	public boolean isEmptyInStore() throws DatabaseNotReachedException {
-		return !this.getOwner().getStore().exists(this.ownerTable, this.getOwner().getIdentifier(), this.getName());
+		return !this.getOwner().getStore().exists(this.owner, this.property, this.ownerTable, this.getOwner().getIdentifier(), this.getName());
 	}
 
 	public boolean containsKey(String key) {
@@ -270,7 +270,7 @@ public abstract class ColumnFamily<T> {
 		}
 		assert this.increments == null || !this.increments.containsKey(key);
 		
-		byte[] res = this.owner.getStore().get(this.ownerTable, this.owner.getIdentifier(), this.name, key);
+		byte[] res = this.owner.getStore().get(this.owner, this.property, this.ownerTable, this.owner.getIdentifier(), this.name, key);
 		if (res == null)
 			return null;
 		T element = this.preparePut(key, res);
