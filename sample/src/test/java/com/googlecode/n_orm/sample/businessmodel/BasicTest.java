@@ -1,6 +1,12 @@
 package com.googlecode.n_orm.sample.businessmodel;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -8,15 +14,9 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.NavigableSet;
 import java.util.Set;
 
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hdfs.server.common.Storage;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
@@ -25,13 +25,7 @@ import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
-import com.googlecode.n_orm.PersistingMixin;
-import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
-import com.googlecode.n_orm.StoreSelector;
-import com.googlecode.n_orm.cf.ColumnFamily;
-import com.googlecode.n_orm.cf.SetColumnFamily;
-import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 /**
@@ -41,7 +35,14 @@ import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
  * <li>with eclipse: menu Project/Clean
  * </ul>
  */
-public class BasicTest extends HBaseTestLauncher {
+public class BasicTest {
+	static {
+		try {
+			ClassLoader.getSystemClassLoader().loadClass("com.googlecode.n_orm.sample.businessmodel.HBaseTestLauncher");
+		} catch (ClassNotFoundException e) {
+			//We are not using HBase ; no need to prepare it
+		}
+	}
 	
 	private BookStore bssut = null;
 	private Book bsut = null;
@@ -360,24 +361,6 @@ public class BasicTest extends HBaseTestLauncher {
 		assertEquals(bsut.getBookStore(), b2.getBookStore());
 		//As such:
 		assertEquals(bsut, b2);
-	 }
-	 
-	 @Test
-	 public void compression() throws IOException {
-		//src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties defines the HBase store
-		com.googlecode.n_orm.storeapi.Store ast = StoreSelector.getInstance().getStoreFor(Book.class);
-		if (! (ast instanceof Store)) //In case you've changed the default store
-			return;
-		Store st = (Store) ast;
-		//According to src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties, can be LZO (if available) or GZ
-		assertTrue(st.getCompression().equals("lzo") || st.getCompression().equals("gz"));
-		//Checking with HBase that the property column family is actually stored in GZ
-		HTableDescriptor td = st.getAdmin().getTableDescriptor(Bytes.toBytes(PersistingMixin.getInstance().getTable(Book.class) /*could be bsut.getTable()*/));
-		//Getting the property CF descriptor
-		HColumnDescriptor pd = td.getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
-		//According to src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties, can be LZO (if available) or GZ
-		Algorithm comp = pd.getCompression();
-		assertTrue(comp.equals(Algorithm.LZO) || comp.equals(Algorithm.GZ));
 	 }
 
 }
