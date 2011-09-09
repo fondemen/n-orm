@@ -62,22 +62,25 @@ public aspect StoreSelector {
 	public TypeAwareStore PersistingElement.getStore() {
 		if (this.store == null)
 			try {
-				Store s = StoreSelector.getInstance().getStoreFor(this.getClass());
-				if (s instanceof TypeAwareStore) {
-					this.store= (TypeAwareStore)s;
-				} else {
-					this.store = TypeAwareStoreWrapper.getWrapper(s);
-				}
+				this.setStore(StoreSelector.getInstance().getStoreFor(this.getClass()));
 			} catch (DatabaseNotReachedException x) {
 				throw new IllegalStateException(x);
 			}
 		return this.store;
 	}
 	
-	public void PersistingElement.setStore(TypeAwareStore store) {
+	public void PersistingElement.setStore(Store store) {
 		if (this.store != null)
 			throw new IllegalStateException("A store is already registered for object " + (this.getIdentifier() == null ? "" : this.getIdentifier()) + " of class " + this.getClass().getName());
-		this.store = store;
+		this.store = StoreSelector.getInstance().toTypeAwareStore(store);
+	}
+	
+	public TypeAwareStore toTypeAwareStore(Store store) {
+		if (store instanceof TypeAwareStore) {
+			return (TypeAwareStore)store;
+		} else {
+			return TypeAwareStoreWrapper.getWrapper(store);
+		}
 	}
 	
 	private Object getLock(Class<?> clazz) {

@@ -20,6 +20,7 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Store;
@@ -255,20 +256,31 @@ public aspect StorageManagement {
 		
 		toBeActivated = new TreeSet<String>(toBeActivated);//Avoiding changing the initial collection
 		
+		ColumnFamily<?> cf;
 		if (rawData != null) {
 			for (Entry<String, Map<String, byte[]>> families : rawData.entrySet()) {
-				this.getColumnFamily(families.getKey()).rebuild(families.getValue());
+				cf = this.getColumnFamily(families.getKey());
+				if (cf != null) //might happen in case of scheme evolution
+					cf.rebuild(families.getValue());
 				boolean removed = toBeActivated.remove(families.getKey());
-				assert removed : "Got unexpected column family " + families.getKey() + " from raw data for " + this;
+				assert cf != null ? removed : true : "Got unexpected column family " + families.getKey() + " from raw data for " + this;
 			}
 		}
 		
 		if (!toBeActivated.isEmpty()) {
 			Map<String, byte[]> emptyTree = new TreeMap<String, byte[]>();
 			for (String tba : toBeActivated) {
-				this.getColumnFamily(tba).rebuild(emptyTree);
+				cf = this.getColumnFamily(tba);
+				if (cf != null)
+					cf.rebuild(emptyTree);
 			}
 		}
+	}
+	
+	public static <E extends PersistingElement> PersistingElement getFromRawData(Class<E> type, Row row) {
+		E element = StorageManagement.getElement(type, row.getKey());
+		element.activateFromRawData(row.getValues().keySet(), row.getValues());
+		return element;
 	}
 
 	private Set<String> PersistingElement.getActualFamiliesToBeActivated(boolean force, String... families) {
@@ -445,5 +457,37 @@ public aspect StorageManagement {
 
 	public static ConstraintBuilder findElements() {
 		return new ConstraintBuilder();
+	}
+	
+	public static <AE extends PersistingElement, E extends AE> void processElements(final Class<E> clazz, final Constraint c, final Process<AE> processAction, final int limit, final String... families) throws DatabaseNotReachedException {
+		CloseableIterator<E> it = findElement(clazz, c, limit, families);
+		try {
+			while (it.hasNext()) {
+				processAction.process(it.next());
+			}
+		} finally {
+			it.close();
+		}
+	}
+	
+	public static <AE extends PersistingElement, E extends AE> void processElementsRemotely(final Class<E> clazz, final Constraint c, final Process<AE> process, final Callback callback, final int limit, final String... families) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
+		
+		Store store = StoreSelector.getInstance().getStoreFor(clazz);
+		if (store instanceof ActionnableStore) {
+			Set<String> autoActivatedFamilies = getAutoActivatedFamilies(clazz, families);
+			((ActionnableStore)store).process(PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies, clazz, process, callback);
+		} else {
+			new Thread() {
+				public void run() {
+					try {
+						processElements(clazz, c, process, limit, families);
+						callback.processCompleted();
+					} catch (Throwable e) {
+						if (callback != null)
+							callback.processCompletedInError(e);
+					}
+				}
+			}.start();
+		}
 	}
 }
