@@ -46,10 +46,10 @@ public aspect IncrementManagement {
 		Incrementing inca = prop.getAnnotation(Incrementing.class);
 		if (inca != null) {
 			if (inca.mode().equals(Mode.IncrementOnly) && oldValue > value)
-				throw new IncrementException(prop, false, oldValue-value);
+				throw new IncrementException(prop, true, oldValue-value);
 
 			if (inca.mode().equals(Mode.DecrementOnly) && oldValue < value)
-				throw new IncrementException(prop, true, value-oldValue);
+				throw new IncrementException(prop, false, value-oldValue);
 		}
 		Number increment = previousIncrement;
 		if (increment == null)

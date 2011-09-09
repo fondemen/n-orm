@@ -3,10 +3,16 @@ package com.googlecode.n_orm.query;
 import java.lang.reflect.Field;
 import java.util.NavigableSet;
 
+import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.WaitingCallBack;
+import com.googlecode.n_orm.storeapi.ActionnableStore;
+import com.googlecode.n_orm.storeapi.Store;
 
 public class SearchableClassConstraintBuilder<T extends PersistingElement>
 		extends ClassConstraintBuilder<T> {
@@ -28,6 +34,13 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 			throw new IllegalArgumentException("A limit is already set to " + this.limit);
 		}
 		this.limit = limit;
+	}
+
+	/**
+	 * Returns whether a limit was set for this query.
+	 */
+	public boolean hasNoLimit() {
+		return this.limit == null || this.limit < 1;
 	}
 	
 	@Override
@@ -80,19 +93,19 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @throws DatabaseNotReachedException
 	 */
 	public NavigableSet<T> go() throws DatabaseNotReachedException {
-		if (this.limit == null || this.limit < 1)
+		if (hasNoLimit())
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
 		return StorageManagement.findElementsToSet(this.getClazz(), this.getConstraint(), this.limit, this.toBeActivated);
 	}
 	
 	/**
 	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link #withAtMost(int)}.
-	 * Elements are not activated.
+	 * Elements are not activated. Instead of this function, you should consider using {@link #forEach(Process)}.
 	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
 	 * @throws DatabaseNotReachedException
 	 */
 	public CloseableIterator<T> iterate() throws DatabaseNotReachedException {
-		if (this.limit == null || this.limit < 1)
+		if (hasNoLimit())
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
 		return StorageManagement.findElement(this.getClazz(), this.getConstraint(), this.limit, this.toBeActivated);
 	}
@@ -130,5 +143,40 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 
 	public SearchableKeyConstraintBuilder<T> andWithKey(String key) {
 		return this.withKey(key);
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query. The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * @param action the action to be performed over each element of the query.
+	 * @throws DatabaseNotReachedException
+	 */
+	public void forEach(Process<T> action) throws DatabaseNotReachedException {
+		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
+		if (hasNoLimit())
+			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
+		StorageManagement.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated);
+	}
+	
+	/**
+	 * Performs <i>asynchronously</i> an action for each element corresponding to the query.
+	 * In case store for class is <i>not</i> implementing {@link ActionnableStore}, this action is equivalent to an asynchronous call to {@link #forEach(Process)}, and the maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Otherwise, the action is performed directly using the data store server process, and the limit is useless.
+	 * In order to wait for process completion, you can use {@link WaitingCallBack}.
+	 * @param action class of the action to be performed over each element of the query ; must have a default constructor
+	 * @param callBack a callback to be invoked as soon as the process completes ; can be null
+	 * @throws DatabaseNotReachedException
+	 * @throws IllegalAccessException 
+	 * @throws InstantiationException 
+	 */
+	public void remoteForEach(Process<T> action, Callback callBack) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
+		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
+		if ((!(s instanceof ActionnableStore)) && hasNoLimit())
+			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
+		int limit;
+		if (this.limit == null)
+			limit = -1;
+		else
+			limit = this.limit;
+		StorageManagement.processElementsRemotely(this.getClazz(), this.getConstraint(), action, callBack, limit, this.toBeActivated);
 	}
 }

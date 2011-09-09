@@ -11,8 +11,8 @@ public class ReceiveSellTest {
 
 	static {
 		try {
-			ClassLoader.getSystemClassLoader().loadClass("com.googlecode.n_orm.sample.businessmodel.HBaseTestLauncher");
-		} catch (ClassNotFoundException e) {
+			ClassLoader.getSystemClassLoader().loadClass("com.googlecode.n_orm.sample.businessmodel.HBaseTestLauncher").newInstance();
+		} catch (Exception e) {
 			//We are not using HBase ; no need to prepare it
 		}
 	}
