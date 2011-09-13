@@ -444,4 +444,70 @@ public class BasicTest {
 		assertFalse(sut2.existsInStore()); //Triggers a database query
 		assertFalse(sut2.exists());
 	}
+	
+	public static class InrementNovel implements Process<Novel> {
+		private static final long serialVersionUID = 4763391618006514705L;
+		
+		private final int inc;
+		
+		public InrementNovel() {
+			inc = 1;
+		}
+
+		public InrementNovel(int inc) {
+			super();
+			this.inc = inc;
+		}
+
+		@Override
+		public void process(Novel element) {
+			//element.activate();
+			element.attribute+=inc;
+			element.store();
+		}
+	};
+	 
+	 @Test public void process() throws DatabaseNotReachedException {
+		 Novel n1 = new Novel(bssut, new Date(123456799), new Date(0));
+		 n1.attribute = 1;
+		 n1.store();
+		 Novel n2 = new Novel(bssut, new Date(123456799), new Date(1));
+		 n2.attribute = 2;
+		 n2.store();
+		 
+		 try {
+			 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel());		 
+
+			 assertEquals(2, n1.attribute);
+			 assertEquals(3, n2.attribute);
+		 } finally {
+			 n1.delete();
+			 n2.delete();
+		 }
+	 }
+	 
+	 @Test(timeout=20000) public void processAsync() throws DatabaseNotReachedException, InterruptedException, InstantiationException, IllegalAccessException {
+		 Novel n1 = new Novel(bssut, new Date(123456799), new Date(0));
+		 n1.attribute = 1;
+		 n1.store();
+		 Novel n2 = new Novel(bssut, new Date(123456799), new Date(1));
+		 n2.attribute = 2;
+		 n2.store();
+		 
+		 try {
+			WaitingCallBack cb = new WaitingCallBack();
+			StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().andActivate().remoteForEach(new InrementNovel(2), cb);
+			synchronized(cb) {
+				cb.waitProcessCompleted();
+			}
+
+			n1.activate();
+			n2.activate();
+			assertEquals(3, n1.attribute);
+			assertEquals(4, n2.attribute);
+		 } finally {
+			 n1.delete();
+			 n2.delete();
+		 }
+	 }
 }

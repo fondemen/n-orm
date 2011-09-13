@@ -45,6 +45,14 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * The store used for this persisting element.
 	 */
 	TypeAwareStore getStore();
+	
+	/**
+	 * Sets the store used for this persisting element. Note that in most case, you do not need to use this method as stores are automatically discovered.
+	 * @param store the store to be used
+	 * @throws IllegalStateException in case this persisting element already has a store
+	 * @see Persisting
+	 */
+	void setStore(Store store) throws IllegalStateException;
 
 	/**
 	 * The table used to store this persisting element as declared by the {@link Persisting#table()} annotation.
