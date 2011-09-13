@@ -10,7 +10,6 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.WeakHashMap;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -457,6 +456,47 @@ public aspect StorageManagement {
 
 	public static ConstraintBuilder findElements() {
 		return new ConstraintBuilder();
+	}
+	
+	/**
+	 * Gets an element according to its keys.
+	 * In case the element is in cache, returns that element.
+	 * Otherwise, returns the element sent in parameter.
+	 * This method should be invoked an a newly created element.
+	 * @see PersistingElement#getCachedVersion()
+	 */
+	public static <T extends PersistingElement> T getElementUsingCache(T element) {
+		KeyManagement km = KeyManagement.getInstance();
+		String id = km.createIdentifier(element, PersistingElement.class);
+		@SuppressWarnings("unchecked")
+		T ret = (T) km.getKnownPersistingElement(id);
+		if (ret != null)
+			return ret;
+		else {
+			km.register(element); //sets the element in cache
+			return element;
+		}
+	}
+	
+	/**
+	 * Gets an element according to its key values.
+	 * In case the element is a {@link PersistingElement}, the cache is queried.
+	 * @param type the class of the element
+	 * @param keyValues the values for each key in the correct order
+	 * @see PersistingElement#getCachedVersion()
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> T getElementWithKeys(Class<T> clazz, Object... keyValues) {
+		T ret = KeyManagement.getInstance().createElement(clazz, keyValues);
+		if (ret instanceof PersistingElement) {
+			return (T) getElementUsingCache((PersistingElement)ret);
+		} else {
+			return ret;
+		}
+	}
+	
+	public PersistingElement PersistingElement.getCachedVersion() {
+		return StorageManagement.getElementUsingCache((PersistingElement)this);
 	}
 	
 	public static <AE extends PersistingElement, E extends AE> void processElements(final Class<E> clazz, final Constraint c, final Process<AE> processAction, final int limit, final String... families) throws DatabaseNotReachedException {
