@@ -61,12 +61,14 @@ import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 
+import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.ColumnFamiliyManagement;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.EmptyCloseableIterator;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.hbase.actions.Action;
@@ -77,9 +79,13 @@ import com.googlecode.n_orm.hbase.actions.GetAction;
 import com.googlecode.n_orm.hbase.actions.IncrementAction;
 import com.googlecode.n_orm.hbase.actions.PutAction;
 import com.googlecode.n_orm.hbase.actions.ScanAction;
+import com.googlecode.n_orm.hbase.mapreduce.ActionJob;
+import com.googlecode.n_orm.hbase.mapreduce.LocalFormat;
 import com.googlecode.n_orm.hbase.mapreduce.RowCounter;
 import com.googlecode.n_orm.hbase.mapreduce.Truncator;
+import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
 
 /**
@@ -96,10 +102,11 @@ import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
  * static-accessor=getStore<br>
  * 1=localhost<br>
  * 2=2181
- * compression=gz &#35;can be 'none', 'gz', 'lzo', 'lzo-or-gz' (gz if lzo is not available), or 'lzo-or-none' (none if lzo is not available); by default 'none' 
+ * compression=gz &#35;can be 'none', 'gz', 'lzo', or 'snappy' (default is 'none') ; in the latter two cases, take great care that those compressors are available for all nodes of your hbase cluster
  * </code><br>
+ * This store supports remote processes as it implements {@link ActionnableStore}. However, be careful when configuring your hadoop: all jars containing your process and n-orm (with dependencies) should be available.
  */
-public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm.storeapi.GenericStore {
+public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n_orm.storeapi.GenericStore, ActionnableStore {
 
 	private static class ReportConf extends Report {
 		private final Configuration conf;
@@ -1159,6 +1166,31 @@ public class Store extends TypeAwareStoreWrapper implements com.googlecode.n_orm
 		} catch (ClassNotFoundException e) {
 			errorLogger.log(Level.INFO, "Could not truncate table " + table, e);
 			throw new DatabaseNotReachedException(e);
+		}
+	}
+
+	@Override
+	public <AE extends PersistingElement, E extends AE> void process(
+			String table, Constraint c, Set<String> families, Class<E> elementClass,
+			Process<AE> action, Callback callback)
+			throws DatabaseNotReachedException {
+		Class<?> actionClass = action.getClass();
+		try {
+			String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
+			Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, famAr), action, elementClass, famAr);
+			logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
+			if (callback != null) {
+				job.waitForCompletion(true);
+				callback.processCompleted();
+			} else
+				job.submit();
+
+			logger.log(Level.FINE, "Server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode() + " done !");
+		} catch (Throwable x) {
+			errorLogger.log(Level.WARNING, "Could not perform server-side process " + actionClass.getName() + " on table " + table, x);
+			if (callback != null) {
+				callback.processCompletedInError(x);
+			}
 		}
 	}
 

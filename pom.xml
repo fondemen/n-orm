@@ -54,8 +54,6 @@
 	</developers>
 	<modules>
 		<module>parent-aspect</module>
-		<module>hbase-test-deps</module>
-		<module>hbase</module>
 	</modules>
 
 	<build>
@@ -217,6 +215,22 @@
 		</profile>
 
 		<profile>
+			<id>hbase</id>
+			<modules>
+				<module>hbase-test-deps</module>
+				<module>hbase</module>
+			</modules>
+		</profile>
+
+		<profile>
+			<id>hbase-cdh</id>
+			<modules>
+				<module>hbase-test-deps/cdh-pom.xml</module>
+				<module>hbase/cdh-pom.xml</module>
+			</modules>
+		</profile>
+
+		<profile>
 			<id>local-nexus</id>
 			<distributionManagement>
 				<repository>
@@ -232,12 +246,5 @@
 			</distributionManagement>
 		</profile>
 
-		<profile>
-			<id>cdh</id>
-			<modules>
-				<module>hbase-test-deps/cdh-pom.xml</module>
-				<module>hbase/cdh-pom.xml</module>
-			</modules>
-		</profile>
 	</profiles>
 </project>
