@@ -114,21 +114,29 @@ public aspect ColumnFamiliyManagement {
 	public boolean isCollectionType(Class<?> type) {
 		return Set.class.equals(type) || Map.class.equals(type) || SetColumnFamily.class.isAssignableFrom(type) || MapColumnFamily.class.isAssignableFrom(type);
 	}
+
+	private Map<Class<?>, Set<Field>> typeColumnFamilies = new HashMap<Class<?>, Set<Field>>();
 	
 	/**
 	 * Finds in a class the fields that are column families
 	 */
-	public Set<Field> detectColumnFamilies(Class<? extends PersistingElement> clazz) {
-		Set<Field> ret = new HashSet<Field>();
-		Class<?> c = clazz;
-		do {
-			for (Field field : c.getDeclaredFields()) {
-				if (isCollectionFamily(field))
-					ret.add(field);
+	public Set<Field> getColumnFamilies(Class<? extends PersistingElement> clazz) {
+		synchronized (typeColumnFamilies) {
+			Set<Field> ret = this.typeColumnFamilies.get(clazz);
+			if (ret == null) {
+				ret = new HashSet<Field>();
+				Class<?> c = clazz;
+				do {
+					for (Field field : c.getDeclaredFields()) {
+						if (isCollectionFamily(field))
+							ret.add(field);
+					}
+					c = c.getSuperclass();
+				} while (PersistingElement.class.isAssignableFrom(c));
+				typeColumnFamilies.put(clazz, ret);
 			}
-			c = c.getSuperclass();
-		} while (PersistingElement.class.isAssignableFrom(c));
-		return ret;
+			return ret;
+		}
 	}
 	
 	//@Transient private boolean PersistingElement.inPOJOMode = false; //Must be @Transient and not transient: in case the persisting element was serialized in pojo mode, it must be deserialized in pojo mode

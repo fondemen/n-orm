@@ -181,7 +181,7 @@ public class Cache {
 			return null;
 		else {
 			PersistingElement ret = (PersistingElement) res.getValue();
-			logger.finer("Found element " + ret + " from cache for thread " + this.thread + " with id " + this.cache.getName());
+			logger.finest("Found element " + ret + " from cache for thread " + this.thread + " with id " + this.cache.getName());
 			return ret;
 		}
 	}

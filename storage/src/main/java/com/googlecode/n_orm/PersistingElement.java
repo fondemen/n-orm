@@ -21,6 +21,7 @@ import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.storeapi.TypeAwareStore;
 
 /**
  * Persisting elements are elements that can be stored and retrieved from a {@link Store}.
@@ -43,7 +44,15 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	/**
 	 * The store used for this persisting element.
 	 */
-	Store getStore();
+	TypeAwareStore getStore();
+	
+	/**
+	 * Sets the store used for this persisting element. Note that in most case, you do not need to use this method as stores are automatically discovered.
+	 * @param store the store to be used
+	 * @throws IllegalStateException in case this persisting element already has a store
+	 * @see Persisting
+	 */
+	void setStore(Store store) throws IllegalStateException;
 
 	/**
 	 * The table used to store this persisting element as declared by the {@link Persisting#table()} annotation.
@@ -154,10 +163,29 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	void delete() throws DatabaseNotReachedException;
 	
 	/**
+	 * If an element with the same id as this element exists in the cache, returns the element from the cache, otherwise returns this element which will be placed in the cache.
+	 * Advantage of this method is to use as much as possible the internal cache, which makes possible to get a possibly already activated object, and get results faster using {@link #exists()}, {@link #activateIfNotAlready(String...)}, {@link #activateColumnFamilyIfNotAlready(String)}, or {@link #activateColumnFamilyIfNotAlready(String, Object, Object)}.<br>
+	 * Typically, this method is used just after the object construction, as soon as keys are valued. An example is the following:<br>
+	 * <code>
+	 * 	&#64;Persisting public class Element {<br>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;&#64;Key private String key;<br>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;&#64;Key publi Element(String key) {<br>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.key = key;<br>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+	 * }
+	 * </code><br>
+	 * <br>
+	 * <code>Element elt = new Element("key").getCachedVersion();</code>
+	 * @see com.googlecode.n_orm.cache.Cache
+	 */
+	PersistingElement getCachedVersion();
+	
+	/**
 	 * Checks whether the row representing this persisting element is known to exist in the store avoiding as much as possible to query the data store.
 	 * A persisting element is said to exist if it has been stored, if it was successfully activated, or if a previous invocation of {@link #exists()} or {@link #existsInStore()}  returned true.
 	 * A persisting element is said not to exist if it has never been stored, if it has been unsuccessfully activated (i.e. the data store didn't return any information about the element), or if a previous invocation of {@link #exists()} or {@link #existsInStore()}  returned false.
 	 * In other situations, the data store is queried using {@link #existsInStore()}.
+	 * @see #getCachedVersion()
 	 */
 	boolean exists() throws DatabaseNotReachedException;
 	
@@ -185,6 +213,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * This means that if a constraint were passed at a previous activation time, it will be preserved.
 	 * @param families names of the families to activate even if they are not annotated with {@link ImplicitActivation} (see {@link #getColumnFamily(String)})
 	 * @throws IllegalArgumentException in case a given column family does not exists
+	 * @see #getCachedVersion()
 	 */
 	void activateIfNotAlready(String... families) throws DatabaseNotReachedException;
 	
@@ -215,6 +244,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws UnknownColumnFamily in case this column family does not exist
 	 * @throws DatabaseNotReachedException
 	 * @see #getColumnFamily(String)
+	 * @see #getCachedVersion()
 	 */
 	void activateColumnFamilyIfNotAlready(String name) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
@@ -227,6 +257,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws UnknownColumnFamily in case this column family does not exist
 	 * @throws DatabaseNotReachedException
 	 * @see #getColumnFamily(String)
+	 * @see #getCachedVersion()
 	 */
 	void activateColumnFamilyIfNotAlready(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
 	

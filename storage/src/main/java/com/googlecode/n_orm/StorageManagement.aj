@@ -10,7 +10,6 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.WeakHashMap;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -20,6 +19,7 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Store;
@@ -47,12 +47,12 @@ public aspect StorageManagement {
 	}
 	
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
-		this.getStore().delete(this.getTable(), this.getIdentifier());
+		this.getStore().delete(this, this.getTable(), this.getIdentifier());
 		Collection<Class<? extends PersistingElement>> psc = this.getPersistingSuperClasses();
 		if (!psc.isEmpty()) {
 			PersistingMixin px = PersistingMixin.getInstance();
 			for (Class<? extends PersistingElement> cls : psc) {
-				this.getStore().delete(px.getTable(cls), this.getFullIdentifier());
+				this.getStore().delete(this, px.getTable(cls), this.getFullIdentifier());
 			}
 		}
 		this.exists= Boolean.FALSE;
@@ -144,7 +144,7 @@ public aspect StorageManagement {
 			
 			if (!(this.exists == Boolean.TRUE && changed.isEmpty() && deleted.isEmpty() && increments.isEmpty())) {
 				
-				this.getStore().storeChanges(this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
+				this.getStore().storeChanges(this, this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
 	
 				propsIncrs.clear();
 				for(ColumnFamily<?> family : families) {
@@ -166,7 +166,7 @@ public aspect StorageManagement {
 //					changed.put(CLASS_COLUMN_FAMILY, classColumn);
 					String ident = this.getFullIdentifier();
 					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
-						this.getStore().storeChanges(px.getTable(sc), ident, changed, deleted, increments);
+						this.getStore().storeChanges(this, px.getTable(sc), ident, changed, deleted, increments);
 					}
 				}
 			}
@@ -240,7 +240,7 @@ public aspect StorageManagement {
 		Set<String> toBeActivated = getActualFamiliesToBeActivated(force, families);
 		
 		if (! toBeActivated.isEmpty()) {
-			Map<String, Map<String, byte[]>> rawData = this.getStore().get(this.getTable(), this.getIdentifier(), toBeActivated);
+			Map<String, Map<String, byte[]>> rawData = this.getStore().get(this, this.getTable(), this.getIdentifier(), toBeActivated);
 			activateFromRawData(toBeActivated, rawData);
 		}
 	}
@@ -255,20 +255,31 @@ public aspect StorageManagement {
 		
 		toBeActivated = new TreeSet<String>(toBeActivated);//Avoiding changing the initial collection
 		
+		ColumnFamily<?> cf;
 		if (rawData != null) {
 			for (Entry<String, Map<String, byte[]>> families : rawData.entrySet()) {
-				this.getColumnFamily(families.getKey()).rebuild(families.getValue());
+				cf = this.getColumnFamily(families.getKey());
+				if (cf != null) //might happen in case of scheme evolution
+					cf.rebuild(families.getValue());
 				boolean removed = toBeActivated.remove(families.getKey());
-				assert removed : "Got unexpected column family " + families.getKey() + " from raw data for " + this;
+				assert cf != null ? removed : true : "Got unexpected column family " + families.getKey() + " from raw data for " + this;
 			}
 		}
 		
 		if (!toBeActivated.isEmpty()) {
 			Map<String, byte[]> emptyTree = new TreeMap<String, byte[]>();
 			for (String tba : toBeActivated) {
-				this.getColumnFamily(tba).rebuild(emptyTree);
+				cf = this.getColumnFamily(tba);
+				if (cf != null)
+					cf.rebuild(emptyTree);
 			}
 		}
+	}
+	
+	public static <E extends PersistingElement> PersistingElement getFromRawData(Class<E> type, Row row) {
+		E element = StorageManagement.getElement(type, row.getKey());
+		element.activateFromRawData(row.getValues().keySet(), row.getValues());
+		return element;
 	}
 
 	private Set<String> PersistingElement.getActualFamiliesToBeActivated(boolean force, String... families) {
@@ -295,7 +306,7 @@ public aspect StorageManagement {
 		
 		Set<String> cfs = new TreeSet<String>();
 		cfs.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
-		for (Field cff : cfm.detectColumnFamilies(clazz)) {
+		for (Field cff : cfm.getColumnFamilies(clazz)) {
 			if (cff.getAnnotation(ImplicitActivation.class) != null)
 				toBeActivated.add(cff.getName());
 			cfs.add(cff.getName());
@@ -321,7 +332,7 @@ public aspect StorageManagement {
 	}
 	
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {
-		boolean ret = this.getStore().exists(this.getTable(), this.getIdentifier());
+		boolean ret = this.getStore().exists(this, this.getTable(), this.getIdentifier());
 		this.exists = ret ? Boolean.TRUE : Boolean.FALSE;
 		return ret;
 	}
@@ -445,5 +456,78 @@ public aspect StorageManagement {
 
 	public static ConstraintBuilder findElements() {
 		return new ConstraintBuilder();
+	}
+	
+	/**
+	 * Gets an element according to its keys.
+	 * In case the element is in cache, returns that element.
+	 * Otherwise, returns the element sent in parameter.
+	 * This method should be invoked an a newly created element.
+	 * @see PersistingElement#getCachedVersion()
+	 */
+	public static <T extends PersistingElement> T getElementUsingCache(T element) {
+		KeyManagement km = KeyManagement.getInstance();
+		String id = km.createIdentifier(element, PersistingElement.class);
+		@SuppressWarnings("unchecked")
+		T ret = (T) km.getKnownPersistingElement(id);
+		if (ret != null)
+			return ret;
+		else {
+			km.register(element); //sets the element in cache
+			return element;
+		}
+	}
+	
+	/**
+	 * Gets an element according to its key values.
+	 * In case the element is a {@link PersistingElement}, the cache is queried.
+	 * @param type the class of the element
+	 * @param keyValues the values for each key in the correct order
+	 * @see PersistingElement#getCachedVersion()
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> T getElementWithKeys(Class<T> clazz, Object... keyValues) {
+		T ret = KeyManagement.getInstance().createElement(clazz, keyValues);
+		if (ret instanceof PersistingElement) {
+			return (T) getElementUsingCache((PersistingElement)ret);
+		} else {
+			return ret;
+		}
+	}
+	
+	public PersistingElement PersistingElement.getCachedVersion() {
+		return StorageManagement.getElementUsingCache((PersistingElement)this);
+	}
+	
+	public static <AE extends PersistingElement, E extends AE> void processElements(final Class<E> clazz, final Constraint c, final Process<AE> processAction, final int limit, final String... families) throws DatabaseNotReachedException {
+		CloseableIterator<E> it = findElement(clazz, c, limit, families);
+		try {
+			while (it.hasNext()) {
+				processAction.process(it.next());
+			}
+		} finally {
+			it.close();
+		}
+	}
+	
+	public static <AE extends PersistingElement, E extends AE> void processElementsRemotely(final Class<E> clazz, final Constraint c, final Process<AE> process, final Callback callback, final int limit, final String... families) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
+		
+		Store store = StoreSelector.getInstance().getStoreFor(clazz);
+		if (store instanceof ActionnableStore) {
+			Set<String> autoActivatedFamilies = getAutoActivatedFamilies(clazz, families);
+			((ActionnableStore)store).process(PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies, clazz, process, callback);
+		} else {
+			new Thread() {
+				public void run() {
+					try {
+						processElements(clazz, c, process, limit, families);
+						callback.processCompleted();
+					} catch (Throwable e) {
+						if (callback != null)
+							callback.processCompletedInError(e);
+					}
+				}
+			}.start();
+		}
 	}
 }
