@@ -74,6 +74,7 @@ public class IncrementHBaseBugTest {
 	}
 
 	@Test
+	@Ignore
 	public void testDelete() {
 		Map<String, Map<String, Number>> all_incrs = new TreeMap<String, Map<String,Number>>();
 		Map<String, Number> incrs = new TreeMap<String, Number>();
@@ -147,7 +148,7 @@ public class IncrementHBaseBugTest {
 		elt.activate();
 		assertEquals(1, elt.ival);
 	}
-
+	
 	@Ignore
 	@Test
 	public void testWithElementWithFlush() throws IOException, InterruptedException {
