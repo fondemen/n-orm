@@ -463,6 +463,7 @@ public aspect StorageManagement {
 	 * In case the element is in cache, returns that element.
 	 * Otherwise, returns the element sent in parameter.
 	 * This method should be invoked an a newly created element.
+	 * @see PersistingElement#getCachedVersion()
 	 */
 	public static <T extends PersistingElement> T getElementUsingCache(T element) {
 		KeyManagement km = KeyManagement.getInstance();
@@ -474,6 +475,23 @@ public aspect StorageManagement {
 		else {
 			km.register(element); //sets the element in cache
 			return element;
+		}
+	}
+	
+	/**
+	 * Gets an element according to its key values.
+	 * In case the element is a {@link PersistingElement}, the cache is queried.
+	 * @param type the class of the element
+	 * @param keyValues the values for each key in the correct order
+	 * @see PersistingElement#getCachedVersion()
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T> T getElementWithKeys(Class<T> clazz, Object... keyValues) {
+		T ret = KeyManagement.getInstance().createElement(clazz, keyValues);
+		if (ret instanceof PersistingElement) {
+			return (T) getElementUsingCache((PersistingElement)ret);
+		} else {
+			return ret;
 		}
 	}
 	
