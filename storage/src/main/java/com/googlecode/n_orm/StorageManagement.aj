@@ -10,7 +10,6 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.WeakHashMap;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -457,6 +456,29 @@ public aspect StorageManagement {
 
 	public static ConstraintBuilder findElements() {
 		return new ConstraintBuilder();
+	}
+	
+	/**
+	 * Gets an element according to its keys.
+	 * In case the element is in cache, returns that element.
+	 * Otherwise, returns the element sent in parameter.
+	 * This method should be invoked an a newly created element.
+	 */
+	public static <T extends PersistingElement> T getElementUsingCache(T element) {
+		KeyManagement km = KeyManagement.getInstance();
+		String id = km.createIdentifier(element, PersistingElement.class);
+		@SuppressWarnings("unchecked")
+		T ret = (T) km.getKnownPersistingElement(id);
+		if (ret != null)
+			return ret;
+		else {
+			km.register(element); //sets the element in cache
+			return element;
+		}
+	}
+	
+	public PersistingElement PersistingElement.getCachedVersion() {
+		return StorageManagement.getElementUsingCache((PersistingElement)this);
 	}
 	
 	public static <AE extends PersistingElement, E extends AE> void processElements(final Class<E> clazz, final Constraint c, final Process<AE> processAction, final int limit, final String... families) throws DatabaseNotReachedException {
