@@ -268,7 +268,7 @@ public aspect KeyManagement {
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T> T createElement(Class<T> type, Object [] keyValues) {
+	<T> T createElement(Class<T> type, Object [] keyValues) {
 		
 		if(!canCreateFromKeys(type))
 			throw new IllegalArgumentException("Non-persisting " + type + " should have either no or only properties annotated with " + Key.class);
