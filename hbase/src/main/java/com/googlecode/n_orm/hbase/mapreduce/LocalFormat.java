@@ -26,6 +26,9 @@ public class LocalFormat {
 		conf.set(LocalFormat.STORE_REF, sp);
 		if (outputWriterClass != null)
 			conf.set(LocalOutputFormat.OUTPUTWRITER_CLASS, outputWriterClass.getName());
+		//Disabling speculative execution
+	    conf.setBoolean("mapred.map.tasks.speculative.execution", false);
+	    conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
 		return conf;
 	}
 	
