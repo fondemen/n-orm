@@ -14,11 +14,12 @@ import java.util.Map;
  * class=com.googlecode.n_orm.hbase.HBase<br>
  * static-accessor=getStore<br>
  * 1=/usr/lib/hadoop-0.20/conf/,/usr/lib/hbase/conf/,!/usr/lib/hadoop/example-confs
- * compression=gz &#35;can be 'none', 'gz', 'lzo', 'lzo-or-gz' (gz if lzo is not available), or 'lzo-or-none' (none if lzo is not available); by default 'none' 
  * </code><br>
  * Given files are explored recursively ignoring files given with a ! prefix.
+ * Otherwise, all available properties for {@link Store} are supported.
  * Difference with {@link Store} is that jar found in the given folders are added to the classpath so that you don't need to include the HBase client jars in your application.
  * However, if your application is ran within a servlet container (Tomcat, JBoss...), you should care excluding servlet and jsp APIs whom HBase depends on... 
+ * @see Store
  */
 public class HBase {
 

@@ -25,7 +25,9 @@ import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.WaitingCallBack;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 /**
@@ -36,10 +38,11 @@ import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
  * </ul>
  */
 public class BasicTest {
+
 	static {
 		try {
-			ClassLoader.getSystemClassLoader().loadClass("com.googlecode.n_orm.sample.businessmodel.HBaseTestLauncher");
-		} catch (ClassNotFoundException e) {
+			ClassLoader.getSystemClassLoader().loadClass("com.googlecode.n_orm.sample.businessmodel.HBaseTestLauncher").newInstance();
+		} catch (Exception e) {
 			//We are not using HBase ; no need to prepare it
 		}
 	}
@@ -66,12 +69,20 @@ public class BasicTest {
 	
 	@AfterClass
 	public static void vacuumStore() {
-		for (BookStore bs : StorageManagement.findElements().ofClass(BookStore.class).withAtMost(10000).elements().go()) {
-			bs.delete();
-		}
-		for (Book b : StorageManagement.findElements().ofClass(Book.class).withAtMost(10000).elements().go()) {
-			b.delete();
-		}
+		StorageManagement.findElements().ofClass(BookStore.class).withAtMost(10000).elements().forEach(new Process<BookStore>() {
+			
+			@Override
+			public void process(BookStore element) {
+				element.delete();
+			}
+		});
+		StorageManagement.findElements().ofClass(Book.class).withAtMost(10000).elements().forEach(new Process<Book>() {
+			
+			@Override
+			public void process(Book element) {
+				element.delete();
+			}
+		});
 		//Novel is subclass of Book:
 		// emptying the Book table should also make the Novel table empty 
 		assertNull(StorageManagement.findElements().ofClass(Novel.class).any());
@@ -334,6 +345,37 @@ public class BasicTest {
 		 assertEquals(2, storeBooks.size());
 		 assertTrue(storeBooks.contains(bsut));
 		 assertTrue(storeBooks.contains(n));
+	 }
+
+	 //Must have a default constructor (or no constructor...)
+		public static class BookSetter implements Process<Book> {
+		private static final long serialVersionUID = -7258359759953024740L;
+			private short value;
+		
+			public BookSetter(short val) {
+				this.value = val;
+			}
+
+			@Override
+			public void process(Book element) {
+				element.setNumber(this.value);
+				element.store();
+			}
+		}
+	 @Test(timeout=20000) public void testSetBooksWithMapReduce() throws DatabaseNotReachedException, InstantiationException, IllegalAccessException, InterruptedException {
+		WaitingCallBack wc = new WaitingCallBack();
+		StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(10000).elements().andActivate().remoteForEach(new BookSetter((short) 50), wc);
+		//withAtMost is not necessary using HBase as com.googlecode.n_orm.hbase.Store implements com.googlecode.n_orm.storeapi.ActionnableStore
+		wc.waitProcessCompleted(); //Nothing happens up to the end of the Map/Reduce task ; in case you do not use an com.googlecode.n_orm.storeapi.ActionnableStore, this action is performed on this thread, i.e. all elements are downloaded and iterated here
+		assertNull(wc.getError());
+		 
+		boolean hasABook = false;
+		for (Book b : bssut.getBooks()) {
+			hasABook = true;
+			b.activate();
+			assertEquals(50, b.getNumber());
+		}
+		assertTrue("No book in test !", hasABook);
 	 }
 	 
 	 @Test public void serialize() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
