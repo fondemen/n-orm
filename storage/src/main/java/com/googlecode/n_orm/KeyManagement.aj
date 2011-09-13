@@ -268,7 +268,7 @@ public aspect KeyManagement {
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T> T createElement(Class<T> type, Object [] keyValues) {
+	<T> T createElement(Class<T> type, Object [] keyValues) {
 		
 		if(!canCreateFromKeys(type))
 			throw new IllegalArgumentException("Non-persisting " + type + " should have either no or only properties annotated with " + Key.class);
@@ -395,9 +395,10 @@ public aspect KeyManagement {
 				ret.append(((PersistingElement)element).identifier);
 			} else {
 				boolean fst = true;
+				PropertyManagement pm = PropertyManagement.getInstance();
 				for (Field key : this.detectKeys(element.getClass())) {
 					if (fst) fst = false; else ret.append(KEY_SEPARATOR);
-					Object o = PropertyManagement.getInstance().readValue(element, key);
+					Object o = pm.readValue(element, key);
 					if (o == null)
 						throw new IllegalStateException("A key cannot be null as it is the case for key " + key + " of " + element);
 //					if (key.getType().isArray() && Array.getLength(o) == 0)
