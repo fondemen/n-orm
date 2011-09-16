@@ -60,4 +60,18 @@
 			<url>file://${basedir}/../../n-orm-wiki/hbase-test-deps</url>
 		</site>
 	</distributionManagement>
+	
+	<repositories>
+		<repository>
+			<id>temp-thrift</id>
+			<name>Thrift 0.2.0</name>
+			<url>http://people.apache.org/~rawson/repo/</url>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+		</repository>
+	</repositories>
 </project>
