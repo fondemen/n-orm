@@ -12,6 +12,9 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.filter.FilterList;
+import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
+import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -46,6 +49,7 @@ public class MapRedTest {
 		
 		store.setCountMapRed(true);
 		store.setTruncateMapRed(true);
+		//store.setMapRedSendJars(false);
 	}
 	
 	@AfterClass
@@ -59,11 +63,15 @@ public class MapRedTest {
 	public void truncate() throws IOException {
 		store.setTruncateMapRed(false);
 		store.truncate(tableName, (Constraint)null);
-		store.setTruncateMapRed(true);
 		assertEquals(0, store.count(tableName, (Constraint)null));
-		Scan scan = new Scan();
-		scan.addFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		store.setTruncateMapRed(true);
 		
+		Scan scan = new Scan();
+		FilterList f = new FilterList();
+		f.addFilter(new KeyOnlyFilter());
+		f.addFilter(new FirstKeyOnlyFilter());
+		scan.setFilter(f);
+		scan.addFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		ResultScanner res = table.getScanner(scan);
 		try {
 			assertNull(res.next());
