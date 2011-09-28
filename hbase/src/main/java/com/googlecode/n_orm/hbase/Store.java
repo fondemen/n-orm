@@ -59,6 +59,7 @@ import org.apache.hadoop.hbase.io.hfile.Compression;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.io.SetFile;
 import org.apache.hadoop.mapreduce.Job;
 
 import com.googlecode.n_orm.Callback;
@@ -70,6 +71,7 @@ import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.hbase.actions.Action;
 import com.googlecode.n_orm.hbase.actions.BatchAction;
@@ -83,6 +85,7 @@ import com.googlecode.n_orm.hbase.mapreduce.ActionJob;
 import com.googlecode.n_orm.hbase.mapreduce.LocalFormat;
 import com.googlecode.n_orm.hbase.mapreduce.RowCounter;
 import com.googlecode.n_orm.hbase.mapreduce.Truncator;
+import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.Row;
@@ -104,7 +107,8 @@ import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
  * 2=2181
  * compression=gz &#35;can be 'none', 'gz', 'lzo', or 'snappy' (default is 'none') ; in the latter two cases, take great care that those compressors are available for all nodes of your hbase cluster
  * </code><br>
- * This store supports remote processes as it implements {@link ActionnableStore}. However, be careful when configuring your hadoop: all jars containing your process and n-orm (with dependencies) should be available.
+ * One important property to configure is {@link #setScanCaching(Integer)}.<br>
+ * This store supports remote processes (see {@link StorageManagement#processElementsRemotely(Class, Constraint, Process, Callback, int, String...)} and {@link SearchableClassConstraintBuilder#remoteForEach(Process, Callback)}) as it implements {@link ActionnableStore} by using HBase/Hadoop Map-only jobs. However, be careful when configuring your hadoop: all jars containing your process and n-orm (with dependencies) should be available. By default, all known jars are sent. You can change this using e.g. {@link #setMapRedSendJars(boolean)}.
  */
 public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n_orm.storeapi.GenericStore, ActionnableStore {
 
@@ -266,6 +270,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	
 	private boolean countMapRed = false;
 	private boolean truncateMapRed = false;
+	
+	private int mapRedScanCaching = 500;
+	private boolean mapRedSendHBaseJars = true;
+	private boolean mapRedSendNOrmJars = true;
+	private boolean mapRedSendJobJars = true;
 
 	protected Store(Properties properties) {
 		this.launchProps = properties;
@@ -307,47 +316,117 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			}
 		
 		this.tablesC = new HTablePool(this.getConf(), Integer.MAX_VALUE);
+		
+		try {
+			String[] host = this.admin.getConnection().getZooKeeperWatcher().getQuorum().split(",")[0].split(":");
+			this.host = host[0].trim();
+			if (host.length > 1)
+				this.port = Integer.parseInt(host[1].trim());
+			else
+				this.port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
+		} catch (Exception e) {
+			errorLogger.log(Level.WARNING, "Cannot read zookeeper info... Might be a bug.", e);
+		}
 			
 		logger.info("Started store " + this.hashCode());
 
 		this.wasStarted = true;
 	}
 
+	/**
+	 * The zookeeper host to be used.
+	 * You can only trust this method is this store was explicitly set the host before or started.
+	 */
 	public String getHost() {
 		return host;
 	}
 
+	/**
+	 * The zookeeper quorum host to be used.
+	 * You shouldn't use this method as it should be set by {@link #getStore(String)}, {@link #getStore(String, int)}, or {@link #getStore(String, int, Integer).
+	 */
 	@Override
 	public void setHost(String url) {
 		this.host = url;
 	}
 
+	/**
+	 * The zookeeper quorum port to be used.
+	 * You can only trust this method is this store was explicitly set the port before or started.
+	 * @return
+	 */
 	public int getPort() {
 		return port;
 	}
 
+	/**
+	 * The zookeeper quorum port to be used.
+	 * You shouldn't use this method as it should be set by {@link #getStore(String)}, {@link #getStore(String, int)}, or {@link #getStore(String, int, Integer).
+	 * @return
+	 */
 	public void setPort(int port) {
 		this.port = port;
 	}
 
+	/**
+	 * The number of times this store can retry connecting the cluster.
+	 * Default value is HBase default value (10).
+	 * @throws IllegalArgumentException in case the sent value is less that 1
+	 */
 	public void setMaxRetries(int maxRetries) {
+		if (maxRetries <= 0)
+			throw new IllegalArgumentException("Cannot retry less than once");
 		this.maxRetries = Integer.valueOf(maxRetries);
 	}
 
+	/**
+	 * The number of elements that this store scans at once during a search.
+	 * @return the expected value, or null if not set (equivalent to the HBase default value - 1 - see <a href="http://hbase.apache.org/book/perf.reading.html#perf.hbase.client.caching">the HBase documentation</a>)
+	 */
 	public Integer getScanCaching() {
 		return scanCaching;
 	}
 
+	/**
+	 * The number of elements that this store scans at once during a search.
+	 * Default value is HBase default value (1).
+	 * Use this carefully ; read <a href="http://hbase.apache.org/book/perf.reading.html#perf.hbase.client.caching">the HBase documentation</a>.
+	 */
 	public void setScanCaching(Integer scanCaching) {
 		this.scanCaching = scanCaching;
 	}
 
+	/**
+	 * The number of elements that this store scans at once during a Map/Reduce task (see <a href="http://hbase.apache.org/book/perf.reading.html#perf.hbase.client.caching">the HBase documentation</a>).
+	 * @see StorageManagement#processElementsRemotely(Class, Constraint, Process, Callback, int, String...)
+	 * @see SearchableClassConstraintBuilder#remoteForEach(Process, Callback)
+	 */
+	public int getMapRedScanCaching() {
+		return mapRedScanCaching;
+	}
+
+	public void setMapRedScanCaching(int mapRedScanCaching) {
+		this.mapRedScanCaching = mapRedScanCaching;
+	}
+
+	/**
+	 * The used compression for this store.
+	 * Compression is used when creating a column family in the HBase cluster.
+	 * In case you set {@link #setForceCompression(boolean)} to true, existing column families are also checked and altered if necessary.
+	 * @return the used compression, or null if not set (equivalent to the HBase default value - none)
+	 */
 	public String getCompression() {
 		if (compression == null)
 			return null;
 		return compression.getName();
 	}
 
+	/**
+	 * The used compression for this store.
+	 * Default value is the HBase default (none).
+	 * Compression is used when creating a column family in the HBase cluster.
+	 * In case you set {@link #setForceCompression(boolean)} to true, existing column families are also checked and altered if necessary.
+	 */
 	public void setCompression(String compression) {
 		if (compression == null) {
 			this.compression = null;
@@ -366,30 +445,125 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct compressor.
+	 * see {@link #getCompression()}
+	 */
 	public boolean isForceCompression() {
 		return forceCompression;
 	}
 
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct compressor.
+	 * Default value is false.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #setForceCompression(boolean)} to true and different values for {@link Store#setCompression(String)} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * see {@link #getCompression()}
+	 */
 	public void setForceCompression(boolean forceCompression) {
 		this.forceCompression = forceCompression;
 	}
 
+	/**
+	 * Whether counts (e.g. {@link #count(String, Constraint)}) should use a map/reduce job.
+	 */
 	public boolean isCountMapRed() {
 		return countMapRed;
 	}
 
+	/**
+	 * Whether counts (e.g. {@link Store#count(String, Constraint)}) should use a map/reduce job.
+	 * Default value is false.
+	 * Map/reduce jobs are usually hard to run, so if this method is faster in case of large data on large cluster, it should be avoided on small clusters.
+	 */
 	public void setCountMapRed(boolean countMapRed) {
 		this.countMapRed = countMapRed;
 	}
 
+	/**
+	 * Whether truncates (e.g. {@link #truncate(String, Constraint)}) should use a map/reduce job.
+	 */
 	public boolean isTruncateMapRed() {
 		return truncateMapRed;
 	}
 
+	/**
+	 * Whether truncates (e.g. {@link #truncate(String, Constraint)}) should use a map/reduce job.
+	 * Default value is false.
+	 * Map/reduce jobs are usually hard to run, so if this method is faster in case of large data on large cluster, it should be avoided on small clusters.
+	 */
 	public void setTruncateMapRed(boolean truncateMapRed) {
 		this.truncateMapRed = truncateMapRed;
 	}
 
+	/**
+	 * Whether jar files containing sent jobs should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 */
+	public boolean isMapRedSendJobJars() {
+		return mapRedSendJobJars;
+	}
+
+	/**
+	 * Whether jar files containing sent jobs should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 * Default value is true.
+	 * Setting this parameter to false will improve map/reduce tasks setup, but you might face {@link ClassNotFoundException} on task tracker nodes if their CLASSPATH is not configured properly.
+	 * To be used with care !
+	 */
+	public void setMapRedSendJobJars(boolean mapRedSendJars) {
+		this.mapRedSendJobJars = mapRedSendJars;
+	}
+
+	/**
+	 * Whether jar files containing n-orm and the n-orm HBase driver should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 */
+	public boolean isMapRedSendNOrmJars() {
+		return mapRedSendNOrmJars;
+	}
+
+	/**
+	 * Whether jar files containing n-orm and the n-orm HBase driver should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 * Default value is true.
+	 * Setting this parameter to false will improve map/reduce tasks setup, but you might face {@link ClassNotFoundException} on task tracker nodes if their CLASSPATH is not configured properly.
+	 * To be used with care !
+	 */
+	public void setMapRedSendNOrmJars(boolean mapRedSendJars) {
+		this.mapRedSendNOrmJars = mapRedSendJars;
+	}
+
+	/**
+	 * Whether jar files containing the HBase client should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 */
+	public boolean isMapRedSendHBaseJars() {
+		return mapRedSendHBaseJars;
+	}
+
+	/**
+	 * Whether jar files containing the HBase client should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 * Default value is true.
+	 * Setting this parameter to false will improve map/reduce tasks setup, but you might face {@link ClassNotFoundException} on task tracker nodes if their CLASSPATH is not configured properly.
+	 * To be used with care !
+	 */
+	public void setMapRedSendHBaseJars(boolean mapRedSendJars) {
+		this.mapRedSendHBaseJars = mapRedSendJars;
+	}
+
+	/**
+	 * Whether jar files containing HBase, n-orm, the n-orm HBase driver and sent job should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 * Default value is true.
+	 * Setting this parameter to false will improve map/reduce tasks setup, but you might face {@link ClassNotFoundException} on task tracker nodes if their CLASSPATH is not configured properly.
+	 * To be used with care !
+	 */
+	public void setMapRedSendJars(boolean mapRedSendJars) {
+		this.setMapRedSendJobJars(mapRedSendJars);
+		this.setMapRedSendNOrmJars(mapRedSendJars);
+		this.setMapRedSendHBaseJars(mapRedSendJars);
+	}
+
+	/**
+	 * The configuration used by this store.
+	 * You can only trust this method is this store was explicitly set the host before or started.
+	 */
 	public Configuration getConf() {
 		return this.config;
 	}
@@ -1180,7 +1354,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, famAr), action, elementClass, famAr);
 			logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
 			if (callback != null) {
-				job.waitForCompletion(true);
+				job.waitForCompletion(false);
 				callback.processCompleted();
 			} else
 				job.submit();
