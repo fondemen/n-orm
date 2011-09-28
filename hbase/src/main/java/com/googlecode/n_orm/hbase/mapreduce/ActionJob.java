@@ -89,13 +89,13 @@ public class ActionJob {
 		poos.close();pobs.close();
 		
 		Job job = new Job(conf, NAME + "_" + processClass.getName() + "(" + elementClass.getName() + ")_" + scan.hashCode());
-		job.setJarByClass(processClass);
-		scan.setCaching(500);
-		scan.setCacheBlocks(false);
+		
 		TableMapReduceUtil.initTableMapperJob(tableName, scan,
 				ActionMapper.class, ImmutableBytesWritable.class,
-				Result.class, job, true);
-		LocalFormat.prepareJob(job);
+				Result.class, job, false);
+		LocalFormat.prepareJob(job, scan, s);
+		if (s.isMapRedSendJobJars())
+			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), processClass, elementClass);
 		job.setNumReduceTasks(0);
 		return job;
 	}
