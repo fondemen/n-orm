@@ -147,14 +147,6 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				e.printStackTrace();
 			}
 		}
-		
-		@Override
-		public void addExploredFile(File toBeExplored) {
-			if (! toBeExplored.isDirectory())
-				errorLogger.config("Cannot read HBase configuration folder " + toBeExplored);
-			else
-				super.addExploredFile(toBeExplored);
-		}
 
 		@Override
 		public boolean acceptFile(File file) {

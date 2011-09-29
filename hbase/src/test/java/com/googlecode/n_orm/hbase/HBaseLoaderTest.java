@@ -73,4 +73,64 @@ public class HBaseLoaderTest {
 	public void loadPropertiesNoConf() throws IOException {
 		Store.getStore("/etc/conf4");
 	}
+
+	@Test(expected=Test.None.class)
+	public void loadPropertiesWithWildcard() throws IOException {
+		Store.getStore(testPath + "/etc/conf2/conf3/*.xml");
+	}
+
+	@Test(expected=Test.None.class)
+	public void loadPropertiesWithWildcardForDir() throws IOException {
+		Store.getStore(testPath + "/etc/conf*/*/*.xml");
+	}
+
+	@Test(expected=Exception.class)
+	public void loadPropertiesWithWildcardForDirBadSubdir() throws IOException {
+		Store.getStore(testPath + "/etc/conf*/toto/*.xml");
+	}
+
+	@Test(expected=IOException.class)
+	public void loadPropertiesWithWildcardForSubdir4() throws IOException {
+		Store.getStore(testPath + "/etc/*4/*.xml");
+	}
+
+	@Test(expected=Test.None.class)
+	public void loadPropertiesWithWildcardForSubdir2Only() throws IOException {
+		Store.getStore(testPath + "/etc/*2");
+	}
+
+	@Test(expected=IOException.class)
+	public void loadPropertiesWithWildcardForSubdir2ExcludingXML() throws IOException {
+		Store.getStore(testPath + "/etc/*2,!*.xml");
+	}
+
+	@Test(expected=Test.None.class)
+	public void loadPropertiesWithWildcardForSubdir2ExcludingJPG() throws IOException {
+		Store.getStore(testPath + "/etc/*2,!*.jpg");
+	}
+
+	@Test(expected=IOException.class)
+	public void loadPropertiesWithWildcardForSubdir2ExcludingConf3() throws IOException {
+		Store.getStore(testPath + "/etc/*2,!*3");
+	}
+
+	@Test(expected=IOException.class)
+	public void loadPropertiesWithWildcardForSubdir2ExcludingConf3XML() throws IOException {
+		Store.getStore(testPath + "/etc/*2,!*3/*.xml");
+	}
+
+	@Test(expected=Test.None.class)
+	public void loadPropertiesWithWildcardForSubdir2ExcludingConf3JPG() throws IOException {
+		Store.getStore(testPath + "/etc/*2,!*3/*.jpg");
+	}
+
+	@Test(expected=IOException.class)
+	public void loadPropertiesWithWildcardForOneDir() throws IOException {
+		Store.getStore(testPath + "/etc/*/hbase-site.xml");
+	}
+
+	@Test(expected=Test.None.class)
+	public void loadPropertiesWithWildcardForMultibleSubdir() throws IOException {
+		Store.getStore(testPath + "/etc/**/hbase-site.xml");
+	}
 }
