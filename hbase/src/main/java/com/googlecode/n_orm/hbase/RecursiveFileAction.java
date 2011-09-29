@@ -139,6 +139,8 @@ public abstract class RecursiveFileAction {
 		for (String ign : this.toBeIgnored) {
 			if (FilenameUtils.wildcardMatch(file, ign, IOCase.INSENSITIVE))
 				return true;
+			if (FilenameUtils.wildcardMatch(new File(file).getName(), ign, IOCase.INSENSITIVE))
+				return true;
 		}
 		return false;
 	}

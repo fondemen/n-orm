@@ -133,4 +133,19 @@ public class HBaseLoaderTest {
 	public void loadPropertiesWithWildcardForMultibleSubdir() throws IOException {
 		Store.getStore(testPath + "/etc/**/hbase-site.xml");
 	}
+
+	@Test(expected=IOException.class)
+	public void loadPropertiesWithWildcardForMultibleSubdirFilered() throws IOException {
+		Store.getStore(testPath + "/etc/**/hbase-site.xml,!hbase*.xml");
+	}
+
+	@Test(expected=IOException.class)
+	public void loadPropertiesWithWildcardForMultibleSubdirFileredSub() throws IOException {
+		Store.getStore(testPath + "/etc/**/hbase-site.xml,!*3/*.xml");
+	}
+
+	@Test(expected=Test.None.class)
+	public void loadPropertiesWithWildcardForMultibleSubdirFileredSubJPG() throws IOException {
+		Store.getStore(testPath + "/etc/**/hbase-site.xml,!*3/*.jpg");
+	}
 }
