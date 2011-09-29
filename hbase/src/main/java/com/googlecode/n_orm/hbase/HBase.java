@@ -8,6 +8,8 @@ import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.io.filefilter.WildcardFileFilter;
+
 /**
  * An HBase {@link Store} starter found according to its configuration folder.
  * An example store.properties file is:<br><code>
