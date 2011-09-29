@@ -98,7 +98,7 @@ import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
  * static-accessor=getStore<br>
  * 1=/usr/lib/hadoop-0.20/conf/,/usr/lib/hbase/conf/,!/usr/lib/hadoop/example-confs
  * </code><br>
- * Given files are explored recursively ignoring files given with a ! prefix.
+ * Given files are explored recursively ignoring files given with a ! prefix. Wilcards such as * (any character set), ? (nay character), and ** (any subdirectory) can be used.
  * Compared to {@link HBase}, no jar found in those is added to classpath.
  * For test purpose, you can also directly reach an HBase instance thanks to one of its zookeeper host and client port:<br><code>
  * class=com.googlecode.n_orm.hbase.Store<br>

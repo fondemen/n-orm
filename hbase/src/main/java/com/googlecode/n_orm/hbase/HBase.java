@@ -15,9 +15,9 @@ import org.apache.commons.io.filefilter.WildcardFileFilter;
  * An example store.properties file is:<br><code>
  * class=com.googlecode.n_orm.hbase.HBase<br>
  * static-accessor=getStore<br>
- * 1=/usr/lib/hadoop/,/usr/lib/hbase,!/usr/lib/hadoop/example-confs
+ * 1=/usr/lib/hadoop,/usr/lib/hbase,!/usr/lib/hadoop/example-confs
  * </code><br>
- * Given files are explored recursively ignoring files given with a ! prefix.
+ * Given files are explored recursively ignoring files given with a ! prefix. Wilcards such as * (any character set), ? (nay character), and ** (any subdirectory) can be used.
  * Otherwise, all available properties for {@link Store} are supported.
  * Difference with {@link Store} is that jars found in the given folders are added to the classpath so that you don't need to include the HBase client jars in your application.
  * However, if your application is ran within a servlet container (Tomcat, JBoss...), you should care excluding servlet and jsp APIs whom HBase depends on... 
