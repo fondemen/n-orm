@@ -87,7 +87,7 @@ public class HBase {
 				
 				try {
 					//Exploiting common configuration
-					String cscf = commaSeparatedConfigurationFolders+"!*-tests.jar,!*slf4j*.jar,"+createFilters(); //no slf4j since n-orm depends on EHCahe, which depends on a (newer) version of slf4j
+					String cscf = commaSeparatedConfigurationFolders+"!**/*-tests.jar,!**/*slf4j*.jar,"+createFilters(); //no slf4j since n-orm depends on EHCahe, which depends on a (newer) version of slf4j
 					addJarAction.clear();
 					addJarAction.addFiles(cscf);
 					try {
