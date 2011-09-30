@@ -1,59 +1,66 @@
 package com.googlecode.n_orm.hbase;
 
 import java.io.File;
-import java.io.FileFilter;
-import java.io.FilenameFilter;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Set;
+import java.util.TreeSet;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOCase;
-import org.apache.commons.io.filefilter.WildcardFileFilter;
+import org.codehaus.plexus.util.DirectoryScanner;
 
 public abstract class RecursiveFileAction {
-	
-	private final Collection<String> toBeIgnored;
+
 	private final Collection<String> toBeExplored;
+	private final Collection<String> toBeIgnoredFilters;
+	private final Collection<String> toBeExploredFilters;
 	
 	public static abstract class Report {
 		public abstract void fileHandled(File f);
 	}
-
-	private FilenameFilter filter = new FilenameFilter() {
-	
-		@Override
-		public boolean accept(File dir, String name) {
-			File f = new File(dir, name);
-			return acceptFile(f) || f.isDirectory();
-		}
-	};
 	
 	public RecursiveFileAction() {
-		toBeIgnored = new LinkedList<String>();
+		toBeIgnoredFilters = new LinkedList<String>();
+		toBeExploredFilters = new LinkedList<String>();
 		toBeExplored = new LinkedList<String>();
 	}
 	
+	private void addFile(Collection<String> list, String element) {
+		list.add(element);
+		String modifiedElement = element;
+		if (!modifiedElement.endsWith("/") && !modifiedElement.endsWith("\\"))
+			modifiedElement = modifiedElement+File.separatorChar;
+		if (!modifiedElement.startsWith("/") && !modifiedElement.startsWith("\\"))
+			modifiedElement = "**/"+modifiedElement;
+		if (modifiedElement != element)
+			list.add(modifiedElement);
+	}
+	
 	public void addIgnoredFile(String toBeIgnored) {
-		this.toBeIgnored.add(toBeIgnored);
+		this.addFile(this.toBeIgnoredFilters, toBeIgnored);
 	}
 	
 	public void clearIgnoredFiles() {
-		this.toBeIgnored.clear();
+		this.toBeIgnoredFilters.clear();
 	}
 	
 	public void addExploredFile(String toBeExplored) {
-		this.toBeExplored.add(toBeExplored);
+		if (toBeExplored.contains("*") || toBeExplored.contains("?"))
+			this.addFile(this.toBeExploredFilters, toBeExplored);
+		else if (new File(toBeExplored).isDirectory())
+			this.toBeExplored.add(toBeExplored);
+		else
+			Store.logger.warning(toBeExplored + " is neither a filter (no *, **, or ? found) nor a valid directory ; ignoring");
 	}
 	
 	public void clear() {
-		this.toBeIgnored.clear();
+		this.toBeIgnoredFilters.clear();
+		this.toBeExploredFilters.clear();
 		this.toBeExplored.clear();
 	}
 	
 	public void addFiles(String... files) {
 		for (String file : files) {
+			file = file.trim();
 			if (file.startsWith("!"))
 				this.addIgnoredFile(file.substring(1));
 			else
@@ -66,13 +73,31 @@ public abstract class RecursiveFileAction {
 	}
 	
 	public void explore(Report r) {
-		Iterator<String> exi = this.toBeExplored.iterator();
-		while (exi.hasNext()) {
-			String f = exi.next();
-			if (!shoudIgnore(f)) {
-				this.exploreFile(new File(f), r);
+		if (this.toBeExplored.isEmpty())
+			throw new IllegalArgumentException("No directory found ; please provide at least one directory with a non filter expression (with no *, **, or ?).");
+		DirectoryScanner scanner = new DirectoryScanner();
+		if (this.toBeExploredFilters.isEmpty())
+			this.toBeExploredFilters.add("**");
+		scanner.setIncludes(this.toBeExploredFilters.toArray(new String[0]));
+		scanner.setExcludes(this.toBeIgnoredFilters.toArray(new String[0]));
+		scanner.setCaseSensitive(false);
+		
+		Set<String> found = new TreeSet<String>();
+		for (String tbe : this.toBeExplored) {
+			scanner.setBasedir(tbe);
+			scanner.scan();
+			for (String ff : scanner.getIncludedFiles()) {
+				found.add(tbe+File.separatorChar+ff);
 			}
-			exi.remove();
+		}
+		
+ 		for (String file : found) {
+			File f = new File(file);
+			if (this.acceptFile(f)) {
+				this.manageFile(f, r);
+				if (r != null)
+					r.fileHandled(f);
+			}
 		}
 	}
 	
@@ -81,68 +106,5 @@ public abstract class RecursiveFileAction {
 	}
 	
 	public abstract void manageFile(File f, Report r);
-
-	protected void exploreFile(File f, Report r) {
-		String file = f.getPath();
-		if (shoudIgnore(file))
-			return;
-
-		FileFilter filter = null;
-		String filterRest = null;
-		boolean inRecurFilter = false;
-		int starP = file.indexOf('*'), questionP = file.indexOf('?');
-		if (starP >= 0 || questionP >= 0) { //filter detected
-			String originalFile = file;
-			int filterP = starP >= 0 ? (questionP >= 0 ? Math.min(starP, questionP) : starP) : questionP;
-			filterP = file.lastIndexOf(File.separatorChar, filterP);
-			String filterStr = file.substring(filterP+1);
-			file = file.substring(0, filterP);
-			
-			filterP = filterStr.indexOf(File.separatorChar);
-			if (filterP >= 0) {
-				filterRest = filterStr.substring(filterP);
-				filterStr = filterStr.substring(0, filterP);
-			}
-			if ("**".equals(filterStr)) {
-				inRecurFilter = true;
-			} else if (!"*".equals(filterStr))
-				filter = new WildcardFileFilter(filterStr);
-			f = new File(file);
-			if (! f.isDirectory())
-				return;
-		}
-		
-		if (!f.exists())
-			return;
-
-		if (f.isDirectory()) {
-			for (File sub : f.listFiles()) {
-				if (filter == null || filter.accept(sub)) {
-					if (sub.isDirectory()) {
-						exploreFile(filterRest == null ? sub : new File(sub.getPath()+filterRest), r);
-						if (inRecurFilter)
-							exploreFile(filterRest == null ? sub : new File(sub.getPath()+File.separatorChar+"**"+filterRest), r);
-					} else if (filterRest == null) {
-						exploreFile(sub, r);
-					}
-				}
-			}
-		} else if (this.acceptFile(f)) {
-			this.manageFile(f, r);
-			if (r != null)
-				r.fileHandled(f);
-		} else
-			Store.logger.warning("Cannot handle file " + f.getAbsolutePath());
-	}
-
-	protected boolean shoudIgnore(String file) {
-		for (String ign : this.toBeIgnored) {
-			if (FilenameUtils.wildcardMatch(file, ign, IOCase.INSENSITIVE))
-				return true;
-			if (FilenameUtils.wildcardMatch(new File(file).getName(), ign, IOCase.INSENSITIVE))
-				return true;
-		}
-		return false;
-	}
 
 }
