@@ -96,9 +96,9 @@ import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
  * An example store.properties file is:<br><code>
  * class=com.googlecode.n_orm.hbase.Store<br>
  * static-accessor=getStore<br>
- * 1=/usr/lib/hadoop-0.20/conf/,/usr/lib/hbase/conf/,!/usr/lib/hadoop/example-confs
+ * 1=/usr/lib/hbase/conf/
  * </code><br>
- * Given files are explored recursively ignoring files given with a ! prefix. Wilcards such as * (any character set), ? (nay character), and ** (any subdirectory) can be used.
+ * Given files are explored recursively ignoring files given with a ! prefix. Wilcards such as * (any character set), ? (nay character), and ** (any subdirectory) can be used both in included and excluded patterns.
  * Compared to {@link HBase}, no jar found in those is added to classpath.
  * For test purpose, you can also directly reach an HBase instance thanks to one of its zookeeper host and client port:<br><code>
  * class=com.googlecode.n_orm.hbase.Store<br>
@@ -222,9 +222,23 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				logger.info("Creating store for " + commaSeparatedConfigurationFolders);
 				Configuration conf = new Configuration();
 				ReportConf r = new ReportConf(conf);
+				
+				//First attempt using usual configuration
+				String cscf = commaSeparatedConfigurationFolders + ",conf/*-site.xml,*-site.xml,!*example*,!*src*";
 				addConfAction.clear();
-				addConfAction.addFiles(commaSeparatedConfigurationFolders);
-				addConfAction.explore(r);
+				addConfAction.addFiles(cscf);
+				try {
+					addConfAction.explore(r);
+				} catch (IllegalArgumentException x) {
+					throw new DatabaseNotReachedException("Invalid configuration folders specification " + commaSeparatedConfigurationFolders + ": " + x.getMessage());
+				}
+				if (!r.foundPropertyFile || !r.foundHBasePropertyFile) {
+					//Second attempt exploring all possibilities
+					cscf = commaSeparatedConfigurationFolders;
+					addConfAction.clear();
+					addConfAction.addFiles(cscf);
+					addConfAction.explore(r);
+				}
 			
 				if (!r.foundPropertyFile)
 					throw new IOException("No configuration file found in the following folders " + commaSeparatedConfigurationFolders + " ; expecting some *-site.xml files");
