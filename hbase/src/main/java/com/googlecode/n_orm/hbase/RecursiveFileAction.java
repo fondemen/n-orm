@@ -80,6 +80,7 @@ public abstract class RecursiveFileAction {
 			scanner.setIncludes(this.toBeExploredFilters.toArray(new String[0]));
 		if (!this.toBeIgnoredFilters.isEmpty())
 			scanner.setExcludes(this.toBeIgnoredFilters.toArray(new String[0]));
+		scanner.addDefaultExcludes();
 		scanner.setCaseSensitive(false);
 		
 		Set<String> found = new TreeSet<String>();
