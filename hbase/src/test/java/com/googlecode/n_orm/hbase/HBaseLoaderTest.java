@@ -101,27 +101,27 @@ public class HBaseLoaderTest {
 
 	@Test(expected=IOException.class)
 	public void loadPropertiesWithWildcardForSubdir2ExcludingXML() throws IOException {
-		Store.getStore(testPath + "/etc/,**/*2/**,!*.xml");
+		Store.getStore(testPath + "/etc/,**/*2/**,!**/*.xml");
 	}
 
 	@Test(expected=Test.None.class)
 	public void loadPropertiesWithWildcardForSubdir2ExcludingJPG() throws IOException {
-		Store.getStore(testPath + "/etc/,**/*2/**,!*.jpg");
+		Store.getStore(testPath + "/etc/,**/*2/**,!**/*.jpg");
 	}
 
 	@Test(expected=IOException.class)
 	public void loadPropertiesWithWildcardForSubdir2ExcludingConf3() throws IOException {
-		Store.getStore(testPath + "/etc/,**/*2/**,!*3");
+		Store.getStore(testPath + "/etc/,*2/**,!**/*3/**");
 	}
 
 	@Test(expected=IOException.class)
 	public void loadPropertiesWithWildcardForSubdir2ExcludingConf3XML() throws IOException {
-		Store.getStore(testPath + "/etc/,*2,!*3/*.xml");
+		Store.getStore(testPath + "/etc/,*2/**,!**/*3/*.xml");
 	}
 
 	@Test(expected=Test.None.class)
 	public void loadPropertiesWithWildcardForSubdir2ExcludingConf3JPG() throws IOException {
-		Store.getStore(testPath + "/etc/,*2,!*3/*.jpg");
+		Store.getStore(testPath + "/etc/,*2/**,!**/*3/*.jpg");
 	}
 
 	@Test(expected=IOException.class)
@@ -136,21 +136,16 @@ public class HBaseLoaderTest {
 
 	@Test(expected=IOException.class)
 	public void loadPropertiesWithWildcardForMultibleSubdirFilered() throws IOException {
-		Store.getStore(testPath + "/etc/,**/hbase-site.xml,!hbase*.xml");
+		Store.getStore(testPath + "/etc/,**/*-site.xml,!**/hbase*.xml");
 	}
 
 	@Test(expected=IOException.class)
 	public void loadPropertiesWithWildcardForMultibleSubdirFileredSub() throws IOException {
-		Store.getStore(testPath + "/etc/,**/hbase-site.xml,!*3/*.xml");
+		Store.getStore(testPath + "/etc/,**/hbase-site.xml,!**/*3/*.xml");
 	}
 
 	@Test(expected=Test.None.class)
 	public void loadPropertiesWithWildcardForMultibleSubdirFileredSubJPG() throws IOException {
 		Store.getStore(testPath + "/etc/,**/hbase-site.xml,!*3/*.jpg");
-	}
-
-	@Test(expected=Test.None.class)
-	public void rgygtyhthntnthtntu() throws IOException {
-		Store.getStore("/usr/lib/hbase/conf,/usr/lib/hadoop/conf");
 	}
 }

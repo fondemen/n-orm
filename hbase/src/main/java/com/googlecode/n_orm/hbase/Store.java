@@ -61,6 +61,7 @@ import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.SetFile;
 import org.apache.hadoop.mapreduce.Job;
+import org.codehaus.plexus.util.DirectoryScanner;
 
 import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.ColumnFamiliyManagement;
@@ -98,7 +99,8 @@ import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
  * static-accessor=getStore<br>
  * 1=/usr/lib/hbase/conf/
  * </code><br>
- * Given files are explored recursively ignoring files given with a ! prefix. Wilcards such as * (any character set), ? (nay character), and ** (any subdirectory) can be used both in included and excluded patterns.
+ * Given files are explored recursively ignoring files given with a ! prefix. You can also define  (positive or negative with a ! prefix) filters using wilcards such as * (any character set), ? (any character), and ** (any sub-directory) can be used both in included and excluded patterns (see {@link DirectoryScanner}), but at least one directory to look in must be defined without wildcard.
+ * Two attempts are performed during search: first explicitly looking for ./*-site.xml and ./conf/*-site.xml, and then all possible ** /*-site.xml. hbase-site.xml MUST be found for the operation to succeed.
  * Compared to {@link HBase}, no jar found in those is added to classpath.
  * For test purpose, you can also directly reach an HBase instance thanks to one of its zookeeper host and client port:<br><code>
  * class=com.googlecode.n_orm.hbase.Store<br>
@@ -224,7 +226,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				ReportConf r = new ReportConf(conf);
 				
 				//First attempt using usual configuration
-				String cscf = commaSeparatedConfigurationFolders + ",conf/*-site.xml,*-site.xml,!*example*,!*src*";
+				String cscf = commaSeparatedConfigurationFolders + ",conf/*-site.xml,*-site.xml,!**/*example*/**,!**/*src*/**";
 				addConfAction.clear();
 				addConfAction.addFiles(cscf);
 				try {
