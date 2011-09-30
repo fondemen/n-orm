@@ -26,13 +26,13 @@ public abstract class RecursiveFileAction {
 	
 	private void addFile(Collection<String> list, String element) {
 		list.add(element);
-		String modifiedElement = element;
-		if (!modifiedElement.endsWith("/") && !modifiedElement.endsWith("\\"))
-			modifiedElement = modifiedElement+File.separatorChar;
-		if (!modifiedElement.startsWith("/") && !modifiedElement.startsWith("\\"))
-			modifiedElement = "**/"+modifiedElement;
-		if (modifiedElement != element)
-			list.add(modifiedElement);
+//		String modifiedElement = element;
+//		if (!modifiedElement.endsWith("/") && !modifiedElement.endsWith("\\"))
+//			modifiedElement = modifiedElement+File.separatorChar;
+//		//if (!modifiedElement.startsWith("/") && !modifiedElement.startsWith("\\") && !modifiedElement.startsWith(".") && !modifiedElement.contains("**"))
+//		//	modifiedElement = "**/"+modifiedElement;
+//		if (modifiedElement != element)
+//			list.add(modifiedElement);
 	}
 	
 	public void addIgnoredFile(String toBeIgnored) {
@@ -76,10 +76,10 @@ public abstract class RecursiveFileAction {
 		if (this.toBeExplored.isEmpty())
 			throw new IllegalArgumentException("No directory found ; please provide at least one directory with a non filter expression (with no *, **, or ?).");
 		DirectoryScanner scanner = new DirectoryScanner();
-		if (this.toBeExploredFilters.isEmpty())
-			this.toBeExploredFilters.add("**");
-		scanner.setIncludes(this.toBeExploredFilters.toArray(new String[0]));
-		scanner.setExcludes(this.toBeIgnoredFilters.toArray(new String[0]));
+		if (!this.toBeExploredFilters.isEmpty())
+			scanner.setIncludes(this.toBeExploredFilters.toArray(new String[0]));
+		if (!this.toBeIgnoredFilters.isEmpty())
+			scanner.setExcludes(this.toBeIgnoredFilters.toArray(new String[0]));
 		scanner.setCaseSensitive(false);
 		
 		Set<String> found = new TreeSet<String>();
