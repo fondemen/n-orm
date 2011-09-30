@@ -8,7 +8,7 @@ import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.io.filefilter.WildcardFileFilter;
+import com.googlecode.n_orm.DatabaseNotReachedException;
 
 /**
  * An HBase {@link Store} starter found according to its configuration folder.
@@ -24,6 +24,18 @@ import org.apache.commons.io.filefilter.WildcardFileFilter;
  * @see Store
  */
 public class HBase {
+	public static final String[] HBaseDependencies = {
+		"org.apache.zookeeper.ZooKeeper",
+		"org.apache.hadoop.conf.Configuration",
+		"org.apache.hadoop.hbase.HBaseConfiguration",
+		"org.apache.commons.logging.LogFactory"
+	};
+	public static final String[] HBaseDependenciesJarFilters = {
+		"zookeeper*.jar,lib/zookeeper*.jar",
+		"hadoop*.jar,lib/hadoop*.jar",
+		"hbase*.jar",
+		"commons-logging*.jar,lib/commons-logging*.jar"
+	};
 
 	private static Map<String, Store> knownStores = new HashMap<String, Store>();
 	
@@ -67,18 +79,57 @@ public class HBase {
 	public static Store getStore(String commaSeparatedConfigurationFolders)
 			throws IOException {
 		synchronized(HBase.class) {
-		
 			Store ret = knownStores.get(commaSeparatedConfigurationFolders);
 			
 			if (ret == null) {
-				addJarAction.clear();
-				addJarAction.addFiles(commaSeparatedConfigurationFolders);
-				addJarAction.explore(null);
+				
+				try {
+					//Exploiting common configuration
+					String cscf = commaSeparatedConfigurationFolders+"!*-tests.jar,!*slf4j*.jar,"+createFilters(); //no slf4j since n-orm depends on EHCahe, which depends on a (newer) version of slf4j
+					addJarAction.clear();
+					addJarAction.addFiles(cscf);
+					try {
+						addJarAction.explore(null);
+					} catch (IllegalArgumentException x) {
+						throw new DatabaseNotReachedException("Invalid configuration folders specification " + commaSeparatedConfigurationFolders + ": " + x.getMessage());
+					}
+					checkConfiguration();
+				} catch (ClassNotFoundException x) {
+					//Explore all possibilities
+					String cscf = commaSeparatedConfigurationFolders; //any jars, anywhere
+					addJarAction.clear();
+					addJarAction.addFiles(cscf);
+					addJarAction.explore(null);
+					try {
+						checkConfiguration();
+					} catch (ClassNotFoundException e) {
+						throw new DatabaseNotReachedException("Cannot load necessary jars from " + commaSeparatedConfigurationFolders + " (" + e.getMessage() + ')');
+					}
+				}
 				ret = Store.getStore(commaSeparatedConfigurationFolders);
 				knownStores.put(commaSeparatedConfigurationFolders, ret);
 			}
 			
 			return ret;
 		}
+	}
+
+	private static void checkConfiguration() throws ClassNotFoundException {
+		for (String clazz : HBaseDependencies) {
+			ClassLoader.getSystemClassLoader().loadClass(clazz);
+		}
+	}
+
+	private static String createFilters() {
+		StringBuffer ret = new StringBuffer();
+		for (int i = 0; i < HBaseDependencies.length; ++i) {
+			try {
+				ClassLoader.getSystemClassLoader().loadClass(HBaseDependencies[i]);
+			} catch (ClassNotFoundException x) {
+				ret.append(',');
+				ret.append(HBaseDependenciesJarFilters[i]);
+			}
+		}
+		return ret.toString();
 	}
 }
