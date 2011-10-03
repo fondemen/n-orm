@@ -156,27 +156,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	};
 
-	public static final Logger logger;
-	public static final Logger errorLogger;
+	public static final Logger logger = HBase.logger;
+	public static final Logger errorLogger = HBase.errorLogger;
 	private static List<String> unavailableCompressors = new ArrayList<String>();
 	
 	protected static Map<Properties, Store> knownStores = new HashMap<Properties, Store>();
-	
-	static {
-		logger = Logger.getLogger(Store.class.getName());
-		errorLogger = Logger.getLogger(Store.class.getName());
-		initSimpleLogger(logger, System.out);
-		initSimpleLogger(errorLogger, System.err);
-	}
-	
-	private static void initSimpleLogger(Logger logger, PrintStream out) {
-		StreamHandler handler = new StreamHandler(System.out, new SimpleFormatter());
-		logger.addHandler(handler);
-		for (Handler h : logger.getHandlers()) {
-			if (h != handler)
-				logger.removeHandler(h);
-		}
-	}
 
 	/**
 	 * For test purpose ; avoid using this.
