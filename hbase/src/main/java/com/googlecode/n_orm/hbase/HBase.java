@@ -9,6 +9,7 @@ import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.logging.StreamHandler;
@@ -36,14 +37,16 @@ public class HBase {
 		"org.apache.hadoop.conf.Configuration",
 		"org.apache.hadoop.hbase.HBaseConfiguration",
 		"org.apache.commons.logging.LogFactory",
-		"org.apache.commons.lang.StringUtils"
+		"org.apache.commons.lang.StringUtils",
+		"org.apache.log4j.Logger"
 	};
 	public static final String[] HBaseDependenciesJarFilters = {
 		"zookeeper*.jar,lib/zookeeper*.jar",
 		"hadoop*.jar,lib/hadoop*.jar",
 		"hbase*.jar",
 		"commons-logging*.jar,lib/commons-logging*.jar",
-		"commons-lang*.jar,/lib/commons-lang*.jar"
+		"commons-lang*.jar,lib/commons-lang*.jar",
+		"log4j*.jar,lib/log4j*.jar"
 	};
 
 	public static final Logger logger;
@@ -65,11 +68,9 @@ public class HBase {
 						.getDeclaredMethod("addURL", parameters);
 				method.setAccessible(true);
 				method.invoke(sysloader, new Object[] { file.toURI().toURL() });
-				logger.info(file.getName() + " added to classpath");
+				errorLogger.fine(file.getAbsolutePath() + " added to classpath");
 			} catch (Throwable t) {
-				System.err.println("Warning: could not add jar file "
-						+ file.getAbsolutePath());
-				t.printStackTrace();
+				errorLogger.log(Level.SEVERE, "Warning: could not add jar file "	+ file.getAbsolutePath(), t);
 			}
 		}
 
@@ -123,6 +124,7 @@ public class HBase {
 					}
 					checkConfiguration();
 				} catch (ClassNotFoundException x) {
+					errorLogger.warning("Could not load all necessary classes (" + x.getMessage() + ") ; retrying loading all possible libraries...");
 					//Explore all possibilities
 					String cscf = commaSeparatedConfigurationFolders; //any jars, anywhere
 					addJarAction.clear();
