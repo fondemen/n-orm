@@ -24,19 +24,8 @@ public abstract class RecursiveFileAction {
 		toBeExplored = new LinkedList<String>();
 	}
 	
-	private void addFile(Collection<String> list, String element) {
-		list.add(element);
-//		String modifiedElement = element;
-//		if (!modifiedElement.endsWith("/") && !modifiedElement.endsWith("\\"))
-//			modifiedElement = modifiedElement+File.separatorChar;
-//		//if (!modifiedElement.startsWith("/") && !modifiedElement.startsWith("\\") && !modifiedElement.startsWith(".") && !modifiedElement.contains("**"))
-//		//	modifiedElement = "**/"+modifiedElement;
-//		if (modifiedElement != element)
-//			list.add(modifiedElement);
-	}
-	
 	public void addIgnoredFile(String toBeIgnored) {
-		this.addFile(this.toBeIgnoredFilters, toBeIgnored);
+		this.toBeIgnoredFilters.add(toBeIgnored);
 	}
 	
 	public void clearIgnoredFiles() {
@@ -45,11 +34,11 @@ public abstract class RecursiveFileAction {
 	
 	public void addExploredFile(String toBeExplored) {
 		if (toBeExplored.contains("*") || toBeExplored.contains("?"))
-			this.addFile(this.toBeExploredFilters, toBeExplored);
+			this.toBeExploredFilters.add(toBeExplored);
 		else if (new File(toBeExplored).isDirectory())
 			this.toBeExplored.add(toBeExplored);
 		else
-			Store.logger.warning(toBeExplored + " is neither a filter (no *, **, or ? found) nor a valid directory ; ignoring");
+			HBase.logger.warning(toBeExplored + " is neither a filter (no *, **, or ? found) nor a valid directory ; ignoring");
 	}
 	
 	public void clear() {
@@ -61,10 +50,12 @@ public abstract class RecursiveFileAction {
 	public void addFiles(String... files) {
 		for (String file : files) {
 			file = file.trim();
-			if (file.startsWith("!"))
-				this.addIgnoredFile(file.substring(1));
-			else
-				this.addExploredFile(file);
+			if (file.length() > 0) {
+				if (file.startsWith("!"))
+					this.addIgnoredFile(file.substring(1));
+				else
+					this.addExploredFile(file);
+			}
 		}
 	}
 		
