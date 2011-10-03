@@ -19,6 +19,7 @@ import java.util.Set;
 
 import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.googlecode.n_orm.CloseableIterator;
@@ -67,6 +68,7 @@ public class BasicTest {
 		}
 	}
 	
+	@BeforeClass
 	@AfterClass
 	public static void vacuumStore() {
 		StorageManagement.findElements().ofClass(BookStore.class).withAtMost(10000).elements().forEach(new Process<BookStore>() {

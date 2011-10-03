@@ -335,7 +335,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 
 	/**
 	 * The zookeeper quorum host to be used.
-	 * You shouldn't use this method as it should be set by {@link #getStore(String)}, {@link #getStore(String, int)}, or {@link #getStore(String, int, Integer).
+	 * You shouldn't use this method as it should be set by {@link #getStore(String)}, {@link #getStore(String, int)}, or {@link #getStore(String, int, Integer)}.
 	 */
 	@Override
 	public void setHost(String url) {
@@ -345,7 +345,6 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	/**
 	 * The zookeeper quorum port to be used.
 	 * You can only trust this method is this store was explicitly set the port before or started.
-	 * @return
 	 */
 	public int getPort() {
 		return port;
@@ -353,8 +352,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 
 	/**
 	 * The zookeeper quorum port to be used.
-	 * You shouldn't use this method as it should be set by {@link #getStore(String)}, {@link #getStore(String, int)}, or {@link #getStore(String, int, Integer).
-	 * @return
+	 * You shouldn't use this method as it should be set by {@link #getStore(String)}, {@link #getStore(String, int)}, or {@link #getStore(String, int, Integer)}.
 	 */
 	public void setPort(int port) {
 		this.port = port;
