@@ -2,11 +2,16 @@ package com.googlecode.n_orm.hbase;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Handler;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+import java.util.logging.StreamHandler;
 
 import org.codehaus.plexus.util.DirectoryScanner;
 
@@ -30,14 +35,19 @@ public class HBase {
 		"org.apache.zookeeper.ZooKeeper",
 		"org.apache.hadoop.conf.Configuration",
 		"org.apache.hadoop.hbase.HBaseConfiguration",
-		"org.apache.commons.logging.LogFactory"
+		"org.apache.commons.logging.LogFactory",
+		"org.apache.commons.lang.StringUtils"
 	};
 	public static final String[] HBaseDependenciesJarFilters = {
 		"zookeeper*.jar,lib/zookeeper*.jar",
 		"hadoop*.jar,lib/hadoop*.jar",
 		"hbase*.jar",
-		"commons-logging*.jar,lib/commons-logging*.jar"
+		"commons-logging*.jar,lib/commons-logging*.jar",
+		"commons-lang*.jar,/lib/commons-lang*.jar"
 	};
+
+	public static final Logger logger;
+	public static final Logger errorLogger;
 
 	private static Map<String, Store> knownStores = new HashMap<String, Store>();
 	
@@ -55,7 +65,7 @@ public class HBase {
 						.getDeclaredMethod("addURL", parameters);
 				method.setAccessible(true);
 				method.invoke(sysloader, new Object[] { file.toURI().toURL() });
-				//System.out.println(file.getName() + " added to the classpath");
+				logger.info(file.getName() + " added to classpath");
 			} catch (Throwable t) {
 				System.err.println("Warning: could not add jar file "
 						+ file.getAbsolutePath());
@@ -68,6 +78,22 @@ public class HBase {
 			return file.getName().endsWith(".jar");
 		}
 	};
+	
+	static {
+		logger = Logger.getLogger(HBase.class.getName());
+		errorLogger = Logger.getLogger(HBase.class.getName()+"-err");
+		initSimpleLogger(logger, System.out);
+		initSimpleLogger(errorLogger, System.err);
+	}
+	
+	private static void initSimpleLogger(Logger logger, PrintStream out) {
+		StreamHandler handler = new StreamHandler(out, new SimpleFormatter());
+		logger.addHandler(handler);
+		for (Handler h : logger.getHandlers()) {
+			if (h != handler)
+				logger.removeHandler(h);
+		}
+	}
 
 	/**
 	 * Get an HBase store according to a set of comma-separated configuration
