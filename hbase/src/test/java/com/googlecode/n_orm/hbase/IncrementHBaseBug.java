@@ -24,7 +24,7 @@ import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.StoreTestLauncher;
 import com.googlecode.n_orm.conversion.ConversionTools;
 
-public class IncrementHBaseBugTest {
+public class IncrementHBaseBug {
 	
 	private static Store store;
 	private static String testTable = "incrtest";
