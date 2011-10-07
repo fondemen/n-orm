@@ -3,13 +3,8 @@ package com.googlecode.n_orm.hbase.mapreduce;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectInput;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
-import java.io.StringWriter;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
@@ -25,11 +20,9 @@ import org.apache.hadoop.mapreduce.Job;
 
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
-import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.hbase.RowWrapper;
 import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.storeapi.ProcessWrapper;
-import com.googlecode.n_orm.storeapi.Row;
 
 public class ActionJob {
 
