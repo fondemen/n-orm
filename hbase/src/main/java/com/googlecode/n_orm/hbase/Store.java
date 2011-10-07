@@ -10,6 +10,7 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -61,6 +62,12 @@ import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.SetFile;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.ZooKeeper.States;
+import org.apache.zookeeper.recipes.lock.SharedExclusiveLock;
 import org.codehaus.plexus.util.DirectoryScanner;
 
 import com.googlecode.n_orm.Callback;
@@ -158,9 +165,22 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 
 	public static final Logger logger = HBase.logger;
 	public static final Logger errorLogger = HBase.errorLogger;
+	public static final String localHostName;
+	public static final long lockTimeout = 10000;
 	private static List<String> unavailableCompressors = new ArrayList<String>();
 	
 	protected static Map<Properties, Store> knownStores = new HashMap<Properties, Store>();
+	
+	static {
+		String lhn;
+		try {
+			lhn = java.net.InetAddress.getLocalHost().getHostName();
+		} catch (Exception x) {
+			lhn = "localhost";
+			errorLogger.log(Level.WARNING, "Cannot get local host name", x);
+		}
+		localHostName = lhn;
+	}
 
 	/**
 	 * For test purpose ; avoid using this.
@@ -247,7 +267,14 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	}
 	
 	private final Properties launchProps;
-	private String host = "localhost";
+	
+	//For inter-processes synchronization:
+	//avoids different processes to alter schema concurrently
+	private Map<String /*tableName*/ , SharedExclusiveLock /*lock*/> locks = new TreeMap<String, SharedExclusiveLock>();
+	//Those tables that are locked in exclusive mode and should be back to shared mode
+	private Set<String /*tableName*/> sharedExclusiveLockedTables = Collections.synchronizedSet(new TreeSet<String>());
+	
+	private String host = localHostName;
 	private int port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
 	private Integer maxRetries = null;
 	private boolean wasStarted = false;
@@ -270,6 +297,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 
 	protected Store(Properties properties) {
 		this.launchProps = properties;
+		try {
+			host = java.net.InetAddress.getLocalHost().getHostName();
+		} catch (Exception x) {
+			errorLogger.log(Level.WARNING, "Cannot get local host name", x);
+		}
 	}
 
 	public synchronized void start() throws DatabaseNotReachedException {
@@ -639,7 +671,12 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			try {
 				if (this.admin.tableExists(table) && this.admin.isTableDisabled(table)) {
 					errorLogger.log(Level.INFO, "It seems that table " + table + " was disabled ; enabling", e);
-					this.admin.enableTable(table);
+					this.exclusiveLockTable(table);
+					try {
+						this.admin.enableTable(table);
+					} finally {
+						this.exclusiveUnlockTable(table);
+					}
 				} else
 					throw new DatabaseNotReachedException(e);
 			} catch (IOException f) {
@@ -709,6 +746,107 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			}
 		}
 	}
+	
+	protected SharedExclusiveLock getLock(String table) throws DatabaseNotReachedException {
+		table = this.mangleTableName(table);
+		synchronized (this.locks) {
+			SharedExclusiveLock ret = this.locks.get(table);
+			ZooKeeper zk;
+			try {
+				zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+				if (!zk.getState().isAlive()) {
+					errorLogger.log(Level.WARNING, "Zookeeper connection lost ; restarting...");
+					this.restart();
+					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+				}
+			} catch (IOException e1) {
+				throw new DatabaseNotReachedException(e1);
+			}
+			
+			if (ret == null) {
+				try {
+					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+					String dir = "/n-orm/schemalock/" + table;
+					if (zk.exists("/n-orm", false) == null)  {
+						zk.create("/n-orm", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+					}
+					if (zk.exists("/n-orm/schemalock", false) == null)  {
+						zk.create("/n-orm/schemalock", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+					}
+					if (zk.exists(dir, false) == null) {
+						String node = zk.create(dir, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+						logger.info("Created lock node " + node);
+					}
+					ret = new SharedExclusiveLock(zk, dir);
+					this.locks.put(table, ret);
+				} catch (Exception e) {
+					throw new DatabaseNotReachedException(e);
+				}
+			}
+			
+			if (ret.getZookeeper() != zk) {
+				ret.setZookeeper(zk);
+			}
+			
+			return ret;
+		}
+	}
+	
+	protected void sharedLockTable(String table) throws DatabaseNotReachedException {
+		table = this.mangleTableName(table);
+		SharedExclusiveLock lock = this.getLock(table);
+		if (lock.getCurrentExclusiveLock() != null) {
+			this.sharedExclusiveLockedTables.add(table);
+			return;
+		}
+		try {
+			lock.getSharedLock(lockTimeout);
+		} catch (Exception e) {
+			throw new DatabaseNotReachedException(e);
+		}
+	}
+	
+	protected void sharedUnlockTable(String table) throws DatabaseNotReachedException {
+		table = this.mangleTableName(table);
+		SharedExclusiveLock lock = this.getLock(table);
+		if (lock.getCurrentSharedLock() != null)
+			try {
+				lock.releaseSharedLock();
+				this.sharedExclusiveLockedTables.remove(table);
+			} catch (Exception e) {
+				errorLogger.log(Level.SEVERE, "Error unlocking table " + table, e);
+			}
+	}
+	
+	protected void exclusiveLockTable(String table) throws DatabaseNotReachedException {
+		table = this.mangleTableName(table);
+		SharedExclusiveLock lock = this.getLock(table);
+		if (lock.getCurrentSharedLock() != null) {
+			this.sharedExclusiveLockedTables.add(table);
+			this.sharedUnlockTable(table);
+		}
+		try {
+			lock.getExclusiveLock(lockTimeout);
+		} catch (Exception e) {
+			throw new DatabaseNotReachedException(e);
+		}
+	}
+	
+	protected void exclusiveUnlockTable(String table) {
+		table = this.mangleTableName(table);
+		SharedExclusiveLock lock = this.getLock(table);
+		try {
+			if (lock.getCurrentExclusiveLock() != null)
+				lock.releaseExclusiveLock();
+		} catch (Exception e) {
+			errorLogger.log(Level.SEVERE, "Error unlocking table " + table + " locked in exclustion", e);
+		} finally {
+			if (this.sharedExclusiveLockedTables.contains(table)) {
+				this.sharedExclusiveLockedTables.remove(table);
+				this.sharedLockTable(table);
+			}
+		}
+	}
 
 	protected boolean hasTable(String name) throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
@@ -721,7 +859,13 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	private boolean hasTableNoCache(String name) {
 		name = this.mangleTableName(name);
 		try {
-			boolean ret = this.admin.tableExists(name);
+			boolean ret;
+			this.sharedLockTable(name);
+			try {
+				ret = this.admin.tableExists(name);
+			} finally {
+				this.sharedUnlockTable(name);
+			}
 			if (!ret &&this.tablesD.containsKey(name)) {
 				this.uncache(name);
 			}
@@ -737,8 +881,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		boolean created = false;
 		synchronized (this.tablesD) {
 			if (!this.tablesD.containsKey(name)) {
-				logger.fine("Unknown table " + name + " for store " + this.hashCode());
 				try {
+					this.sharedLockTable(name);
+					logger.fine("Unknown table " + name + " for store " + this.hashCode());
 					if (!this.admin.tableExists(name)) {
 						logger.info("Table " + name + " not found ; creating with column families " + Arrays.toString(expectedFamilies));
 						td = new HTableDescriptor(name);
@@ -753,7 +898,12 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 								}
 							}
 						}
-						this.admin.createTable(td);
+						this.exclusiveLockTable(name);
+						try {
+							this.admin.createTable(td);
+						} finally {
+							this.exclusiveUnlockTable(name);
+						}
 						logger.info("Table " + name + " created with column families " + Arrays.toString(expectedFamilies));
 						created = true;
 					} else {
@@ -761,10 +911,10 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 						logger.fine("Got descriptor for table " + name);
 					}
 					this.cache(name, td);
-				} catch (UndeclaredThrowableException x) {
-					throw new DatabaseNotReachedException(x.getCause());
-				} catch (IOException e) {
-					throw new DatabaseNotReachedException(e);
+				} catch (Exception x) {
+					throw new DatabaseNotReachedException(x);
+				} finally {
+					this.sharedUnlockTable(name);
 				}
 			} else {
 				td = this.tablesD.get(name);
@@ -805,12 +955,15 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		if (td != null && td.hasFamily(Bytes.toBytes(family)))
 			return true;
 		synchronized (this.tablesD) {
+			this.sharedLockTable(table);
 			try {
 				td = this.admin.getTableDescriptor(Bytes.toBytes(table));
-				this.cache(table, td);
-			} catch (IOException e) {
+			} catch (Exception e) {
 				throw new DatabaseNotReachedException(e);
+			} finally {
+				this.sharedUnlockTable(table);
 			}
+			this.cache(table, td);
 		}
 		return td.hasFamily(Bytes.toBytes(family));
 	}
@@ -820,6 +973,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		assert tableD != null;
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.length);
 		List<HColumnDescriptor> toBeCompressed = new ArrayList<HColumnDescriptor>(columnFamilies.length);
+		String tableName = tableD.getNameAsString();
 		synchronized (tableD) {
 			boolean recreated = false;
 			for (String cf : columnFamilies) {
@@ -828,8 +982,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				boolean familyExists = family != null;
 				boolean hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
 				if (!recreated && (!familyExists || !hasCorrectCompressor)) {
-					String tableName = tableD.getNameAsString();
 					logger.fine("Table " + tableName + " is not known to have family " + cf + " propertly configured: checking from HBase");
+					this.sharedLockTable(tableName);
 					try {
 						tableD = this.admin.getTableDescriptor(tableD.getName());
 					} catch (Exception e) {
@@ -837,6 +991,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 						this.handleProblem(e, tableName);
 						this.getTableDescriptor(tableName, columnFamilies);
 						return;
+					} finally {
+						this.sharedUnlockTable(tableName);
 					}
 					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
 					familyExists = family != null;
@@ -860,6 +1016,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 						logger.info("Table " + tableD.getNameAsString() + " is missing families " + toBeAdded.toString() + ": creating");
 					if (!toBeCompressed.isEmpty())
 						logger.info("Table " + tableD.getNameAsString() + " compressed with " + this.compression + " has the wrong compressor for families " + toBeCompressed.toString() + ": altering");
+					this.exclusiveLockTable(tableName);
 					try {
 						this.admin.disableTable(tableD.getName());
 					} catch (TableNotFoundException x) {
@@ -883,6 +1040,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				} catch (IOException e) {
 					errorLogger.log(Level.SEVERE, "Could not create on table " + tableD.getNameAsString() + " families " + toBeAdded.toString(), e);
 					throw new DatabaseNotReachedException(e);
+				} finally {
+					this.exclusiveUnlockTable(tableName);
 				}
 
 			}
