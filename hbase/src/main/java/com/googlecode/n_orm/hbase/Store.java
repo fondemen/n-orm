@@ -83,6 +83,7 @@ import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.hbase.actions.Action;
 import com.googlecode.n_orm.hbase.actions.BatchAction;
+import com.googlecode.n_orm.hbase.actions.CountAction;
 import com.googlecode.n_orm.hbase.actions.DeleteAction;
 import com.googlecode.n_orm.hbase.actions.ExistsAction;
 import com.googlecode.n_orm.hbase.actions.GetAction;
@@ -797,8 +798,10 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		table = this.mangleTableName(table);
 		SharedExclusiveLock lock = this.getLock(table);
 		if (lock.getCurrentExclusiveLock() != null) {
-			this.sharedExclusiveLockedTables.add(table);
-			return;
+			synchronized (this.sharedExclusiveLockedTables) {
+				this.sharedExclusiveLockedTables.add(table);
+				return;
+			}
 		}
 		try {
 			lock.getSharedLock(lockTimeout);
@@ -812,8 +815,10 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		SharedExclusiveLock lock = this.getLock(table);
 		if (lock.getCurrentSharedLock() != null)
 			try {
-				lock.releaseSharedLock();
-				this.sharedExclusiveLockedTables.remove(table);
+				synchronized (this.sharedExclusiveLockedTables) {
+					lock.releaseSharedLock();
+					this.sharedExclusiveLockedTables.remove(table);
+				}
 			} catch (Exception e) {
 				errorLogger.log(Level.SEVERE, "Error unlocking table " + table, e);
 			}
@@ -823,8 +828,10 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		table = this.mangleTableName(table);
 		SharedExclusiveLock lock = this.getLock(table);
 		if (lock.getCurrentSharedLock() != null) {
-			this.sharedExclusiveLockedTables.add(table);
-			this.sharedUnlockTable(table);
+			synchronized (this.sharedExclusiveLockedTables) {
+				this.sharedUnlockTable(table);
+				this.sharedExclusiveLockedTables.add(table);
+			}
 		}
 		try {
 			lock.getExclusiveLock(lockTimeout);
@@ -842,9 +849,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		} catch (Exception e) {
 			errorLogger.log(Level.SEVERE, "Error unlocking table " + table + " locked in exclustion", e);
 		} finally {
-			if (this.sharedExclusiveLockedTables.contains(table)) {
-				this.sharedExclusiveLockedTables.remove(table);
-				this.sharedLockTable(table);
+			synchronized (this.sharedExclusiveLockedTables) {
+				if (this.sharedExclusiveLockedTables.contains(table)) {
+					this.sharedExclusiveLockedTables.remove(table);
+					this.sharedLockTable(table);
+				}
 			}
 		}
 	}
@@ -904,6 +913,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 							this.admin.createTable(td);
 						} finally {
 							this.exclusiveUnlockTable(name);
+							assert this.getLock(name).getCurrentSharedLock() != null;
 						}
 						logger.info("Table " + name + " created with column families " + Arrays.toString(expectedFamilies));
 						created = true;
@@ -976,7 +986,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		List<HColumnDescriptor> toBeCompressed = new ArrayList<HColumnDescriptor>(columnFamilies.length);
 		String tableName = tableD.getNameAsString();
 		synchronized (tableD) {
-			boolean recreated = false;
+			boolean recreated = false; //Whether table descriptor was just retrieved from HBase admin
 			for (String cf : columnFamilies) {
 				byte[] cfname = Bytes.toBytes(cf);
 				HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
@@ -1014,7 +1024,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			if (!toBeAdded.isEmpty() || !toBeCompressed.isEmpty()) {
 				try {
 					if (!toBeAdded.isEmpty())
-						logger.info("Table " + tableD.getNameAsString() + " is missing families " + toBeAdded.toString() + ": creating");
+						logger.info("Table " + tableD.getNameAsString() + " is missing families " + toBeAdded.toString() + ": altering");
 					if (!toBeCompressed.isEmpty())
 						logger.info("Table " + tableD.getNameAsString() + " compressed with " + this.compression + " has the wrong compressor for families " + toBeCompressed.toString() + ": altering");
 					this.exclusiveLockTable(tableName);
@@ -1037,7 +1047,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 						this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
 					}
 					this.admin.enableTable(tableD.getName());
-					logger.info("Table " + tableD.getNameAsString() + " does not have families " + toBeAdded.toString() + ": created");
+					logger.info("Table " + tableD.getNameAsString() + " altered");
 				} catch (IOException e) {
 					errorLogger.log(Level.SEVERE, "Could not create on table " + tableD.getNameAsString() + " families " + toBeAdded.toString(), e);
 					throw new DatabaseNotReachedException(e);
@@ -1048,45 +1058,10 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			}
 		}
 	}
-
-	@Override
-	public Map<String, Map<String, byte[]>> get(String table, String id,
-			Set<String> families) throws DatabaseNotReachedException {
-		Get g = new Get(Bytes.toBytes(id));
-		for (String family : families) {
-			g.addFamily(Bytes.toBytes(family));
-		}
-
-		Result r = this.tryPerform(new GetAction(g), table, families.toArray(new String[families.size()]));
-		if (r.isEmpty())
-			return null;
-		
-		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String, byte[]>>();
-		if (!r.isEmpty()) {
-			for (KeyValue kv : r.list()) {
-				String family = Bytes.toString(kv.getFamily());
-				if (!ret.containsKey(family))
-					ret.put(family, new TreeMap<String, byte[]>());
-				ret.get(family).put(Bytes.toString(kv.getQualifier()),
-						kv.getValue());
-			}
-		}
-		return ret;
-	}
-
-	protected Filter createFamilyConstraint(Constraint c,
-			boolean firstKeyOnly) {
-		Filter f = null;
-		if (c.getStartKey() != null)
-			f = new QualifierFilter(CompareOp.GREATER_OR_EQUAL,
-					new BinaryComparator(Bytes.toBytes(c.getStartKey())));
-		if (c.getEndKey() != null)
-			f = this.addFilter(f, new QualifierFilter(CompareOp.LESS_OR_EQUAL,
-					new BinaryComparator(Bytes.toBytes(c.getEndKey()))));
-		if (firstKeyOnly)
-			f = this.addFilter(f, new FirstKeyOnlyFilter());
-		return f;
-	}
+	
+	////////////////////////////////////////////////////////////////////
+	// Actual implementation methods
+	////////////////////////////////////////////////////////////////////
 
 	private Filter addFilter(Filter f1, Filter f2) {
 		if (f2 == null) {
@@ -1102,6 +1077,72 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			list.addFilter(f2);
 			return list;
 		}
+	}
+
+	protected Filter createFamilyConstraint(Constraint c) {
+		Filter f = null;
+		if (c.getStartKey() != null)
+			f = new QualifierFilter(CompareOp.GREATER_OR_EQUAL,
+					new BinaryComparator(Bytes.toBytes(c.getStartKey())));
+		if (c.getEndKey() != null)
+			f = this.addFilter(f, new QualifierFilter(CompareOp.LESS_OR_EQUAL,
+					new BinaryComparator(Bytes.toBytes(c.getEndKey()))));
+		return f;
+	}
+
+	protected Scan getScan(Constraint c, String... families) throws DatabaseNotReachedException {
+		Scan s = new Scan();
+		if (this.scanCaching != null)
+			s.setCaching(this.getScanCaching());
+		if (c != null && c.getStartKey() != null)
+			s.setStartRow(Bytes.toBytes(c.getStartKey()));
+		if (c != null && c.getEndKey() != null) {
+			byte[] endb = Bytes.toBytes(c.getEndKey());
+			endb = Bytes.add(endb, new byte[] { 0 });
+			s.setStopRow(endb);
+		}
+		
+		if (families != null) {
+			for (String fam : families) {
+				s.addFamily(Bytes.toBytes(fam));
+			}
+		} else {
+			//No family to load ; avoid getting all information in the row (that may be big)
+			s.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
+		}
+		
+		return s;
+	}
+
+	@Override
+	public Map<String, Map<String, byte[]>> get(String table, String id,
+			Set<String> families) throws DatabaseNotReachedException {
+		if (!this.hasTable(table))
+			return null;
+		
+		Get g = new Get(Bytes.toBytes(id));
+		for (String family : families) {
+			g.addFamily(Bytes.toBytes(family));
+		}
+
+		Result r = this.tryPerform(new GetAction(g), table, families.toArray(new String[families.size()]));
+		if (r.isEmpty())
+			return null;
+		
+		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String, byte[]>>();
+		if (!r.isEmpty()) {
+			for (KeyValue kv : r.list()) {
+				String familyName = Bytes.toString(kv.getFamily());
+				Map<String, byte[]> fam = ret.get(familyName);
+				if (fam == null) {
+					fam = new TreeMap<String, byte[]>();
+					ret.put(familyName, fam);
+				}
+				fam.put(Bytes.toString(kv.getQualifier()),
+						kv.getValue());
+			}
+		}
+		return ret;
 	}
 
 	@Override
@@ -1129,11 +1170,10 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			Put rowPut = null;
 			if (changed != null && !changed.isEmpty()) {
 				rowPut = new Put(row);
-				for (String family : changed.keySet()) {
-					byte[] cf = Bytes.toBytes(family);
-					Map<String, byte[]> toPut = changed.get(family);
-					for (String key : toPut.keySet()) {
-						rowPut.add(cf, Bytes.toBytes(key), toPut.get(key));
+				for (Entry<String, Map<String, byte[]>> family : changed.entrySet()) {
+					byte[] cf = Bytes.toBytes(family.getKey());
+					for (Entry<String, byte[]> col : family.getValue().entrySet()) {
+						rowPut.add(cf, Bytes.toBytes(col.getKey()), col.getValue());
 					}
 				}
 				if (rowPut.getFamilyMap().isEmpty())
@@ -1145,9 +1185,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			Delete rowDel = null;
 			if (removed != null && !removed.isEmpty()) {
 				rowDel = new Delete(row);
-				for (String family : removed.keySet()) {
-					byte[] cf = Bytes.toBytes(family);
-					for (String key : removed.get(family)) {
+				for (Entry<String, Set<String>> family : removed.entrySet()) {
+					byte[] cf = Bytes.toBytes(family.getKey());
+					for (String key : family.getValue()) {
 						rowDel.deleteColumns(cf, Bytes.toBytes(key));
 					}
 	
@@ -1162,8 +1202,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			if (increments != null && !increments.isEmpty()) {
 				rowInc = new Increment(row);
 				for (Entry<String, Map<String, Number>> incrs : increments.entrySet()) {
+					byte[] cf = Bytes.toBytes(incrs.getKey());
 					for (Entry<String, Number> inc : incrs.getValue().entrySet()) {
-						rowInc.addColumn(Bytes.toBytes(incrs.getKey()), Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
+						rowInc.addColumn(cf, Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
 					}
 				}
 				if (rowInc.getFamilyMap().isEmpty())
@@ -1263,51 +1304,6 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 //		}
 //	}
 
-	protected long count(String table, Scan s) throws DatabaseNotReachedException {
-		if (this.isCountMapRed())
-			return this.countMapRed(table, s);
-		else
-			return this.countSimple(table, s);
-	}
-
-	protected long countSimple(String table, Scan s) throws DatabaseNotReachedException {
-		if (! this.hasTableNoCache(table))
-			return 0;
-		
-		ResultScanner r = this.tryPerform(new ScanAction(s), table);
-		int count = 0;
-		try {
-			Iterator<Result> it = r.iterator();
-			while (it.hasNext()) {
-				it.next();
-				count++;
-			}
-			return count;
-		} finally {
-			if (r != null)
-				r.close();
-		}
-	}
-	
-	protected long countMapRed(String table, Scan s) throws DatabaseNotReachedException {
-		if (!this.hasTableNoCache(table))
-			return 0;
-
-		String tableName = this.mangleTableName(table);
-		try {
-			Job count = RowCounter.createSubmittableJob(this, tableName, s);
-			if(!count.waitForCompletion(false))
-				throw new DatabaseNotReachedException("Row count failed for table " + table);
-			return count.getCounters().findCounter(RowCounter.RowCounterMapper.Counters.ROWS).getValue();
-		} catch (IOException e) {
-			throw new DatabaseNotReachedException(e);
-		} catch (InterruptedException e) {
-			throw new DatabaseNotReachedException(e);
-		} catch (ClassNotFoundException e) {
-			throw new DatabaseNotReachedException(e);
-		}
-	}
-
 	@Override
 	public boolean exists(String table, String row, String family)
 			throws DatabaseNotReachedException {
@@ -1315,7 +1311,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			return false;
 
 		Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));
-		g.setFilter(new FirstKeyOnlyFilter());
+		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
 		return this.tryPerform(new ExistsAction(g), table);
 	}
 
@@ -1326,13 +1322,16 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			return false;
 
 		Get g = new Get(Bytes.toBytes(row));
-		g.setFilter(new FirstKeyOnlyFilter());
+		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
 		return this.tryPerform(new ExistsAction(g), table);
 	}
 
 	@Override
 	public byte[] get(String table, String row, String family, String key)
 			throws DatabaseNotReachedException {
+		if (!this.hasTable(table))
+			return null;
+
 		Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
 				Bytes.toBytes(key));
 
@@ -1352,10 +1351,13 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	@Override
 	public Map<String, byte[]> get(String table, String id, String family,
 			Constraint c) throws DatabaseNotReachedException {
+		if (!this.hasTable(table))
+			return null;
+
 		Get g = new Get(Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
 
 		if (c != null) {
-			g.setFilter(createFamilyConstraint(c, false));
+			g.setFilter(createFamilyConstraint(c));
 		}
 
 		Result r = this.tryPerform(new GetAction(g), table, family);
@@ -1364,40 +1366,19 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		
 		Map<String, byte[]> ret = new HashMap<String, byte[]>();
 		if (!r.isEmpty()) {
-			for (KeyValue kv : r.list()) {
+			for (KeyValue kv : r.raw()) {
 				ret.put(Bytes.toString(kv.getQualifier()), kv.getValue());
 			}
 		}
 		return ret;
 	}
 
-	protected Scan getScan(Constraint c, String... families) throws DatabaseNotReachedException {
-		Scan s = new Scan();
-		if (this.scanCaching != null)
-			s.setCaching(this.getScanCaching());
-		if (c != null && c.getStartKey() != null)
-			s.setStartRow(Bytes.toBytes(c.getStartKey()));
-		if (c != null && c.getEndKey() != null) {
-			byte[] endb = Bytes.toBytes(c.getEndKey());
-			endb = Bytes.add(endb, new byte[] { 0 });
-			s.setStopRow(endb);
-		}
-		
-		if (families != null) {
-			for (String fam : families) {
-				s.addFamily(Bytes.toBytes(fam));
-			}
-		} else {
-			//No family to load ; avoid getting all information in the row (that may be big)
-			s.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-		}
-		
-		return s;
-	}
-
 	@Override
 	public long count(String table, Constraint c) throws DatabaseNotReachedException {
-		return this.count(table, this.getScan(c));
+		if (! this.hasTable(table))
+			return 0;
+		
+		return this.tryPerform(new CountAction(this, this.getScan(c)), table);
 	}
 
 	@Override
@@ -1408,21 +1389,14 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		
 		String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
 		Scan s = this.getScan(c, famAr);
-		Filter filter = s.getFilter();
-		FilterList fl;
-		if (filter instanceof FilterList) {
-			fl = (FilterList)filter;
-			fl.addFilter(new PageFilter(limit));
-		} else {
-			s.setFilter(new PageFilter(limit));
-		}
+		s.setFilter(this.addFilter(s.getFilter(), new PageFilter(limit)));
 		
 		ResultScanner r = this.tryPerform(new ScanAction(s), table, famAr);
 		return new CloseableIterator(r, families != null);
 	}
 
 	public void truncate(String table, Constraint c) throws DatabaseNotReachedException {
-		if (!this.hasTableNoCache(table))
+		if (!this.hasTable(table))
 			return;
 		
 		logger.info("Truncating table " + table);
@@ -1435,17 +1409,34 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 
 	@Override
 	public <AE extends PersistingElement, E extends AE> void process(
-			String table, Constraint c, Set<String> families, Class<E> elementClass,
-			Process<AE> action, Callback callback)
+			final String table, Constraint c, Set<String> families, Class<E> elementClass,
+			Process<AE> action, final Callback callback)
 			throws DatabaseNotReachedException {
-		Class<?> actionClass = action.getClass();
+		final Class<?> actionClass = action.getClass();
 		try {
 			String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
-			Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, famAr), action, elementClass, famAr);
+			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, famAr), action, elementClass, famAr);
 			logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
 			if (callback != null) {
-				job.waitForCompletion(false);
-				callback.processCompleted();
+				new Thread() {
+
+					@Override
+					public void run() {
+						try {
+							if (job.waitForCompletion(false)) {
+								callback.processCompleted();
+							} else {
+								throw new RuntimeException("Unknown reason");
+							}
+						} catch (Throwable x) {
+							errorLogger.log(Level.WARNING, "Could not perform server-side process " + actionClass.getName() + " on table " + table, x);
+							if (callback != null) {
+								callback.processCompletedInError(x);
+							}
+						}
+					}
+					
+				}.start();
 			} else
 				job.submit();
 
