@@ -89,6 +89,7 @@ import com.googlecode.n_orm.hbase.actions.GetAction;
 import com.googlecode.n_orm.hbase.actions.IncrementAction;
 import com.googlecode.n_orm.hbase.actions.PutAction;
 import com.googlecode.n_orm.hbase.actions.ScanAction;
+import com.googlecode.n_orm.hbase.actions.TruncateAction;
 import com.googlecode.n_orm.hbase.mapreduce.ActionJob;
 import com.googlecode.n_orm.hbase.mapreduce.LocalFormat;
 import com.googlecode.n_orm.hbase.mapreduce.RowCounter;
@@ -1421,75 +1422,15 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	}
 
 	public void truncate(String table, Constraint c) throws DatabaseNotReachedException {
-		this.truncate(table, this.getScan(c));
-	}
-	
-	protected void truncate(String table, Scan s) {
-		if (this.isTruncateMapRed())
-			this.truncateMapReduce(table, s);
-		else
-			this.truncateSimple(table, s);
-	}
-	
-	protected void truncateSimple(String table, Scan s)  {
-		if (! this.hasTableNoCache(table))
+		if (!this.hasTableNoCache(table))
 			return;
 		
 		logger.info("Truncating table " + table);
 		
-		HTable t = this.getTable(table);
-		ScanAction action = new ScanAction(s);
-		ResultScanner r = this.tryPerform(action, t, table);
-		t = action.getTable();
-
-		try {
-			final int nbRows = 100;
-			List<Delete> dels = new ArrayList<Delete>(nbRows);
-			Result [] res = r.next(nbRows);
-			while (res != null && res.length != 0) {
-				dels.clear();
-				for (Result result : res) {
-					dels.add(new Delete(result.getRow()));
-				}
-				t.delete(dels);
-				res = r.next(nbRows);
-			}
-			logger.info("Truncated table " + table);
-		} catch (IOException e) {
-			errorLogger.log(Level.INFO, "Could not truncate table " + table, e);
-			throw new DatabaseNotReachedException(e);
-		} finally {
-			this.returnTable(t);
-			
-			if (r != null)
-				r.close();
-		}
-	}
-	
-	protected void truncateMapReduce(String table, Scan s)  {
-		if (!this.hasTableNoCache(table))
-			return;
+		TruncateAction action = new TruncateAction(this, this.getScan(c));
+		this.tryPerform(action, table);
 		
-		logger.info("Truncating table " + table + " using map/reduce job");
-
-		String tableName = this.mangleTableName(table);
-		try {
-			Job count = Truncator.createSubmittableJob(this, tableName, s);
-			if(!count.waitForCompletion(false)) {
-				errorLogger.info("Could not truncate table with map/reduce " + table);
-				throw new DatabaseNotReachedException("Truncate failed for table " + table);
-			}
-			logger.info("Truncated table " + table + " using map/reduce job");
-		} catch (IOException e) {
-			errorLogger.log(Level.INFO, "Could not truncate table " + table, e);
-			throw new DatabaseNotReachedException(e);
-		} catch (InterruptedException e) {
-			errorLogger.log(Level.INFO, "Could not truncate table " + table, e);
-			throw new DatabaseNotReachedException(e);
-		} catch (ClassNotFoundException e) {
-			errorLogger.log(Level.INFO, "Could not truncate table " + table, e);
-			throw new DatabaseNotReachedException(e);
-		}
+		logger.info("Truncated table " + table);
 	}
 
 	@Override
