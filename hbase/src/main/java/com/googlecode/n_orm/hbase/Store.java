@@ -274,7 +274,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	//avoids different processes to alter schema concurrently
 	private Map<String /*tableName*/ , SharedExclusiveLock /*lock*/> locks = new TreeMap<String, SharedExclusiveLock>();
 	//Those tables that are locked in exclusive mode and should be back to shared mode
-	private Set<String /*tableName*/> sharedExclusiveLockedTables = Collections.synchronizedSet(new TreeSet<String>());
+	private Set<String /*tableName*/> sharedExclusiveLockedTables = new TreeSet<String>();
 	
 	private String host = localHostName;
 	private int port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
@@ -797,59 +797,60 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	protected void sharedLockTable(String table) throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
 		SharedExclusiveLock lock = this.getLock(table);
-		if (lock.getCurrentExclusiveLock() != null) {
-			synchronized (this.sharedExclusiveLockedTables) {
+		synchronized (lock) {
+			if (lock.getCurrentExclusiveLock() != null) {
 				this.sharedExclusiveLockedTables.add(table);
 				return;
 			}
-		}
-		try {
-			lock.getSharedLock(lockTimeout);
-		} catch (Exception e) {
-			throw new DatabaseNotReachedException(e);
+			try {
+				lock.getSharedLock(lockTimeout);
+			} catch (Exception e) {
+				throw new DatabaseNotReachedException(e);
+			}
 		}
 	}
 	
 	protected void sharedUnlockTable(String table) throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
 		SharedExclusiveLock lock = this.getLock(table);
-		if (lock.getCurrentSharedLock() != null)
-			try {
-				synchronized (this.sharedExclusiveLockedTables) {
+		synchronized (lock) {
+			if (lock.getCurrentSharedLock() != null) {
+				try {
 					lock.releaseSharedLock();
 					this.sharedExclusiveLockedTables.remove(table);
+				} catch (Exception e) {
+					errorLogger.log(Level.SEVERE, "Error unlocking table " + table, e);
 				}
-			} catch (Exception e) {
-				errorLogger.log(Level.SEVERE, "Error unlocking table " + table, e);
 			}
+		}
 	}
 	
 	protected void exclusiveLockTable(String table) throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
 		SharedExclusiveLock lock = this.getLock(table);
-		if (lock.getCurrentSharedLock() != null) {
-			synchronized (this.sharedExclusiveLockedTables) {
+		synchronized (lock) {
+			if (lock.getCurrentSharedLock() != null) {
 				this.sharedUnlockTable(table);
 				this.sharedExclusiveLockedTables.add(table);
 			}
-		}
-		try {
-			lock.getExclusiveLock(lockTimeout);
-		} catch (Exception e) {
-			throw new DatabaseNotReachedException(e);
+			try {
+				lock.getExclusiveLock(lockTimeout);
+			} catch (Exception e) {
+				throw new DatabaseNotReachedException(e);
+			}
 		}
 	}
 	
 	protected void exclusiveUnlockTable(String table) {
 		table = this.mangleTableName(table);
 		SharedExclusiveLock lock = this.getLock(table);
-		try {
-			if (lock.getCurrentExclusiveLock() != null)
-				lock.releaseExclusiveLock();
-		} catch (Exception e) {
-			errorLogger.log(Level.SEVERE, "Error unlocking table " + table + " locked in exclustion", e);
-		} finally {
-			synchronized (this.sharedExclusiveLockedTables) {
+		synchronized (lock) {
+			try {
+				if (lock.getCurrentExclusiveLock() != null)
+					lock.releaseExclusiveLock();
+			} catch (Exception e) {
+				errorLogger.log(Level.SEVERE, "Error unlocking table " + table + " locked in exclustion", e);
+			} finally {
 				if (this.sharedExclusiveLockedTables.contains(table)) {
 					this.sharedExclusiveLockedTables.remove(table);
 					this.sharedLockTable(table);
