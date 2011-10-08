@@ -54,6 +54,8 @@ public class SharedExclusiveLock {
     private String currentExclusiveLock;
 
     private String currentSharedLock;
+    
+    private Thread currentThread;
 
     public SharedExclusiveLock(ZooKeeper zooKeeper, String lockPath) {
         this.zooKeeper = zooKeeper;
@@ -195,6 +197,7 @@ public class SharedExclusiveLock {
         }
 
         currentExclusiveLock = exclusiveLock;
+        currentThread = Thread.currentThread();
 
         return exclusiveLock;
     }
@@ -294,6 +297,7 @@ public class SharedExclusiveLock {
         	throw zookeeperException;
         }
         currentSharedLock = sharedLock;
+        currentThread = Thread.currentThread();
 
         return sharedLock;
     }
@@ -302,12 +306,14 @@ public class SharedExclusiveLock {
             KeeperException {
         zooKeeper.delete(currentSharedLock, -1);
         currentSharedLock = null;
+        currentThread = null;
     }
 
     public void releaseExclusiveLock() throws InterruptedException,
             KeeperException {
         zooKeeper.delete(currentExclusiveLock, -1);
         currentExclusiveLock = null;
+        currentThread = null;
     }
 
     private Long getSequenceId(final String fileName) {
@@ -324,6 +330,10 @@ public class SharedExclusiveLock {
 
     public String getCurrentSharedLock() {
         return currentSharedLock;
+    }
+    
+    public Thread getCurrentThread() {
+    	return this.currentThread;
     }
 
     /**
