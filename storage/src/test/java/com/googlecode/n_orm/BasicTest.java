@@ -2,6 +2,12 @@ package com.googlecode.n_orm;
 
 import static org.junit.Assert.*;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.NavigableSet;
@@ -22,6 +28,7 @@ import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class BasicTest {
 
@@ -174,6 +181,48 @@ public class BasicTest {
 		 assertTrue(storeBooks.contains(b3));
 		 
 		 checkOrder(storeBooks);
+	 }
+	 
+	 @Test public void checkSerializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
+		 
+		 BookStore bstore = new BookStore("test serialization book");
+		 bstore.setName("bookstore name");
+		 bstore.store();
+		 
+		 Book b2 = new Book(bstore, new Date(123456789), new Date());
+		 b2.store();
+		 Book b3 = new Book(bstore, new Date(121212121), new Date());
+		 b3.store();
+		 
+		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).andWithKey("bookStore").setTo(bstore).withAtMost(1000).elements();
+		 
+		 File f = new File("books.ser");
+		 f.delete();
+		 assertFalse(f.exists());
+		 
+		 // Serialize in a file
+		 FileOutputStream fos = new FileOutputStream(f);
+		 searchQuery.serialize(fos);
+		 fos.close();
+		 
+		 // Test if the file has been created
+		 assertTrue(f.exists());
+		 
+		 NavigableSet<Book> originalBooks = searchQuery.go();
+		 
+		 FileInputStream fis = new FileInputStream(f);
+		 ObjectInputStream ois = new ObjectInputStream(fis);
+		 @SuppressWarnings("unchecked")
+		 NavigableSet<Book> unserializedBooks = (NavigableSet<Book>) ois.readObject();
+		 
+		 assertEquals(originalBooks, unserializedBooks);
+		 
+		 Book current;
+		 Iterator<Book> it = unserializedBooks.iterator();
+		 while(it.hasNext())
+		 {
+			 current = it.next();
+		 }
 	 }
 
 	public void checkOrder(Set<? extends PersistingElement> elements) {
