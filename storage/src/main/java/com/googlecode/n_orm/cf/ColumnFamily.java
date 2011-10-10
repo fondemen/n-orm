@@ -37,7 +37,7 @@ public abstract class ColumnFamily<T> {
 	
 	protected boolean activated = false;
 	
-	public ColumnFamily() { 
+	public ColumnFamily() { //For compile-time purpose only ; should be replaced by Around of ColumnFamilyManagement
 		this.clazz = null;
 		this.property = null;
 		this.name = null;
