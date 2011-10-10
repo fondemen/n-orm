@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
+import java.util.Iterator;
 import java.util.NavigableSet;
 
 import com.googlecode.n_orm.Callback;
@@ -188,16 +189,14 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @throws IOException 
 	 */
 	public void serialize(OutputStream out) throws IOException {
-		
 		ObjectOutputStream oos= new ObjectOutputStream(out);
-		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
-		if (hasNoLimit())
-			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
-		NavigableSet<T> set = StorageManagement.findElementsToSet(this.getClazz(), this.getConstraint(), this.limit, this.toBeActivated);
+
+		NavigableSet<T> set = this.go();
 
 		oos.writeObject(set);
 		
 		oos.flush();
 		oos.close();
+		out.flush();
 	}
 }
