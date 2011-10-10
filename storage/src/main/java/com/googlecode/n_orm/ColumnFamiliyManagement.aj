@@ -210,13 +210,12 @@ public aspect ColumnFamiliyManagement {
 		}
 	}
 	
-	void around(PersistingElement self, Object cf): set(!@Transient !transient !static (Set+ || Map+) PersistingElement+.*) && target(self) && args(cf) {
-
+	void around(PersistingElement self, Object cf): set(!@Transient !transient !static (Set+ || Map+) (*.*)) && !within(ColumnFamiliyManagement) && target(self) && args(cf) {
 		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();
 		Field field = sign.getField();
 		assert isCollectionFamily(field);
 
-		ColumnFamily<?> ccf = createColumnFamily(self, field, cf);
+		ColumnFamily<?> ccf = createColumnFamily((PersistingElement)self, field, cf);
 		
 		if(ColumnFamily.class.isAssignableFrom(field.getType()))
 			proceed(self, ccf);
@@ -259,4 +258,8 @@ public aspect ColumnFamiliyManagement {
 		if (cf.getOwner() != null)
 			cf.getOwner().addColumnFamily(cf);
 	}
+	
+	//before(ColumnFamily cf) : execution(public * ColumnFamily+.*(..) && target(cf)) {
+	//	assert cf.owner != null;
+	//}
 }
