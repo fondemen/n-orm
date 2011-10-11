@@ -184,17 +184,15 @@ public class BasicTest {
 	 }
 	 
 	 @Test public void checkSerializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
-		 
-		 BookStore bstore = new BookStore("test serialization book");
-		 bstore.setName("bookstore name");
-		 bstore.store();
-		 
-		 Book b2 = new Book(bstore, new Date(123456789), new Date());
+		 Book current;
+		 Iterator<Book> it;
+
+		 Book b2 = new Book(bssut, new Date(12121212), new Date());
 		 b2.store();
-		 Book b3 = new Book(bstore, new Date(121212121), new Date());
+		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
 		 b3.store();
 		 
-		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).andWithKey("bookStore").setTo(bstore).withAtMost(1000).elements();
+		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
 		 
 		 File f = new File("books.ser");
 		 f.delete();
@@ -209,6 +207,12 @@ public class BasicTest {
 		 assertTrue(f.exists());
 		 
 		 NavigableSet<Book> originalBooks = searchQuery.go();
+		 it = originalBooks.iterator();
+		 while(it.hasNext())
+		 {
+			 current = it.next();
+			 current.delete();
+		 }
 		 
 		 FileInputStream fis = new FileInputStream(f);
 		 ObjectInputStream ois = new ObjectInputStream(fis);
@@ -216,12 +220,12 @@ public class BasicTest {
 		 NavigableSet<Book> unserializedBooks = (NavigableSet<Book>) ois.readObject();
 		 
 		 assertEquals(originalBooks, unserializedBooks);
-		 
-		 Book current;
-		 Iterator<Book> it = unserializedBooks.iterator();
+		 System.out.println("deserilization");
+		 it = unserializedBooks.iterator();
 		 while(it.hasNext())
 		 {
 			 current = it.next();
+			 current.store();
 		 }
 	 }
 
