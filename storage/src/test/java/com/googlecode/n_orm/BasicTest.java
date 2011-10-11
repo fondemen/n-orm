@@ -2,11 +2,14 @@ package com.googlecode.n_orm;
 
 import static org.junit.Assert.*;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.NavigableSet;
@@ -228,6 +231,20 @@ public class BasicTest {
 		 }
 	 }
 	 
+	 @Test public void checkNpeIncrementsBook() throws IOException, ClassNotFoundException  {
+		 Book b2 = new Book(bssut, new Date(12121212), new Date());
+		 b2.store();
+		 
+		 ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		 ObjectOutputStream oos = new ObjectOutputStream(baos);
+		 
+		 oos.writeObject(b2);
+		 
+		 ObjectInputStream bais = new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray()));
+		 @SuppressWarnings("unchecked")
+		 Book usBook = (Book) bais.readObject();
+		 usBook.store();
+	 }
 	 
 	 @Test public void checkUnserializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
 		 Book current;
