@@ -33,9 +33,14 @@ public aspect IncrementManagement {
 			: "Only naturals or maps of naturals may be incremented";
 	declare warning: set(@Incrementing @Key * *.*): "Keys (that identify a persisting element) should not be incremented";
 	
-	private transient Map<String, Number> PersistingElement.increments = new HashMap<String, Number>();
+	private transient Map<String, Number> PersistingElement.increments;
 	
 	Map<String, Number> PersistingElement.getIncrements() {
+		// increments is transient, it should be initialized somewhere
+		if(this.increments == null)
+		{
+			 this.increments = new HashMap<String, Number>();
+		}
 		return this.increments;
 	}
 
