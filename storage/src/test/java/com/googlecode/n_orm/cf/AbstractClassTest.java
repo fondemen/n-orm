@@ -24,10 +24,10 @@ public class AbstractClassTest {
 	@Persisting
 	public static class PersistingClass extends NonPersistingClass {
 	}
-
+	
 	@Test
 	public void putAndGet() {
-		NonPersistingClass sut = new PersistingClass();
+		PersistingClass sut = new PersistingClass();
 		assertTrue(sut instanceof PersistingElement);
 		sut.set.add("addedtoset");
 		sut.map.put("addedtomapkey", "addedtomapvalue");
@@ -45,5 +45,21 @@ public class AbstractClassTest {
 		assertTrue(sut.map2.containsKey((Object)"addedtomap2key"));
 		assertTrue(sut.map2.containsValue((Object)"addedtomap2value"));
 		assertEquals("addedtomap2value", sut.map2.get("addedtomap2key"));
+	}
+	
+	@Test
+	public void activate() {
+		PersistingClass sut = new PersistingClass();
+		sut.set.add("elt");
+		sut.store();
+		
+		PersistingClass sut2 = new PersistingClass();
+		sut2.activate(sut2.set, sut2.map);
+		
+		assertEquals(sut, sut2);
+		assertFalse(sut2.set.isEmpty());
+		assertEquals(sut.set, sut2.set);
+		assertTrue(sut2.map.isEmpty());
+		assertEquals(sut.map, sut2.map);
 	}
 }

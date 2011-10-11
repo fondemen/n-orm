@@ -233,6 +233,17 @@ public aspect StorageManagement {
 	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
 		this.activate(true, families);
 	}
+	
+	public void PersistingElement.activate(Object... families) throws DatabaseNotReachedException {
+		String[] fams = new String[families.length];
+		for (int i = 0; i < families.length; ++i) {
+			ColumnFamily<?> cf = this.getColumnFamily(families[i]);
+			if (cf == null)
+				throw new IllegalArgumentException("Element " + families[i] + " does not correspond to a column familiy.");
+			fams[i] = cf.getName();
+		}
+		this.activate(fams);
+	}
 
 	private void PersistingElement.activate(boolean force, String... families) throws DatabaseNotReachedException {
 		this.checkIsValid();
