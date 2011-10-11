@@ -61,6 +61,7 @@ import org.apache.hadoop.hbase.io.hfile.Compression;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.zookeeper.ZKConfig;
 import org.apache.hadoop.io.SetFile;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.zookeeper.CreateMode;
@@ -343,6 +344,23 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			}
 		
 		this.tablesC = new HTablePool(this.getConf(), Integer.MAX_VALUE);
+		
+		//Wait fo Zookeeper availability
+		int maxRetries = 100;
+		ZooKeeper zk = null;
+		do {
+			try {
+				zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+			} catch (Exception x) {
+				try {
+					Thread.sleep(50);
+				} catch (InterruptedException e) {
+				}
+			}
+		} while (zk == null && maxRetries-- > 0);
+		if (zk == null) {
+			logger.log(Level.SEVERE, "Cannot reach Zookeeper");
+		}
 		
 		try {
 			String[] host = this.admin.getConnection().getZooKeeperWatcher().getQuorum().split(",")[0].split(":");
@@ -766,13 +784,18 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			SharedExclusiveLock ret = this.locks.get(table);
 			ZooKeeper zk;
 			try {
-				zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+				try {
+					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+				} catch (NullPointerException x) { //Lost zookeeper ?
+					this.restart();
+					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+				}
 				if (!zk.getState().isAlive()) {
 					errorLogger.log(Level.WARNING, "Zookeeper connection lost ; restarting...");
 					this.restart();
 					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
 				}
-			} catch (IOException e1) {
+			} catch (Exception e1) {
 				throw new DatabaseNotReachedException(e1);
 			}
 			
@@ -807,9 +830,16 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected SharedExclusiveLock sharedLockTable(String table) throws DatabaseNotReachedException {
+	protected Object sharedLockTable(String table) throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
-		SharedExclusiveLock lock = this.getLock(table);
+		SharedExclusiveLock lock;
+		try {
+			lock = this.getLock(table);
+		} catch(Exception x) {
+			//Giving up
+			logger.log(Level.WARNING, "Cannot get shared lock on " + table + " ; continuing anyway", x);
+			return new Object();
+		}
 		synchronized (lock) {
 			assert lock.getCurrentExclusiveLock() == null;
 			try {
