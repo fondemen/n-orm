@@ -1,9 +1,8 @@
 package com.googlecode.n_orm;
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.lang.reflect.Field;
 import java.util.Collection;
@@ -537,12 +536,12 @@ public aspect StorageManagement {
 	}
 	
 	/**
-	 * Import a serlized set in a FileInputStream
+	 * Import a serialized set in a InputStream
 	 * @param fis the FileInputStream
 	 * @throws IOException
 	 * @throws ClassNotFoundException
 	 */
-	public static void insert(FileInputStream fis) throws IOException, ClassNotFoundException {
+	public static void insert(InputStream fis) throws IOException, ClassNotFoundException {
 		 ObjectInputStream ois = new ObjectInputStream(fis);
 		 @SuppressWarnings("unchecked")
 		 NavigableSet<PersistingElement> unserializedBooks = (NavigableSet<PersistingElement>) ois.readObject();
