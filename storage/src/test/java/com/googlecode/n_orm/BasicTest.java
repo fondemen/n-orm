@@ -4,7 +4,6 @@ import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -220,13 +219,52 @@ public class BasicTest {
 		 NavigableSet<Book> unserializedBooks = (NavigableSet<Book>) ois.readObject();
 		 
 		 assertEquals(originalBooks, unserializedBooks);
-		 System.out.println("deserilization");
+		 System.out.println("deserialization");
 		 it = unserializedBooks.iterator();
 		 while(it.hasNext())
 		 {
 			 current = it.next();
 			 current.store();
 		 }
+	 }
+	 
+	 
+	 @Test public void checkUnserializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
+		 Book current;
+		 Iterator<Book> it;
+
+		 Book b2 = new Book(bssut, new Date(12121212), new Date());
+		 b2.store();
+		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
+		 b3.store();
+		 
+		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
+		 
+		 File f = new File("books.ser");
+		 f.delete();
+		 assertFalse(f.exists());
+		 
+		 // Serialize in a file
+		 FileOutputStream fos = new FileOutputStream(f);
+		 searchQuery.serialize(fos);
+		 fos.close();
+		 
+		 // Test if the file has been created
+		 assertTrue(f.exists());
+		 NavigableSet<Book> originalBooks = searchQuery.go();
+		 long originalCount = searchQuery.count();
+
+		 it = originalBooks.iterator();
+		 while(it.hasNext())
+		 {
+			 current = it.next();
+			 current.delete();
+		 }
+		 assertEquals(0, searchQuery.count());
+
+		 StorageManagement.insert(new FileInputStream(f));
+		 
+		 assertEquals(originalCount, searchQuery.count());
 	 }
 
 	public void checkOrder(Set<? extends PersistingElement> elements) {
