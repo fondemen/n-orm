@@ -1071,7 +1071,6 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 					if (this.compression != null)
 						newFamily.setCompressionType(this.compression);
 					toBeAdded.add(newFamily);
-					tableD.addFamily(newFamily);
 				} else if (!hasCorrectCompressor) {
 					toBeCompressed.add(family);
 				}
@@ -1084,6 +1083,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 						logger.info("Table " + tableD.getNameAsString() + " compressed with " + this.compression + " has the wrong compressor for families " + toBeCompressed.toString() + ": altering");
 					synchronized (this.exclusiveLockTable(tableName)) {
 						try {
+							this.tablesC.closeTablePool(tableName);
 							try {
 								this.admin.disableTable(tableD.getName());
 							} catch (TableNotFoundException x) {
@@ -1103,8 +1103,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 								this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
 							}
 							this.admin.enableTable(tableD.getName());
+							tableD = this.admin.getTableDescriptor(tableD.getName());
+							this.cache(tableName, tableD);
 							logger.info("Table " + tableD.getNameAsString() + " altered");
 						} finally {
+							
 							this.exclusiveUnlockTable(tableName);
 						}
 					}
