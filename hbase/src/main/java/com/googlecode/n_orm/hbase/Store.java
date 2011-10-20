@@ -1087,14 +1087,17 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 							try {
 								this.admin.disableTable(tableD.getName());
 							} catch (TableNotFoundException x) {
-								this.handleProblem(x, tableD.getNameAsString());
+								this.handleProblem(x, tableName);
 								this.admin.disableTable(tableD.getName());
 							}
+							if (! this.admin.isTableDisabled(tableD.getName()))
+								throw new IOException("Not able to disable table " + tableName);
+							logger.info("Table " + tableD.getNameAsString() + " disabled");
 							for (HColumnDescriptor hColumnDescriptor : toBeAdded) {
 								try {
 									this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 								} catch (TableNotFoundException x) {
-									this.handleProblem(x, tableD.getNameAsString());
+									this.handleProblem(x, tableName);
 									this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 								}
 							}
@@ -1102,16 +1105,40 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 								hColumnDescriptor.setCompressionType(this.compression);
 								this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
 							}
+							boolean done = true;
+							do {
+								Thread.sleep(10);
+								tableD = this.admin.getTableDescriptor(tableD.getName());
+								for (int i = 0; done && i < toBeAdded.size(); i++) {
+									done = done && tableD.hasFamily(toBeAdded.get(i).getName());
+								}
+								for (int i = 0; done && i < toBeCompressed.size(); ++i) {
+									HColumnDescriptor expectedFamily = toBeCompressed.get(i);
+									HColumnDescriptor actualFamily = tableD.getFamily(expectedFamily.getName());
+									done = done && actualFamily != null && expectedFamily.getCompressionType().equals(actualFamily.getCompressionType());
+								}
+							} while (!done);
 							this.admin.enableTable(tableD.getName());
-							tableD = this.admin.getTableDescriptor(tableD.getName());
+							if (! this.admin.isTableEnabled(tableD.getName()))
+								throw new IOException("Not able to enable table " + tableName);
+							logger.info("Table " + tableD.getNameAsString() + " enabled");
+							for (int i = 0; done && i < toBeAdded.size(); i++) {
+								if (!tableD.hasFamily(toBeAdded.get(i).getName()))
+									throw new IOException("Table " + tableName + " is still lacking familiy " + toBeAdded.get(i).getNameAsString());
+							}
+							for (int i = 0; done && i < toBeCompressed.size(); ++i) {
+								HColumnDescriptor expectedFamily = toBeCompressed.get(i);
+								HColumnDescriptor actualFamily = tableD.getFamily(expectedFamily.getName());
+								if (actualFamily == null || !expectedFamily.getCompressionType().equals(actualFamily.getCompressionType()))
+									throw new IOException("Table " + tableName + " is still having wrong compressor for familiy " + expectedFamily.getNameAsString());
+							}
 							this.cache(tableName, tableD);
 							logger.info("Table " + tableD.getNameAsString() + " altered");
 						} finally {
-							
 							this.exclusiveUnlockTable(tableName);
 						}
 					}
-				} catch (IOException e) {
+				} catch (Exception e) {
 					errorLogger.log(Level.SEVERE, "Could not create on table " + tableD.getNameAsString() + " families " + toBeAdded.toString(), e);
 					throw new DatabaseNotReachedException(e);
 				}
