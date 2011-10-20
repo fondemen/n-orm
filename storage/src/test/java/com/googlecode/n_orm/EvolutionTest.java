@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 import java.util.Date;
 import java.util.Set;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import com.googlecode.n_orm.cf.SetColumnFamily;
@@ -36,7 +37,7 @@ public class EvolutionTest {
 	@Test
 	public void newProps() {
 		String key = "JIOJJ:?IKBYI:NIUBYBF";
-		V0 v0 = new V0(); v0.key = key; v0.store();
+		V0 v0 = new V0(); v0.key = key; v0.delete(); v0.store();
 		
 		V0NewProps v1 = new V0NewProps(), uninitialized = new V0NewProps(); v1.key = key;
 		v1.sval = "huihjk";
@@ -68,7 +69,7 @@ public class EvolutionTest {
 	@Test
 	public void newCf() {
 		String key = "JIOJJ:?IKBYI:NIUBYBF";
-		V0 v0 = new V0(); v0.key = key; v0.store();
+		V0 v0 = new V0(); v0.key = key; v0.delete(); v0.store();
 		
 		KeyManagement.getInstance().cleanupKnownPersistingElements();
 		
@@ -105,6 +106,7 @@ public class EvolutionTest {
 		AnotherClass sut = new AnotherClass();
 		sut.key = key;
 		sut.prop = "toto";
+		sut.delete();
 		sut.store();
 		
 		AnotherClass sut2 = new AnotherClass();
