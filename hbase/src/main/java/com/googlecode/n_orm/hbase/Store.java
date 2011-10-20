@@ -1083,7 +1083,6 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 						logger.info("Table " + tableD.getNameAsString() + " compressed with " + this.compression + " has the wrong compressor for families " + toBeCompressed.toString() + ": altering");
 					synchronized (this.exclusiveLockTable(tableName)) {
 						try {
-							this.tablesC.closeTablePool(tableName);
 							try {
 								this.admin.disableTable(tableD.getName());
 							} catch (TableNotFoundException x) {
