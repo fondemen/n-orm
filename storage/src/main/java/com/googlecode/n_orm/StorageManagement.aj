@@ -1,13 +1,19 @@
 package com.googlecode.n_orm;
 
+import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableSet;
@@ -38,6 +44,7 @@ public aspect StorageManagement {
 //	public static final String CLASS_COLUMN_FAMILY = "class";
 //	public static final String CLASS_COLUMN = "";
 	
+	private static final String SERIALIZATION_SEPARATOR = "n-orm";
 	transient Boolean PersistingElement.exists = null;
 	private transient boolean PersistingElement.isStoring = false;
 	private transient Collection<Class<? extends PersistingElement>> PersistingElement.persistingSuperClasses = null;
@@ -236,6 +243,17 @@ public aspect StorageManagement {
 	
 	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
 		this.activate(true, families);
+	}
+	
+	public void PersistingElement.activate(Object... families) throws DatabaseNotReachedException {
+		String[] fams = new String[families.length];
+		for (int i = 0; i < families.length; ++i) {
+			ColumnFamily<?> cf = this.getColumnFamily(families[i]);
+			if (cf == null)
+				throw new IllegalArgumentException("Element " + families[i] + " does not correspond to a column familiy.");
+			fams[i] = cf.getName();
+		}
+		this.activate(fams);
 	}
 
 	private void PersistingElement.activate(boolean force, String... families) throws DatabaseNotReachedException {
@@ -535,24 +553,120 @@ public aspect StorageManagement {
 		}
 	}
 	
+	private static class Element implements Row, Serializable {
+		private static final long serialVersionUID = -8217112442099719281L;
+		
+		private String key;
+		private Class<? extends PersistingElement> clazz;
+		private Map<String, Map<String, byte[]>> values;
+		
+		public Element(PersistingElement pe) {
+			pe.checkIsValid();
+			pe.updateFromPOJO();
+			this.clazz = pe.getClass();
+			this.key = pe.getIdentifier();
+			Collection<ColumnFamily<?>> fams = pe.getColumnFamilies();
+			values = new TreeMap<String, Map<String,byte[]>>();
+			for (ColumnFamily<?> family : fams) {
+				Map<String, byte[]> familyMap = new TreeMap<String, byte[]>();
+				values.put(family.getName(), familyMap);
+				for (String qualifier : family.getKeys()) {
+					Object element = family.getElement(qualifier);
+					Class<?> expected;
+					if (family.getProperty() != null) {
+						expected = family.getClazz();
+					} else if (element instanceof PropertyManagement.Property) {
+						Field propField = ((PropertyManagement.Property)element).getField();
+						assert propField != null;
+						expected = propField.getType();
+					} else {
+						assert false;
+						expected = element.getClass();
+					}
+					familyMap.put(qualifier, ConversionTools.convert(element, expected));
+				}
+			}
+		}
+
+		@Override
+		public String getKey() {
+			return key;
+		}
+
+		@Override
+		public Map<String, Map<String, byte[]>> getValues() {
+			return values;
+		}
+		
+		public PersistingElement getElement() {
+			PersistingElement ret = KeyManagement.getInstance().createElement(this.clazz, this.key);
+			ret.activateFromRawData(this.getValues().keySet(), this.getValues());
+			return ret;
+		}
+		
+	}
+	
 	/**
-	 * Import a serialized set in a InputStream
-	 * @param fis the FileInputStream
-	 * @throws IOException
-	 * @throws ClassNotFoundException
+	 * Serialize a binary representation for elements in an OutputStream.
+	 * Dependencies are not serialized.
+	 * Elements are removed from cache to avoid memory consumption.
+	 * @param elementsIterator an iterator over the elements to be serialized ; closed by the method
+	 * @return lastElement the last element serialized from the collection
 	 */
-	public static void insert(InputStream fis) throws IOException, ClassNotFoundException {
-		 ObjectInputStream ois = new ObjectInputStream(fis);
-		 @SuppressWarnings("unchecked")
-		 NavigableSet<PersistingElement> unserializedBooks = (NavigableSet<PersistingElement>) ois.readObject();
-		 
-		 Iterator<PersistingElement> it = unserializedBooks.iterator();
-		 PersistingElement current;
-		 while(it.hasNext())
-		 {
-			 current = (PersistingElement) it.next();
-			 current.store();
-		 }
-		 ois.close();
+	public static PersistingElement exportPersistingElements(CloseableIterator<? extends PersistingElement> elementsIterator, OutputStream out) throws IOException {
+		ObjectOutputStream oos= new ObjectOutputStream(out);
+		PersistingElement lastElement = null;
+		KeyManagement km = KeyManagement.getInstance();
+		
+		try {
+			while (elementsIterator.hasNext()) {
+				PersistingElement elt = elementsIterator.next();
+				elt.checkIsValid();
+				elt.updateFromPOJO();
+				oos.writeObject(SERIALIZATION_SEPARATOR);
+				oos.writeObject(new Element(elt));
+				lastElement = elt;
+				km.unregister(elt);
+			}
+		} finally {
+			elementsIterator.close();
+		}
+		
+		return lastElement;
+	}
+	
+	/**
+	 * Import a serialized set in a InputStream. Each element is loaded with data found from the input stream and stored.
+	 * Elements are removed from cache to avoid memory consumption.
+	 * @param fis the input stream to import from ; must support {@link InputStream#markSupported()}
+	 */
+	public static void importPersistingElements(InputStream fis) throws DatabaseNotReachedException, IOException, ClassNotFoundException {
+		if (!fis.markSupported())
+			fis = new BufferedInputStream(fis);
+		
+		ObjectInputStream ois = new ObjectInputStream(fis);
+		KeyManagement km = KeyManagement.getInstance();
+		
+		boolean ok = true;
+		while(ok && fis.available()>0) {
+			fis.mark(SERIALIZATION_SEPARATOR.getBytes().length*2);
+			try {
+				String sep = (String) ois.readObject();
+				ok = SERIALIZATION_SEPARATOR.equals(sep);
+			} catch (Exception x) {
+				fis.reset();
+				ok = false;
+			}
+			if (ok) {
+				Element elt = (Element)ois.readObject();
+				PersistingElement pe = elt.getElement();
+				pe.delete(); //To be sure that store will get only read data
+				for (ColumnFamily<?> cf : pe.getColumnFamilies()) {
+					cf.setAllChanged();
+				}
+				pe.store();
+				km.unregister(pe);
+			}
+		}
 	}
 }

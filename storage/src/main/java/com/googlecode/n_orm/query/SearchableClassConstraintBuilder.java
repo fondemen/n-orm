@@ -1,14 +1,17 @@
 package com.googlecode.n_orm.query;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.util.Iterator;
 import java.util.NavigableSet;
+import java.util.Set;
 
 import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.CloseableIterator;
+import com.googlecode.n_orm.ColumnFamiliyManagement;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
@@ -16,6 +19,7 @@ import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.WaitingCallBack;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
+import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.Store;
 
 public class SearchableClassConstraintBuilder<T extends PersistingElement>
@@ -71,6 +75,17 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 			System.arraycopy(this.toBeActivated, 0, tba, 0, this.toBeActivated.length);
 			System.arraycopy(families, 0, tba, this.toBeActivated.length, families.length);
 			this.toBeActivated = tba;
+		}
+		return this;
+	}
+
+	public SearchableClassConstraintBuilder<T> andActivateAllFamilies() {
+		Set<Field> knownCfs = ColumnFamiliyManagement.getInstance().getColumnFamilies(getClazz());
+		this.toBeActivated = new String[knownCfs.size()];
+		int i = 0;
+		for (Field cf : knownCfs) {
+			this.toBeActivated[i] = cf.getName();
+			++i;
 		}
 		return this;
 	}
@@ -185,18 +200,25 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	}
 	
 	/**
-	 * Serialize the elements in a OutputStream
+	 * Runs the query to find at most N matching elements and serialize a representation into the output stream. The maximum limit N can be set before using {@link #withAtMost(int)}, but is not mandatory.
+	 * Dependencies are not serialized. Consider carefully setting families to be activated before ; it is advised to use {@link #andActivateAllFamilies()}.
+	 * Implementation tries to optimize as much as possible memory impact.
+	 * @param out an output stream that must support {@link InputStream#markSupported()}
 	 * @throws IOException 
 	 */
-	public void serialize(OutputStream out) throws IOException {
-		ObjectOutputStream oos= new ObjectOutputStream(out);
-
-		NavigableSet<T> set = this.go();
-
-		oos.writeObject(set);
-		
-		oos.flush();
-		oos.close();
-		out.flush();
+	public void serialize(OutputStream out) throws IOException, DatabaseNotReachedException {
+		if (this.hasNoLimit()) {
+			PersistingElement pe;
+			Constraint c = this.getConstraint();
+			do {
+				pe = StorageManagement.exportPersistingElements(StorageManagement.findElement(this.getClazz(), c, Integer.MAX_VALUE, this.toBeActivated), out);
+				if (pe == null)
+					break;
+				else
+					c = new Constraint(pe.getIdentifier()+Character.MIN_VALUE, c.getEndKey());
+			} while (true);
+		} else {
+			StorageManagement.exportPersistingElements(this.iterate(), out);
+		}
 	}
 }

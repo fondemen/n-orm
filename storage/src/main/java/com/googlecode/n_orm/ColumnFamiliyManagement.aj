@@ -48,7 +48,7 @@ public aspect ColumnFamiliyManagement {
 		|| get(@ImplicitActivation @Transient * PersistingElement+.*)
 		: "This field is not persitent, thus cannot be auto-activated";
 	
-	private transient Map<String, ColumnFamily<?>> PersistingElement.columnFamilies = null;
+	private transient Map<String, ColumnFamily<?>> PersistingElement.columnFamilies;
 	
 	private Map<String, ColumnFamily<?>> PersistingElement.getColumnFamiliesInt() {
 		if (this.columnFamilies == null) {
@@ -77,9 +77,9 @@ public aspect ColumnFamiliyManagement {
 	
 	public ColumnFamily<?> PersistingElement.getColumnFamily(Object collection) throws UnknownColumnFamily {
 		PropertyManagement pm = PropertyManagement.getInstance();
-		for (ColumnFamily<?> cf : this.getColumnFamiliesInt().values()) {
+		for (ColumnFamily<?> cf : this.getColumnFamilies()) {
 			try {
-				if (pm.readValue(this, cf.getProperty()) == collection)
+				if (cf == collection || pm.readValue(this, cf.getProperty()) == collection)
 					return cf;
 			} catch (Exception e) {
 			}
@@ -132,7 +132,7 @@ public aspect ColumnFamiliyManagement {
 							ret.add(field);
 					}
 					c = c.getSuperclass();
-				} while (PersistingElement.class.isAssignableFrom(c));
+				} while (c != null);
 				typeColumnFamilies.put(clazz, ret);
 			}
 			return ret;
@@ -210,13 +210,12 @@ public aspect ColumnFamiliyManagement {
 		}
 	}
 	
-	void around(PersistingElement self, Object cf): set(!@Transient !transient !static (Set+ || Map+) PersistingElement+.*) && target(self) && args(cf) {
-
+	void around(PersistingElement self, Object cf): set(!@Transient !transient !static (Set+ || Map+) (*.*)) && !within(ColumnFamiliyManagement) && target(self) && args(cf) {
 		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();
 		Field field = sign.getField();
 		assert isCollectionFamily(field);
 
-		ColumnFamily<?> ccf = createColumnFamily(self, field, cf);
+		ColumnFamily<?> ccf = createColumnFamily((PersistingElement)self, field, cf);
 		
 		if(ColumnFamily.class.isAssignableFrom(field.getType()))
 			proceed(self, ccf);
@@ -259,4 +258,8 @@ public aspect ColumnFamiliyManagement {
 		if (cf.getOwner() != null)
 			cf.getOwner().addColumnFamily(cf);
 	}
+	
+	//before(ColumnFamily cf) : execution(public * ColumnFamily+.*(..) && target(cf)) {
+	//	assert cf.owner != null;
+	//}
 }

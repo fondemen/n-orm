@@ -215,19 +215,16 @@ public class BasicTest {
 			 current = it.next();
 			 current.delete();
 		 }
-		 
-		 FileInputStream fis = new FileInputStream(f);
-		 ObjectInputStream ois = new ObjectInputStream(fis);
-		 @SuppressWarnings("unchecked")
-		 NavigableSet<Book> unserializedBooks = (NavigableSet<Book>) ois.readObject();
+
+		 StorageManagement.importPersistingElements(new FileInputStream(f));
+		 NavigableSet<Book> unserializedBooks = searchQuery.go();
 		 
 		 assertEquals(originalBooks, unserializedBooks);
-		 System.out.println("deserialization");
-		 it = unserializedBooks.iterator();
+		 it = originalBooks.iterator();
 		 while(it.hasNext())
 		 {
 			 current = it.next();
-			 current.store();
+			 current.delete();
 		 }
 	 }
 	 
@@ -279,9 +276,15 @@ public class BasicTest {
 		 }
 		 assertEquals(0, searchQuery.count());
 
-		 StorageManagement.insert(new FileInputStream(f));
+		 StorageManagement.importPersistingElements(new FileInputStream(f));
 		 
 		 assertEquals(originalCount, searchQuery.count());
+		 it = searchQuery.go().iterator();
+		 while(it.hasNext())
+		 {
+			 current = it.next();
+			 current.delete();
+		 }
 	 }
 
 	public void checkOrder(Set<? extends PersistingElement> elements) {

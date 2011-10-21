@@ -9,6 +9,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -29,6 +30,35 @@ import com.googlecode.n_orm.storeapi.Constraint;
 
 
 public class ConcurrentTest {
+	private static class PutElement implements Runnable {
+		private final int[] done;
+		private final Store store;
+		private Throwable error;
+
+		private PutElement(int[] done, Store store) {
+			this.done = done;
+			this.store = store;
+		}
+
+		@Override
+		public void run() {
+			try {
+				Map<String, Map<String, byte[]>> ch = new TreeMap<String, Map<String,byte[]>>();
+				Map<String, byte[]> cf = new TreeMap<String, byte[]>();
+				cf.put("qual", new byte [] {1, 2, 3, 4});
+				ch.put("cf", cf );
+				this.store.storeChanges("t1", "idt1", ch , null, null);
+				done[0]--;
+			} catch (Throwable e) {
+				this.error = e;
+			}
+		}
+		
+		public Throwable getError() {
+			return this.error;
+		}
+	}
+
 	private static Store store1, store2;
 
 	@BeforeClass
@@ -79,6 +109,93 @@ public class ConcurrentTest {
 		
 		store1.storeChanges("t1", "idt1", null, null, null);
 		assertTrue(store2.exists("t1", "idt1"));
+		assertTrue(store1.exists("t1", "idt1"));
+	}
+	
+	@Test(timeout=60000)
+	public void creatingNewTableFrom2Threads() throws IOException, InterruptedException {
+		final Object syncStart = new Object();
+		final int [] done = new int[] {2};
+		this.deleteTable("t1");
+		PutElement r = new PutElement(done, store1);
+		Thread t1 = new Thread(r, "Put 1");
+		Thread t2 = new Thread(r, "Put 2");
+		t1.start();t2.start();
+		synchronized (syncStart) {
+			syncStart.notifyAll();
+		}
+		while (done[0] != 0) {
+			Thread.sleep(10);
+		}
+		
+		assertNull(r.getError());
+		assertTrue(store1.exists("t1", "idt1"));
+	}
+	
+	@Test(timeout=60000)
+	public void creatingNewTableFrom2Stores() throws IOException, InterruptedException {
+		final Object syncStart = new Object();
+		final int [] done = new int[] {2};
+		this.deleteTable("t1");
+		PutElement r1 = new PutElement(done, store1);
+		PutElement r2 = new PutElement(done, store2);
+		Thread t1 =new Thread(r1, "Put from store1");
+		Thread t2 =new Thread(r2, "Put from store2");
+		t1.start();t2.start();
+		synchronized (syncStart) {
+			syncStart.notifyAll();
+		}
+		while (done[0] != 0) {
+			Thread.sleep(10);
+		}
+
+		assertNull(r1.getError());
+		assertNull(r2.getError());
+		assertTrue(store1.exists("t1", "idt1"));
+	}
+	
+	@Test(timeout=60000)
+	public void creatingNewCFFrom2Threads() throws IOException, InterruptedException {
+		final Object syncStart = new Object();
+		final int [] done = new int[] {2};
+		this.deleteTable("t1");
+		store1.storeChanges("t1", "idt1", null , null, null); //Creates T1 table with prop
+		PutElement r = new PutElement(done, store1);
+		Thread t1 = new Thread(r, "Put 1");
+		Thread t2 = new Thread(r, "Put 2");
+		t1.start();t2.start();
+		synchronized (syncStart) {
+			syncStart.notifyAll();
+		}
+		while (done[0] != 0) {
+			Thread.sleep(10);
+		}
+		
+		assertNull(r.getError());
+		assertTrue(store1.exists("t1", "idt1", "cf"));
+	}
+	
+	@Test(timeout=60000)
+	public void creatingNewCFFrom2Stores() throws IOException, InterruptedException {
+		final Object syncStart = new Object();
+		final int [] done = new int[] {2};
+		this.deleteTable("t1");
+		store1.storeChanges("t1", "idt1", null , null, null); //Creates T1 table with prop
+		store2.storeChanges("t1", "idt1", null , null, null); //Creates T1 table with prop
+		PutElement r1 = new PutElement(done, store1);
+		PutElement r2 = new PutElement(done, store2);
+		Thread t1 =new Thread(r1, "Put from store1");
+		Thread t2 =new Thread(r2, "Put from store2");
+		t1.start();t2.start();
+		synchronized (syncStart) {
+			syncStart.notifyAll();
+		}
+		while (done[0] != 0) {
+			Thread.sleep(10);
+		}
+
+		assertNull(r1.getError());
+		assertNull(r2.getError());
 		assertTrue(store1.exists("t1", "idt1"));
 	}
 	
