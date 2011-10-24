@@ -3,6 +3,7 @@ package com.googlecode.n_orm;
 import static org.junit.Assert.*;
 
 import org.junit.After;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -216,6 +217,7 @@ public class RelationalStorageTest {
 		@Key public String k;
 		public @ImplicitActivation Ref1 ref;
 	}
+	@Ignore //Cannot do that without any cache
 	@Test(expected=Test.None.class) public void storingCircularDeps() {
 		Ref1 sut1 = new Ref1(); sut1.k = "k1";
 		Ref2 sut2 = new Ref2(); sut2.k = "k2";

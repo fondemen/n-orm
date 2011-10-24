@@ -3,8 +3,10 @@ package com.googlecode.n_orm;
 import static org.junit.Assert.*;
 
 import org.aspectj.lang.annotation.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
+@Ignore
 public class CacheTest {
 
 	@Persisting
