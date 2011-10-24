@@ -230,15 +230,16 @@ public aspect KeyManagement {
 	private transient String PersistingElement.fullIdentifier;
 	
 	public void register(PersistingElement element) {
-		Cache.getCache().register(element);
+		//Cache.getCache().register(element);
 	}
 	
 	public void unregister(PersistingElement element) {
-		Cache.getCache().unregister(element);
+		//Cache.getCache().unregister(element);
 	}
 	
 	public PersistingElement getKnownPersistingElement(String fullIdentifier) {
-		return Cache.getCache().getKnownPersistingElement(fullIdentifier);
+		//return Cache.getCache().getKnownPersistingElement(fullIdentifier);
+		return null;
 	}
 	
 	public PersistingElement getKnownPersistingElement(String identifier, Class<? extends PersistingElement> clazz) {
@@ -247,7 +248,7 @@ public aspect KeyManagement {
 	
 	//For test purpose
 	public void cleanupKnownPersistingElements() {
-		Cache.getCache().reset();
+		//Cache.getCache().reset();
 	}
 	
 	after(PersistingElement self) returning: execution(void PersistingElement+.delete()) && this(self) {

@@ -4,11 +4,13 @@ import static org.junit.Assert.*;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.googlecode.n_orm.BookStore;
 import com.googlecode.n_orm.StorageManagement;
 
+@Ignore
 public class CacheTest {
 	
 	static int originalCleanupPeriod;
