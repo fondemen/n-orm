@@ -19,6 +19,7 @@ import java.util.TreeSet;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -33,6 +34,8 @@ import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class BasicTest {
+
+	private static final String BOOKS_SER_FILE = "books.ser";
 
 	public BasicTest() {
 		Properties props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
@@ -74,6 +77,13 @@ public class BasicTest {
 			bsut.store();
 			assertTrue(bsut.getPropertiesColumnFamily().isActivated());
 		}
+	}
+	
+	@After
+	public void deleteSerialization() {
+		File ser = new File(BOOKS_SER_FILE);
+		if (ser.exists())
+			ser.delete();
 	}
 	
 	public void deleteBookstore() throws DatabaseNotReachedException {
@@ -196,7 +206,7 @@ public class BasicTest {
 		 
 		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
 		 
-		 File f = new File("books.ser");
+		 File f = new File(BOOKS_SER_FILE);
 		 f.delete();
 		 assertFalse(f.exists());
 		 
@@ -226,6 +236,8 @@ public class BasicTest {
 			 current = it.next();
 			 current.delete();
 		 }
+		 
+		 this.bsut = null;
 	 }
 	 
 	 @Test public void checkNpeIncrementsBook() throws IOException, ClassNotFoundException  {
@@ -254,7 +266,7 @@ public class BasicTest {
 		 
 		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
 		 
-		 File f = new File("books.ser");
+		 File f = new File(BOOKS_SER_FILE);
 		 f.delete();
 		 assertFalse(f.exists());
 		 
@@ -285,6 +297,7 @@ public class BasicTest {
 			 current = it.next();
 			 current.delete();
 		 }
+		 bsut = null;
 	 }
 
 	public void checkOrder(Set<? extends PersistingElement> elements) {
