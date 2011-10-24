@@ -196,6 +196,7 @@ public class BasicTest {
 		 checkOrder(storeBooks);
 	 }
 	 
+	 @Ignore
 	 @Test public void checkSerializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
 		 Book current;
 		 Iterator<Book> it;
@@ -248,6 +249,7 @@ public class BasicTest {
 		 usBook.store();
 	 }
 	 
+	 @Ignore
 	 @Test public void checkUnserializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
 		 Book current;
 		 Iterator<Book> it;
