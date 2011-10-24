@@ -21,9 +21,9 @@ import com.googlecode.n_orm.PersistingElement;
 public class Cache {
 	private static Logger logger = Logger.getLogger(Cache.class.getName());
 
-	private static int timeToLiveSeconds = 60;
-	private static int maxElementsInCache = 10000;
-	private static int periodBetweenCacheCleanupSeconds = 10000;
+	private static int periodBetweenCacheCleanupMS = 1000;
+	private static int timeToLiveSeconds = 5;
+	private static int maxElementsInCache = 1000;
 	
 	private static final CacheManager cacheManager = CacheManager.create();
 	private static final Map<Thread, Cache> perThreadCaches;
@@ -64,7 +64,7 @@ public class Cache {
 			}
 		};
 		cacheCleanerTimer = new Timer("per-thread cache cleaner", true);
-		cacheCleanerTimer.schedule(cacheCleaner, new Date(), periodBetweenCacheCleanupSeconds);
+		cacheCleanerTimer.schedule(cacheCleaner, new Date(), periodBetweenCacheCleanupMS);
 		logger.info("Per-thread caching system started.");
 	}
 	
@@ -84,8 +84,8 @@ public class Cache {
 		Cache.maxElementsInCache = maxElementsInCache;
 	}
 
-	static int getPeriodBetweenCacheCleanupSeconds() {
-		return periodBetweenCacheCleanupSeconds;
+	static int getPeriodBetweenCacheCleanupMS() {
+		return periodBetweenCacheCleanupMS;
 	}
 
 	static void runCacheCleanup() {
@@ -141,7 +141,7 @@ public class Cache {
 			       .timeToLiveSeconds(timeToLiveSeconds)
 			       .timeToIdleSeconds(timeToLiveSeconds)
 			       .diskPersistent(false)
-			       .diskExpiryThreadIntervalSeconds(0)
+			       .diskExpiryThreadIntervalSeconds(periodBetweenCacheCleanupMS/1000)
 			       .statistics(false));
 		cacheManager.addCache(this.cache);
 		logger.fine("Cache started for " + this.thread + " with id " + this.cache.getName());
