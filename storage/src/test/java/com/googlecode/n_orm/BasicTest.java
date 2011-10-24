@@ -65,18 +65,19 @@ public class BasicTest {
 	
 	@Before
 	public void storeSUTs() throws DatabaseNotReachedException {
-		if (bssut == null) {
+		vacuumDB();
+		//if (bssut == null) {
 			 bssut = new BookStore("testbookstore");
 			 bssut.setName("bookstore name");
 			 bssut.store();
-		}
+		//}
 		
-		if (bsut == null) {
+		//if (bsut == null) {
 			bsut = new Book(bssut, new Date(1234567890), new Date(1234567890));
 			bsut.setNumber((short)12);
 			bsut.store();
 			assertTrue(bsut.getPropertiesColumnFamily().isActivated());
-		}
+		//}
 	}
 	
 	@After
@@ -230,14 +231,6 @@ public class BasicTest {
 		 NavigableSet<Book> unserializedBooks = searchQuery.go();
 		 
 		 assertEquals(originalBooks, unserializedBooks);
-		 it = originalBooks.iterator();
-		 while(it.hasNext())
-		 {
-			 current = it.next();
-			 current.delete();
-		 }
-		 
-		 this.bsut = null;
 	 }
 	 
 	 @Test public void checkNpeIncrementsBook() throws IOException, ClassNotFoundException  {
@@ -291,13 +284,6 @@ public class BasicTest {
 		 StorageManagement.importPersistingElements(new FileInputStream(f));
 		 
 		 assertEquals(originalCount, searchQuery.count());
-		 it = searchQuery.go().iterator();
-		 while(it.hasNext())
-		 {
-			 current = it.next();
-			 current.delete();
-		 }
-		 bsut = null;
 	 }
 
 	public void checkOrder(Set<? extends PersistingElement> elements) {
