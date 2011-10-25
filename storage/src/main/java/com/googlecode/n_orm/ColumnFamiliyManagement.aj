@@ -67,6 +67,10 @@ public aspect ColumnFamiliyManagement {
 		return Collections.unmodifiableCollection(this.getColumnFamiliesInt().values());
 	}
 	
+	public Set<String> PersistingElement.getColumnFamilyNames() {
+		return Collections.unmodifiableSet(this.getColumnFamiliesInt().keySet());
+	}
+	
 	public ColumnFamily<?> PersistingElement.getColumnFamily(String name) throws UnknownColumnFamily {
 		ColumnFamily<?> ret = this.getColumnFamiliesInt().get(name);
 		if (ret == null)

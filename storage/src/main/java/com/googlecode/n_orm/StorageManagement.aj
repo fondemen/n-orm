@@ -107,7 +107,8 @@ public aspect StorageManagement {
 								expected = family.getClazz();
 							} else if (element instanceof PropertyManagement.Property) {
 								Field propField = ((PropertyManagement.Property)element).getField();
-								assert propField != null;
+								if (propField == null) //Property that was activated but which has disappeared
+									continue;
 								expected = propField.getType();
 							} else {
 								assert false;
@@ -298,7 +299,7 @@ public aspect StorageManagement {
 		}
 	}
 	
-	public static <E extends PersistingElement> PersistingElement getFromRawData(Class<E> type, Row row) {
+	public static <E extends PersistingElement> E getFromRawData(Class<E> type, Row row) {
 		E element = StorageManagement.getElement(type, row.getKey());
 		element.activateFromRawData(row.getValues().keySet(), row.getValues());
 		return element;
@@ -577,7 +578,8 @@ public aspect StorageManagement {
 						expected = family.getClazz();
 					} else if (element instanceof PropertyManagement.Property) {
 						Field propField = ((PropertyManagement.Property)element).getField();
-						assert propField != null;
+						if (propField == null)
+							continue;
 						expected = propField.getType();
 					} else {
 						assert false;
@@ -600,7 +602,7 @@ public aspect StorageManagement {
 		
 		public PersistingElement getElement() {
 			PersistingElement ret = KeyManagement.getInstance().createElement(this.clazz, this.key);
-			ret.activateFromRawData(this.getValues().keySet(), this.getValues());
+			ret.activateFromRawData(ret.getColumnFamilyNames(), this.getValues());
 			return ret;
 		}
 		

@@ -88,6 +88,9 @@ public class BasicTest {
 		//Novel is subclass of Book:
 		// emptying the Book table should also make the Novel table empty 
 		assertNull(StorageManagement.findElements().ofClass(Novel.class).any());
+		
+		//Cleaning cache to simulate new session
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
 	}
 	
 	public void deleteBookstore() throws DatabaseNotReachedException {
@@ -381,7 +384,6 @@ public class BasicTest {
 	 }
 	 
 	 @Test public void serialize() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
-		
 		//Java serialization ; also tested successfully with GSon
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ObjectOutputStream oo = new ObjectOutputStream(out);
@@ -405,6 +407,43 @@ public class BasicTest {
 		assertEquals(bsut.getBookStore(), b2.getBookStore());
 		//As such:
 		assertEquals(bsut, b2);
+	 }
+	 
+	 @Test public void importExport() throws IOException, ClassNotFoundException, DatabaseNotReachedException {
+		 //Reusable query
+		SearchableClassConstraintBuilder<Book> query = StorageManagement.findElements().ofClass(Book.class).andActivateAllFamilies().withAtMost(1000).elements();
+		
+		//Original collection
+		Set<Book> knownBooks = query.go();
+		assertFalse(knownBooks.isEmpty());
+		assertEquals(knownBooks.size(), query.count());
+
+		//Exporting collection directly from store
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		query.exportTo(out);
+		
+		//Deleting collection from base
+		for (Book book : knownBooks) {
+			book.delete();
+		}
+		assertEquals(0, query.count());
+		//Simulating new session by emptying the cache
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		//Importing stored elements
+		StorageManagement.importPersistingElements(new ByteArrayInputStream(out.toByteArray()));
+		assertEquals(knownBooks.size(), query.count());
+		
+		//Checking database
+		Set<Book> newKnownBooks = query.go(); //Caches found elements
+		assertEquals(knownBooks, newKnownBooks);
+		for (Book knownBook : knownBooks) {
+			Book newKnownBook = StorageManagement.getElementUsingCache(knownBook); //The element activated by the last query.go()
+			assertNotSame(knownBook, newKnownBook);
+			assertEquals(knownBook, newKnownBook);
+			assertEquals(knownBook.getBookStore(), newKnownBook.getBookStore());
+			assertEquals(knownBook.getTitle(), newKnownBook.getTitle());
+		}
 	 }
 
 }
