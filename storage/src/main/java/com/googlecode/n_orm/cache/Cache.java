@@ -56,6 +56,8 @@ public class Cache {
 						if ((entry.getKey()+(timeToLiveSeconds*1000)) < now) {
 							entry.getValue().close();
 							ai.remove();
+						} else {
+							entry.getValue().cleanInvalidElements();
 						}
 					}
 				} catch (RuntimeException x) {
