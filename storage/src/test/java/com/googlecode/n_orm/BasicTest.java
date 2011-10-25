@@ -191,7 +191,46 @@ public class BasicTest {
 		 assertTrue(storeBooks.contains(b3));
 		 
 		 checkOrder(storeBooks);
-	 }rtEquals(originalBooks, unserializedBooks);
+	 }
+	 
+	 @Ignore
+	 @Test public void checkSerializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
+		 Book current;
+		 Iterator<Book> it;
+
+		 Book b2 = new Book(bssut, new Date(12121212), new Date());
+		 b2.store();
+		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
+		 b3.store();
+		 
+		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
+		 
+		 File f = new File(BOOKS_SER_FILE);
+		 f.delete();
+		 assertFalse(f.exists());
+		 
+		 // Serialize in a file
+		 FileOutputStream fos = new FileOutputStream(f);
+		 searchQuery.exportTo(fos);
+		 fos.close();
+		 
+		 // Test if the file has been created
+		 assertTrue(f.exists());
+		 
+		 NavigableSet<Book> originalBooks = searchQuery.go();
+		 it = originalBooks.iterator();
+		 while(it.hasNext())
+		 {
+			 current = it.next();
+			 current.delete();
+		 }
+		 
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		 StorageManagement.importPersistingElements(new FileInputStream(f));
+		 NavigableSet<Book> unserializedBooks = searchQuery.go();
+		 
+		 assertEquals(originalBooks, unserializedBooks);
 	 }
 	 
 	 @Test public void checkNpeIncrementsBook() throws IOException, ClassNotFoundException  {
@@ -246,6 +285,45 @@ public class BasicTest {
 			assertEquals(knownBook.getBookStore(), newKnownBook.getBookStore());
 			assertEquals(knownBook.getNumber(), newKnownBook.getNumber());
 		}
+	 }
+	 
+	 @Ignore
+	 @Test public void checkUnserializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
+		 Book current;
+		 Iterator<Book> it;
+
+		 Book b2 = new Book(bssut, new Date(12121212), new Date());
+		 b2.store();
+		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
+		 b3.store();
+		 
+		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
+		 
+		 File f = new File(BOOKS_SER_FILE);
+		 
+		 // Serialize in a file
+		 FileOutputStream fos = new FileOutputStream(f);
+		 searchQuery.exportTo(fos);
+		 fos.close();
+		 
+		 // Test if the file has been created
+		 assertTrue(f.exists());
+		 NavigableSet<Book> originalBooks = searchQuery.go();
+		 long originalCount = searchQuery.count();
+
+		 it = originalBooks.iterator();
+		 while(it.hasNext())
+		 {
+			 current = it.next();
+			 current.delete();
+		 }
+		 assertEquals(0, searchQuery.count());
+		 
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		 StorageManagement.importPersistingElements(new FileInputStream(f));
+		 
+		 assertEquals(originalCount, searchQuery.count());
 	 }
 
 	public void checkOrder(Set<? extends PersistingElement> elements) {
