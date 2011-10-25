@@ -21,7 +21,7 @@ public class CacheTest {
 		assertSame(bs,Cache.getCache().getKnownPersistingElement(bs.getFullIdentifier()));
 	}
 
-	@Test(timeout=11000)
+	@Test//(timeout=11000)
 	public void cacheCleanup() throws InterruptedException {
 		int max = Cache.getMaxElementsInCache();
 		Cache.setMaxElementsInCache(2);
