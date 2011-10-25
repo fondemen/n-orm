@@ -206,7 +206,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @param out an output stream that must support {@link InputStream#markSupported()}
 	 * @throws IOException 
 	 */
-	public void serialize(OutputStream out) throws IOException, DatabaseNotReachedException {
+	public void exportTo(OutputStream out) throws IOException, DatabaseNotReachedException {
 		if (this.hasNoLimit()) {
 			PersistingElement pe;
 			Constraint c = this.getConstraint();
