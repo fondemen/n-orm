@@ -246,7 +246,7 @@ public class BasicTest {
 		 Book usBook = (Book) bais.readObject();
 		 usBook.store();
 	 }
-	 
+	 @Ignore
 	 @Test public void checkUnserializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
 		 Book current;
 		 Iterator<Book> it;
