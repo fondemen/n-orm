@@ -20,16 +20,20 @@ public class Cache {
 	private static int maxElementsInCache = 10000;
 	
 	private static final FastMap<Thread, Cache> perThreadCaches;
+	private static final FastMap<Long, Cache> availableCaches;
 	private static final Timer cacheCleanerTimer;
 	private static final TimerTask cacheCleaner;
 	
 	static {
 		perThreadCaches = new FastMap<Thread, Cache>();
+		availableCaches = new FastMap<Long, Cache>();
 		perThreadCaches.shared();
+		availableCaches.shared();
 		cacheCleaner = new TimerTask() {
 			
 			@Override
 			public void run() {
+				long now = System.currentTimeMillis();
 				try {
 					Iterator<Entry<Thread, Cache>> ci = perThreadCaches.entrySet().iterator();
 					while (ci.hasNext()) {
@@ -37,8 +41,21 @@ public class Cache {
 						if (entry.getValue().isValid()) {
 							entry.getValue().shouldCleanup = true;
 						} else {
-							entry.getValue().close();
+							availableCaches.put(now, entry.getValue());
 							ci.remove();
+						}
+					}
+				} catch (RuntimeException x) {
+					logger.log(Level.WARNING, "Problem while checking cache.", x);
+				}
+				
+				try {
+					Iterator<Entry<Long, Cache>> ai = availableCaches.entrySet().iterator();
+					while (ai.hasNext()) {
+						Entry<Long, Cache> entry = ai.next();
+						if ((entry.getKey()+(timeToLiveSeconds*1000)) < now) {
+							entry.getValue().close();
+							ai.remove();
 						}
 					}
 				} catch (RuntimeException x) {
@@ -91,14 +108,27 @@ public class Cache {
 	
 	public static Cache getCache() {
 		Cache res = perThreadCaches.get(Thread.currentThread());
-		if (res != null && !res.isValid()) {
-			perThreadCaches.remove(res);
-			res.close();
+		
+		if (res == null) {
+			Iterator<Entry<Long, Cache>> available = availableCaches.entrySet().iterator();
+			do {
+				if (available.hasNext()) {
+					Entry<Long, Cache> availableEntry = available.next();
+					availableCaches.remove(availableEntry.getKey());
+					res = availableEntry.getValue();
+				}
+			} while(res != null && res.isClosed());
+			if (res != null) {
+				res.init();
+			}
 		}
+		
 		if (res == null) {
 			res = new Cache();
-			perThreadCaches.put(res.thread, res);
 		}
+		
+		assert res.isValid();
+		
 		return res;
 	}
 	
@@ -135,14 +165,19 @@ public class Cache {
 	}
 	
 	private FastMap<String, Element> cache;
-	private final Thread thread;
-	private final String threadId;
-	private boolean shouldCleanup;
+	private Thread thread;
+	private String threadId;
+	private volatile boolean shouldCleanup;
 
 	private Cache() {
+		this.init();
+	}
+	
+	private void init() {
 		this.thread = Thread.currentThread();
 		this.threadId = getThreadId(this.thread);
 		this.cache = new FastMap<String, Element>();
+		perThreadCaches.put(this.thread, this);
 		logger.fine("Cache started for " + this.thread + " with id " + this.threadId);
 	}
 	
@@ -243,8 +278,9 @@ public class Cache {
 		if (this.cache == null)
 			return;
 		this.reset();
+		FastMap.recycle(this.cache);
 		this.cache = null;
-		logger.fine("Cache stopped for thread " + this.thread + " with id " + this.threadId);
+		logger.info("Cache stopped for thread " + this.thread + " with id " + this.threadId);
 	}
 
 	@Override
