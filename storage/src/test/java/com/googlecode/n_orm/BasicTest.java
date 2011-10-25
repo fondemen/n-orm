@@ -61,6 +61,7 @@ public class BasicTest {
 				found.close();
 			}
 		}
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
 	}
 	
 	@Before
@@ -116,7 +117,6 @@ public class BasicTest {
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
 		 assertNull(p.getName());
-		 deleteBookstore();
 	 }
 	
 	 @Test public void bookStoreDeletion() throws DatabaseNotReachedException {
@@ -163,10 +163,7 @@ public class BasicTest {
 		 assertNull(p.getName());
 	 }
 	
-	 @Ignore //Regularly (though only occasionally) fails...
 	 @Test public void bookStoreDeletionAndthenAccess() throws DatabaseNotReachedException {
-		 deleteBookstore();
-		 this.storeSUTs();
 		 BookStore p = new BookStore("testbookstore");
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 v.activate();
@@ -196,7 +193,6 @@ public class BasicTest {
 		 checkOrder(storeBooks);
 	 }
 	 
-	 @Ignore
 	 @Test public void checkSerializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
 		 Book current;
 		 Iterator<Book> it;
@@ -214,7 +210,7 @@ public class BasicTest {
 		 
 		 // Serialize in a file
 		 FileOutputStream fos = new FileOutputStream(f);
-		 searchQuery.serialize(fos);
+		 searchQuery.exportTo(fos);
 		 fos.close();
 		 
 		 // Test if the file has been created
@@ -227,6 +223,8 @@ public class BasicTest {
 			 current = it.next();
 			 current.delete();
 		 }
+		 
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
 
 		 StorageManagement.importPersistingElements(new FileInputStream(f));
 		 NavigableSet<Book> unserializedBooks = searchQuery.go();
@@ -249,7 +247,6 @@ public class BasicTest {
 		 usBook.store();
 	 }
 	 
-	 @Ignore
 	 @Test public void checkUnserializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
 		 Book current;
 		 Iterator<Book> it;
@@ -262,12 +259,10 @@ public class BasicTest {
 		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
 		 
 		 File f = new File(BOOKS_SER_FILE);
-		 f.delete();
-		 assertFalse(f.exists());
 		 
 		 // Serialize in a file
 		 FileOutputStream fos = new FileOutputStream(f);
-		 searchQuery.serialize(fos);
+		 searchQuery.exportTo(fos);
 		 fos.close();
 		 
 		 // Test if the file has been created
@@ -282,6 +277,8 @@ public class BasicTest {
 			 current.delete();
 		 }
 		 assertEquals(0, searchQuery.count());
+		 
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
 
 		 StorageManagement.importPersistingElements(new FileInputStream(f));
 		 
