@@ -122,6 +122,7 @@ public class Cache {
 			} while(res != null && res.isClosed());
 			if (res != null) {
 				res.init();
+				logger.finer("Reusing existing cache for thread " + res.thread);
 			}
 		}
 		
@@ -282,7 +283,7 @@ public class Cache {
 		this.reset();
 		FastMap.recycle(this.cache);
 		this.cache = null;
-		logger.info("Cache stopped for thread " + this.thread + " with id " + this.threadId);
+		logger.fine("Cache stopped for thread " + this.thread + " with id " + this.threadId);
 	}
 
 	@Override
