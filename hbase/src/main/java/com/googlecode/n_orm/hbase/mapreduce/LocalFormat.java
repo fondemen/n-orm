@@ -5,9 +5,9 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Properties;
 
-import net.sf.ehcache.Ehcache;
-import net.sf.ehcache.hibernate.management.impl.BeanUtils;
+import javolution.util.FastMap;
 
+import org.apache.commons.beanutils.BeanUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
@@ -22,7 +22,6 @@ import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.aspectj.lang.Aspects;
-import org.slf4j.Logger;
 
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
@@ -50,7 +49,7 @@ public class LocalFormat {
 		if (store.isMapRedSendHBaseJars())
 			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), org.apache.zookeeper.ZooKeeper.class, HTable.class, HBaseAdmin.class, HTablePool.class, HColumnDescriptor.class, Scan.class, Increment.class);
 		if (store.isMapRedSendNOrmJars())
-			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), Store.class, StorageManagement.class, Aspects.class, Ehcache.class, Logger.class, org.apache.log4j.Logger.class, BeanUtils.class);
+			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), Store.class, StorageManagement.class, Aspects.class, FastMap.class, org.apache.log4j.Logger.class, BeanUtils.class);
 		
 		scan.setCaching(store.getMapRedScanCaching());
 		scan.setCacheBlocks(false);
