@@ -191,45 +191,7 @@ public class BasicTest {
 		 assertTrue(storeBooks.contains(b3));
 		 
 		 checkOrder(storeBooks);
-	 }
-	 
-	 @Test public void checkSerializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
-		 Book current;
-		 Iterator<Book> it;
-
-		 Book b2 = new Book(bssut, new Date(12121212), new Date());
-		 b2.store();
-		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
-		 b3.store();
-		 
-		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
-		 
-		 File f = new File(BOOKS_SER_FILE);
-		 f.delete();
-		 assertFalse(f.exists());
-		 
-		 // Serialize in a file
-		 FileOutputStream fos = new FileOutputStream(f);
-		 searchQuery.exportTo(fos);
-		 fos.close();
-		 
-		 // Test if the file has been created
-		 assertTrue(f.exists());
-		 
-		 NavigableSet<Book> originalBooks = searchQuery.go();
-		 it = originalBooks.iterator();
-		 while(it.hasNext())
-		 {
-			 current = it.next();
-			 current.delete();
-		 }
-		 
-		 KeyManagement.getInstance().cleanupKnownPersistingElements();
-
-		 StorageManagement.importPersistingElements(new FileInputStream(f));
-		 NavigableSet<Book> unserializedBooks = searchQuery.go();
-		 
-		 assertEquals(originalBooks, unserializedBooks);
+	 }rtEquals(originalBooks, unserializedBooks);
 	 }
 	 
 	 @Test public void checkNpeIncrementsBook() throws IOException, ClassNotFoundException  {
@@ -246,43 +208,44 @@ public class BasicTest {
 		 Book usBook = (Book) bais.readObject();
 		 usBook.store();
 	 }
-	 @Ignore
-	 @Test public void checkUnserializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
-		 Book current;
-		 Iterator<Book> it;
+	 
+	 @Test public void importExport() throws IOException, ClassNotFoundException, DatabaseNotReachedException {
+		 //Reusable query
+		SearchableClassConstraintBuilder<Book> query = StorageManagement.findElements().ofClass(Book.class).andActivateAllFamilies().withAtMost(1000).elements();
+		
+		//Original collection
+		bsut.setNumber((short) 100);
+		bsut.store();
+		Set<Book> knownBooks = query.go();
+		assertFalse(knownBooks.isEmpty());
+		assertEquals(knownBooks.size(), query.count());
 
-		 Book b2 = new Book(bssut, new Date(12121212), new Date());
-		 b2.store();
-		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
-		 b3.store();
-		 
-		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
-		 
-		 File f = new File(BOOKS_SER_FILE);
-		 
-		 // Serialize in a file
-		 FileOutputStream fos = new FileOutputStream(f);
-		 searchQuery.exportTo(fos);
-		 fos.close();
-		 
-		 // Test if the file has been created
-		 assertTrue(f.exists());
-		 NavigableSet<Book> originalBooks = searchQuery.go();
-		 long originalCount = searchQuery.count();
-
-		 it = originalBooks.iterator();
-		 while(it.hasNext())
-		 {
-			 current = it.next();
-			 current.delete();
-		 }
-		 assertEquals(0, searchQuery.count());
-		 
-		 KeyManagement.getInstance().cleanupKnownPersistingElements();
-
-		 StorageManagement.importPersistingElements(new FileInputStream(f));
-		 
-		 assertEquals(originalCount, searchQuery.count());
+		//Exporting collection directly from store
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		query.exportTo(out);
+		
+		//Deleting collection from base
+		for (Book book : knownBooks) {
+			book.delete();
+		}
+		assertEquals(0, query.count());
+		//Simulating new session by emptying the cache
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		//Importing stored elements
+		StorageManagement.importPersistingElements(new ByteArrayInputStream(out.toByteArray()));
+		assertEquals(knownBooks.size(), query.count());
+		
+		//Checking database
+		Set<Book> newKnownBooks = query.go(); //Caches found elements
+		assertEquals(knownBooks, newKnownBooks);
+		for (Book knownBook : knownBooks) {
+			Book newKnownBook = StorageManagement.getElementUsingCache(knownBook); //The element activated by the last query.go()
+			assertNotSame(knownBook, newKnownBook);
+			assertEquals(knownBook, newKnownBook);
+			assertEquals(knownBook.getBookStore(), newKnownBook.getBookStore());
+			assertEquals(knownBook.getNumber(), newKnownBook.getNumber());
+		}
 	 }
 
 	public void checkOrder(Set<? extends PersistingElement> elements) {
