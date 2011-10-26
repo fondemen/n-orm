@@ -248,6 +248,7 @@ public class BasicTest {
 		 usBook.store();
 	 }
 	 
+	 @Ignore
 	 @Test public void importExport() throws IOException, ClassNotFoundException, DatabaseNotReachedException {
 		 //Reusable query
 		SearchableClassConstraintBuilder<Book> query = StorageManagement.findElements().ofClass(Book.class).andActivateAllFamilies().withAtMost(1000).elements();
