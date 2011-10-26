@@ -63,7 +63,17 @@ public class ActionJob {
 		@Override
 		protected void map(final ImmutableBytesWritable key, final Result value,
 				Context context) throws IOException, InterruptedException {
-			this.process.process(new RowWrapper(value));
+			try {
+				this.process.process(new RowWrapper(value));
+			} catch (RuntimeException x) {
+				throw x;
+			} catch (IOException x) {
+				throw x;
+			} catch (InterruptedException x) {
+				throw x;
+			} catch (Throwable x) {
+				throw new RuntimeException(x);
+			}
 		}
 	}
 

@@ -7,6 +7,7 @@ import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.StorageManagement;
 
 public class ProcessWrapper<AE extends PersistingElement, E extends AE> implements Process<Row> {
+	private static final long serialVersionUID = 108311129419175780L;
 	private final Process<AE> process;
 	private final Class<E> clazz;
 	private final Set<String> toBeActivated;
@@ -23,9 +24,8 @@ public class ProcessWrapper<AE extends PersistingElement, E extends AE> implemen
 		return process;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public void process(Row row) {
+	public void process(Row row) throws Throwable {
 		process.process((AE)StorageManagement.getFromRawData(this.clazz, row));
 	}
 	
