@@ -20,6 +20,9 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -522,18 +525,29 @@ public aspect StorageManagement {
 		return StorageManagement.getElementUsingCache((PersistingElement)this);
 	}
 	
-	public static <AE extends PersistingElement, E extends AE> void processElements(final Class<E> clazz, final Constraint c, final Process<AE> processAction, final int limit, final String... families) throws DatabaseNotReachedException {
-		CloseableIterator<E> it = findElement(clazz, c, limit, families);
+	public static <AE extends PersistingElement, E extends AE> void processElements(Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout) throws DatabaseNotReachedException, InterruptedException {
+		final CloseableIterator<E> it = findElement(clazz, c, limit, families);
+		ExecutorService executor = Executors.newFixedThreadPool(threadNumber);
 		try {
 			while (it.hasNext()) {
-				processAction.process(it.next());
+				final E elt = it.next();
+				executor.execute(new Runnable() {
+		
+					@Override
+					public void run() {
+						processAction.process(elt);
+					}
+				});
 			}
+			executor.shutdown();
+			if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS))
+				throw new InterruptedException("Could not perform task in expected time (timeout)");
 		} finally {
 			it.close();
 		}
 	}
 	
-	public static <AE extends PersistingElement, E extends AE> void processElementsRemotely(final Class<E> clazz, final Constraint c, final Process<AE> process, final Callback callback, final int limit, final String... families) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
+	public static <AE extends PersistingElement, E extends AE> void processElementsRemotely(final Class<E> clazz, final Constraint c, final Process<AE> process, final Callback callback, final int limit, final String[] families, final int threadNumber, final long timeout) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
 		
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		if (store instanceof ActionnableStore) {
@@ -543,8 +557,9 @@ public aspect StorageManagement {
 			new Thread() {
 				public void run() {
 					try {
-						processElements(clazz, c, process, limit, families);
-						callback.processCompleted();
+						processElements(clazz, c, process, limit, families, threadNumber, timeout);
+						if (callback != null)
+							callback.processCompleted();
 					} catch (Throwable e) {
 						if (callback != null)
 							callback.processCompletedInError(e);

@@ -248,7 +248,6 @@ public class BasicTest {
 		 usBook.store();
 	 }
 	 
-	 @Ignore
 	 @Test public void importExport() throws IOException, ClassNotFoundException, DatabaseNotReachedException {
 		 //Reusable query
 		SearchableClassConstraintBuilder<Book> query = StorageManagement.findElements().ofClass(Book.class).andActivateAllFamilies().withAtMost(1000).elements();
@@ -618,7 +617,7 @@ public class BasicTest {
 		}
 	};
 	 
-	 @Test public void process() throws DatabaseNotReachedException {
+	 @Test public void process() throws DatabaseNotReachedException, InterruptedException {
 		 Novel n1 = new Novel(bssut, new Date(123456799), new Date(0));
 		 n1.attribute = 1;
 		 n1.store();
@@ -627,7 +626,7 @@ public class BasicTest {
 		 n2.store();
 		 
 		 try {
-			 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel());		 
+			 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 2, 20000);		 
 
 			 assertEquals(2, n1.attribute);
 			 assertEquals(3, n2.attribute);
@@ -647,7 +646,7 @@ public class BasicTest {
 		 
 		 try {
 			WaitingCallBack cb = new WaitingCallBack();
-			StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().andActivate().remoteForEach(new InrementNovel(2), cb);
+			StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().andActivate().remoteForEach(new InrementNovel(2), cb, 2, 20000);
 			synchronized(cb) {
 				cb.waitProcessCompleted();
 			}
