@@ -12,6 +12,17 @@ import javolution.util.FastMap;
 
 import com.googlecode.n_orm.PersistingElement;
 
+/**
+ * A cache for temporarily storing {@link PersistingElement}s.<br>
+ * There is a cache per thread, so that cached elements are thread safe unless explicitly shared across threads.
+ * Only thread owning a cache is allowed to use this cache.<br>
+ * To get a cache, use {@link #getCache()} within the using thread.<br>
+ * Caches are limited in size (see {@link #getMaxElementsInCache()}).
+ * Cached elements are removed as soon as they have not been accessed since a certain amount of time (see {@link #getTimeToLiveSeconds()}).<br>
+ * Caches for dead thread are recycled, but in case they have not been used during a certain amount of time (see {@link #getTimeToLiveSeconds()}), they are dropped.
+ * @author fondemen
+ *
+ */
 public class Cache {
 	private static Logger logger = Logger.getLogger(Cache.class.getName());
 
@@ -70,27 +81,65 @@ public class Cache {
 		logger.info("Per-thread caching system started.");
 	}
 	
-	static int getTimeToLiveSeconds() {
+	/**
+	 * Time during which a element is kept in the cache (10s by default).
+	 * If an element is accessed (e.g. by storing or activating it), its time to live is reseted.
+	 * A cache is also kept during this time once its corresponding thread is over, so that it can be reused by another thread.
+	 * @return time to live in seconds
+	 */
+	public static int getTimeToLiveSeconds() {
 		return timeToLiveSeconds;
 	}
 
-	static void setTimeToLiveSeconds(int timeToLiveSeconds) {
+	/**
+	 * Sets time during which a element is kept in the cache.
+	 * If an element is accessed (e.g. by storing or activating it), its time to live is reseted.
+	 * A cache is also kept during this time once its corresponding thread is over, so that it can be reused by another thread.
+	 * @param timeToLiveSeconds time to live in seconds
+	 */
+	public static void setTimeToLiveSeconds(int timeToLiveSeconds) {
 		Cache.timeToLiveSeconds = timeToLiveSeconds;
 	}
 
-	static int getMaxElementsInCache() {
+	/**
+	 * The maximum number of elements that can be kept in a (per-thread) cache (10 000 by default).
+	 */
+	public static int getMaxElementsInCache() {
 		return maxElementsInCache;
 	}
 
-	static void setMaxElementsInCache(int maxElementsInCache) {
+	/**
+	 * Sets the maximum number of elements that can be kept in a (per-thread) cache.
+	 */
+	public static void setMaxElementsInCache(int maxElementsInCache) {
 		Cache.maxElementsInCache = maxElementsInCache;
 	}
 
-	static int getPeriodBetweenCacheCleanupMS() {
+	/**
+	 * The time between two cache cleanups (1s by default).
+	 * Caches with alive thread are asked to cleanup at next access: all elements that have not been accessed since their time to live are discarded.
+	 * Caches with dead threads are checked for time to live and discarded if this period is over, otherwise their elements are immediately checked for time to live.
+	 * @return period between two cache cleanups in milliseconds
+	 */
+	public static int getPeriodBetweenCacheCleanupMS() {
 		return periodBetweenCacheCleanupMS;
 	}
 
-	static void runCacheCleanup() {
+	/**
+	 * The time between two cache cleanups.
+	 * Caches with alive thread are asked to cleanup at next access: all elements that have not been accessed since their time to live are discarded.
+	 * Caches with dead threads are checked for time to live and discarded if this period is over, otherwise their elements are immediately checked for time to live.
+	 * @param periodBetweenCacheCleanupMS period between two cache cleanups in milliseconds
+	 */
+	public static void setPeriodBetweenCacheCleanupMS(
+			int periodBetweenCacheCleanupMS) {
+		Cache.periodBetweenCacheCleanupMS = periodBetweenCacheCleanupMS;
+	}
+
+	/**
+	 * Performs a cleanup on caches for dead threads, and marks others for being cleaned at next access.
+	 */
+	public static void runCacheCleanup() {
 		cacheCleaner.run();
 	}
 
@@ -104,10 +153,14 @@ public class Cache {
 		return findCache(thread)!= null;
 	}
 	
-	static Cache findCache(Thread thread) {
+	public static Cache findCache(Thread thread) {
 		return perThreadCaches.get(thread);
 	}
 	
+	/**
+	 * Gives a cache to the current thread.
+	 * In case this cache does not already exists, creates it.
+	 */
 	public static Cache getCache() {
 		Cache res = perThreadCaches.get(Thread.currentThread());
 		
@@ -135,6 +188,9 @@ public class Cache {
 		return res;
 	}
 	
+	/**
+	 * A string identifier for the thread.
+	 */
 	public static String getThreadId(Thread thread) {
 		return Long.toHexString(thread.getId());
 	}
@@ -221,7 +277,15 @@ public class Cache {
 		return eldest;
 	}
 	
-	public void register(PersistingElement element) {
+	/**
+	 * Registers an element in the cache.<br>
+	 * Only thread for this cache has access to this method.<br>
+	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).<br>
+	 * In case the maximum number of cacheable elements is reached, element with the eldest access id removed from the cache (see {@link #setMaxElementsInCache(int)})
+	 * @param element the element to be cached (during {@link #getTimeToLiveSeconds()})
+	 * @throws IllegalStateException in case this thread is not the thread for this cache
+	 */
+	public void register(PersistingElement element) throws IllegalStateException {
 		this.checkState();
 		
 		if (element == null)
@@ -239,7 +303,14 @@ public class Cache {
 		logger.finer("Registered element " + element + " for thread " + this.thread + " with id " + threadId);
 	}
 	
-	public void unregister(PersistingElement element) {
+	/**
+	 * Removes an element in the cache.<br>
+	 * Only thread for this cache has access to this method.<br>
+	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).<br>
+	 * @param element the element to be uncached
+	 * @throws IllegalStateException in case this thread is not the thread for this cache
+	 */
+	public void unregister(PersistingElement element) throws IllegalStateException {
 		this.checkState();
 		
 		if (this.cache.remove(element.getFullIdentifier()) != null) {
@@ -247,6 +318,14 @@ public class Cache {
 		}
 	}
 	
+	/**
+	 * Finds an element in the cache according to its full identifier.<br>
+	 * Only thread for this cache has access to this method.<br>
+	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).<br>
+	 * @param fullIdentifier the full identifier of the element to be cached; null if not found
+	 * @throws IllegalStateException in case this thread is not the thread for this cache
+	 * @see PersistingElement#getFullIdentifier()
+	 */
 	public PersistingElement getKnownPersistingElement(String fullIdentifier) {
 		this.checkState();
 		Element res = (Element) this.cache.get(fullIdentifier);
@@ -258,26 +337,56 @@ public class Cache {
 			return ret;
 		}
 	}
-	
+
+	/**
+	 * Finds an element in the cache according to its identifier.<br>
+	 * Only thread for this cache has access to this method.<br>
+	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).<br>
+	 * @param identifier the full identifier of the element to be cached; null if not found
+	 * @param clazz the class that the element instantiates (see {@link Object#getClass())}; null if not found
+	 * @throws IllegalStateException in case this thread is not the thread for this cache
+	 * @see PersistingElement#getIdentifier()
+	 */
 	public PersistingElement getKnownPersistingElement(String identifier, Class<? extends PersistingElement> clazz) {
 		return this.getKnownPersistingElement(identifier + clazz.getName());
 	}
 	
+	/**
+	 * The size of the cache.
+	 * This method checks elements for their time to live regardless the cache is marked for that or not.
+	 * @return
+	 */
 	public int size() {
 		this.cleanInvalidElements();
 		return this.cache.size();
 	}
 	
+	/**
+	 * Clears the cache.
+	 */
 	public void reset() {
 		this.cache.clear();
 		logger.finer("Reseted cache for thread " + this.thread + " with id " + threadId);
 	}
 	
-	public boolean isClosed() {
+	/**
+	 * Checks if this cache can be used or not.
+	 * A cache cannot be used if its thread is deas and if its time to live is over.
+	 * A closed cache must not be used in any case (necessary resources were released)
+	 * @return whether this cache has bee closed
+	 * @see #close()
+	 */
+	public synchronized boolean isClosed() {
 		return this.cache == null;
 	}
 	
-	protected void close() {
+	/**
+	 * Closes the cache.
+	 * This method is automatically invoked on caches for dead threads and whose time to live is over.
+	 * A closed cache cannot be used anymore.
+	 * @see #isClosed()
+	 */
+	protected synchronized void close() {
 		if (this.cache == null)
 			return;
 		this.reset();
