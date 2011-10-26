@@ -21,6 +21,7 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.Ignore;
 
 import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -410,7 +411,7 @@ public class BasicTest {
 		assertEquals(bsut, b2);
 	 }
 	 
-	 @Test public void importExport() throws IOException, ClassNotFoundException, DatabaseNotReachedException {
+	 @Ignore @Test public void importExport() throws IOException, ClassNotFoundException, DatabaseNotReachedException {
 		 //Reusable query
 		SearchableClassConstraintBuilder<Book> query = StorageManagement.findElements().ofClass(Book.class).andActivateAllFamilies().withAtMost(1000).elements();
 		
