@@ -115,4 +115,14 @@ public class EvolutionTest {
 		
 		assertEquals("toto", sut2.prop);
 	}
+	
+	@Test public void deletedCf() {
+		String key = "JIOJJ:?IKBYI:NIUBYBF";
+		V0NewCf old = new V0NewCf();
+		old.key = key;
+		old.aProp = "testprop";
+		old.cf.add("element");
+		old.delete();
+		old.store();
+	}
 }

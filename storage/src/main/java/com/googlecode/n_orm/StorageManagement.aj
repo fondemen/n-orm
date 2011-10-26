@@ -22,6 +22,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 
@@ -525,25 +526,47 @@ public aspect StorageManagement {
 		return StorageManagement.getElementUsingCache((PersistingElement)this);
 	}
 	
-	public static <AE extends PersistingElement, E extends AE> void processElements(Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout) throws DatabaseNotReachedException, InterruptedException {
+	public static <AE extends PersistingElement, E extends AE> void processElements(Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		long start = System.currentTimeMillis();
 		final CloseableIterator<E> it = findElement(clazz, c, limit, families);
-		ExecutorService executor = Executors.newFixedThreadPool(threadNumber);
+		ExecutorService executor = Executors.newCachedThreadPool();
+		final Map<E, Throwable> problems = new TreeMap<E, Throwable>();
 		try {
+			List<Future<?>> performing = new ArrayList<Future<?>>(threadNumber);
 			while (it.hasNext()) {
 				final E elt = it.next();
-				executor.execute(new Runnable() {
+				//Cleaning performing from done until there is room for another execution
+				while (performing.size() >= threadNumber) {
+					Thread.sleep(10); //Hopefully, some execution will be done
+					if (start+timeout < System.currentTimeMillis())
+						throw new InterruptedException();
+					Iterator<Future<?>> prfIt = performing.iterator();
+					while (prfIt.hasNext()) {
+						Future<?> prf = prfIt.next();
+						if (prf.isDone())
+							prfIt.remove();
+					}
+				}
+				Future<?> done = executor.submit(new Runnable() {
 		
 					@Override
 					public void run() {
-						processAction.process(elt);
+						try {
+							processAction.process(elt);
+						} catch (Throwable t) {
+							problems.put(elt, t);
+						}
 					}
 				});
+				performing.add(done);
 			}
+		} finally {
+			it.close();
 			executor.shutdown();
 			if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS))
 				throw new InterruptedException("Could not perform task in expected time (timeout)");
-		} finally {
-			it.close();
+			if (!problems.isEmpty())
+				throw new ProcessException(processAction, problems);
 		}
 	}
 	

@@ -27,6 +27,7 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
+import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.WaitingCallBack;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
@@ -70,7 +71,7 @@ public class BasicTest {
 	
 	@BeforeClass
 	@AfterClass
-	public static void vacuumStore() throws DatabaseNotReachedException, InterruptedException {
+	public static void vacuumStore() throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		StorageManagement.findElements().ofClass(BookStore.class).withAtMost(10000).elements().forEach(new Process<BookStore>() {
 			
 			@Override
