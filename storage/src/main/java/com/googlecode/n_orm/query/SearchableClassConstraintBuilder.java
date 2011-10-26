@@ -17,6 +17,7 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.ImplicitActivation;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
+import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.WaitingCallBack;
@@ -180,13 +181,28 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	/**
 	 * Performs an action for each element corresponding to the query using parallel threads.
 	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Invoking this method is blocking until execution is completed, or a timeout of 1min i reached.
+	 * Only one thread is used to perform processes.
+	 * @param action the action to be performed over each element of the query.
+	 * @throws DatabaseNotReachedException
+	 * @throws InterruptedException in case threads are interrupted or timeout is reached
+	 * @throws ProcessException in case some process sent an exception while running
+	 */
+	public void forEach(Process<T> action) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		this.forEach(action, 1, 60000);
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query using parallel threads.
+	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
 	 * Invoking this method is blocking until execution is completed.
 	 * @param action the action to be performed over each element of the query.
 	 * @param timeoutMs the max allowed time to execute this task
 	 * @throws DatabaseNotReachedException
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
+	 * @throws ProcessException in case some process sent an exception while running
 	 */
-	public void forEach(Process<T> action, int threadNumber, long timeoutMs) throws DatabaseNotReachedException, InterruptedException {
+	public void forEach(Process<T> action, int threadNumber, long timeoutMs) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
 		if (hasNoLimit())
 			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
