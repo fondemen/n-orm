@@ -1,7 +1,6 @@
 package com.googlecode.n_orm.memory;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -9,8 +8,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-
-import javolution.util.FastMap;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -52,87 +49,24 @@ public class Memory implements Store {
 	}
 
 	@SuppressWarnings("serial")
-	private abstract class LazyHash<T> implements Map<String, T> {
-		
-		private FastMap<String, T> map;
-		
-		public LazyHash() {
-			this.map = new FastMap<String, T>();
-			this.map.shared();
-		}
-		
+	private abstract class LazyHash<T> extends TreeMap<String, T> {
 		protected abstract T newElement(String key);
 
 		@Override
 		public T get(Object key) {
-			T ret = this.map.get(key);
+			T ret = super.get(key);
 			if (ret == null) {
 				ret = this.newElement((String) key);
 				this.put((String) key, ret);
 			}
 			return ret;
 		}
-
-		@Override
-		public void clear() {
-			this.map.clear();
-		}
-
-		@Override
-		public boolean containsKey(Object key) {
-			return this.map.containsKey(key);
-		}
-
-		@Override
-		public boolean containsValue(Object value) {
-			return this.map.containsValue(value);
-		}
-
-		@Override
-		public Set<Entry<String, T>> entrySet() {
-			return this.map.entrySet();
-		}
-
-		@Override
-		public boolean isEmpty() {
-			return this.map.isEmpty();
-		}
-
-		@Override
-		public Set<String> keySet() {
-			return this.map.keySet();
-		}
-
-		@Override
-		public T put(String key, T value) {
-			return this.map.put(key, value);
-		}
-
-		@Override
-		public void putAll(Map<? extends String, ? extends T> m) {
-			this.map.putAll(m);
-		}
-
-		@Override
-		public T remove(Object key) {
-			return this.map.remove(key);
-		}
-
-		@Override
-		public int size() {
-			return this.map.size();
-		}
-
-		@Override
-		public Collection<T> values() {
-			return this.map.values();
-		}
 		
 		
 	}
 
 	@SuppressWarnings("serial")
-	public class Table extends FastMap<String, Table.Row> {
+	public class Table extends TreeMap<String, Table.Row> {
 		public class Row extends LazyHash<Row.ColumnFamily> implements com.googlecode.n_orm.storeapi.Row {
 			public final String key;
 			
@@ -161,14 +95,10 @@ public class Memory implements Store {
 
 			@Override
 			public Map<String, Map<String, byte[]>> getValues() {
-				return new FastMap<String, Map<String,byte[]>>(this);
+				return new TreeMap<String, Map<String,byte[]>>(this);
 			}
 		}
 
-		public Table() {
-			shared();
-		}
-		
 		protected Row newElement(String key) {
 			return new Row(key);
 		}
