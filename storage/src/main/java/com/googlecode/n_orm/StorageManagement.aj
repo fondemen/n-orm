@@ -11,6 +11,7 @@ import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -528,6 +529,7 @@ public aspect StorageManagement {
 	
 	public static <AE extends PersistingElement, E extends AE> void processElements(Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		long start = System.currentTimeMillis();
+		long end = (start > Long.MAX_VALUE - timeout) ? Long.MAX_VALUE : start+timeout;
 		final CloseableIterator<E> it = findElement(clazz, c, limit, families);
 		ExecutorService executor = Executors.newCachedThreadPool();
 		final Map<E, Throwable> problems = new TreeMap<E, Throwable>();
@@ -538,8 +540,8 @@ public aspect StorageManagement {
 				//Cleaning performing from done until there is room for another execution
 				while (performing.size() >= threadNumber) {
 					Thread.sleep(10); //Hopefully, some execution will be done
-					if (start+timeout < System.currentTimeMillis())
-						throw new InterruptedException();
+					if (end < System.currentTimeMillis())
+						throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
 					Iterator<Future<?>> prfIt = performing.iterator();
 					while (prfIt.hasNext()) {
 						Future<?> prf = prfIt.next();

@@ -67,6 +67,10 @@ public class ProcessTest {
 	 @Test(expected=InterruptedException.class) public void processTooShort() throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 1, 1);		 
 	 }
+	 
+	 @Test public void processUntimeouted() throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 1, Long.MAX_VALUE);		 
+	 }
 
 		
 		public static class BadProcess implements Process<Novel> {
