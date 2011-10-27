@@ -179,25 +179,25 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	}
 	
 	/**
-	 * Performs an action for each element corresponding to the query using parallel threads.
+	 * Performs an action for each element corresponding to the query.
 	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
-	 * Invoking this method is blocking until execution is completed, or a timeout of 1min i reached.
-	 * Only one thread is used to perform processes.
 	 * @param action the action to be performed over each element of the query.
 	 * @throws DatabaseNotReachedException
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
 	public void forEach(Process<T> action) throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		this.forEach(action, 1, 60000);
+		this.forEach(action, 1, 0);
 	}
 	
 	/**
 	 * Performs an action for each element corresponding to the query using parallel threads.
 	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
-	 * Invoking this method is blocking until execution is completed.
+	 * Invoking this method is blocking until execution is completed.<br>
+	 * In case you only use one thread, process will be performed in this thread.<br>
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
 	 * @param action the action to be performed over each element of the query.
-	 * @param timeoutMs the max allowed time to execute this task
+	 * @param timeoutMs the max allowed time to execute this task ; useless in case threadNumber is 1
 	 * @throws DatabaseNotReachedException
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
 	 * @throws ProcessException in case some process sent an exception while running
