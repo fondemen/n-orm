@@ -30,42 +30,95 @@ public class ProcessTest {
 	public static class InrementNovel implements Process<Novel> {
 		private static final long serialVersionUID = 4763391618006514705L;
 		
-		private final int inc;
+		private int inc = 1;
+		private boolean activate = true;
+		private boolean wait = false;
 		
 		public InrementNovel() {
-			inc = 1;
+		}
+		
+		public InrementNovel(boolean activate, boolean wait) {
+			this.activate = activate;
+			this.wait = wait;
 		}
 
 		public InrementNovel(int inc) {
 			super();
 			this.inc = inc;
 		}
-
+		
 		@Override
-		public void process(Novel element) {
-			//element.activate();
+		public void process(Novel element) throws InterruptedException {
+			if (this.activate)
+				element.activate();
 			element.attribute+=inc;
 			element.store();
+			if (this.wait)
+				Thread.sleep(20);
 		}
 	}
 	 
 	 @Test public void process() throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		 
 		 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 2, 20000);		 
-
+		 n1.activate();
+		 n2.activate();
 		 assertEquals(2, n1.attribute);
 		 assertEquals(3, n2.attribute);
 	 }
 	 
+	 @Test public void processActivating() throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		 
+		 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().andActivate().forEach(new InrementNovel(false, false), 2, 20000);		 
+		 n1.activate();
+		 n2.activate();
+		 assertEquals(2, n1.attribute);
+		 assertEquals(3, n2.attribute);
+	 }
+	 
+	 @Test public void processNotActivating() throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		 
+		 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(false, false), 2, 20000);		 
+		 n1.activate();
+		 n2.activate();
+		 assertEquals(1, n1.attribute);
+		 assertEquals(1, n2.attribute);
+	 }
+	 
 	 @Test public void processOneThread() throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 1, 20000);		 
+		 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(false, false), 1, 20000);		 
+
+		 //No need for activation as elements are processed in this thread
+		 assertEquals(2, n1.attribute);
+		 assertEquals(3, n2.attribute);
+	 }
+	 
+	 @Test public void processOneThreadDefaultParameters() throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(false, false));		 
+
+		 //No need for activation as elements are processed in this thread
+		 assertEquals(2, n1.attribute);
+		 assertEquals(3, n2.attribute);
+	 }
+	 
+	 @Test public void processNotActivatingOneThread() throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		 
+		 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(false, false), 1, 20000);		 
 
 		 assertEquals(2, n1.attribute);
 		 assertEquals(3, n2.attribute);
 	 }
 	 
 	 @Test(expected=InterruptedException.class) public void processTooShort() throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 1, 1);		 
+		StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(true, true), 2, 1);		 
+	 }
+	 
+	 @Test public void processTooShortOneThread() throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 1, 1);				 
+
+		 //No need for activation as elements are processed in this thread
+		 assertEquals(2, n1.attribute);
+		 assertEquals(3, n2.attribute);
 	 }
 	 
 	 @Test public void processUntimeouted() throws DatabaseNotReachedException, InterruptedException, ProcessException {
