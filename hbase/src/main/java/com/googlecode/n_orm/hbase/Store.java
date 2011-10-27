@@ -824,8 +824,6 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				ret.setZookeeper(zk);
 			}
 			
-			assert ret.getCurrentThread() == null || ret.getCurrentThread() == Thread.currentThread();
-			
 			return ret;
 		}
 	}
@@ -877,6 +875,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			}
 			try {
 				lock.getExclusiveLock(lockTimeout);
+				assert lock.getCurrentThread() == Thread.currentThread();
 				return lock;
 			} catch (Exception e) {
 				throw new DatabaseNotReachedException(e);
@@ -892,7 +891,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				if (lock.getCurrentExclusiveLock() != null)
 					lock.releaseExclusiveLock();
 			} catch (Exception e) {
-				errorLogger.log(Level.SEVERE, "Error unlocking table " + table + " locked in exclustion", e);
+				errorLogger.log(Level.SEVERE, "Error unlocking table " + table + " locked in exclusion", e);
 			} finally {
 				if (this.sharedExclusiveLockedTables.contains(table)) {
 					this.sharedExclusiveLockedTables.remove(table);
