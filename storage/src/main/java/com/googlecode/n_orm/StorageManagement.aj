@@ -368,6 +368,37 @@ public aspect StorageManagement {
 	public static <T> T getElement(Class<T> clazz, String identifier) {
 		return KeyManagement.getInstance().createElement(clazz, identifier);
 	}
+
+	static <T extends PersistingElement> T createElementFromRow(final Class<T> clazz,
+			final Set<String> toBeActivated, Row data) {
+		T elt = ConversionTools.convertFromString(clazz, data.getKey());
+		((PersistingElement)elt).exists = Boolean.TRUE;
+		//assert (toBeActivated == null) == ((data.getValues() == null)  || (data.getValues().entrySet().isEmpty())); //may be false (e.g. no properties)
+		if (toBeActivated != null) { //the element should be activated
+			Set<String> tba = toBeActivated, missingCf = null;
+			Set<String> dataKeys = data.getValues().keySet();
+			if (! dataKeys.containsAll(toBeActivated)) {
+				missingCf = new TreeSet<String>(toBeActivated);
+				missingCf.removeAll(dataKeys);
+				tba = new TreeSet<String>(toBeActivated);
+				tba.retainAll(dataKeys);
+				Iterator<String> mci = missingCf.iterator();
+				while (mci.hasNext()) {
+					if (elt.getColumnFamily(mci.next()).isActivated())
+						mci.remove();
+				}
+			}
+			
+			if (!tba.isEmpty()) {
+				elt.activateFromRawData(tba, data.getValues());
+			}
+			
+			if (missingCf != null && !missingCf.isEmpty()) {
+				elt.activate(missingCf.toArray(new String[missingCf.size()]));
+			}
+		}
+		return elt;
+	}
 	
 	public static <T extends PersistingElement> CloseableIterator<T> findElement(final Class<T> clazz, Constraint c, final int limit, String... families) throws DatabaseNotReachedException {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
@@ -394,33 +425,7 @@ public aspect StorageManagement {
 						throw new IllegalStateException("The list is empty");
 					Row data = keys.next();
 					try {
-						T elt = ConversionTools.convertFromString(clazz, data.getKey());
-						((PersistingElement)elt).exists = Boolean.TRUE;
-						//assert (toBeActivated == null) == ((data.getValues() == null)  || (data.getValues().entrySet().isEmpty())); //may be false (e.g. no properties)
-						if (toBeActivated != null) { //the element should be activated
-							Set<String> tba = toBeActivated, missingCf = null;
-							Set<String> dataKeys = data.getValues().keySet();
-							if (! dataKeys.containsAll(toBeActivated)) {
-								missingCf = new TreeSet<String>(toBeActivated);
-								missingCf.removeAll(dataKeys);
-								tba = new TreeSet<String>(toBeActivated);
-								tba.retainAll(dataKeys);
-								Iterator<String> mci = missingCf.iterator();
-								while (mci.hasNext()) {
-									if (elt.getColumnFamily(mci.next()).isActivated())
-										mci.remove();
-								}
-							}
-							
-							if (!tba.isEmpty()) {
-								elt.activateFromRawData(tba, data.getValues());
-							}
-							
-							if (missingCf != null && !missingCf.isEmpty()) {
-								elt.activate(missingCf.toArray(new String[missingCf.size()]));
-							}
-						}
-						return elt;
+						return createElementFromRow(clazz, toBeActivated, data);
 					} finally {
 						returned++;
 					}
@@ -527,16 +532,21 @@ public aspect StorageManagement {
 		return StorageManagement.getElementUsingCache((PersistingElement)this);
 	}
 	
-	public static <AE extends PersistingElement, E extends AE> void processElements(Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+	public static <AE extends PersistingElement, E extends AE> void processElements(final Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		long start = System.currentTimeMillis();
-		long end = (start > Long.MAX_VALUE - timeout) ? Long.MAX_VALUE : start+timeout;
-		final CloseableIterator<E> it = findElement(clazz, c, limit, families);
-		ExecutorService executor = Executors.newCachedThreadPool();
-		final Map<E, Throwable> problems = new TreeMap<E, Throwable>();
+		long end = (threadNumber == 1 || start > Long.MAX_VALUE - timeout) ? Long.MAX_VALUE : start+timeout;
+		//final CloseableIterator<E> it = findElement(clazz, c, limit, families);
+		Store store = StoreSelector.getInstance().getStoreFor(clazz);
+		final Set<String> toBeActivated = families == null ? null : getAutoActivatedFamilies(clazz, families);
+		final CloseableKeyIterator keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
+		ExecutorService executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
+		final List<ProcessException.Problem> problems = new LinkedList<ProcessException.Problem>();
 		try {
 			List<Future<?>> performing = new ArrayList<Future<?>>(threadNumber);
-			while (it.hasNext()) {
-				final E elt = it.next();
+			while (keys.hasNext()) {
+				final Row data = keys.next();
+				if (end < System.currentTimeMillis())
+					throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
 				//Cleaning performing from done until there is room for another execution
 				while (performing.size() >= threadNumber) {
 					Thread.sleep(10); //Hopefully, some execution will be done
@@ -549,24 +559,31 @@ public aspect StorageManagement {
 							prfIt.remove();
 					}
 				}
-				Future<?> done = executor.submit(new Runnable() {
+				Runnable r = new Runnable() {
 		
 					@Override
 					public void run() {
+						E elt = null;
 						try {
+							elt = createElementFromRow(clazz, toBeActivated, data);
 							processAction.process(elt);
 						} catch (Throwable t) {
-							problems.put(elt, t);
+							problems.add(new ProcessException.Problem(elt, data, t));
 						}
 					}
-				});
-				performing.add(done);
+				};
+				if (threadNumber == 1)
+					r.run();
+				else
+					performing.add(executor.submit(r));
 			}
 		} finally {
-			it.close();
-			executor.shutdown();
-			if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS))
-				throw new InterruptedException("Could not perform task in expected time (timeout)");
+			keys.close();
+			if (executor != null) {
+				executor.shutdown();
+				if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS))
+					throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
+			}
 			if (!problems.isEmpty())
 				throw new ProcessException(processAction, problems);
 		}
