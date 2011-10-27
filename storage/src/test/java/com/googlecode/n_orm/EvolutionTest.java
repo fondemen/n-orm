@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.Set;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.googlecode.n_orm.cf.SetColumnFamily;
@@ -100,6 +101,7 @@ public class EvolutionTest {
 		protected Set<String> cf = null;
 	}
 	
+	@Ignore
 	@Test
 	public void newCfSawnAfter() {
 		String key = "JIOJJ:?IKBYI:NIUBYBF";
