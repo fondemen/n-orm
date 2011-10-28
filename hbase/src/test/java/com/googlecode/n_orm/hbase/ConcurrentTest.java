@@ -35,23 +35,34 @@ public class ConcurrentTest {
 		private final int[] done;
 		private final Store store;
 		private Throwable error;
+		private volatile boolean go = false;
 
 		private PutElement(int[] done, Store store) {
 			this.done = done;
 			this.store = store;
 		}
+		
+		public void go() {
+			go = true;
+		}
 
 		@Override
 		public void run() {
+			while (!go)
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e1) {
+				}
 			try {
 				Map<String, Map<String, byte[]>> ch = new TreeMap<String, Map<String,byte[]>>();
 				Map<String, byte[]> cf = new TreeMap<String, byte[]>();
 				cf.put("qual", new byte [] {1, 2, 3, 4});
 				ch.put("cf", cf );
 				this.store.storeChanges("t1", "idt1", ch , null, null);
-				done[0]--;
 			} catch (Throwable e) {
 				this.error = e;
+			} finally {
+				done[0]--;
 			}
 		}
 		
@@ -114,50 +125,45 @@ public class ConcurrentTest {
 	}
 	
 	@Test(timeout=60000)
-	public void creatingNewTableFrom2Threads() throws IOException, InterruptedException {
-		final Object syncStart = new Object();
+	public void creatingNewTableFrom2Threads() throws Throwable {
 		final int [] done = new int[] {2};
 		this.deleteTable("t1");
 		PutElement r = new PutElement(done, store1);
 		Thread t1 = new Thread(r, "Put 1");
 		Thread t2 = new Thread(r, "Put 2");
 		t1.start();t2.start();
-		synchronized (syncStart) {
-			syncStart.notifyAll();
-		}
+		r.go();
 		while (done[0] != 0) {
 			Thread.sleep(10);
 		}
 		
-		assertNull(r.getError());
+		if (r.getError() != null)
+			throw r.getError();
 		assertTrue(store1.exists("t1", "idt1"));
 	}
 	
 	@Test(timeout=60000)
-	public void creatingNewTableFrom2Stores() throws IOException, InterruptedException {
-		final Object syncStart = new Object();
+	public void creatingNewTableFrom2Stores() throws Throwable {
 		final int [] done = new int[] {2};
 		this.deleteTable("t1");
-		PutElement r1 = new PutElement(done, store1);
-		PutElement r2 = new PutElement(done, store2);
+		PutElement r1 = new PutElement(done, store1); r1.go();
+		PutElement r2 = new PutElement(done, store2); r2.go();
 		Thread t1 =new Thread(r1, "Put from store1");
 		Thread t2 =new Thread(r2, "Put from store2");
 		t1.start();t2.start();
-		synchronized (syncStart) {
-			syncStart.notifyAll();
-		}
 		while (done[0] != 0) {
 			Thread.sleep(10);
 		}
 
-		assertNull(r1.getError());
-		assertNull(r2.getError());
+		if (r1.getError() != null)
+			throw r1.getError();
+		if (r2.getError() != null)
+			throw r2.getError();
 		assertTrue(store1.exists("t1", "idt1"));
 	}
 	
 	@Test(timeout=60000)
-	public void creatingNewCFFrom2Threads() throws IOException, InterruptedException {
-		final Object syncStart = new Object();
+	public void creatingNewCFFrom2Threads() throws Throwable {
 		final int [] done = new int[] {2};
 		this.deleteTable("t1");
 		store1.storeChanges("t1", "idt1", null , null, null); //Creates T1 table with prop
@@ -165,20 +171,18 @@ public class ConcurrentTest {
 		Thread t1 = new Thread(r, "Put 1");
 		Thread t2 = new Thread(r, "Put 2");
 		t1.start();t2.start();
-		synchronized (syncStart) {
-			syncStart.notifyAll();
-		}
+		r.go();
 		while (done[0] != 0) {
 			Thread.sleep(10);
 		}
-		
-		assertNull(r.getError());
+
+		if (r.getError() != null)
+			throw r.getError();
 		assertTrue(store1.exists("t1", "idt1", "cf"));
 	}
 	
 	@Test(timeout=60000)
-	public void creatingNewCFFrom2Stores() throws IOException, InterruptedException {
-		final Object syncStart = new Object();
+	public void creatingNewCFFrom2Stores() throws Throwable {
 		final int [] done = new int[] {2};
 		this.deleteTable("t1");
 		store1.storeChanges("t1", "idt1", null , null, null); //Creates T1 table with prop
@@ -188,15 +192,15 @@ public class ConcurrentTest {
 		Thread t1 =new Thread(r1, "Put from store1");
 		Thread t2 =new Thread(r2, "Put from store2");
 		t1.start();t2.start();
-		synchronized (syncStart) {
-			syncStart.notifyAll();
-		}
+		r1.go(); r2.go();
 		while (done[0] != 0) {
 			Thread.sleep(10);
 		}
 
-		assertNull(r1.getError());
-		assertNull(r2.getError());
+		if (r1.getError() != null)
+			throw r1.getError();
+		if (r2.getError() != null)
+			throw r2.getError();
 		assertTrue(store1.exists("t1", "idt1"));
 	}
 	
