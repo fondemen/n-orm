@@ -704,6 +704,7 @@ public aspect StorageManagement {
 				km.unregister(elt);
 				exported++;
 			}
+			oos.flush();
 		} finally {
 			elementsIterator.close();
 		}
