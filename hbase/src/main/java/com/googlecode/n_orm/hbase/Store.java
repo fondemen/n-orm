@@ -998,7 +998,13 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		//Checking that this table actually exists with the expected column families
 		this.getTableDescriptor(name, expectedFamilies);
 		
-		return (HTable)this.tablesC.getTable(name);
+		try {
+			return (HTable)this.tablesC.getTable(name);
+		} catch (Exception x) {
+			this.handleProblem(x, name, expectedFamilies);
+			this.getTableDescriptor(name, expectedFamilies);
+			return (HTable)this.tablesC.getTable(name);
+		}
 	}
 	
 	protected void returnTable(HTable table) {

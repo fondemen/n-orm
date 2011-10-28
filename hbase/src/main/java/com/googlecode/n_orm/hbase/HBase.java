@@ -38,7 +38,8 @@ public class HBase {
 		"org.apache.hadoop.hbase.HBaseConfiguration",
 		"org.apache.commons.logging.LogFactory",
 		"org.apache.commons.lang.StringUtils",
-		"org.apache.log4j.Logger"
+		"org.apache.log4j.Logger",
+		"org.codehaus.jackson.map.JsonMappingException"
 	};
 	public static final String[] HBaseDependenciesJarFilters = {
 		"zookeeper*.jar,lib/zookeeper*.jar",
@@ -46,7 +47,8 @@ public class HBase {
 		"hbase*.jar",
 		"commons-logging*.jar,lib/commons-logging*.jar",
 		"commons-lang*.jar,lib/commons-lang*.jar",
-		"log4j*.jar,lib/log4j*.jar"
+		"log4j*.jar,lib/log4j*.jar",
+		"jackson*.jar"
 	};
 
 	public static final Logger logger;
