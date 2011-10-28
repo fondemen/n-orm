@@ -13,8 +13,8 @@ import com.googlecode.n_orm.cf.CollectionStorageTest;
 		PersistableSearchTest.class,
 		InheritanceTest.class,
 		ReveresedOrderSearchTest.class,
-		EvolutionTest.class,
-		ImportExportTest.class
+		EvolutionTest.class
+		//ImportExportTest.class
 })
 
 public class GenericTests {
