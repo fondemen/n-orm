@@ -19,6 +19,7 @@ import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.StorageManagement.ExportReport;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.WaitingCallBack;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
@@ -240,19 +241,20 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @param out an output stream that must support {@link InputStream#markSupported()}
 	 * @throws IOException 
 	 */
-	public void exportTo(OutputStream out) throws IOException, DatabaseNotReachedException {
+	public long exportTo(OutputStream out) throws IOException, DatabaseNotReachedException {
 		if (this.hasNoLimit()) {
-			PersistingElement pe;
+			long exported = 0;
 			Constraint c = this.getConstraint();
 			do {
-				pe = StorageManagement.exportPersistingElements(StorageManagement.findElement(this.getClazz(), c, Integer.MAX_VALUE, this.toBeActivated), out);
-				if (pe == null)
-					break;
+				ExportReport ex = StorageManagement.exportPersistingElements(StorageManagement.findElement(this.getClazz(), c, Integer.MAX_VALUE, this.toBeActivated), out);
+				exported+=ex.getExportedElements();
+				if (ex.getExportedElements() < Integer.MAX_VALUE)
+					return exported;
 				else
-					c = new Constraint(pe.getIdentifier()+Character.MIN_VALUE, c.getEndKey());
+					c = new Constraint(ex.getElement().getIdentifier()+Character.MIN_VALUE, c.getEndKey());
 			} while (true);
 		} else {
-			StorageManagement.exportPersistingElements(this.iterate(), out);
+			return StorageManagement.exportPersistingElements(this.iterate(), out).getExportedElements();
 		}
 	}
 }
