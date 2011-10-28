@@ -26,6 +26,7 @@ import org.junit.Test;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.hbase.HBaseLauncher;
 import com.googlecode.n_orm.hbase.Store;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 
 
@@ -263,6 +264,42 @@ public class ConcurrentTest {
 		assertFalse(store1.exists("t1", "idt1", "cf1"));
 		
 		store1.restart();
+	}
+	
+	@Test(expected=Test.None.class)
+	public void acceptingTableDisableWhileScanning() throws IOException, SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+		this.truncateTable("t1");
+		store1.setScanCaching(1);
+		
+		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
+		change1.put("cf1", ch1);
+		ch1.put("k1", new byte[]{1, 2});
+		store1.storeChanges("t1", "idt1", change1 , null, null);
+		store1.storeChanges("t1", "idt2", change1 , null, null);
+		assertTrue(store1.exists("t1", "idt1", "cf1"));
+		assertTrue(store1.exists("t1", "idt2", "cf1"));
+
+		CloseableKeyIterator it = store1.get("t1", (Constraint)null, 100, change1.keySet());
+		
+		try {
+		
+			store1.getAdmin().disableTable("t1");
+			
+			assertTrue(it.hasNext());
+			assertEquals("idt1", it.next().getKey());
+			
+			assertTrue(it.hasNext());
+			store1.getAdmin().disableTable("t1");
+			assertEquals("idt2", it.next().getKey());
+	
+			store1.getAdmin().disableTable("t1");
+			
+			assertFalse(it.hasNext());
+		
+		} finally {
+			it.close();
+		}
 	}
 	
 	@Test

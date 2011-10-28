@@ -666,7 +666,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		this.start();
 	}
 	
-	private void handleProblem(Throwable e, String table, String... expectedFamilies) throws DatabaseNotReachedException {		
+	protected void handleProblem(Throwable e, String table, String... expectedFamilies) throws DatabaseNotReachedException {		
 		while (e instanceof UndeclaredThrowableException)
 			e = ((UndeclaredThrowableException)e).getCause();
 		
@@ -1478,7 +1478,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		s.setFilter(this.addFilter(s.getFilter(), new PageFilter(limit)));
 		
 		ResultScanner r = this.tryPerform(new ScanAction(s), table, famAr);
-		return new CloseableIterator(r, families != null);
+		return new CloseableIterator(this, table, c, limit, families, r, families != null);
 	}
 
 	public void truncate(String table, Constraint c) throws DatabaseNotReachedException {
