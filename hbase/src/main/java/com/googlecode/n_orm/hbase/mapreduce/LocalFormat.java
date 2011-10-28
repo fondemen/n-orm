@@ -22,6 +22,7 @@ import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.aspectj.lang.Aspects;
+import org.codehaus.jackson.map.JsonMappingException;
 
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
@@ -47,7 +48,7 @@ public class LocalFormat {
 	
 	public static void prepareJob(Job job, Scan scan, Store store) throws IOException {
 		if (store.isMapRedSendHBaseJars())
-			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), org.apache.zookeeper.ZooKeeper.class, HTable.class, HBaseAdmin.class, HTablePool.class, HColumnDescriptor.class, Scan.class, Increment.class);
+			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), org.apache.zookeeper.ZooKeeper.class, HTable.class, HBaseAdmin.class, HTablePool.class, HColumnDescriptor.class, Scan.class, Increment.class, JsonMappingException.class);
 		if (store.isMapRedSendNOrmJars())
 			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), Store.class, StorageManagement.class, Aspects.class, FastMap.class, org.apache.log4j.Logger.class, BeanUtils.class);
 		
