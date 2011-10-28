@@ -665,6 +665,22 @@ public aspect StorageManagement {
 		
 	}
 	
+	public static class ExportReport {
+		private final PersistingElement element;
+		private final long exportedElements;
+		public ExportReport(PersistingElement element, long exportedElements) {
+			super();
+			this.element = element;
+			this.exportedElements = exportedElements;
+		}
+		public PersistingElement getElement() {
+			return element;
+		}
+		public long getExportedElements() {
+			return exportedElements;
+		}
+	}
+	
 	/**
 	 * Serialize a binary representation for elements in an OutputStream.
 	 * Dependencies are not serialized.
@@ -672,11 +688,11 @@ public aspect StorageManagement {
 	 * @param elementsIterator an iterator over the elements to be serialized ; closed by the method
 	 * @return lastElement the last element serialized from the collection
 	 */
-	public static PersistingElement exportPersistingElements(CloseableIterator<? extends PersistingElement> elementsIterator, OutputStream out) throws IOException {
+	public static ExportReport exportPersistingElements(CloseableIterator<? extends PersistingElement> elementsIterator, OutputStream out) throws IOException {
 		ObjectOutputStream oos= new ObjectOutputStream(out);
 		PersistingElement lastElement = null;
 		KeyManagement km = KeyManagement.getInstance();
-		
+		long exported = 0;
 		try {
 			while (elementsIterator.hasNext()) {
 				PersistingElement elt = elementsIterator.next();
@@ -686,26 +702,28 @@ public aspect StorageManagement {
 				oos.writeObject(new Element(elt));
 				lastElement = elt;
 				km.unregister(elt);
+				exported++;
 			}
 		} finally {
 			elementsIterator.close();
 		}
 		
-		return lastElement;
+		return new ExportReport(lastElement, exported);
 	}
 	
 	/**
 	 * Import a serialized set in a InputStream. Each element is loaded with data found from the input stream and stored.
 	 * Elements are removed from cache to avoid memory consumption.
 	 * @param fis the input stream to import from ; must support {@link InputStream#markSupported()}
+	 * @return the number of imported elements
 	 */
-	public static void importPersistingElements(InputStream fis) throws DatabaseNotReachedException, IOException, ClassNotFoundException {
+	public static long importPersistingElements(InputStream fis) throws DatabaseNotReachedException, IOException, ClassNotFoundException {
 		if (!fis.markSupported())
 			fis = new BufferedInputStream(fis);
 		
 		ObjectInputStream ois = new ObjectInputStream(fis);
 		KeyManagement km = KeyManagement.getInstance();
-		
+		long ret = 0;
 		boolean ok = true;
 		while(ok && fis.available()>0) {
 			fis.mark(SERIALIZATION_SEPARATOR.getBytes().length*2);
@@ -725,7 +743,9 @@ public aspect StorageManagement {
 				}
 				pe.store();
 				km.unregister(pe);
+				ret++;
 			}
 		}
+		return ret;
 	}
 }

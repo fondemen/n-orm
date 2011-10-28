@@ -134,8 +134,9 @@ public class ImportExportTest {
 		 
 		 // Serialize in a file
 		 FileOutputStream fos = new FileOutputStream(f);
-		 searchQuery.exportTo(fos);
+		 long exported = searchQuery.exportTo(fos);
 		 fos.close();
+		 assertEquals(searchQuery.count(), exported);
 		 
 		 // Test if the file has been created
 		 assertTrue(f.exists());
@@ -152,8 +153,9 @@ public class ImportExportTest {
 		 
 		 KeyManagement.getInstance().cleanupKnownPersistingElements();
 
-		 StorageManagement.importPersistingElements(new FileInputStream(f));
+		 long imported = StorageManagement.importPersistingElements(new FileInputStream(f));
 		 
+		 assertEquals(exported, imported);
 		 assertEquals(originalCount, searchQuery.count());
 	 }
 
