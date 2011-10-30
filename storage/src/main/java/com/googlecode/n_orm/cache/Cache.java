@@ -1,7 +1,9 @@
 package com.googlecode.n_orm.cache;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -30,16 +32,14 @@ public class Cache {
 	private static int timeToLiveSeconds = 10;
 	private static int maxElementsInCache = 10000;
 	
-	private static final FastMap<Thread, Cache> perThreadCaches;
-	private static final FastMap<Long, Cache> availableCaches;
+	private static final Map<Thread, Cache> perThreadCaches;
+	private static final Map<Long, Cache> availableCaches;
 	private static final Timer cacheCleanerTimer;
 	private static final TimerTask cacheCleaner;
 	
 	static {
-		perThreadCaches = new FastMap<Thread, Cache>();
-		availableCaches = new FastMap<Long, Cache>();
-		perThreadCaches.shared();
-		availableCaches.shared();
+		perThreadCaches = Collections.synchronizedMap(new FastMap<Thread, Cache>());
+		availableCaches = Collections.synchronizedMap(new FastMap<Long, Cache>());
 		cacheCleaner = new TimerTask() {
 			
 			@Override
