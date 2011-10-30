@@ -541,6 +541,7 @@ public aspect StorageManagement {
 		final CloseableKeyIterator keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
 		ExecutorService executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
 		final List<ProcessException.Problem> problems = new LinkedList<ProcessException.Problem>();
+		List<Throwable> exceptions = new ArrayList<Throwable>();
 		try {
 			List<Future<?>> performing = new ArrayList<Future<?>>(threadNumber);
 			while (keys.hasNext()) {
@@ -581,11 +582,16 @@ public aspect StorageManagement {
 			keys.close();
 			if (executor != null) {
 				executor.shutdown();
-				if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS))
-					throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
+				if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS)) {
+					InterruptedException ie = new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
+					if (problems.isEmpty() && exceptions.isEmpty())
+						throw ie;
+					else
+						exceptions.add(ie);
+				}
 			}
-			if (!problems.isEmpty())
-				throw new ProcessException(processAction, problems);
+			if (!problems.isEmpty() || !exceptions.isEmpty())
+				throw new ProcessException(processAction, problems, exceptions);
 		}
 	}
 	
