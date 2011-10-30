@@ -49,13 +49,42 @@ public class ProcessException extends Exception {
 		
 	}
 	
+	private static String buildMessage(List<Problem> problems, List<Throwable> otherExceptions) {
+		StringBuffer ret = new StringBuffer();
+		for (Throwable throwable : otherExceptions) {
+			ret.append('\n');
+			ret.append(throwable.getClass().getName());
+			ret.append(": ");
+			ret.append(throwable.getMessage());
+		}
+		for (Problem problem : problems) {
+			ret.append('\n');
+			ret.append("While treating ");
+			PersistingElement elt = problem.getElement();
+			if (elt == null) {
+				ret.append("unconstructible element with id ");
+				ret.append(problem.getRawData().getKey());
+			} else
+				ret.append(elt);
+				
+			ret.append(": ");
+			Throwable throwable = problem.getReportedProblem();
+			ret.append(throwable.getClass().getName());
+			ret.append(": ");
+			ret.append(throwable.getMessage());
+		}
+		return ret.toString();
+	}
+	
 	private final Process<? extends PersistingElement> process;
 	private final List<Problem> problems;
+	private final List<Throwable> otherExceptions;
 	
-	public ProcessException(Process<? extends PersistingElement> p, List<Problem> problems) {
-		super("Problem while executing process " + p.getClass().getName() + ' ' + p, problems.get(0).getReportedProblem());
+	public ProcessException(Process<? extends PersistingElement> p, List<Problem> problems, List<Throwable> otherExceptions) {
+		super("Problem while executing process " + p.getClass().getName() + ':' + buildMessage(problems, otherExceptions));
 		this.process = p;
 		this.problems = problems;
+		this.otherExceptions = otherExceptions;
 	}
 
 	/**
@@ -72,5 +101,13 @@ public class ProcessException extends Exception {
 	 */
 	public Process<? extends PersistingElement> getProcess() {
 		return process;
+	}
+
+	/**
+	 * The list of exceptions not linked to a particular element.
+	 * @return
+	 */
+	public List<Throwable> getOtherExceptions() {
+		return otherExceptions;
 	}
 }
