@@ -48,7 +48,7 @@ public class HBase {
 		"commons-logging*.jar,lib/commons-logging*.jar",
 		"commons-lang*.jar,lib/commons-lang*.jar",
 		"log4j*.jar,lib/log4j*.jar",
-		"jackson*.jar"
+		"jackson*.jar,lib/jackson*.jar"
 	};
 
 	public static final Logger logger;
@@ -70,7 +70,7 @@ public class HBase {
 						.getDeclaredMethod("addURL", parameters);
 				method.setAccessible(true);
 				method.invoke(sysloader, new Object[] { file.toURI().toURL() });
-				logger.info(file.getAbsolutePath() + " added to classpath");
+				logger.fine(file.getAbsolutePath() + " added to classpath");
 			} catch (Throwable t) {
 				errorLogger.log(Level.SEVERE, "Warning: could not add jar file "	+ file.getAbsolutePath(), t);
 			}
