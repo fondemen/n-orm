@@ -578,6 +578,8 @@ public aspect StorageManagement {
 				else
 					performing.add(executor.submit(r));
 			}
+		} catch (Throwable t) {
+			exceptions.add(t);
 		} finally {
 			keys.close();
 			if (executor != null) {
