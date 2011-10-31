@@ -36,6 +36,16 @@ final class CloseableIterator implements CloseableKeyIterator {
 	}
 	
 	private void setResult(ResultScanner result) {
+		//Trying to close existing scanner
+		if (this.result != null) {
+			final ResultScanner res = this.result;
+			new Thread(){
+				@Override
+				public void run() {
+					res.close();
+				}
+			}.start();
+		}
 		this.result = result;
 		this.iterator = result.iterator();
 	}
