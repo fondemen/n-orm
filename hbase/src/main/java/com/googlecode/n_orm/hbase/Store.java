@@ -38,6 +38,7 @@ import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.TableExistsException;
 import org.apache.hadoop.hbase.TableNotFoundException;
+import org.apache.hadoop.hbase.UnknownScannerException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.ScannerTimeoutException;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.filter.Filter;
@@ -282,6 +284,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	private int port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
 	private Integer maxRetries = null;
 	private boolean wasStarted = false;
+	private volatile boolean restarting = false;
+	private final Object restartMutex = new Object();
 	private Configuration config;
 	private HBaseAdmin admin;
 	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
@@ -656,14 +660,32 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 
-	protected synchronized void restart() {
-		synchronized(this.tablesD) {
-			this.tablesD.clear();
+	protected void restart() {
+		synchronized(this.restartMutex) {
+			if (this.restarting)
+				try {
+					this.restartMutex.wait(10000);
+					assert !this.restarting;
+					return;
+				} catch (InterruptedException e) {
+					errorLogger.log(Level.WARNING, "Problem while waiting for store restart: " + e.getMessage(), e);
+				}
+			this.restarting = true;
 		}
-		this.config = HBaseConfiguration.create(this.config);
-		this.admin = null;
-		this.wasStarted = false;
-		this.start();
+		try {
+			synchronized(this.tablesD) {
+				this.tablesD.clear();
+			}
+			this.config = HBaseConfiguration.create(this.config);
+			this.admin = null;
+			this.wasStarted = false;
+			this.start();
+		} finally {
+			synchronized (this.restartMutex) {
+				this.restartMutex.notifyAll();
+				this.restarting = false;
+			}
+		}
 	}
 	
 	protected void handleProblem(Throwable e, String table, String... expectedFamilies) throws DatabaseNotReachedException {		
@@ -731,8 +753,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			HConnectionManager.deleteConnection(this.config, true);
 			restart();
 		} else if (e instanceof IOException) {
-			if (e.getMessage().contains("closed")) {
-				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
+			if (e.getMessage().contains("closed") || (e instanceof ScannerTimeoutException) || e.getMessage().contains("timeout") || (e instanceof UnknownScannerException)) {
+				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " ; restarting store", e);
 				restart();
 				return;
 			}
