@@ -1534,6 +1534,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		final Class<?> actionClass = action.getClass();
 		try {
 			String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
+			//Checking that cf are all there so that process will work
+			this.getTableDescriptor(table, famAr);
 			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, famAr), action, elementClass, famAr);
 			logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
 			if (callback != null) {
