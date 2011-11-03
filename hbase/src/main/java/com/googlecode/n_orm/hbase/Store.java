@@ -1526,6 +1526,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			final String table, Constraint c, Set<String> families, Class<E> elementClass,
 			Process<AE> action, final Callback callback)
 			throws DatabaseNotReachedException {
+		if (! this.hasTable(table)) {
+			if (callback != null)
+				callback.processCompleted();
+			return;
+		}
 		final Class<?> actionClass = action.getClass();
 		try {
 			String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
