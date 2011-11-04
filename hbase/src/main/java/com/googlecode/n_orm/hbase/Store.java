@@ -84,6 +84,7 @@ import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.cache.Cache;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.hbase.actions.Action;
 import com.googlecode.n_orm.hbase.actions.BatchAction;
@@ -660,7 +661,12 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 
-	protected void restart() {
+	/**
+	 * Resets the connection to HBase.
+	 * Also vacuum any cached value about the store (but not Cached elements from {@link Cache}).
+	 * This method is thread-safe ; if a restart is already ongoing, the methods block until restart is done.
+	 */
+	public void restart() {
 		synchronized(this.restartMutex) {
 			if (this.restarting)
 				try {
