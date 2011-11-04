@@ -25,7 +25,7 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
  * static-accessor=getStore<br>
  * 1=/usr/lib/hadoop,/usr/lib/hbase,!/usr/lib/hadoop/example-confs
  * </code><br>
- * Given files are explored recursively ignoring files given with a ! prefix. You can also define (positive or negative with a ! prefix) filters using wilcards such as * (any character set), ? (any character), and ** (any sub-directory) can be used both in included and excluded patterns (see {@link DirectoryScanner}), but at least one directory to look in must be defined without wildcard.
+ * Given files and directories are explored recursively ignoring files given with a ! prefix. You can also define (positive or negative with a ! prefix) filters using wilcards such as * (any character set), ? (any character), and ** (any sub-directory) can be used both in included and excluded patterns (see {@link DirectoryScanner}), but at least one directory to look in must be defined without wildcard.
  * All available properties for {@link Store} are supported.
  * Difference with {@link Store} is that jars found in the given folders are added to the classpath so that you don't need to include the HBase client jars in your application.
  * However, if your application is ran within a servlet container (Tomcat, JBoss...), you should care excluding servlet and jsp APIs whom HBase depends on... 
@@ -60,7 +60,7 @@ public class HBase {
 	private static RecursiveFileAction addJarAction = new RecursiveFileAction() {
 
 		@Override
-		public void manageFile(File file, Report r) {
+		public void fileFound(File file, Report r) {
 			URLClassLoader sysloader = (URLClassLoader) ClassLoader
 					.getSystemClassLoader();
 			Class<URLClassLoader> sysclass = URLClassLoader.class;

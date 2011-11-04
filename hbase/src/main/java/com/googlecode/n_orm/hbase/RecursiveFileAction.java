@@ -10,6 +10,7 @@ import org.codehaus.plexus.util.DirectoryScanner;
 
 public abstract class RecursiveFileAction {
 
+	private final Collection<String> toBeExploredFiles;
 	private final Collection<String> toBeExplored;
 	private final Collection<String> toBeIgnoredFilters;
 	private final Collection<String> toBeExploredFilters;
@@ -22,6 +23,7 @@ public abstract class RecursiveFileAction {
 		toBeIgnoredFilters = new LinkedList<String>();
 		toBeExploredFilters = new LinkedList<String>();
 		toBeExplored = new LinkedList<String>();
+		toBeExploredFiles = new LinkedList<String>();
 	}
 	
 	public void addIgnoredFile(String toBeIgnored) {
@@ -33,9 +35,12 @@ public abstract class RecursiveFileAction {
 	}
 	
 	public void addExploredFile(String toBeExplored) {
+		File tbe = new File(toBeExplored);
 		if (toBeExplored.contains("*") || toBeExplored.contains("?"))
 			this.toBeExploredFilters.add(toBeExplored);
-		else if (new File(toBeExplored).isDirectory())
+		else if (tbe.isFile())
+			this.toBeExploredFiles.add(toBeExplored);
+		else if (tbe.isDirectory())
 			this.toBeExplored.add(toBeExplored);
 		else
 			HBase.logger.warning(toBeExplored + " is neither a filter (no *, **, or ? found) nor a valid directory ; ignoring");
@@ -45,6 +50,7 @@ public abstract class RecursiveFileAction {
 		this.toBeIgnoredFilters.clear();
 		this.toBeExploredFilters.clear();
 		this.toBeExplored.clear();
+		this.toBeExploredFiles.clear();
 	}
 	
 	public void addFiles(String... files) {
@@ -75,6 +81,8 @@ public abstract class RecursiveFileAction {
 		scanner.setCaseSensitive(false);
 		
 		Set<String> found = new TreeSet<String>();
+		found.addAll(toBeExploredFiles);
+		
 		for (String tbe : this.toBeExplored) {
 			scanner.setBasedir(tbe);
 			scanner.scan();
@@ -86,7 +94,7 @@ public abstract class RecursiveFileAction {
  		for (String file : found) {
 			File f = new File(file);
 			if (this.acceptFile(f)) {
-				this.manageFile(f, r);
+				this.fileFound(f, r);
 				if (r != null)
 					r.fileHandled(f);
 			}
@@ -97,6 +105,6 @@ public abstract class RecursiveFileAction {
 		return true;
 	}
 	
-	public abstract void manageFile(File f, Report r);
+	public abstract void fileFound(File f, Report r);
 
 }
