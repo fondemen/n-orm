@@ -124,7 +124,9 @@ import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
  * compression=gz &#35;can be 'none', 'gz', 'lzo', or 'snappy' (default is 'none') ; in the latter two cases, take great care that those compressors are available for all nodes of your hbase cluster
  * </code><br>
  * One important property to configure is {@link #setScanCaching(Integer)}.<br>
- * This store supports remote processes (see {@link StorageManagement#processElementsRemotely(Class, Constraint, Process, Callback, int, String...)} and {@link SearchableClassConstraintBuilder#remoteForEach(Process, Callback)}) as it implements {@link ActionnableStore} by using HBase/Hadoop Map-only jobs. However, be careful when configuring your hadoop: all jars containing your process and n-orm (with dependencies) should be available. By default, all known jars are sent. You can change this using e.g. {@link #setMapRedSendJars(boolean)}.
+ * This store supports remote processes (see {@link StorageManagement#processElementsRemotely(Class, Constraint, Process, Callback, int, String...)} and {@link SearchableClassConstraintBuilder#remoteForEach(Process, Callback)}) as it implements {@link ActionnableStore} by using HBase/Hadoop Map-only jobs. However, be careful when configuring your hadoop: all jars containing your process and n-orm (with dependencies) should be available.
+ * By default, all known jars are sent (which might become a problem is same jars are sent over and over).
+ * You can change this using e.g. {@link #setMapRedSendJars(boolean)}.
  */
 public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n_orm.storeapi.GenericStore, ActionnableStore {
 
@@ -611,6 +613,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	/**
 	 * The configuration used by this store.
 	 * You can only trust this method is this store was explicitly set the host before or started.
+	 * This method provides a mean to have greater control over HBase and Hadoop.
 	 */
 	public Configuration getConf() {
 		return this.config;
@@ -620,6 +623,14 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		return launchProps;
 	}
 
+
+	/**
+	 * The configuration to be used by this store for its {@link #start()} or {@link #restart()}.
+	 * Only valid when store is not started yet.
+	 * Overloads any other configuration setting already set by {@link #getStore(String)}, {@link #getStore(String, int)}, {@link #getStore(String, int, Integer)}, or {@link #getAdmin()}.
+	 * Ignored in case of a subsequent {@link #setAdmin(HBaseAdmin)}.
+	 * Changed when invoked {@link #start()} or {@link #restart()}.
+	 */
 	public void setConf(Configuration configuration) {
 		this.config = configuration;
 	}
