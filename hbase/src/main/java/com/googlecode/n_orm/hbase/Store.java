@@ -8,6 +8,7 @@ import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.net.ConnectException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -129,6 +130,12 @@ import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
  * You can change this using e.g. {@link #setMapRedSendJars(boolean)}.
  */
 public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n_orm.storeapi.GenericStore, ActionnableStore {
+
+	private static final String CONF_MAXRETRIES_KEY = "hbase.client.retries.number";
+
+	private static final String CONF_PORT_KEY = "hbase.zookeeper.property.clientPort";
+
+	private static final String CONF_HOST_KEY = HConstants.ZOOKEEPER_QUORUM;
 
 	private static class ReportConf extends Report {
 		private final Configuration conf;
@@ -275,6 +282,14 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		return knownStores.get(properties);
 	}
 	
+	public static Store getStore(Configuration conf, Properties props) throws IOException {
+		if (knownStores.containsKey(props))
+			throw new IllegalStateException("Store already exists with " + props);
+		Store s = new Store(props);
+		s.setConf(conf);
+		return s;
+	}
+	
 	private final Properties launchProps;
 	
 	//For inter-processes synchronization:
@@ -325,13 +340,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			Configuration properties = HBaseConfiguration.create();
 			properties.clear();
 
-			properties.set(HConstants.ZOOKEEPER_QUORUM, this.getHost());
-			properties.setInt("hbase.zookeeper.property.clientPort",
-					this.getPort());
+			properties.set(CONF_HOST_KEY, this.getHost());
+			properties.setInt(CONF_PORT_KEY, this.getPort());
 
 			if (this.maxRetries != null)
-				properties.set("hbase.client.retries.number",
-						this.maxRetries.toString());
+				properties.set(CONF_MAXRETRIES_KEY, this.maxRetries.toString());
 
 			this.config = properties;
 		}
@@ -633,6 +646,25 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	 */
 	public void setConf(Configuration configuration) {
 		this.config = configuration;
+		String prop = this.config.get(CONF_HOST_KEY);
+		if (prop != null)
+			this.host = prop;
+		else
+			try {
+				this.host = java.net.InetAddress.getLocalHost().getHostName();
+			} catch (UnknownHostException e) {
+				logger.log(Level.WARNING, "Cannot determine local host", e);
+			}
+		prop = this.config.get(CONF_PORT_KEY);
+		if (prop != null)
+			this.port = Integer.parseInt(prop);
+		else
+			this.port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
+		prop = this.config.get(CONF_MAXRETRIES_KEY);
+		if (prop != null)
+			this.maxRetries = Integer.parseInt(prop);
+		else
+			this.maxRetries = null;
 	}
 	
 	public HBaseAdmin getAdmin() {
