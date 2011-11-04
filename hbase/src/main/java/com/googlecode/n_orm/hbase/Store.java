@@ -120,9 +120,9 @@ import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
  * class=com.googlecode.n_orm.hbase.Store<br>
  * static-accessor=getStore<br>
  * 1=localhost<br>
- * 2=2181
+ * 2=2181<br>
  * compression=gz &#35;can be 'none', 'gz', 'lzo', or 'snappy' (default is 'none') ; in the latter two cases, take great care that those compressors are available for all nodes of your hbase cluster
- * </code><br>
+ * <br></code>
  * One important property to configure is {@link #setScanCaching(Integer)}.<br>
  * This store supports remote processes (see {@link StorageManagement#processElementsRemotely(Class, Constraint, Process, Callback, int, String...)} and {@link SearchableClassConstraintBuilder#remoteForEach(Process, Callback)}) as it implements {@link ActionnableStore} by using HBase/Hadoop Map-only jobs. However, be careful when configuring your hadoop: all jars containing your process and n-orm (with dependencies) should be available.
  * By default, all known jars are sent (which might become a problem is same jars are sent over and over).
