@@ -60,7 +60,7 @@ public class LocalFormat {
 			job.setOutputFormatClass(LocalOutputFormat.class);
 		else
 			job.setOutputFormatClass(NullOutputFormat.class);
-		TableMapReduceUtil.setScannerCaching(job, 500);
+		TableMapReduceUtil.setScannerCaching(job, store.getMapRedScanCaching());
 	}
 
 	protected HTable table;
