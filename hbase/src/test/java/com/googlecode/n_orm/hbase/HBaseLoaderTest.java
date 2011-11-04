@@ -54,6 +54,20 @@ public class HBaseLoaderTest {
 		assertNull(conf.get("dummy2.prop"));
 	}
 
+	@Test
+	public void loadPropertiesWithFile() throws IOException {
+		Configuration conf = Store.getStore(testPath + "/etc/conf1/," + testPath + "/etc/conf2/dummy1-site.xml," + testPath + "/etc/conf2/conf3/hbase-site.xml").getConf();
+		assertEquals("dummyval", conf.get("dummy.prop.one"));
+		assertEquals("2", conf.get("dummy.prop.two"));
+		assertEquals("dummyval12", conf.get("dummy12.prop"));
+		assertEquals("dummy2val", conf.get("dummy2.prop"));
+	}
+
+	@Test(expected=IOException.class)
+	public void loadPropertiesWithFileNoHBaseSite() throws IOException {
+		Store.getStore(testPath + "/etc/conf1/," + testPath + "/etc/conf2/dummy1-site.xml");
+	}
+
 	@Test(expected=IOException.class)
 	public void loadPropertiesMissingHbaseSite() throws IOException {
 		Store.getStore(testPath+"/etc/conf1/");

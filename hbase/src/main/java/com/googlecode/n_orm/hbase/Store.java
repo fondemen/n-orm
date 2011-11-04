@@ -113,7 +113,7 @@ import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
  * static-accessor=getStore<br>
  * 1=/usr/lib/hbase/conf/
  * </code><br>
- * Given files are explored recursively ignoring files given with a ! prefix. You can also define  (positive or negative with a ! prefix) filters using wilcards such as * (any character set), ? (any character), and ** (any sub-directory) can be used both in included and excluded patterns (see {@link DirectoryScanner}), but at least one directory to look in must be defined without wildcard.
+ * Given files adn directories are explored recursively ignoring files given with a ! prefix. You can also define  (positive or negative with a ! prefix) filters using wilcards such as * (any character set), ? (any character), and ** (any sub-directory) can be used both in included and excluded patterns (see {@link DirectoryScanner}), but at least one directory to look in must be defined without wildcard.
  * Two attempts are performed during search: first explicitly looking for ./*-site.xml and ./conf/*-site.xml, and then all possible ** /*-site.xml. hbase-site.xml MUST be found for the operation to succeed.
  * Compared to {@link HBase}, no jar found in those is added to classpath.
  * For test purpose, you can also directly reach an HBase instance thanks to one of its zookeeper host and client port:<br><code>
@@ -156,7 +156,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	private static RecursiveFileAction addConfAction = new RecursiveFileAction() {
 		
 		@Override
-		public void manageFile(File f, Report r) {
+		public void fileFound(File f, Report r) {
 			try {
 				((ReportConf)r).getConf().addResource(new FileInputStream(f));
 				System.out.println("Getting HBase store: found configuration file " + f.getAbsolutePath());
