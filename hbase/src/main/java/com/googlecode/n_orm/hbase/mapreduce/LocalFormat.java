@@ -83,7 +83,10 @@ public class LocalFormat {
 			props = new Properties();
 			props.load(srp);
 			hstore = Store.getKnownStore(props);
-			this.conf = hstore.getConf();
+			if (hstore != null)
+				this.conf = hstore.getConf();
+			else
+				this.conf = HBaseConfiguration.create(conf);
 		} catch (Exception e1) {
 			e1.printStackTrace();
 			this.conf = HBaseConfiguration.create(conf);
