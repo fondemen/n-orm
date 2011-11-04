@@ -99,6 +99,7 @@ public class ActionJob {
 		LocalFormat.prepareJob(job, scan, s);
 		if (s.isMapRedSendJobJars())
 			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), processClass, elementClass);
+		job.setInputFormatClass(ActionLocalInputFormat.class);
 		job.setNumReduceTasks(0);
 		return job;
 	}
