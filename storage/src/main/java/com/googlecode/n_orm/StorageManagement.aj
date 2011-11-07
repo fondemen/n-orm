@@ -532,12 +532,36 @@ public aspect StorageManagement {
 		return StorageManagement.getElementUsingCache((PersistingElement)this);
 	}
 	
-	public static <AE extends PersistingElement, E extends AE> void processElements(final Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+	public static class ProcessReport<T extends PersistingElement> {
+		private int elementsTreated;
+		private T lastProcessedElement;
+		private Row lastProcessedElementData;
+		private Class<T> clazz;
+		private Set<String> toBeActivated;
+		private long durationInMillis;
+		public int getElementsTreated() {
+			return elementsTreated;
+		}
+		public T getLastProcessedElement() {
+			if (this.lastProcessedElement == null && this.lastProcessedElementData != null) {
+				lastProcessedElement = createElementFromRow(clazz, toBeActivated, lastProcessedElementData);
+			}
+			return lastProcessedElement;
+		}
+		public long getDurationInMillis() {
+			return durationInMillis;
+		}
+	}
+	
+	public static <AE extends PersistingElement, E extends AE> ProcessReport<E> processElements(final Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		ProcessReport<E> ret = new ProcessReport<E>();
 		long start = System.currentTimeMillis();
 		long end = (threadNumber == 1 || start > Long.MAX_VALUE - timeout) ? Long.MAX_VALUE : start+timeout;
 		//final CloseableIterator<E> it = findElement(clazz, c, limit, families);
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		final Set<String> toBeActivated = families == null ? null : getAutoActivatedFamilies(clazz, families);
+		ret.toBeActivated = toBeActivated;
+		ret.clazz = clazz;
 		final CloseableKeyIterator keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
 		ExecutorService executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
 		final List<ProcessException.Problem> problems = new LinkedList<ProcessException.Problem>();
@@ -577,6 +601,8 @@ public aspect StorageManagement {
 					r.run();
 				else
 					performing.add(executor.submit(r));
+				ret.lastProcessedElementData = data;
+				ret.elementsTreated++;
 			}
 		} catch (Throwable t) {
 			exceptions.add(t);
@@ -585,16 +611,15 @@ public aspect StorageManagement {
 			if (executor != null) {
 				executor.shutdown();
 				if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS)) {
-					InterruptedException ie = new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
-					if (problems.isEmpty() && exceptions.isEmpty())
-						throw ie;
-					else
-						exceptions.add(ie);
+					exceptions.add(new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date()));
 				}
 			}
-			if (!problems.isEmpty() || !exceptions.isEmpty())
-				throw new ProcessException(processAction, problems, exceptions);
+			if (!problems.isEmpty() || !exceptions.isEmpty()) {
+				throw new ProcessException(processAction, ret, problems, exceptions);
+			}
+			ret.durationInMillis = System.currentTimeMillis()-start;
 		}
+		return ret;
 	}
 	
 	public static <AE extends PersistingElement, E extends AE> void processElementsRemotely(final Class<E> clazz, final Constraint c, final Process<AE> process, final Callback callback, final int limit, final String[] families, final int threadNumber, final long timeout) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {

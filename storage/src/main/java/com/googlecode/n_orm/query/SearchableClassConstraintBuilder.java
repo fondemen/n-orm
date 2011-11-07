@@ -187,8 +187,8 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
-	public void forEach(Process<T> action) throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		this.forEach(action, 1, 0);
+	public StorageManagement.ProcessReport<T> forEach(Process<T> action) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		return this.forEach(action, 1, 0);
 	}
 	
 	/**
@@ -203,11 +203,11 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
-	public void forEach(Process<T> action, int threadNumber, long timeoutMs) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+	public StorageManagement.ProcessReport<T> forEach(Process<T> action, int threadNumber, long timeoutMs) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
 		if (hasNoLimit())
 			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
-		StorageManagement.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, timeoutMs);
+		return StorageManagement.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, timeoutMs);
 	}
 	
 	/**
