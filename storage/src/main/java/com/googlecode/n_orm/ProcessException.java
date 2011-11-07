@@ -82,7 +82,7 @@ public class ProcessException extends Exception {
 	private final List<Throwable> otherExceptions;
 	
 	public ProcessException(Process<? extends PersistingElement> p, StorageManagement.ProcessReport<? extends PersistingElement> report, List<Problem> problems, List<Throwable> otherExceptions) {
-		super("Problem while executing process " + p.getClass().getName() + ':' + buildMessage(problems, otherExceptions));
+		super("Problem while executing process " + p.getClass().getName() + ':' + buildMessage(problems, otherExceptions), otherExceptions.isEmpty() ? problems.get(0).getReportedProblem() : otherExceptions.get(0));
 		this.process = p;
 		this.report = report;
 		this.problems = problems;

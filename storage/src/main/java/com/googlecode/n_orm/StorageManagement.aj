@@ -553,7 +553,7 @@ public aspect StorageManagement {
 		}
 	}
 	
-	public static <AE extends PersistingElement, E extends AE> ProcessReport<E> processElements(final Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+	public static <AE extends PersistingElement, E extends AE> ProcessReport<E> processElements(final Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		ProcessReport<E> ret = new ProcessReport<E>();
 		long start = System.currentTimeMillis();
 		long end = (threadNumber == 1 || start > Long.MAX_VALUE - timeout) ? Long.MAX_VALUE : start+timeout;
@@ -563,7 +563,10 @@ public aspect StorageManagement {
 		ret.toBeActivated = toBeActivated;
 		ret.clazz = clazz;
 		final CloseableKeyIterator keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
-		ExecutorService executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
+		boolean ownsExecutor = executor == null;
+		if (ownsExecutor) {
+			executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
+		}
 		final List<ProcessException.Problem> problems = new LinkedList<ProcessException.Problem>();
 		List<Throwable> exceptions = new ArrayList<Throwable>();
 		try {
@@ -609,9 +612,11 @@ public aspect StorageManagement {
 		} finally {
 			keys.close();
 			if (executor != null) {
-				executor.shutdown();
-				if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS)) {
-					exceptions.add(new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date()));
+				if (ownsExecutor) {
+					executor.shutdown();
+					if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS)) {
+						exceptions.add(new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date()));
+					}
 				}
 			}
 			if (!problems.isEmpty() || !exceptions.isEmpty()) {
@@ -632,7 +637,7 @@ public aspect StorageManagement {
 			new Thread() {
 				public void run() {
 					try {
-						processElements(clazz, c, process, limit, families, threadNumber, timeout);
+						processElements(clazz, c, process, limit, families, threadNumber, timeout, null);
 						if (callback != null)
 							callback.processCompleted();
 					} catch (Throwable e) {

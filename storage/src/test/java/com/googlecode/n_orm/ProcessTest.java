@@ -1,8 +1,12 @@
 package com.googlecode.n_orm;
 
+import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 
 import java.util.Date;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.Before;
@@ -77,7 +81,7 @@ public class ProcessTest {
 		 assertEquals(3, n2.attribute);
 		 assertEquals(2, ret.getElementsTreated());
 		 assertEquals(n2, ret.getLastProcessedElement());
-		 assertEquals(end-start, ret.getDurationInMillis(), 5);
+		 assertEquals(end-start, ret.getDurationInMillis(), 10);
 	 }
 	 
 	 @Test public void processActivating() throws DatabaseNotReachedException, InterruptedException, ProcessException {
@@ -168,8 +172,10 @@ public class ProcessTest {
 						throw new Exception();
 					isRunning = true;
 				}
-				Thread.sleep(10);
-				isRunning = false;
+				Thread.sleep(50);
+				synchronized(this) {
+					isRunning = false;
+				}
 			}
 		};
 		 @Test(expected=ProcessException.class) public void tooMuchProcesses() throws DatabaseNotReachedException, InterruptedException, ProcessException {
@@ -177,6 +183,14 @@ public class ProcessTest {
 		 }
 		 @Test public void onlyOneProcess() throws DatabaseNotReachedException, InterruptedException, ProcessException {
 			StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new ThreadUnsafeProcess(), 1, 20000);	
+		 }
+		 
+		 @Test public void processWithExecutor() throws DatabaseNotReachedException, InterruptedException, ProcessException {
+			ExecutorService executor = Executors.newFixedThreadPool(1);
+			StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new ThreadUnsafeProcess(), 3, 20000, executor);
+			assertFalse(executor.isTerminated());
+			executor.shutdown();
+			assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
 		 }
 
 }

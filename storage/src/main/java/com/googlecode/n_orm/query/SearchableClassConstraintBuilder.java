@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 
 import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.CloseableIterator;
@@ -198,16 +199,34 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * In case you only use one thread, process will be performed in this thread.<br>
 	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
 	 * @param action the action to be performed over each element of the query.
+	 * @param threadNumber the maximum number of concurrent threads
 	 * @param timeoutMs the max allowed time to execute this task ; useless in case threadNumber is 1
 	 * @throws DatabaseNotReachedException
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
 	public StorageManagement.ProcessReport<T> forEach(Process<T> action, int threadNumber, long timeoutMs) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		return this.forEach(action, threadNumber, timeoutMs, null);
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query using parallel threads ; method might return before process is ended.
+	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Invoking this method can be blocking as long as threadNumber is less that the number of elements to be treated.<br>
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
+	 * @param action the action to be performed over each element of the query.
+	 * @param threadNumber the maximum number of concurrent threads
+	 * @param timeoutMs the max allowed time to execute this task ; useless in case threadNumber is 1
+	 * @param executor the executor to run process ; you need to call {@link ExecutorService#awaitTermination(long, java.util.concurrent.TimeUnit)} to be sure that all elements are processed ; if null, this method is equivalent to {@link #forEach(Process, int, long)}
+	 * @throws DatabaseNotReachedException
+	 * @throws InterruptedException in case threads are interrupted or timeout is reached
+	 * @throws ProcessException in case some process sent an exception while running
+	 */
+	public StorageManagement.ProcessReport<T> forEach(Process<T> action, int threadNumber, long timeoutMs, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
 		if (hasNoLimit())
 			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
-		return StorageManagement.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, timeoutMs);
+		return StorageManagement.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, timeoutMs, executor);
 	}
 	
 	/**
