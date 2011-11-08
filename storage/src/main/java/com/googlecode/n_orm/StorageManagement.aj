@@ -11,6 +11,7 @@ import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -567,7 +568,7 @@ public aspect StorageManagement {
 		if (ownsExecutor) {
 			executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
 		}
-		final List<ProcessException.Problem> problems = new LinkedList<ProcessException.Problem>();
+		final List<ProcessException.Problem> problems = Collections.synchronizedList(new LinkedList<ProcessException.Problem>());
 		List<Throwable> exceptions = new ArrayList<Throwable>();
 		try {
 			List<Future<?>> performing = new ArrayList<Future<?>>(threadNumber);
@@ -577,7 +578,7 @@ public aspect StorageManagement {
 					throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
 				//Cleaning performing from done until there is room for another execution
 				while (performing.size() >= threadNumber) {
-					Thread.sleep(10); //Hopefully, some execution will be done
+					Thread.sleep(25); //Hopefully, some execution will be done
 					if (end < System.currentTimeMillis())
 						throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
 					Iterator<Future<?>> prfIt = performing.iterator();
