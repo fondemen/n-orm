@@ -58,6 +58,35 @@ public class IncrementsTest {
 		assertEquals(5l, (long)e.getIncrements().get("incrementing").longValue());
 	}
 	
+	@Test(expected=IncrementException.class)
+	public void decrementAnIncrementOnlyProp() {
+		Element e = new Element(1);
+		e.incrementing = -10;
+	}
+	
+	@Test(expected=IncrementException.class)
+	public void decrementAnIncrementOnlyPropByMin() {
+		Element e = new Element(1);
+		e.incrementing -= 10;
+	}
+	
+	@Test
+	public void decrementAnIncrementOnlyPropNotChecked() {
+		IncrementManagement.setImmedatePropertyCheck(false);
+		try {
+			Element e = new Element(1);
+			e.incrementing -= 10;
+		} finally {
+			IncrementManagement.setImmedatePropertyCheck(true);
+		}
+	}
+	
+	@Test(expected=IncrementException.class)
+	public void incrementAnDecrementOnlyProp() {
+		Element e = new Element(1);
+		e.decrementing = 10;
+	}
+	
 	@Test
 	public void incrementDecrement() {
 		Element e = new Element(1);
