@@ -131,7 +131,10 @@ public class ProcessTest {
 	 }
 	 
 	 @Test public void processTooShortOneThread() throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 1, 1);				 
+		 assertEquals(1, n1.attribute);
+		 assertEquals(2, n2.attribute);
+		 
+		StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(false, false), 1, 1);				 
 
 		 //No need for activation as elements are processed in this thread
 		 assertEquals(2, n1.attribute);
