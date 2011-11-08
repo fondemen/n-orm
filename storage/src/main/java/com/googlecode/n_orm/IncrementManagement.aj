@@ -33,6 +33,22 @@ public aspect IncrementManagement {
 			: "Only naturals or maps of naturals may be incremented";
 	declare warning: set(@Incrementing @Key * *.*): "Keys (that identify a persisting element) should not be incremented";
 	
+	private static volatile boolean immedatePropertyCheck = true;
+	
+	/**
+	 * Whether setting a property marked as {@link Incrementing} immediately triggers an check that might throw an {@link IncrementException}.
+	 */
+	public static boolean isImmedatePropertyCheck() {
+		return immedatePropertyCheck;
+	}
+
+	/**
+	 * Whether setting a property marked as {@link Incrementing} immediately triggers an check that might throw an {@link IncrementException}.
+	 */
+	public static void setImmedatePropertyCheck(boolean _immedatePropertyCheck) {
+		immedatePropertyCheck = _immedatePropertyCheck;
+	}
+
 	private transient Map<String, Number> PersistingElement.increments;
 	
 	Map<String, Number> PersistingElement.getIncrements() {
@@ -48,6 +64,15 @@ public aspect IncrementManagement {
 			Number oldVal, Number previousIncrement, Field prop) throws IncrementException {
 		long value = toLong(val, prop);
 		long oldValue = toLong(oldVal, prop);
+		checkIncrement(prop, value, oldValue);
+		Number increment = previousIncrement;
+		if (increment == null)
+			increment = 0l;
+		long inc = increment.longValue()+value-oldValue;
+		return toNumber(((Number)val).getClass(), inc);
+	}
+
+	private void checkIncrement(Field prop, long value, long oldValue) {
 		Incrementing inca = prop.getAnnotation(Incrementing.class);
 		if (inca != null) {
 			if (inca.mode().equals(Mode.IncrementOnly) && oldValue > value)
@@ -56,11 +81,6 @@ public aspect IncrementManagement {
 			if (inca.mode().equals(Mode.DecrementOnly) && oldValue < value)
 				throw new IncrementException(prop, false, value-oldValue);
 		}
-		Number increment = previousIncrement;
-		if (increment == null)
-			increment = 0l;
-		long inc = increment.longValue()+value-oldValue;
-		return toNumber(((Number)val).getClass(), inc);
 	}
 
 	protected long toLong(Object val, Field prop) {
@@ -103,5 +123,13 @@ public aspect IncrementManagement {
 	public void PropertyFamily.clearChanges() {
 		super.clearChanges();
 		this.getOwner().getIncrements().clear();
+	}
+	
+	before(PersistingElement self, Object newValue): set(@Incrementing (Number+||long||int||short||byte) PersistingElement+.*) && target(self) && args(newValue) && if(immedatePropertyCheck) {
+		Field f = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
+		Incrementing inc = f.getAnnotation(Incrementing.class);
+		if (Mode.Free.equals(inc.mode()))
+			return;
+		this.checkIncrement(f, toLong((Number)newValue, f), toLong((Number)PropertyManagement.getInstance().candideReadValue(self, f), f));
 	}
 }
