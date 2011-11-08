@@ -38,21 +38,43 @@ public class Cache {
 	private static final TimerTask cacheCleaner;
 	
 	static {
-		perThreadCaches = Collections.synchronizedMap(new FastMap<Thread, Cache>());
-		availableCaches = Collections.synchronizedMap(new FastMap<Long, Cache>());
+		FastMap<Thread, Cache> fmTC = new FastMap<Thread, Cache>();
+		fmTC.shared();
+		perThreadCaches = Collections.synchronizedMap(fmTC);
+		FastMap<Long, Cache> fmAC = new FastMap<Long, Cache>();
+		fmAC.shared();
+		availableCaches = Collections.synchronizedMap(fmAC);
 		cacheCleaner = new TimerTask() {
 			
 			@Override
 			public void run() {
 				long now = System.currentTimeMillis();
 				try {
-					Iterator<Entry<Thread, Cache>> ci = perThreadCaches.entrySet().iterator();
-					while (ci.hasNext()) {
-						Entry<Thread, Cache> entry = ci.next();
-						if (entry.getValue().isValid()) {
-							entry.getValue().shouldCleanup = true;
+					Iterator<Cache> ci = perThreadCaches.values().iterator();
+cacheCheck:			while (ci.hasNext()) {
+						Cache cache = ci.next();
+						if (cache == null) {
+							logger.warning("Invalid state: got an empty object while iterating over active caches.");
+							if (ci.hasNext()) {
+								cache = ci.next();
+								if (cache == null) {
+									String cachesStr;
+									try {
+										cachesStr = perThreadCaches.toString();
+										logger.severe("Invalid state: cannot continue iterating over caches " + cachesStr);
+									} catch (Throwable t) {
+										logger.log(Level.SEVERE, "It seems that caches are lost. No mean to recover, resetting.", t);
+										perThreadCaches.clear();
+									}
+									break cacheCheck;
+								}
+							} else
+								break cacheCheck;
+						}
+						if (cache.isValid()) {
+							cache.shouldCleanup = true;
 						} else {
-							availableCaches.put(now, entry.getValue());
+							availableCaches.put(now, cache);
 							ci.remove();
 						}
 					}
@@ -62,9 +84,29 @@ public class Cache {
 				
 				try {
 					Iterator<Entry<Long, Cache>> ai = availableCaches.entrySet().iterator();
-					while (ai.hasNext()) {
+availableCachesCheck: while (ai.hasNext()) {
 						Entry<Long, Cache> entry = ai.next();
-						if ((entry.getKey()+(timeToLiveSeconds*1000)) < now) {
+						if (entry == null || entry.getKey() == null || entry.getValue() == null) {
+							logger.warning("Invalid state: got an empty object while iterating over available caches.");
+							if (ai.hasNext()) {
+								entry = ai.next();
+								if (entry == null || entry.getKey() == null || entry.getValue() == null) {
+									String cachesStr;
+									try {
+										cachesStr = availableCaches.toString();
+										logger.severe("Invalid state: cannot continue iterating over available caches " + cachesStr);
+									} catch (Throwable t) {
+										logger.log(Level.SEVERE, "It seems that available caches are lost. No mean to recover, resetting.", t);
+										availableCaches.clear();
+									}
+									break availableCachesCheck;
+								}
+							} else
+								break availableCachesCheck;
+						}
+						if (entry == null || entry.getValue() == null)
+							break;
+						else  if ((entry.getKey()+(timeToLiveSeconds*1000)) < now) {
 							entry.getValue().close();
 							ai.remove();
 						} else {
