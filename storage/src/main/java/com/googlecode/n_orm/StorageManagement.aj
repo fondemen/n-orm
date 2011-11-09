@@ -22,6 +22,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -540,17 +541,66 @@ public aspect StorageManagement {
 		private Class<T> clazz;
 		private Set<String> toBeActivated;
 		private long durationInMillis;
+		private List<Future<?>> performing;
+		
+		/**
+		 * The number of elements that were processed.
+		 */
 		public int getElementsTreated() {
 			return elementsTreated;
 		}
+		
+		/**
+		 * The last element that was processed. Can be null if no element was processed.
+		 */
 		public T getLastProcessedElement() {
 			if (this.lastProcessedElement == null && this.lastProcessedElementData != null) {
 				lastProcessedElement = createElementFromRow(clazz, toBeActivated, lastProcessedElementData);
 			}
 			return lastProcessedElement;
 		}
+		
+		/**
+		 * Total time took for processing elements.
+		 */
 		public long getDurationInMillis() {
 			return durationInMillis;
+		}
+		
+		/**
+		 * The list of future for processed that are still performing.
+		 * Should be empty if you did not give executor by yourself.
+		 * Should be less or equal than the number of admitted threads.
+		 */
+		public List<Future<?>> getPerforming() {
+			Iterator<Future<?>> prfIt = performing.iterator();
+			while (prfIt.hasNext()) {
+				Future<?> prf = prfIt.next();
+				if (prf.isDone())
+					prfIt.remove();
+			}
+			return performing;
+		}
+		
+		/**
+		 * Waits for all processes to be done.
+		 * Termination is checked every 25 milliseconds.
+		 * Should not wait if you did not provide an executor by yourself.
+		 * @param timeout number of milliseconds the wait can happen.
+		 * @return true if termination happened, false if timeout occured
+		 */
+		public boolean awaitTermination(long timeout) {
+			long end  = System.currentTimeMillis()+timeout;
+			while (!getPerforming().isEmpty()) {
+				try {
+					Thread.sleep(25);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				if (end < System.currentTimeMillis())
+					return false;
+			}
+			return true;
 		}
 	}
 	
@@ -571,22 +621,16 @@ public aspect StorageManagement {
 		final List<ProcessException.Problem> problems = Collections.synchronizedList(new LinkedList<ProcessException.Problem>());
 		List<Throwable> exceptions = new ArrayList<Throwable>();
 		try {
-			List<Future<?>> performing = new ArrayList<Future<?>>(threadNumber);
+			ret.performing = new ArrayList<Future<?>>(threadNumber);
 			while (keys.hasNext()) {
 				final Row data = keys.next();
 				if (end < System.currentTimeMillis())
 					throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
 				//Cleaning performing from done until there is room for another execution
-				while (performing.size() >= threadNumber) {
+				while (ret.getPerforming().size() >= threadNumber) {
 					Thread.sleep(25); //Hopefully, some execution will be done
 					if (end < System.currentTimeMillis())
 						throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
-					Iterator<Future<?>> prfIt = performing.iterator();
-					while (prfIt.hasNext()) {
-						Future<?> prf = prfIt.next();
-						if (prf.isDone())
-							prfIt.remove();
-					}
 				}
 				Runnable r = new Runnable() {
 		
@@ -604,7 +648,7 @@ public aspect StorageManagement {
 				if (threadNumber == 1)
 					r.run();
 				else
-					performing.add(executor.submit(r));
+					ret.performing.add(executor.submit(r));
 				ret.lastProcessedElementData = data;
 				ret.elementsTreated++;
 			}

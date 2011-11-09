@@ -75,6 +75,7 @@ public class ProcessTest {
 		 long start = System.currentTimeMillis();
 		 ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 2, 20000);		 
 		 long end = System.currentTimeMillis();
+		 assertTrue(ret.getPerforming().isEmpty());
 		 n1.activate();
 		 n2.activate();
 		 assertEquals(2, n1.attribute);
@@ -103,8 +104,8 @@ public class ProcessTest {
 	 }
 	 
 	 @Test public void processOneThread() throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(false, false), 1, 20000);		 
-
+		 ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(false, false), 1, 20000);		 
+		 assertTrue(ret.getPerforming().isEmpty());
 		 //No need for activation as elements are processed in this thread
 		 assertEquals(2, n1.attribute);
 		 assertEquals(3, n2.attribute);
@@ -190,10 +191,19 @@ public class ProcessTest {
 		 
 		 @Test public void processWithExecutor() throws DatabaseNotReachedException, InterruptedException, ProcessException {
 			ExecutorService executor = Executors.newFixedThreadPool(1);
-			StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new ThreadUnsafeProcess(), 3, 20000, executor);
+			ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new ThreadUnsafeProcess(), 3, 20000, executor);
+			assertFalse(ret.getPerforming().isEmpty());
 			assertFalse(executor.isTerminated());
 			executor.shutdown();
 			assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+		 }
+		 
+		 @Test public void processWithExecutorWaitingForTheEnd() throws DatabaseNotReachedException, InterruptedException, ProcessException {
+			ExecutorService executor = Executors.newFixedThreadPool(1);
+			ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new ThreadUnsafeProcess(), 3, 20000, executor);
+			assertTrue(ret.awaitTermination(10000));
+			executor.shutdown();
+			assertTrue(executor.awaitTermination(1, TimeUnit.MILLISECONDS));
 		 }
 
 }
