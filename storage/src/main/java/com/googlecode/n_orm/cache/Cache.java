@@ -10,6 +10,7 @@ import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javolution.context.PoolContext;
 import javolution.util.FastMap;
 
 import com.googlecode.n_orm.PersistingElement;
@@ -281,7 +282,14 @@ availableCachesCheck:	while (ai.hasNext()) {
 	private void init() {
 		this.thread = Thread.currentThread();
 		this.threadId = getThreadId(this.thread);
-		this.cache = new FastMap<String, Element>();
+		
+		try {
+			PoolContext.enter();
+			this.cache = FastMap.newInstance();
+		} finally {
+			PoolContext.exit();
+		}
+		
 		perThreadCaches.put(this.thread, this);
 		logger.fine("Cache started for " + this.thread + " with id " + this.threadId);
 	}
@@ -435,8 +443,16 @@ availableCachesCheck:	while (ai.hasNext()) {
 	protected synchronized void close() {
 		if (this.cache == null)
 			return;
+		
 		this.reset();
-		FastMap.recycle(this.cache);
+		try {
+			PoolContext.enter();
+			
+			FastMap.recycle(this.cache);
+		} finally {
+			PoolContext.exit();
+		}
+		
 		this.cache = null;
 		logger.fine("Cache stopped for thread " + this.thread + " with id " + this.threadId);
 	}
