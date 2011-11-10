@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.f_console.commands;
+package com.googlecode.n_orm.console.commands;
 
 import org.junit.Test;
 

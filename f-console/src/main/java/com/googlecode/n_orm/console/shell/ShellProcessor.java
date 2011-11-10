@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.f_console.f_shell;
+package com.googlecode.n_orm.console.shell;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -8,8 +8,9 @@ import java.util.Map;
 import groovy.lang.GroovyShell;
 import org.apache.commons.beanutils.ConvertUtils;
 import org.codehaus.groovy.control.CompilationFailedException;
-import com.googlecode.n_orm.f_console.annotations.Trigger;
-import com.googlecode.n_orm.f_console.commands.CommandList;
+
+import com.googlecode.n_orm.console.annotations.Trigger;
+import com.googlecode.n_orm.console.commands.CommandList;
 
 public class ShellProcessor
 {

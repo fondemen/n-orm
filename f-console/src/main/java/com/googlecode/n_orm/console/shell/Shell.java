@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.f_console.f_shell;
+package com.googlecode.n_orm.console.shell;
 
 import java.io.IOException;
 import java.io.PrintStream;
