@@ -123,7 +123,7 @@ availableCachesCheck:	while (ai.hasNext()) {
 						logger.log(Level.WARNING, "Problem while checking cache.", x);
 					}
 
-					if (availableCaches != null) {
+					if (available != null) {
 						try {
 							for (Cache cache : available) {
 								availableCaches.put(now, cache);
