@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.f_console.f_shell;
+package com.googlecode.n_orm.console.shell;
 
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
@@ -7,7 +7,10 @@ import java.lang.reflect.Method;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
-import com.googlecode.n_orm.f_console.commands.CommandList;
+
+import com.googlecode.n_orm.console.commands.CommandList;
+import com.googlecode.n_orm.console.shell.Shell;
+import com.googlecode.n_orm.console.shell.ShellProcessor;
 
 public class ShellProcessorTest
 {

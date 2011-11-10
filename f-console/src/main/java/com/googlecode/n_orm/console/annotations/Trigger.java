@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.f_console.annotations;
+package com.googlecode.n_orm.console.annotations;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;

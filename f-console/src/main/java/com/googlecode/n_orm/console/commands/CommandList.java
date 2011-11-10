@@ -1,9 +1,9 @@
-package com.googlecode.n_orm.f_console.commands;
+package com.googlecode.n_orm.console.commands;
 
 import org.codehaus.groovy.control.CompilationFailedException;
 
-import com.googlecode.n_orm.f_console.annotations.Trigger;
-import com.googlecode.n_orm.f_console.f_shell.Shell;
+import com.googlecode.n_orm.console.annotations.Trigger;
+import com.googlecode.n_orm.console.shell.Shell;
 
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;

@@ -1,7 +1,8 @@
-package com.googlecode.n_orm.f_console;
+package com.googlecode.n_orm.console;
 
 import java.io.IOException;
-import com.googlecode.n_orm.f_console.f_shell.Shell;
+
+import com.googlecode.n_orm.console.shell.Shell;
 
 public class Launcher
 {
