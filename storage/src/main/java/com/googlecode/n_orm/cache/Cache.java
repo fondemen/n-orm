@@ -11,6 +11,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javolution.context.PoolContext;
+import javolution.util.FastList;
 import javolution.util.FastMap;
 
 import com.googlecode.n_orm.PersistingElement;
@@ -46,8 +47,11 @@ public class Cache {
 			@Override
 			public void run() {
 				long now = System.currentTimeMillis();
+				FastList<Cache> available = null;
+				
 				synchronized(perThreadCaches) {
 					try {
+						
 						Iterator<Cache> ci = perThreadCaches.values().iterator();
 cacheCheck:				while (ci.hasNext()) {
 							Cache cache = ci.next();
@@ -72,9 +76,9 @@ cacheCheck:				while (ci.hasNext()) {
 							if (cache.isValid()) {
 								cache.shouldCleanup = true;
 							} else {
-								synchronized(availableCaches) {
-									availableCaches.put(now, cache);
-								}
+								if (available == null)
+									available = FastList.newInstance();
+								available.add(cache);
 								ci.remove();
 							}
 						}
@@ -117,6 +121,18 @@ availableCachesCheck:	while (ai.hasNext()) {
 						}
 					} catch (RuntimeException x) {
 						logger.log(Level.WARNING, "Problem while checking cache.", x);
+					}
+
+					if (availableCaches != null) {
+						try {
+							for (Cache cache : available) {
+								availableCaches.put(now, cache);
+							}
+						} catch (RuntimeException x) {
+							logger.log(Level.WARNING, "Problem while checking cache.", x);
+						} finally {
+							FastList.recycle(available);
+						}
 					}
 				}
 			}
