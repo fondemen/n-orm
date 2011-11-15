@@ -33,6 +33,11 @@ public class ShellProcessor
 		}
 	}
 	
+	public String getEscapeCommand()
+	{
+		return this.escapeCommand;
+	}
+	
 	public List<String> getCommands()
 	{
 		ArrayList<String> result = new ArrayList<String>();
