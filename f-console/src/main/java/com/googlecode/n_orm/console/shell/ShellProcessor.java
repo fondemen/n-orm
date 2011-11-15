@@ -8,7 +8,6 @@ import java.util.Map;
 import groovy.lang.GroovyShell;
 import org.apache.commons.beanutils.ConvertUtils;
 import org.codehaus.groovy.control.CompilationFailedException;
-
 import com.googlecode.n_orm.console.annotations.Trigger;
 import com.googlecode.n_orm.console.commands.CommandList;
 
@@ -16,17 +15,17 @@ public class ShellProcessor
 {
 	private Shell shell;
 	private String escapeCommand;
-	private CommandList processor;
+	private CommandList commandList;
 	private Map<String, Method> processorCommands;
 	
 	public ShellProcessor(Shell shell)
 	{
 		this.shell = shell;
 		this.escapeCommand = "exit";
-		this.processor = new CommandList(shell);
+		this.commandList = new CommandList(shell);
 		
 		processorCommands = new HashMap<String, Method>();
-		for (Method m : processor.getClass().getDeclaredMethods())
+		for (Method m : commandList.getClass().getDeclaredMethods())
 		{
 			if (m.getAnnotation(Trigger.class) != null)
 				processorCommands.put(m.getName(), m);
@@ -36,6 +35,16 @@ public class ShellProcessor
 	public String getEscapeCommand()
 	{
 		return this.escapeCommand;
+	}
+	
+	public CommandList getCommandList()
+	{
+		return commandList;
+	}
+
+	public void setCommandList(CommandList commandList)
+	{
+		this.commandList = commandList;
 	}
 	
 	public List<String> getCommands()
@@ -52,19 +61,19 @@ public class ShellProcessor
 			shell.doStop();
 		else
 		{
-//			executeGroovy(text);
+//			executeGroovyCommand(text);
 			executeManualCommand(text);
 		}
 	}
+//	
+//	private void executeGroovyCommand(String query) throws CompilationFailedException
+//	{
+//		GroovyShell shell = new GroovyShell();
+//		Object value = shell.evaluate(query);
+//		this.shell.print(value.toString());
+//	}
 	
-	public void executeGroovyCommand(String query) throws CompilationFailedException
-	{
-		GroovyShell shell = new GroovyShell();
-		Object value = shell.evaluate(query);
-		this.shell.print(value.toString());
-	}
-	
-	public void executeManualCommand(String query)
+	private void executeManualCommand(String query)
 	{
 		String[] tokens = query.split(" ");
 		int currentTokenIndex = 0;
@@ -96,15 +105,13 @@ public class ShellProcessor
 							for (int i = 0; i < parameterTypes.length; i++)
 								params[i] = ConvertUtils.convert(tokens[currentTokenIndex + i], parameterTypes[i]);
 							
-							currentTokenIndex += parameterTypes.length - 1;
+							currentTokenIndex += parameterTypes.length;
 						}
 					}
-					m.invoke(processor, params);
+					m.invoke(commandList, params);
 				}
 				catch (Exception e)
-				{
-					shell.println(e.toString());
-				}
+				{ }
 			}
 			else
 			{
