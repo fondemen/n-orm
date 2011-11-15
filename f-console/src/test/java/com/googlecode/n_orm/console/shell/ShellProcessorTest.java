@@ -2,7 +2,7 @@ package com.googlecode.n_orm.console.shell;
 
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
-import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,16 +16,24 @@ public class ShellProcessorTest
 {
 	private ShellProcessor sut;
 	private Shell shell = createMock(Shell.class);
-	private CommandList commandList = new CommandList(shell);
+	private CommandList commandList = createMockBuilder(CommandList.class).withConstructor(Shell.class).withArgs(shell).createMock();
 	
 	@Before
-	public void createSut() throws IOException
+	public void createSut()
 	{
-		this.sut = new ShellProcessor(new Shell());
+		this.sut = new ShellProcessor(shell);
 	}
 	
 	@Test
-	public void testGetCommands()
+	public void accessorsCommandListTest()
+	{
+		CommandList tmp = createMock(CommandList.class);
+		sut.setCommandList(tmp);
+		assertEquals(tmp, sut.getCommandList());
+	}
+	
+	@Test
+	public void getCommandsTest()
 	{
 		Method[] tmp1 = commandList.getClass().getDeclaredMethods();
 		List<String> tmp2 = sut.getCommands();
@@ -37,8 +45,48 @@ public class ShellProcessorTest
 	}
 	
 	@Test
-	public void testTreatLine()
+	public void treatLineWithArgsTest()
 	{
-		this.sut.treatLine("exit");
+		String tmp = "newPrompt";
+		
+		commandList.changePrompt(tmp);
+		replay(commandList);
+		this.sut.treatLine("changePrompt " + tmp);
+		verify(commandList);
+		reset(commandList);
+	}
+	
+	@Test
+	public void treatLineExitTest()
+	{
+		this.sut.treatLine(this.sut.getEscapeCommand());
+		assertFalse(shell.isStarted());
+	}
+	
+	@Test
+	public void treatLineUnknownCommandTest() throws UnsupportedEncodingException
+	{
+		String unknownCommand = "unknowncommand";
+		String errorMessage = "n-orm: " + unknownCommand + ": command not found";
+		
+		shell.print(errorMessage);
+		replay(shell);
+		this.sut.treatLine(unknownCommand);
+		verify(shell);
+		reset(shell);
+	}
+	
+	@Test
+	public void treatLineWrongParametersTest() throws UnsupportedEncodingException
+	{
+		String command = "changePrompt";
+		String args = "newPrompt anotherParameter";
+		String errorMessage = "Command format error: " + command + "(java.lang.String)";
+		
+		shell.print(errorMessage);
+		replay(shell);
+		this.sut.treatLine(command + " " + args);
+		verify(shell);
+		reset(shell);
 	}
 }
