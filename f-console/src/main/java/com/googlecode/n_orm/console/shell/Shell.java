@@ -45,6 +45,11 @@ public class Shell
 		this.mustStop = true;
 	}
 	
+	protected boolean isStarted()
+	{
+		return !this.mustStop;
+	}
+	
 	public void print(String text)
 	{
 		out.print(text);
@@ -60,9 +65,35 @@ public class Shell
 		this.prompt = prompt;
 	}
 	
+	protected String getPrompt()
+	{
+		return this.prompt;
+	}
+	
+	protected void setOutput(PrintStream out)
+	{
+		this.out = out;
+	}
+	
+	protected PrintStream getOutput()
+	{
+		return this.out;
+	}
+	
+	protected void setInput(ConsoleReader in)
+	{
+		this.in = in;
+	}
+	
+	protected ConsoleReader getInput()
+	{
+		return this.in;
+	}
+	
 	public void launch()
 	{
 		boolean isFirstCommand = true;
+		String line;
 		
 		this.doStart();
 		while (!mustStop)
@@ -71,7 +102,13 @@ public class Shell
 			{
 				if (!isFirstCommand)
 					this.println("");
-				shellProcessor.treatLine(this.in.readLine(this.prompt));
+				
+				line = this.in.readLine(this.prompt);
+				if (line != null)
+					shellProcessor.treatLine(line);
+				else
+					mustStop = true;
+				
 				isFirstCommand = isFirstCommand && false;
 			}
 			catch (IOException e)
