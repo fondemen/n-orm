@@ -1,10 +1,8 @@
 package com.googlecode.n_orm.console.commands;
 
 import org.codehaus.groovy.control.CompilationFailedException;
-
 import com.googlecode.n_orm.console.annotations.Trigger;
 import com.googlecode.n_orm.console.shell.Shell;
-
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 
