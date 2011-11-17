@@ -177,4 +177,27 @@ public class CacheTest {
 		t3.end();
 		assertSame(c2, c3);
 	}
+	
+	@Test
+	public void cacheTooOld() throws InterruptedException {
+		int initialTTL = Cache.getTimeToLiveSeconds();
+		Cache.setTimeToLiveSeconds(0);
+		try {
+			Cache.cleanRecyclableCaches();
+			Cache.waitNextCleanup();
+			WaitingThread t1 = new WaitingThread(), t2 = new WaitingThread();
+			t1.start();
+			t1.end();
+			assert !t1.isAlive();
+			//Wait for next cache cleanup
+			Cache.waitNextCleanup();
+			Cache.waitNextCleanup();
+			t2.start();
+			Cache c1 = t1.getCache(), c2 = t2.getCache();
+			t2.end();
+			assertNotSame(c1, c2);
+		} finally {
+			Cache.setTimeToLiveSeconds(initialTTL);
+		}
+	}
 }
