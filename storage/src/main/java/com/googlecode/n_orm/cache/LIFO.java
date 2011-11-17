@@ -77,10 +77,10 @@ public class LIFO<T> implements Iterable<T> {
 				} else if (this.previous.head == null) { //We've been too far (some pops happened since last next)
 					this.previous = null;
 				} else {
-					Node<T> prev = this.previous.head;
-					Node<T> next = this.previous.tail;
-					next.head = prev;
-					prev.tail = next;
+					Node<T> head = this.previous.head;
+					Node<T> tail = this.previous.tail;
+					if (tail != null) tail.head = head;
+					head.tail = tail;
 				}
 				this.removed = true;
 			}
