@@ -1,21 +1,10 @@
 package com.googlecode.n_orm;
 
-import java.io.BufferedInputStream;
 import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
-import java.io.Serializable;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableSet;
@@ -23,10 +12,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -36,7 +21,6 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Store;
@@ -51,7 +35,6 @@ public aspect StorageManagement {
 //	public static final String CLASS_COLUMN_FAMILY = "class";
 //	public static final String CLASS_COLUMN = "";
 	
-	private static final String SERIALIZATION_SEPARATOR = "n-orm";
 	transient Boolean PersistingElement.exists = null;
 	private transient boolean PersistingElement.isStoring = false;
 	private transient Collection<Class<? extends PersistingElement>> PersistingElement.persistingSuperClasses = null;
@@ -275,7 +258,7 @@ public aspect StorageManagement {
 		}
 	}
 
-	private void PersistingElement.activateFromRawData(Set<String> toBeActivated,
+	public void PersistingElement.activateFromRawData(Set<String> toBeActivated,
 			Map<String, Map<String, byte[]>> rawData) {
 		assert ! toBeActivated.isEmpty();
 		if (rawData == null)
@@ -325,7 +308,14 @@ public aspect StorageManagement {
 		return toBeActivated;
 	}
 	
-	private static Set<String> getAutoActivatedFamilies(Class<? extends PersistingElement> clazz, String... families) {
+	/**
+	 * The list of column families that should be activated while providing the desired list of column families.
+	 * This function takes care of the property column family and any {@link ImplicitActivation} marked column family.
+	 * @param clazz the class of the element where column families should be found
+	 * @param families the desired set of families
+	 * @return a set of names for families to be activated
+	 */
+	public static Set<String> getAutoActivatedFamilies(Class<? extends PersistingElement> clazz, String... families) {
 		ColumnFamiliyManagement cfm = ColumnFamiliyManagement.getInstance();
 		Set<String> toBeActivated = new TreeSet<String>();
 		
@@ -371,7 +361,14 @@ public aspect StorageManagement {
 		return KeyManagement.getInstance().createElement(clazz, identifier);
 	}
 
-	static <T extends PersistingElement> T createElementFromRow(final Class<T> clazz,
+	/**
+	 * Creates an element from byte-array based data. If element can be found in cache, it will.
+	 * Any existing data is replaced by the given {@link Row}, except for families with no data.
+	 * @param clazz the class of the returned element
+	 * @param toBeActivated the list of families to be activated
+	 * @param data the raw data as can be found in a data store
+	 */
+	public static <T extends PersistingElement> T createElementFromRow(final Class<T> clazz,
 			final Set<String> toBeActivated, Row data) {
 		T elt = ConversionTools.convertFromString(clazz, data.getKey());
 		((PersistingElement)elt).exists = Boolean.TRUE;
@@ -532,304 +529,5 @@ public aspect StorageManagement {
 	
 	public PersistingElement PersistingElement.getCachedVersion() {
 		return StorageManagement.getElementUsingCache((PersistingElement)this);
-	}
-	
-	public static class ProcessReport<T extends PersistingElement> {
-		private int elementsTreated;
-		private T lastProcessedElement;
-		private Row lastProcessedElementData;
-		private Class<T> clazz;
-		private Set<String> toBeActivated;
-		private long durationInMillis;
-		private List<Future<?>> performing;
-		
-		/**
-		 * The number of elements that were processed.
-		 */
-		public int getElementsTreated() {
-			return elementsTreated;
-		}
-		
-		/**
-		 * The last element that was processed. Can be null if no element was processed.
-		 */
-		public T getLastProcessedElement() {
-			if (this.lastProcessedElement == null && this.lastProcessedElementData != null) {
-				lastProcessedElement = createElementFromRow(clazz, toBeActivated, lastProcessedElementData);
-			}
-			return lastProcessedElement;
-		}
-		
-		/**
-		 * Total time took for processing elements.
-		 */
-		public long getDurationInMillis() {
-			return durationInMillis;
-		}
-		
-		/**
-		 * The list of future for processed that are still performing.
-		 * Should be empty if you did not give executor by yourself.
-		 * Should be less or equal than the number of admitted threads.
-		 */
-		public List<Future<?>> getPerforming() {
-			Iterator<Future<?>> prfIt = performing.iterator();
-			while (prfIt.hasNext()) {
-				Future<?> prf = prfIt.next();
-				if (prf.isDone())
-					prfIt.remove();
-			}
-			return performing;
-		}
-		
-		/**
-		 * Waits for all processes to be done.
-		 * Termination is checked every 25 milliseconds.
-		 * Should not wait if you did not provide an executor by yourself.
-		 * @param timeout number of milliseconds the wait can happen.
-		 * @return true if termination happened, false if timeout occured
-		 */
-		public boolean awaitTermination(long timeout) {
-			long end  = System.currentTimeMillis()+timeout;
-			while (!getPerforming().isEmpty()) {
-				try {
-					Thread.sleep(25);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-				if (end < System.currentTimeMillis())
-					return false;
-			}
-			return true;
-		}
-	}
-	
-	public static <AE extends PersistingElement, E extends AE> ProcessReport<E> processElements(final Class<E> clazz, Constraint c, final Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		ProcessReport<E> ret = new ProcessReport<E>();
-		long start = System.currentTimeMillis();
-		long end = (threadNumber == 1 || start > Long.MAX_VALUE - timeout) ? Long.MAX_VALUE : start+timeout;
-		//final CloseableIterator<E> it = findElement(clazz, c, limit, families);
-		Store store = StoreSelector.getInstance().getStoreFor(clazz);
-		final Set<String> toBeActivated = families == null ? null : getAutoActivatedFamilies(clazz, families);
-		ret.toBeActivated = toBeActivated;
-		ret.clazz = clazz;
-		final CloseableKeyIterator keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
-		boolean ownsExecutor = executor == null;
-		if (ownsExecutor) {
-			executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
-		}
-		final List<ProcessException.Problem> problems = Collections.synchronizedList(new LinkedList<ProcessException.Problem>());
-		List<Throwable> exceptions = new ArrayList<Throwable>();
-		try {
-			ret.performing = new ArrayList<Future<?>>(threadNumber);
-			while (keys.hasNext()) {
-				final Row data = keys.next();
-				if (end < System.currentTimeMillis())
-					throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
-				//Cleaning performing from done until there is room for another execution
-				while (ret.getPerforming().size() >= threadNumber) {
-					Thread.sleep(25); //Hopefully, some execution will be done
-					if (end < System.currentTimeMillis())
-						throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
-				}
-				Runnable r = new Runnable() {
-		
-					@Override
-					public void run() {
-						E elt = null;
-						try {
-							elt = createElementFromRow(clazz, toBeActivated, data);
-							processAction.process(elt);
-						} catch (Throwable t) {
-							problems.add(new ProcessException.Problem(elt, data, t));
-						}
-					}
-				};
-				if (threadNumber == 1)
-					r.run();
-				else
-					ret.performing.add(executor.submit(r));
-				ret.lastProcessedElementData = data;
-				ret.elementsTreated++;
-			}
-		} catch (Throwable t) {
-			exceptions.add(t);
-		} finally {
-			keys.close();
-			if (executor != null) {
-				if (ownsExecutor) {
-					executor.shutdown();
-					if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS)) {
-						exceptions.add(new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date()));
-					}
-				}
-			}
-			if (!problems.isEmpty() || !exceptions.isEmpty()) {
-				throw new ProcessException(processAction, ret, problems, exceptions);
-			}
-			ret.durationInMillis = System.currentTimeMillis()-start;
-		}
-		return ret;
-	}
-	
-	public static <AE extends PersistingElement, E extends AE> void processElementsRemotely(final Class<E> clazz, final Constraint c, final Process<AE> process, final Callback callback, final int limit, final String[] families, final int threadNumber, final long timeout) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
-		
-		Store store = StoreSelector.getInstance().getStoreFor(clazz);
-		if (store instanceof ActionnableStore) {
-			Set<String> autoActivatedFamilies = getAutoActivatedFamilies(clazz, families);
-			((ActionnableStore)store).process(PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies, clazz, process, callback);
-		} else {
-			new Thread() {
-				public void run() {
-					try {
-						processElements(clazz, c, process, limit, families, threadNumber, timeout, null);
-						if (callback != null)
-							callback.processCompleted();
-					} catch (Throwable e) {
-						if (callback != null)
-							callback.processCompletedInError(e);
-					}
-				}
-			}.start();
-		}
-	}
-	
-	private static class Element implements Row, Serializable {
-		private static final long serialVersionUID = -8217112442099719281L;
-		
-		private String key;
-		private Class<? extends PersistingElement> clazz;
-		private Map<String, Map<String, byte[]>> values;
-		
-		public Element(PersistingElement pe) {
-			pe.checkIsValid();
-			pe.updateFromPOJO();
-			this.clazz = pe.getClass();
-			this.key = pe.getIdentifier();
-			Collection<ColumnFamily<?>> fams = pe.getColumnFamilies();
-			values = new TreeMap<String, Map<String,byte[]>>();
-			for (ColumnFamily<?> family : fams) {
-				Map<String, byte[]> familyMap = new TreeMap<String, byte[]>();
-				values.put(family.getName(), familyMap);
-				for (String qualifier : family.getKeys()) {
-					Object element = family.getElement(qualifier);
-					Class<?> expected;
-					if (family.getProperty() != null) {
-						expected = family.getClazz();
-					} else if (element instanceof PropertyManagement.Property) {
-						Field propField = ((PropertyManagement.Property)element).getField();
-						if (propField == null)
-							continue;
-						expected = propField.getType();
-					} else {
-						assert false;
-						expected = element.getClass();
-					}
-					familyMap.put(qualifier, ConversionTools.convert(element, expected));
-				}
-			}
-		}
-
-		@Override
-		public String getKey() {
-			return key;
-		}
-
-		@Override
-		public Map<String, Map<String, byte[]>> getValues() {
-			return values;
-		}
-		
-		public PersistingElement getElement() {
-			PersistingElement ret = KeyManagement.getInstance().createElement(this.clazz, this.key);
-			ret.activateFromRawData(ret.getColumnFamilyNames(), this.getValues());
-			return ret;
-		}
-		
-	}
-	
-	public static class ExportReport {
-		private final PersistingElement element;
-		private final long exportedElements;
-		public ExportReport(PersistingElement element, long exportedElements) {
-			super();
-			this.element = element;
-			this.exportedElements = exportedElements;
-		}
-		public PersistingElement getElement() {
-			return element;
-		}
-		public long getExportedElements() {
-			return exportedElements;
-		}
-	}
-	
-	/**
-	 * Serialize a binary representation for elements in an OutputStream.
-	 * Dependencies are not serialized.
-	 * Elements are removed from cache to avoid memory consumption.
-	 * @param elementsIterator an iterator over the elements to be serialized ; closed by the method
-	 * @return lastElement the last element serialized from the collection
-	 */
-	public static ExportReport exportPersistingElements(CloseableIterator<? extends PersistingElement> elementsIterator, OutputStream out) throws IOException {
-		ObjectOutputStream oos= new ObjectOutputStream(out);
-		PersistingElement lastElement = null;
-		KeyManagement km = KeyManagement.getInstance();
-		long exported = 0;
-		try {
-			while (elementsIterator.hasNext()) {
-				PersistingElement elt = elementsIterator.next();
-				elt.checkIsValid();
-				elt.updateFromPOJO();
-				oos.writeObject(SERIALIZATION_SEPARATOR);
-				oos.writeObject(new Element(elt));
-				lastElement = elt;
-				km.unregister(elt);
-				exported++;
-			}
-			oos.flush();
-		} finally {
-			elementsIterator.close();
-		}
-		
-		return new ExportReport(lastElement, exported);
-	}
-	
-	/**
-	 * Import a serialized set in a InputStream. Each element is loaded with data found from the input stream and stored.
-	 * Elements are removed from cache to avoid memory consumption.
-	 * @param fis the input stream to import from ; must support {@link InputStream#markSupported()}
-	 * @return the number of imported elements
-	 */
-	public static long importPersistingElements(InputStream fis) throws DatabaseNotReachedException, IOException, ClassNotFoundException {
-		if (!fis.markSupported())
-			fis = new BufferedInputStream(fis);
-		
-		ObjectInputStream ois = new ObjectInputStream(fis);
-		KeyManagement km = KeyManagement.getInstance();
-		long ret = 0;
-		boolean ok = true;
-		while(ok && fis.available()>0) {
-			fis.mark(SERIALIZATION_SEPARATOR.getBytes().length*2);
-			try {
-				String sep = (String) ois.readObject();
-				ok = SERIALIZATION_SEPARATOR.equals(sep);
-			} catch (Exception x) {
-				fis.reset();
-				ok = false;
-			}
-			if (ok) {
-				Element elt = (Element)ois.readObject();
-				PersistingElement pe = elt.getElement();
-				pe.delete(); //To be sure that store will get only read data
-				for (ColumnFamily<?> cf : pe.getColumnFamilies()) {
-					cf.setAllChanged();
-				}
-				pe.store();
-				km.unregister(pe);
-				ret++;
-			}
-		}
-		return ret;
 	}
 }

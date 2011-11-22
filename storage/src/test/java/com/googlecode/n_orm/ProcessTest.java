@@ -1,7 +1,8 @@
 package com.googlecode.n_orm;
 
-import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Date;
 import java.util.concurrent.ExecutorService;
@@ -12,8 +13,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import com.googlecode.n_orm.StorageManagement.ProcessReport;
 
 public class ProcessTest {
 
@@ -73,7 +72,7 @@ public class ProcessTest {
 	 
 	 @Test public void process() throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		 long start = System.currentTimeMillis();
-		 ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 2, 20000);		 
+		 com.googlecode.n_orm.operations.Process.ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(), 2, 20000);		 
 		 long end = System.currentTimeMillis();
 		 assertTrue(ret.getPerforming().isEmpty());
 		 n1.activate();
@@ -104,7 +103,7 @@ public class ProcessTest {
 	 }
 	 
 	 @Test public void processOneThread() throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		 ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(false, false), 1, 20000);		 
+		 com.googlecode.n_orm.operations.Process.ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel(false, false), 1, 20000);		 
 		 assertTrue(ret.getPerforming().isEmpty());
 		 //No need for activation as elements are processed in this thread
 		 assertEquals(2, n1.attribute);
@@ -191,7 +190,7 @@ public class ProcessTest {
 		 
 		 @Test public void processWithExecutor() throws DatabaseNotReachedException, InterruptedException, ProcessException {
 			ExecutorService executor = Executors.newFixedThreadPool(1);
-			ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new ThreadUnsafeProcess(), 3, 20000, executor);
+			com.googlecode.n_orm.operations.Process.ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new ThreadUnsafeProcess(), 3, 20000, executor);
 			assertFalse(ret.getPerforming().isEmpty());
 			assertFalse(executor.isTerminated());
 			executor.shutdown();
@@ -200,7 +199,7 @@ public class ProcessTest {
 		 
 		 @Test public void processWithExecutorWaitingForTheEnd() throws DatabaseNotReachedException, InterruptedException, ProcessException {
 			ExecutorService executor = Executors.newFixedThreadPool(1);
-			ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new ThreadUnsafeProcess(), 3, 20000, executor);
+			com.googlecode.n_orm.operations.Process.ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new ThreadUnsafeProcess(), 3, 20000, executor);
 			assertTrue(ret.awaitTermination(10000));
 			executor.shutdown();
 			assertTrue(executor.awaitTermination(1, TimeUnit.MILLISECONDS));
