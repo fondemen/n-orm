@@ -20,9 +20,10 @@ import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.StorageManagement;
-import com.googlecode.n_orm.StorageManagement.ExportReport;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.WaitingCallBack;
+import com.googlecode.n_orm.operations.ImportExport;
+import com.googlecode.n_orm.operations.Process.ProcessReport;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.Store;
@@ -188,7 +189,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
-	public StorageManagement.ProcessReport<T> forEach(Process<T> action) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+	public ProcessReport<T> forEach(Process<T> action) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		return this.forEach(action, 1, 0);
 	}
 	
@@ -205,7 +206,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
-	public StorageManagement.ProcessReport<T> forEach(Process<T> action, int threadNumber, long timeoutMs) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+	public ProcessReport<T> forEach(Process<T> action, int threadNumber, long timeoutMs) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		return this.forEach(action, threadNumber, timeoutMs, null);
 	}
 	
@@ -222,11 +223,11 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
-	public StorageManagement.ProcessReport<T> forEach(Process<T> action, int threadNumber, long timeoutMs, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+	public ProcessReport<T> forEach(Process<T> action, int threadNumber, long timeoutMs, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
 		if (hasNoLimit())
 			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
-		return StorageManagement.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, timeoutMs, executor);
+		return com.googlecode.n_orm.operations.Process.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, timeoutMs, executor);
 	}
 	
 	/**
@@ -250,7 +251,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 			limit = -1;
 		else
 			limit = this.limit;
-		StorageManagement.processElementsRemotely(this.getClazz(), this.getConstraint(), action, callBack, limit, this.toBeActivated, threadNumber, timeout);
+		com.googlecode.n_orm.operations.Process.processElementsRemotely(this.getClazz(), this.getConstraint(), action, callBack, limit, this.toBeActivated, threadNumber, timeout);
 	}
 	
 	/**
@@ -265,7 +266,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 			long exported = 0;
 			Constraint c = this.getConstraint();
 			do {
-				ExportReport ex = StorageManagement.exportPersistingElements(StorageManagement.findElement(this.getClazz(), c, Integer.MAX_VALUE, this.toBeActivated), out);
+				com.googlecode.n_orm.operations.ImportExport.ExportReport ex = ImportExport.exportPersistingElements(StorageManagement.findElement(this.getClazz(), c, Integer.MAX_VALUE, this.toBeActivated), out);
 				exported+=ex.getExportedElements();
 				if (ex.getExportedElements() < Integer.MAX_VALUE)
 					return exported;
@@ -273,7 +274,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 					c = new Constraint(ex.getElement().getIdentifier()+Character.MIN_VALUE, c.getEndKey());
 			} while (true);
 		} else {
-			return StorageManagement.exportPersistingElements(this.iterate(), out).getExportedElements();
+			return ImportExport.exportPersistingElements(this.iterate(), out).getExportedElements();
 		}
 	}
 }
