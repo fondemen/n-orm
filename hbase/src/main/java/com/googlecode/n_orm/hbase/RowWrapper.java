@@ -1,5 +1,6 @@
 package com.googlecode.n_orm.hbase;
 
+import java.io.Serializable;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
@@ -10,7 +11,8 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 import com.googlecode.n_orm.storeapi.Row;
 
-public class RowWrapper implements Row {
+public class RowWrapper implements Row, Serializable {
+	private static final long serialVersionUID = -3943538431236454382L;
 	private final String key;
 	private final Map<String, Map<String, byte[]>> values;
 
