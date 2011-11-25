@@ -77,8 +77,15 @@ public aspect StorageManagement {
 			Map<String, Set<String>> deleted = new TreeMap<String, Set<String>>();
 			Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String,Number>>();
 			Map<String,Number> propsIncrs = this.getIncrements();
-			if (!propsIncrs.isEmpty())
-				increments.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, propsIncrs);
+			if (!propsIncrs.isEmpty()) {
+				Map<String,Number> realPropsIncrs = new TreeMap<String, Number>();
+				for (Entry<String, Number> incr : propsIncrs.entrySet()) {
+					if (incr.getValue().longValue() != 0)
+						realPropsIncrs.put(incr.getKey(), incr.getValue());
+				}
+				if (!realPropsIncrs.isEmpty())
+					increments.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, realPropsIncrs);
+			}
 			Collection<ColumnFamily<?>> families = this.getColumnFamilies();
 			for (ColumnFamily<?> family : families) {
 				Set<String> changedKeys = family.changedKeySet();
@@ -115,10 +122,13 @@ public aspect StorageManagement {
 				Set<String> incrementedKeys = family.incrementedKeySet();
 				if (!incrementedKeys.isEmpty()) {
 					Map<String, Number> familyIncr = new TreeMap<String,Number>();
-					increments.put(family.getName(), familyIncr);
 					for (String key : incrementedKeys) {
-						familyIncr.put(key, family.getIncrement(key));
+						Number incr = family.getIncrement(key);
+						if (incr.longValue() != 0)
+							familyIncr.put(key, incr);
 					}
+					if (!familyIncr.isEmpty())
+						increments.put(family.getName(), familyIncr);
 				}
 			}
 			
