@@ -4,6 +4,11 @@ import static org.junit.Assert.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 
@@ -18,9 +23,43 @@ import com.googlecode.n_orm.cf.MapColumnFamily;
 
 public class IncrementsTest {
 
+	public IncrementsTest() {
+		Properties props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
+		StoreSelector.getInstance().setPropertiesFor(Element.class, props);
+	}
+
+	private static class Incrementer implements Runnable {
+		public volatile Exception exception = null;
+		public volatile int done = 0;
+		private final long id;
+		
+		public Incrementer(long id) {
+			super();
+			this.id = id;
+		}
+
+		@Override
+		public void run() {
+			try {
+				final Element elt = new Element(id);
+				for (short i = 1; i <= 100; i++) {
+					elt.incrementing++;
+					elt.incrementingFamily.put("qualifier", i);
+					elt.store();
+				}
+			} catch(Exception x) {
+				exception = x;
+			} finally {
+				synchronized(this) {
+					done++;
+				}
+			}
+		}
+	}
+
 	@Persisting
 	public static class Element {
-		@Key public int key;
+		@Key public long key;
 		public int notIncrmenting;
 		@Incrementing(mode=Incrementing.Mode.Free) public int free;
 		@Incrementing public int incrementing;
@@ -28,8 +67,8 @@ public class IncrementsTest {
 		@Incrementing public Map<String, Short> incrementingFamily = new HashMap<String, Short>();
 		@Incrementing(mode=Incrementing.Mode.Free) public Map<String, Short> freeFamily = new HashMap<String, Short>();
 		@Incrementing(mode=Incrementing.Mode.DecrementOnly) public Map<String, Short> decrementingFamily = new HashMap<String, Short>();
-		public Element(int key) {
-			this.key = key;
+		public Element(long id) {
+			this.key = id;
 		}
 	}
 	
@@ -158,5 +197,28 @@ public class IncrementsTest {
 		e.incrementingFamily.put("val", (short)7);
 		e.updateFromPOJO();
 		assertEquals((short)4, e.getColumnFamily("incrementingFamily").getIncrement("val"));
+	}
+	
+	@Test
+	public void multiThreadedIncr() throws Exception {
+		long id = System.currentTimeMillis();
+		Incrementer incrementer = new Incrementer(id);
+		ExecutorService executor = Executors.newCachedThreadPool();
+		executor.submit(incrementer);
+		executor.submit(incrementer);
+		executor.submit(incrementer);
+		executor.submit(incrementer);
+		
+		executor.shutdown();
+		assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+		assertEquals(4, incrementer.done);
+		if (incrementer.exception != null)
+			throw incrementer.exception;
+		
+		Element e = new Element(id);
+		e.activate("incrementingFamily");
+		assertEquals(4*100, e.incrementing);
+		assertEquals(4*100, e.incrementingFamily.get("qualifier").shortValue());
+		e.delete();
 	}
 }
