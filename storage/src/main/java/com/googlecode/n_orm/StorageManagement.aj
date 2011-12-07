@@ -1,5 +1,6 @@
 package com.googlecode.n_orm;
 
+import java.io.FileInputStream;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Iterator;
@@ -10,6 +11,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -19,7 +21,6 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Store;
@@ -76,8 +77,15 @@ public aspect StorageManagement {
 			Map<String, Set<String>> deleted = new TreeMap<String, Set<String>>();
 			Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String,Number>>();
 			Map<String,Number> propsIncrs = this.getIncrements();
-			if (!propsIncrs.isEmpty())
-				increments.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, propsIncrs);
+			if (!propsIncrs.isEmpty()) {
+				Map<String,Number> realPropsIncrs = new TreeMap<String, Number>();
+				for (Entry<String, Number> incr : propsIncrs.entrySet()) {
+					if (incr.getValue().longValue() != 0)
+						realPropsIncrs.put(incr.getKey(), incr.getValue());
+				}
+				if (!realPropsIncrs.isEmpty())
+					increments.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, realPropsIncrs);
+			}
 			Collection<ColumnFamily<?>> families = this.getColumnFamilies();
 			for (ColumnFamily<?> family : families) {
 				Set<String> changedKeys = family.changedKeySet();
@@ -96,7 +104,8 @@ public aspect StorageManagement {
 								expected = family.getClazz();
 							} else if (element instanceof PropertyManagement.Property) {
 								Field propField = ((PropertyManagement.Property)element).getField();
-								assert propField != null;
+								if (propField == null) //Property that was activated but which has disappeared
+									continue;
 								expected = propField.getType();
 							} else {
 								assert false;
@@ -113,10 +122,13 @@ public aspect StorageManagement {
 				Set<String> incrementedKeys = family.incrementedKeySet();
 				if (!incrementedKeys.isEmpty()) {
 					Map<String, Number> familyIncr = new TreeMap<String,Number>();
-					increments.put(family.getName(), familyIncr);
 					for (String key : incrementedKeys) {
-						familyIncr.put(key, family.getIncrement(key));
+						Number incr = family.getIncrement(key);
+						if (incr.longValue() != 0)
+							familyIncr.put(key, incr);
 					}
+					if (!familyIncr.isEmpty())
+						increments.put(family.getName(), familyIncr);
 				}
 			}
 			
@@ -233,6 +245,17 @@ public aspect StorageManagement {
 	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
 		this.activate(true, families);
 	}
+	
+	public void PersistingElement.activate(Object... families) throws DatabaseNotReachedException {
+		String[] fams = new String[families.length];
+		for (int i = 0; i < families.length; ++i) {
+			ColumnFamily<?> cf = this.getColumnFamily(families[i]);
+			if (cf == null)
+				throw new IllegalArgumentException("Element " + families[i] + " does not correspond to a column familiy.");
+			fams[i] = cf.getName();
+		}
+		this.activate(fams);
+	}
 
 	private void PersistingElement.activate(boolean force, String... families) throws DatabaseNotReachedException {
 		this.checkIsValid();
@@ -245,7 +268,7 @@ public aspect StorageManagement {
 		}
 	}
 
-	private void PersistingElement.activateFromRawData(Set<String> toBeActivated,
+	public void PersistingElement.activateFromRawData(Set<String> toBeActivated,
 			Map<String, Map<String, byte[]>> rawData) {
 		assert ! toBeActivated.isEmpty();
 		if (rawData == null)
@@ -276,7 +299,7 @@ public aspect StorageManagement {
 		}
 	}
 	
-	public static <E extends PersistingElement> PersistingElement getFromRawData(Class<E> type, Row row) {
+	public static <E extends PersistingElement> E getFromRawData(Class<E> type, Row row) {
 		E element = StorageManagement.getElement(type, row.getKey());
 		element.activateFromRawData(row.getValues().keySet(), row.getValues());
 		return element;
@@ -295,7 +318,14 @@ public aspect StorageManagement {
 		return toBeActivated;
 	}
 	
-	private static Set<String> getAutoActivatedFamilies(Class<? extends PersistingElement> clazz, String... families) {
+	/**
+	 * The list of column families that should be activated while providing the desired list of column families.
+	 * This function takes care of the property column family and any {@link ImplicitActivation} marked column family.
+	 * @param clazz the class of the element where column families should be found
+	 * @param families the desired set of families
+	 * @return a set of names for families to be activated
+	 */
+	public static Set<String> getAutoActivatedFamilies(Class<? extends PersistingElement> clazz, String... families) {
 		ColumnFamiliyManagement cfm = ColumnFamiliyManagement.getInstance();
 		Set<String> toBeActivated = new TreeSet<String>();
 		
@@ -340,6 +370,44 @@ public aspect StorageManagement {
 	public static <T> T getElement(Class<T> clazz, String identifier) {
 		return KeyManagement.getInstance().createElement(clazz, identifier);
 	}
+
+	/**
+	 * Creates an element from byte-array based data. If element can be found in cache, it will.
+	 * Any existing data is replaced by the given {@link Row}, except for families with no data.
+	 * @param clazz the class of the returned element
+	 * @param toBeActivated the list of families to be activated
+	 * @param data the raw data as can be found in a data store
+	 */
+	public static <T extends PersistingElement> T createElementFromRow(final Class<T> clazz,
+			final Set<String> toBeActivated, Row data) {
+		T elt = ConversionTools.convertFromString(clazz, data.getKey());
+		((PersistingElement)elt).exists = Boolean.TRUE;
+		//assert (toBeActivated == null) == ((data.getValues() == null)  || (data.getValues().entrySet().isEmpty())); //may be false (e.g. no properties)
+		if (toBeActivated != null) { //the element should be activated
+			Set<String> tba = toBeActivated, missingCf = null;
+			Set<String> dataKeys = data.getValues().keySet();
+			if (! dataKeys.containsAll(toBeActivated)) {
+				missingCf = new TreeSet<String>(toBeActivated);
+				missingCf.removeAll(dataKeys);
+				tba = new TreeSet<String>(toBeActivated);
+				tba.retainAll(dataKeys);
+				Iterator<String> mci = missingCf.iterator();
+				while (mci.hasNext()) {
+					if (elt.getColumnFamily(mci.next()).isActivated())
+						mci.remove();
+				}
+			}
+			
+			if (!tba.isEmpty()) {
+				elt.activateFromRawData(tba, data.getValues());
+			}
+			
+			if (missingCf != null && !missingCf.isEmpty()) {
+				elt.activate(missingCf.toArray(new String[missingCf.size()]));
+			}
+		}
+		return elt;
+	}
 	
 	public static <T extends PersistingElement> CloseableIterator<T> findElement(final Class<T> clazz, Constraint c, final int limit, String... families) throws DatabaseNotReachedException {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
@@ -366,33 +434,7 @@ public aspect StorageManagement {
 						throw new IllegalStateException("The list is empty");
 					Row data = keys.next();
 					try {
-						T elt = ConversionTools.convertFromString(clazz, data.getKey());
-						((PersistingElement)elt).exists = Boolean.TRUE;
-						//assert (toBeActivated == null) == ((data.getValues() == null)  || (data.getValues().entrySet().isEmpty())); //may be false (e.g. no properties)
-						if (toBeActivated != null) { //the element should be activated
-							Set<String> tba = toBeActivated, missingCf = null;
-							Set<String> dataKeys = data.getValues().keySet();
-							if (! dataKeys.containsAll(toBeActivated)) {
-								missingCf = new TreeSet<String>(toBeActivated);
-								missingCf.removeAll(dataKeys);
-								tba = new TreeSet<String>(toBeActivated);
-								tba.retainAll(dataKeys);
-								Iterator<String> mci = missingCf.iterator();
-								while (mci.hasNext()) {
-									if (elt.getColumnFamily(mci.next()).isActivated())
-										mci.remove();
-								}
-							}
-							
-							if (!tba.isEmpty()) {
-								elt.activateFromRawData(tba, data.getValues());
-							}
-							
-							if (missingCf != null && !missingCf.isEmpty()) {
-								elt.activate(missingCf.toArray(new String[missingCf.size()]));
-							}
-						}
-						return elt;
+						return createElementFromRow(clazz, toBeActivated, data);
 					} finally {
 						returned++;
 					}
@@ -497,37 +539,5 @@ public aspect StorageManagement {
 	
 	public PersistingElement PersistingElement.getCachedVersion() {
 		return StorageManagement.getElementUsingCache((PersistingElement)this);
-	}
-	
-	public static <AE extends PersistingElement, E extends AE> void processElements(final Class<E> clazz, final Constraint c, final Process<AE> processAction, final int limit, final String... families) throws DatabaseNotReachedException {
-		CloseableIterator<E> it = findElement(clazz, c, limit, families);
-		try {
-			while (it.hasNext()) {
-				processAction.process(it.next());
-			}
-		} finally {
-			it.close();
-		}
-	}
-	
-	public static <AE extends PersistingElement, E extends AE> void processElementsRemotely(final Class<E> clazz, final Constraint c, final Process<AE> process, final Callback callback, final int limit, final String... families) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
-		
-		Store store = StoreSelector.getInstance().getStoreFor(clazz);
-		if (store instanceof ActionnableStore) {
-			Set<String> autoActivatedFamilies = getAutoActivatedFamilies(clazz, families);
-			((ActionnableStore)store).process(PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies, clazz, process, callback);
-		} else {
-			new Thread() {
-				public void run() {
-					try {
-						processElements(clazz, c, process, limit, families);
-						callback.processCompleted();
-					} catch (Throwable e) {
-						if (callback != null)
-							callback.processCompletedInError(e);
-					}
-				}
-			}.start();
-		}
 	}
 }

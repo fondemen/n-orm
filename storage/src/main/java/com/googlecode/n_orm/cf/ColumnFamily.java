@@ -31,13 +31,14 @@ public abstract class ColumnFamily<T> {
 
 	protected final Map<String, T> collection = new TreeMap<String, T>();
 
+	protected boolean allChanged;
 	protected Map<String, ChangeKind> changes;
 	protected final Map<String, Number> increments;
 	protected final boolean addOnly;
 	
 	protected boolean activated = false;
 	
-	public ColumnFamily() { 
+	public ColumnFamily() { //For compile-time purpose only ; should be replaced by Around of ColumnFamilyManagement
 		this.clazz = null;
 		this.property = null;
 		this.name = null;
@@ -282,6 +283,7 @@ public abstract class ColumnFamily<T> {
 	}
 	
 	public Set<String> changedKeySet() {
+		if (this.allChanged ) return this.getKeys();
 		return this.changes == null ? new TreeSet<String>() : this.changes.keySet();
 	}
 	
@@ -290,24 +292,35 @@ public abstract class ColumnFamily<T> {
 	}
 	
 	public boolean hasChanged() {
-		return (this.changes != null && !this.changes.isEmpty())
+		return this.allChanged
+				|| (this.changes != null && !this.changes.isEmpty())
 				|| (this.increments != null && !this.increments.isEmpty());
 	}
 	
 	public boolean wasChanged(String key) {
-		return (this.changes != null && this.changes.containsKey(key)&& this.changes.get(key).equals(ChangeKind.SET))
-			|| (this.increments != null && this.increments.containsKey(key));
+		return this.allChanged
+				|| (this.changes != null && this.changes.containsKey(key)&& this.changes.get(key).equals(ChangeKind.SET))
+				|| (this.increments != null && this.increments.containsKey(key));
 	}
 	
 	public boolean wasDeleted(String key) {
-		return this.changes != null && this.changes.containsKey(key)&& this.changes.get(key).equals(ChangeKind.DELETE);
+		return !this.allChanged && this.changes != null && this.changes.containsKey(key)&& this.changes.get(key).equals(ChangeKind.DELETE);
 	}
 	
 	public Number getIncrement(String key) {
 		return this.increments == null ? null : this.increments.containsKey(key) ? this.increments.get(key) : null;
 	}
+
+	public void setAllChanged() {
+		this.allChanged = true;
+		if (this.changes != null)
+			this.changes.clear();
+		if (this.increments != null)
+		this.increments.clear();
+	}
 	
 	public void clearChanges() {
+		this.allChanged = false;
 		if (this.changes != null)
 			this.changes.clear();
 		if (this.increments != null)

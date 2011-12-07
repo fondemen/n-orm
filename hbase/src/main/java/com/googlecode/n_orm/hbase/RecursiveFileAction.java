@@ -1,57 +1,67 @@
 package com.googlecode.n_orm.hbase;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.codehaus.plexus.util.DirectoryScanner;
 
 public abstract class RecursiveFileAction {
-	
-	private final Collection<File> toBeIgnored;
-	private final Collection<File> toBeExplored;
+
+	private final Collection<String> toBeExploredFiles;
+	private final Collection<String> toBeExplored;
+	private final Collection<String> toBeIgnoredFilters;
+	private final Collection<String> toBeExploredFilters;
 	
 	public static abstract class Report {
 		public abstract void fileHandled(File f);
 	}
-
-	private FilenameFilter filter = new FilenameFilter() {
-	
-		@Override
-		public boolean accept(File dir, String name) {
-			File f = new File(dir, name);
-			return acceptFile(f) || f.isDirectory();
-		}
-	};
 	
 	public RecursiveFileAction() {
-		toBeIgnored = new LinkedList<File>();
-		toBeExplored = new LinkedList<File>();
+		toBeIgnoredFilters = new LinkedList<String>();
+		toBeExploredFilters = new LinkedList<String>();
+		toBeExplored = new LinkedList<String>();
+		toBeExploredFiles = new LinkedList<String>();
 	}
 	
-	public void addIgnoredFile(File toBeIgnored) {
-		this.toBeIgnored.add(toBeIgnored);
+	public void addIgnoredFile(String toBeIgnored) {
+		this.toBeIgnoredFilters.add(toBeIgnored);
 	}
 	
 	public void clearIgnoredFiles() {
-		this.toBeIgnored.clear();
+		this.toBeIgnoredFilters.clear();
 	}
 	
-	public void addExploredFile(File toBeExplored) {
-		this.toBeExplored.add(toBeExplored);
+	public void addExploredFile(String toBeExplored) {
+		File tbe = new File(toBeExplored);
+		if (toBeExplored.contains("*") || toBeExplored.contains("?"))
+			this.toBeExploredFilters.add(toBeExplored);
+		else if (tbe.isFile())
+			this.toBeExploredFiles.add(toBeExplored);
+		else if (tbe.isDirectory())
+			this.toBeExplored.add(toBeExplored);
+		else
+			HBase.logger.warning(toBeExplored + " is neither a filter (no *, **, or ? found) nor a valid directory ; ignoring");
 	}
 	
 	public void clear() {
-		this.toBeIgnored.clear();
+		this.toBeIgnoredFilters.clear();
+		this.toBeExploredFilters.clear();
 		this.toBeExplored.clear();
+		this.toBeExploredFiles.clear();
 	}
 	
 	public void addFiles(String... files) {
 		for (String file : files) {
-			if (file.startsWith("!"))
-				this.addIgnoredFile(new File(file.substring(1)));
-			else
-				this.addExploredFile(new File(file));
+			file = file.trim();
+			if (file.length() > 0) {
+				if (file.startsWith("!"))
+					this.addIgnoredFile(file.substring(1));
+				else
+					this.addExploredFile(file);
+			}
 		}
 	}
 		
@@ -60,42 +70,41 @@ public abstract class RecursiveFileAction {
 	}
 	
 	public void explore(Report r) {
-		Iterator<File> exi = this.toBeExplored.iterator();
-		while (exi.hasNext()) {
-			File f = exi.next();
-			if (!this.toBeIgnored.contains(f)) {
-				this.recursiveManageFile(f, r);
-			}
-			exi.remove();
-		}
-	}
-	
-	public abstract boolean acceptFile(File file);
-	
-	public abstract void manageFile(File f, Report r);
-	
-	
-
-	protected void recursiveManageFile(File file, Report r) {
-		if (this.toBeIgnored.contains(file))
-			return;
+		if (this.toBeExplored.isEmpty())
+			throw new IllegalArgumentException("No directory found ; please provide at least one directory with a non filter expression (with no *, **, or ?).");
+		DirectoryScanner scanner = new DirectoryScanner();
+		if (!this.toBeExploredFilters.isEmpty())
+			scanner.setIncludes(this.toBeExploredFilters.toArray(new String[0]));
+		if (!this.toBeIgnoredFilters.isEmpty())
+			scanner.setExcludes(this.toBeIgnoredFilters.toArray(new String[0]));
+		scanner.addDefaultExcludes();
+		scanner.setCaseSensitive(false);
 		
-		if (!file.canRead()) {
-			System.err.println("WARNING: cannot read " + file.getAbsolutePath());
-			return;
-		}
-
-		if (file.isDirectory()) {
-			for (String name : file.list(this.filter)) {
-				recursiveManageFile(new File(file, name), r);
+		Set<String> found = new TreeSet<String>();
+		found.addAll(toBeExploredFiles);
+		
+		for (String tbe : this.toBeExplored) {
+			scanner.setBasedir(tbe);
+			scanner.scan();
+			for (String ff : scanner.getIncludedFiles()) {
+				found.add(tbe+File.separatorChar+ff);
 			}
-		} else if (this.acceptFile(file)) {
-			this.manageFile(file, r);
-			if (r != null)
-				r.fileHandled(file);
-		} else
-			System.err.println("Cannot add file " + file.getAbsolutePath()
-					+ " to classpath");
+		}
+		
+ 		for (String file : found) {
+			File f = new File(file);
+			if (this.acceptFile(f)) {
+				this.fileFound(f, r);
+				if (r != null)
+					r.fileHandled(f);
+			}
+		}
 	}
+	
+	public boolean acceptFile(File file) {
+		return true;
+	}
+	
+	public abstract void fileFound(File f, Report r);
 
 }

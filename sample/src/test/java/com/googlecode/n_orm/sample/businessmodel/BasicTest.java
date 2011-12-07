@@ -19,15 +19,19 @@ import java.util.Set;
 
 import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.Ignore;
 
 import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
+import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.WaitingCallBack;
+import com.googlecode.n_orm.operations.ImportExport;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 /**
@@ -67,25 +71,29 @@ public class BasicTest {
 		}
 	}
 	
+	@BeforeClass
 	@AfterClass
-	public static void vacuumStore() {
+	public static void vacuumStore() throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		StorageManagement.findElements().ofClass(BookStore.class).withAtMost(10000).elements().forEach(new Process<BookStore>() {
 			
 			@Override
 			public void process(BookStore element) {
 				element.delete();
 			}
-		});
+		}, 10, 10000);
 		StorageManagement.findElements().ofClass(Book.class).withAtMost(10000).elements().forEach(new Process<Book>() {
 			
 			@Override
 			public void process(Book element) {
 				element.delete();
 			}
-		});
+		}, 10, 1000);
 		//Novel is subclass of Book:
 		// emptying the Book table should also make the Novel table empty 
 		assertNull(StorageManagement.findElements().ofClass(Novel.class).any());
+		
+		//Cleaning cache to simulate new session
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
 	}
 	
 	public void deleteBookstore() throws DatabaseNotReachedException {
@@ -364,7 +372,7 @@ public class BasicTest {
 		}
 	 @Test(timeout=20000) public void testSetBooksWithMapReduce() throws DatabaseNotReachedException, InstantiationException, IllegalAccessException, InterruptedException {
 		WaitingCallBack wc = new WaitingCallBack();
-		StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(10000).elements().andActivate().remoteForEach(new BookSetter((short) 50), wc);
+		StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(10000).elements().andActivate().remoteForEach(new BookSetter((short) 50), wc, 100, 1000);
 		//withAtMost is not necessary using HBase as com.googlecode.n_orm.hbase.Store implements com.googlecode.n_orm.storeapi.ActionnableStore
 		wc.waitProcessCompleted(); //Nothing happens up to the end of the Map/Reduce task ; in case you do not use an com.googlecode.n_orm.storeapi.ActionnableStore, this action is performed on this thread, i.e. all elements are downloaded and iterated here
 		assertNull(wc.getError());
@@ -379,7 +387,6 @@ public class BasicTest {
 	 }
 	 
 	 @Test public void serialize() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
-		
 		//Java serialization ; also tested successfully with GSon
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ObjectOutputStream oo = new ObjectOutputStream(out);
@@ -403,6 +410,43 @@ public class BasicTest {
 		assertEquals(bsut.getBookStore(), b2.getBookStore());
 		//As such:
 		assertEquals(bsut, b2);
+	 }
+	 
+	 @Ignore @Test public void importExport() throws IOException, ClassNotFoundException, DatabaseNotReachedException {
+		 //Reusable query
+		SearchableClassConstraintBuilder<Book> query = StorageManagement.findElements().ofClass(Book.class).andActivateAllFamilies().withAtMost(1000).elements();
+		
+		//Original collection
+		Set<Book> knownBooks = query.go();
+		assertFalse(knownBooks.isEmpty());
+		assertEquals(knownBooks.size(), query.count());
+
+		//Exporting collection directly from store
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		query.exportTo(out);
+		
+		//Deleting collection from base
+		for (Book book : knownBooks) {
+			book.delete();
+		}
+		assertEquals(0, query.count());
+		//Simulating new session by emptying the cache
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		//Importing stored elements
+		ImportExport.importPersistingElements(new ByteArrayInputStream(out.toByteArray()));
+		assertEquals(knownBooks.size(), query.count());
+		
+		//Checking database
+		Set<Book> newKnownBooks = query.go(); //Caches found elements
+		assertEquals(knownBooks, newKnownBooks);
+		for (Book knownBook : knownBooks) {
+			Book newKnownBook = StorageManagement.getElementUsingCache(knownBook); //The element activated by the last query.go()
+			assertNotSame(knownBook, newKnownBook);
+			assertEquals(knownBook, newKnownBook);
+			assertEquals(knownBook.getBookStore(), newKnownBook.getBookStore());
+			assertEquals(knownBook.getTitle(), newKnownBook.getTitle());
+		}
 	 }
 
 }

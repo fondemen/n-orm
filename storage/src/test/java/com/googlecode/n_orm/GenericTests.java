@@ -9,11 +9,13 @@ import com.googlecode.n_orm.cf.CollectionStorageTest;
 @RunWith(Suite.class)
 @SuiteClasses(value={
 		BasicTest.class,
+		IncrementsTest.class,
 		CollectionStorageTest.class,
 		PersistableSearchTest.class,
 		InheritanceTest.class,
 		ReveresedOrderSearchTest.class,
 		EvolutionTest.class
+		//ImportExportTest.class
 })
 
 public class GenericTests {

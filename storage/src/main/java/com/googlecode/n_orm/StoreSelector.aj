@@ -61,10 +61,13 @@ public aspect StoreSelector {
 	
 	public TypeAwareStore PersistingElement.getStore() {
 		if (this.store == null)
-			try {
-				this.setStore(StoreSelector.getInstance().getStoreFor(this.getClass()));
-			} catch (DatabaseNotReachedException x) {
-				throw new IllegalStateException(x);
+			synchronized(this) {
+				if (this.store == null)
+					try {
+						this.setStore(StoreSelector.getInstance().getStoreFor(this.getClass()));
+					} catch (DatabaseNotReachedException x) {
+						throw new IllegalStateException(x);
+					}
 			}
 		return this.store;
 	}
