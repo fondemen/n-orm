@@ -111,7 +111,9 @@ public class ShellProcessor
 					m.invoke(commandList, params);
 				}
 				catch (Exception e)
-				{ }
+				{
+					shell.print("n-orm: " + e.getMessage() + ": command error");
+				}
 			}
 			else
 			{
