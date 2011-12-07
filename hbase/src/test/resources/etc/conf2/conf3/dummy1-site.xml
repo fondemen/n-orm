@@ -1,0 +1,10 @@
+<configuration>
+	<property>
+		<name>dummy.prop.one</name>
+		<value>dummyval</value>
+	</property>
+	<property>
+		<name>dummy.prop.two</name>
+		<value>2</value>
+	</property>
+</configuration>

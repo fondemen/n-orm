@@ -2,6 +2,14 @@ package com.googlecode.n_orm;
 
 import static org.junit.Assert.*;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.NavigableSet;
@@ -11,17 +19,19 @@ import java.util.TreeSet;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.ProcessTest.InrementNovel;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class BasicTest {
 
@@ -49,22 +59,24 @@ public class BasicTest {
 				found.close();
 			}
 		}
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
 	}
 	
 	@Before
 	public void storeSUTs() throws DatabaseNotReachedException {
-		if (bssut == null) {
+		vacuumDB();
+		//if (bssut == null) {
 			 bssut = new BookStore("testbookstore");
 			 bssut.setName("bookstore name");
 			 bssut.store();
-		}
+		//}
 		
-		if (bsut == null) {
+		//if (bsut == null) {
 			bsut = new Book(bssut, new Date(1234567890), new Date(1234567890));
 			bsut.setNumber((short)12);
 			bsut.store();
 			assertTrue(bsut.getPropertiesColumnFamily().isActivated());
-		}
+		//}
 	}
 	
 	public void deleteBookstore() throws DatabaseNotReachedException {
@@ -96,7 +108,6 @@ public class BasicTest {
 		 BookStore p = new BookStore("testbookstore");
 		 p.activate();
 		 assertNull(p.getName());
-		 deleteBookstore();
 	 }
 	
 	 @Test public void bookStoreDeletion() throws DatabaseNotReachedException {
@@ -143,10 +154,7 @@ public class BasicTest {
 		 assertNull(p.getName());
 	 }
 	
-	 @Ignore //Regularly (though only occasionally) fails...
 	 @Test public void bookStoreDeletionAndthenAccess() throws DatabaseNotReachedException {
-		 deleteBookstore();
-		 this.storeSUTs();
 		 BookStore p = new BookStore("testbookstore");
 		 Book v = new Book(p, new Date(1234567890), new Date(1234567890));
 		 v.activate();
@@ -174,6 +182,21 @@ public class BasicTest {
 		 assertTrue(storeBooks.contains(b3));
 		 
 		 checkOrder(storeBooks);
+	 }
+	 
+	 @Test public void checkNpeIncrementsBook() throws IOException, ClassNotFoundException  {
+		 Book b2 = new Book(bssut, new Date(12121212), new Date());
+		 b2.store();
+		 
+		 ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		 ObjectOutputStream oos = new ObjectOutputStream(baos);
+		 
+		 oos.writeObject(b2);
+		 
+		 ObjectInputStream bais = new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray()));
+		 @SuppressWarnings("unchecked")
+		 Book usBook = (Book) bais.readObject();
+		 usBook.store();
 	 }
 
 	public void checkOrder(Set<? extends PersistingElement> elements) {
@@ -444,47 +467,6 @@ public class BasicTest {
 		assertFalse(sut2.existsInStore()); //Triggers a database query
 		assertFalse(sut2.exists());
 	}
-	
-	public static class InrementNovel implements Process<Novel> {
-		private static final long serialVersionUID = 4763391618006514705L;
-		
-		private final int inc;
-		
-		public InrementNovel() {
-			inc = 1;
-		}
-
-		public InrementNovel(int inc) {
-			super();
-			this.inc = inc;
-		}
-
-		@Override
-		public void process(Novel element) {
-			//element.activate();
-			element.attribute+=inc;
-			element.store();
-		}
-	};
-	 
-	 @Test public void process() throws DatabaseNotReachedException {
-		 Novel n1 = new Novel(bssut, new Date(123456799), new Date(0));
-		 n1.attribute = 1;
-		 n1.store();
-		 Novel n2 = new Novel(bssut, new Date(123456799), new Date(1));
-		 n2.attribute = 2;
-		 n2.store();
-		 
-		 try {
-			 StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new InrementNovel());		 
-
-			 assertEquals(2, n1.attribute);
-			 assertEquals(3, n2.attribute);
-		 } finally {
-			 n1.delete();
-			 n2.delete();
-		 }
-	 }
 	 
 	 @Test(timeout=20000) public void processAsync() throws DatabaseNotReachedException, InterruptedException, InstantiationException, IllegalAccessException {
 		 Novel n1 = new Novel(bssut, new Date(123456799), new Date(0));
@@ -496,7 +478,7 @@ public class BasicTest {
 		 
 		 try {
 			WaitingCallBack cb = new WaitingCallBack();
-			StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().andActivate().remoteForEach(new InrementNovel(2), cb);
+			StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().andActivate().remoteForEach(new InrementNovel(2), cb, 2, 20000);
 			synchronized(cb) {
 				cb.waitProcessCompleted();
 			}

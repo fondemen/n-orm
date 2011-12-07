@@ -1,5 +1,7 @@
 package com.googlecode.n_orm.hbase;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Properties;
 
 import org.apache.hadoop.hbase.HBaseTestingUtility;
@@ -14,12 +16,21 @@ import com.googlecode.n_orm.hbase.Store;
 public class HBaseLauncher extends StoreTestLauncher {
 	private static Properties hbaseProperties = null;
 
-	public static String hbaseHost = "localhost";
+	public static String hbaseHost;
 	public static Integer hbasePort = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
 	public static Integer hbaseMaxRetries = 3;
 
 	public static HBaseTestingUtility hBaseServer = null;
 	public static com.googlecode.n_orm.hbase.Store hbaseStore;
+	
+	static {
+		try {
+			hbaseHost = InetAddress.getLocalHost().getHostName();
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+			hbaseHost = "localhost";
+		}
+	}
 
 	public static Properties prepareHBase() {
 		Properties p = new Properties();

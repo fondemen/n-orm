@@ -12,7 +12,6 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper.Context;
 
 import com.googlecode.n_orm.hbase.Store;
 
@@ -53,14 +52,12 @@ public class Truncator {
 			String tableName, Scan scan) throws IOException {
 		Configuration conf = LocalFormat.prepareConf(s, null);
 		Job job = new Job(conf, NAME + "_" + tableName + "_" + scan.hashCode());
-		scan.setCaching(500);
-		scan.setCacheBlocks(false);
 		TableMapReduceUtil.initTableMapperJob(tableName, scan,
 				TruncatorMapper.class, ImmutableBytesWritable.class,
-				Delete.class, job, true);
+				Delete.class, job, false);
 	    job.setOutputKeyClass(ImmutableBytesWritable.class);
 	    job.setOutputValueClass(Delete.class);
-	    LocalFormat.prepareJob(job);
+	    LocalFormat.prepareJob(job, scan, s);
 		job.setNumReduceTasks(0);
 		return job;
 	}

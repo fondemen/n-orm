@@ -14,5 +14,5 @@ import com.googlecode.n_orm.storeapi.Row;
  * @param <Input> The kind of elements to be processed. Should be a {@link PersistingElement} to be used in a search, or a {@link Row} to be used with {@link ActionnableStore}
  */
 public interface Process<Input> extends Serializable {
-	void process(Input element);
+	void process(Input element) throws Throwable;
 }

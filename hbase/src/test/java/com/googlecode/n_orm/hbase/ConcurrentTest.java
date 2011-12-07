@@ -9,6 +9,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -25,10 +26,51 @@ import org.junit.Test;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.hbase.HBaseLauncher;
 import com.googlecode.n_orm.hbase.Store;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 
 
 public class ConcurrentTest {
+	private static class PutElement implements Runnable {
+		private final int[] done;
+		private final Store store;
+		private Throwable error;
+		private volatile boolean go = false;
+
+		private PutElement(int[] done, Store store) {
+			this.done = done;
+			this.store = store;
+		}
+		
+		public void go() {
+			go = true;
+		}
+
+		@Override
+		public void run() {
+			while (!go)
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e1) {
+				}
+			try {
+				Map<String, Map<String, byte[]>> ch = new TreeMap<String, Map<String,byte[]>>();
+				Map<String, byte[]> cf = new TreeMap<String, byte[]>();
+				cf.put("qual", new byte [] {1, 2, 3, 4});
+				ch.put("cf", cf );
+				this.store.storeChanges("t1", "idt1", ch , null, null);
+			} catch (Throwable e) {
+				this.error = e;
+			} finally {
+				done[0]--;
+			}
+		}
+		
+		public Throwable getError() {
+			return this.error;
+		}
+	}
+
 	private static Store store1, store2;
 
 	@BeforeClass
@@ -79,6 +121,86 @@ public class ConcurrentTest {
 		
 		store1.storeChanges("t1", "idt1", null, null, null);
 		assertTrue(store2.exists("t1", "idt1"));
+		assertTrue(store1.exists("t1", "idt1"));
+	}
+	
+	@Test(timeout=60000)
+	public void creatingNewTableFrom2Threads() throws Throwable {
+		final int [] done = new int[] {2};
+		this.deleteTable("t1");
+		PutElement r = new PutElement(done, store1);
+		Thread t1 = new Thread(r, "Put 1");
+		Thread t2 = new Thread(r, "Put 2");
+		t1.start();t2.start();
+		r.go();
+		while (done[0] != 0) {
+			Thread.sleep(10);
+		}
+		
+		if (r.getError() != null)
+			throw r.getError();
+		assertTrue(store1.exists("t1", "idt1"));
+	}
+	
+	@Test(timeout=60000)
+	public void creatingNewTableFrom2Stores() throws Throwable {
+		final int [] done = new int[] {2};
+		this.deleteTable("t1");
+		PutElement r1 = new PutElement(done, store1); r1.go();
+		PutElement r2 = new PutElement(done, store2); r2.go();
+		Thread t1 =new Thread(r1, "Put from store1");
+		Thread t2 =new Thread(r2, "Put from store2");
+		t1.start();t2.start();
+		while (done[0] != 0) {
+			Thread.sleep(10);
+		}
+
+		if (r1.getError() != null)
+			throw r1.getError();
+		if (r2.getError() != null)
+			throw r2.getError();
+		assertTrue(store1.exists("t1", "idt1"));
+	}
+	
+	@Test(timeout=60000)
+	public void creatingNewCFFrom2Threads() throws Throwable {
+		final int [] done = new int[] {2};
+		this.deleteTable("t1");
+		store1.storeChanges("t1", "idt1", null , null, null); //Creates T1 table with prop
+		PutElement r = new PutElement(done, store1);
+		Thread t1 = new Thread(r, "Put 1");
+		Thread t2 = new Thread(r, "Put 2");
+		t1.start();t2.start();
+		r.go();
+		while (done[0] != 0) {
+			Thread.sleep(10);
+		}
+
+		if (r.getError() != null)
+			throw r.getError();
+		assertTrue(store1.exists("t1", "idt1", "cf"));
+	}
+	
+	@Test(timeout=60000)
+	public void creatingNewCFFrom2Stores() throws Throwable {
+		final int [] done = new int[] {2};
+		this.deleteTable("t1");
+		store1.storeChanges("t1", "idt1", null , null, null); //Creates T1 table with prop
+		store2.storeChanges("t1", "idt1", null , null, null); //Creates T1 table with prop
+		PutElement r1 = new PutElement(done, store1);
+		PutElement r2 = new PutElement(done, store2);
+		Thread t1 =new Thread(r1, "Put from store1");
+		Thread t2 =new Thread(r2, "Put from store2");
+		t1.start();t2.start();
+		r1.go(); r2.go();
+		while (done[0] != 0) {
+			Thread.sleep(10);
+		}
+
+		if (r1.getError() != null)
+			throw r1.getError();
+		if (r2.getError() != null)
+			throw r2.getError();
 		assertTrue(store1.exists("t1", "idt1"));
 	}
 	
@@ -146,6 +268,42 @@ public class ConcurrentTest {
 		assertFalse(store1.exists("t1", "idt1", "cf1"));
 		
 		store1.restart();
+	}
+	
+	@Test(expected=Test.None.class)
+	public void acceptingTableDisableWhileScanning() throws IOException, SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+		this.truncateTable("t1");
+		store1.setScanCaching(1);
+		
+		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
+		change1.put("cf1", ch1);
+		ch1.put("k1", new byte[]{1, 2});
+		store1.storeChanges("t1", "idt1", change1 , null, null);
+		store1.storeChanges("t1", "idt2", change1 , null, null);
+		assertTrue(store1.exists("t1", "idt1", "cf1"));
+		assertTrue(store1.exists("t1", "idt2", "cf1"));
+
+		CloseableKeyIterator it = store1.get("t1", (Constraint)null, 100, change1.keySet());
+		
+		try {
+		
+			store1.getAdmin().disableTable("t1");
+			
+			assertTrue(it.hasNext());
+			assertEquals("idt1", it.next().getKey());
+			
+			assertTrue(it.hasNext());
+			store1.getAdmin().disableTable("t1");
+			assertEquals("idt2", it.next().getKey());
+	
+			store1.getAdmin().disableTable("t1");
+			
+			assertFalse(it.hasNext());
+		
+		} finally {
+			it.close();
+		}
 	}
 	
 	@Test
