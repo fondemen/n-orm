@@ -111,8 +111,11 @@ public class Shell
 				
 				isFirstCommand = isFirstCommand && false;
 			}
-			catch (IOException e)
-			{}
+			catch (Exception e)
+			{
+				println("n-orm: " + e.getMessage() + ": command error");
+				mustStop = true;
+			}
 		}
 	}
 }

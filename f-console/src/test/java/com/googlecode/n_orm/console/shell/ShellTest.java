@@ -96,4 +96,18 @@ public class ShellTest
 		sut.launch();
 		assertFalse(sut.isStarted());
 	}
+	
+	@Test
+	public void launchWithErrorTest() throws IOException
+	{
+		sut.setInput(null);
+		sut.setOutput(out);
+
+		String errorMessage = "n-orm: " + "null" + ": command error";
+		out.print(errorMessage + System.getProperty("line.separator"));
+		replay(out);
+		sut.launch();
+		verify(out);
+		reset(out);
+	}
 }
