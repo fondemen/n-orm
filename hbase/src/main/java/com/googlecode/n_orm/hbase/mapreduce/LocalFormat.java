@@ -5,13 +5,23 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Properties;
 
+import org.apache.commons.beanutils.BeanUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.HTablePool;
+import org.apache.hadoop.hbase.client.Increment;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.mapreduce.TableInputFormat;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
+import org.aspectj.lang.Aspects;
+import org.codehaus.jackson.map.JsonMappingException;
 
+import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.hbase.Store;
 
 public class LocalFormat {
@@ -26,16 +36,27 @@ public class LocalFormat {
 		conf.set(LocalFormat.STORE_REF, sp);
 		if (outputWriterClass != null)
 			conf.set(LocalOutputFormat.OUTPUTWRITER_CLASS, outputWriterClass.getName());
+		//Disabling speculative execution
+	    conf.setBoolean("mapred.map.tasks.speculative.execution", false);
+	    conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
 		return conf;
 	}
 	
-	public static void prepareJob(Job job) {
-		job.setJarByClass(Store.class);
+	public static void prepareJob(Job job, Scan scan, Store store) throws IOException {
+		if (store.isMapRedSendHBaseJars())
+			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), org.apache.zookeeper.ZooKeeper.class, HTable.class, HBaseAdmin.class, HTablePool.class, HColumnDescriptor.class, Scan.class, Increment.class, JsonMappingException.class);
+		if (store.isMapRedSendNOrmJars())
+			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), Store.class, StorageManagement.class, Aspects.class, org.apache.log4j.Logger.class, BeanUtils.class);
+		
+		scan.setCaching(store.getMapRedScanCaching());
+		scan.setCacheBlocks(false);
+		
 		job.setInputFormatClass(LocalInputFormat.class);
 		if (job.getConfiguration().get(LocalOutputFormat.OUTPUTWRITER_CLASS) != null)
 			job.setOutputFormatClass(LocalOutputFormat.class);
 		else
 			job.setOutputFormatClass(NullOutputFormat.class);
+		TableMapReduceUtil.setScannerCaching(job, store.getMapRedScanCaching());
 	}
 
 	protected HTable table;
@@ -58,7 +79,10 @@ public class LocalFormat {
 			props = new Properties();
 			props.load(srp);
 			hstore = Store.getKnownStore(props);
-			this.conf = hstore.getConf();
+			if (hstore != null)
+				this.conf = hstore.getConf();
+			else
+				this.conf = HBaseConfiguration.create(conf);
 		} catch (Exception e1) {
 			e1.printStackTrace();
 			this.conf = HBaseConfiguration.create(conf);

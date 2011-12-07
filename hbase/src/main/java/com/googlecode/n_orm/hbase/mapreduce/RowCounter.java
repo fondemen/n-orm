@@ -39,13 +39,10 @@ public class RowCounter {
 	public static Job createSubmittableJob(Store s, String tableName,
 			Scan scan) throws IOException {
 		Job job = new Job(LocalFormat.prepareConf(s, null), NAME + "_" + tableName + "_" + scan.hashCode());
-		scan.setCaching(500);
-		scan.setCacheBlocks(false);
-		scan.setFilter(new FirstKeyOnlyFilter());
 		TableMapReduceUtil.initTableMapperJob(tableName, scan,
 				RowCounterMapper.class, ImmutableBytesWritable.class,
-				Result.class, job, true);
-		LocalFormat.prepareJob(job);
+				Result.class, job, false);
+		LocalFormat.prepareJob(job, scan, s);
 		job.setNumReduceTasks(0);
 		return job;
 	}
