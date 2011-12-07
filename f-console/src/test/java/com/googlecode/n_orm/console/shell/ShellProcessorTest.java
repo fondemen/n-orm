@@ -89,4 +89,21 @@ public class ShellProcessorTest
 		verify(shell);
 		reset(shell);
 	}
+	
+	@Test
+	public void treatLineWithErrorTest()
+	{
+		sut.setCommandList(null);
+		
+		String groovyCommand = "groovy";
+		String errorMessage = "n-orm: " + "null" + ": command error";
+		
+		shell.print(errorMessage);
+		replay(shell);
+		this.sut.treatLine(groovyCommand);
+		verify(shell);
+		reset(shell);
+		
+		sut.setCommandList(commandList);
+	}
 }
