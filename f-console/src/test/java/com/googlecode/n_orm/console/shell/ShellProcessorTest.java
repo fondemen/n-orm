@@ -5,9 +5,14 @@ import static org.junit.Assert.*;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import org.junit.Before;
 import org.junit.Test;
+import org.w3c.dom.ls.LSInput;
+
 import com.googlecode.n_orm.console.commands.CommandList;
 import com.googlecode.n_orm.console.shell.Shell;
 import com.googlecode.n_orm.console.shell.ShellProcessor;
@@ -16,7 +21,7 @@ public class ShellProcessorTest
 {
 	private ShellProcessor sut;
 	private Shell shell = createMock(Shell.class);
-	private CommandList commandList = createMockBuilder(CommandList.class).withConstructor(Shell.class).withArgs(shell).createMock();
+	private CommandList mapCommands = createMockBuilder(CommandList.class).withConstructor(Shell.class).withArgs(shell).createMock();
 	
 	@Before
 	public void createSut()
@@ -25,17 +30,19 @@ public class ShellProcessorTest
 	}
 	
 	@Test
-	public void accessorsCommandListTest()
+	public void accessorsMapCommandsTest()
 	{
 		CommandList tmp = createMock(CommandList.class);
-		sut.setCommandList(tmp);
-		assertEquals(tmp, sut.getCommandList());
+		Map<String, Object> mapCommands = new HashMap<String, Object>();
+		mapCommands.put(CommandList.class.getName(), tmp);
+		sut.setMapCommands(mapCommands);
+		assertEquals(mapCommands, sut.getMapCommands());
 	}
 	
 	@Test
 	public void getCommandsTest()
 	{
-		Method[] tmp1 = commandList.getClass().getDeclaredMethods();
+		Method[] tmp1 = mapCommands.getClass().getDeclaredMethods();
 		List<String> tmp2 = sut.getCommands();
 		List<String> tmp3 = new ArrayList<String>();
 		for (int i = 0; i < tmp1.length; i++)
@@ -49,11 +56,11 @@ public class ShellProcessorTest
 	{
 		String tmp = "newPrompt";
 		
-		commandList.changePrompt(tmp);
-		replay(commandList);
+		mapCommands.changePrompt(tmp);
+		replay(mapCommands);
 		this.sut.treatLine("changePrompt " + tmp);
-		verify(commandList);
-		reset(commandList);
+		verify(mapCommands);
+		reset(mapCommands);
 	}
 	
 	@Test
@@ -93,7 +100,7 @@ public class ShellProcessorTest
 	@Test
 	public void treatLineWithErrorTest()
 	{
-		sut.setCommandList(null);
+		sut.setMapCommands(null);
 		
 		String groovyCommand = "groovy";
 		String errorMessage = "n-orm: " + "null" + ": command error";
@@ -104,6 +111,8 @@ public class ShellProcessorTest
 		verify(shell);
 		reset(shell);
 		
-		sut.setCommandList(commandList);
+		Map<String, Object> tmp = new HashMap<String, Object>();
+		tmp.put(CommandList.class.getName(), this.mapCommands);
+		sut.setMapCommands(tmp);
 	}
 }
