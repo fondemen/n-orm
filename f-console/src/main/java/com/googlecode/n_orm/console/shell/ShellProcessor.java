@@ -15,20 +15,24 @@ public class ShellProcessor
 {
 	private Shell shell;
 	private String escapeCommand;
-	private CommandList commandList;
+	private Map<String, Object> mapCommands;
 	private Map<String, Method> processorCommands;
 	
 	public ShellProcessor(Shell shell)
 	{
 		this.shell = shell;
 		this.escapeCommand = "exit";
-		this.commandList = new CommandList(shell);
+		this.mapCommands = new HashMap<String, Object>();
+		this.mapCommands.put(CommandList.class.getName(), new CommandList(shell));
 		
 		processorCommands = new HashMap<String, Method>();
-		for (Method m : commandList.getClass().getDeclaredMethods())
+		for (Object o : mapCommands.values())
 		{
-			if (m.getAnnotation(Trigger.class) != null)
-				processorCommands.put(m.getName(), m);
+			for (Method m : o.getClass().getDeclaredMethods())
+			{
+				if (m.getAnnotation(Trigger.class) != null)
+					processorCommands.put(m.getName(), m);
+			}
 		}
 	}
 	
@@ -37,14 +41,14 @@ public class ShellProcessor
 		return this.escapeCommand;
 	}
 	
-	public CommandList getCommandList()
+	public Map<String, Object> getMapCommands()
 	{
-		return commandList;
+		return mapCommands;
 	}
 
-	public void setCommandList(CommandList commandList)
+	public void setMapCommands(Map<String, Object> mapCommands)
 	{
-		this.commandList = commandList;
+		this.mapCommands = mapCommands;
 	}
 	
 	public List<String> getCommands()
@@ -108,7 +112,7 @@ public class ShellProcessor
 							currentTokenIndex += parameterTypes.length;
 						}
 					}
-					m.invoke(commandList, params);
+					m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
 				}
 				catch (Exception e)
 				{
