@@ -6,6 +6,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.util.HashMap;
+import java.util.Map;
+
 import jline.ConsoleReader;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,6 +46,23 @@ public class ShellTest
 		ConsoleReader tmp = createMock(ConsoleReader.class);
 		sut.setInput(tmp);
 		assertEquals(tmp, sut.getInput());
+	}
+	
+	@Test
+	public void accessorsShellProcessorTest()
+	{
+		ShellProcessor tmp = createMock(ShellProcessor.class);
+		sut.setShellProcessor(tmp);
+		assertEquals(tmp, sut.getShellProcessor());
+	}
+	
+	@Test
+	public void accessorsMapCommandsTest()
+	{
+		Map<String, Object> tmp = new HashMap<String, Object>();
+		tmp.put("test", new Object());
+		sut.setMapCommands(tmp);
+		assertEquals(tmp, sut.getMapCommands());
 	}
 	
 	@Test
@@ -109,5 +129,15 @@ public class ShellTest
 		sut.launch();
 		verify(out);
 		reset(out);
+	}
+	
+	@Test
+	public void accessorsMapCommandsWithNullShellProcessorTest()
+	{
+		sut.setShellProcessor(null);
+		Map<String, Object> tmp = new HashMap<String, Object>();
+		tmp.put("test", new Object());
+		sut.setMapCommands(tmp);
+		assertEquals(null, sut.getMapCommands());
 	}
 }

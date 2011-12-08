@@ -2,6 +2,8 @@ package com.googlecode.n_orm.console.shell;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Map;
+
 import jline.Completor;
 import jline.ConsoleReader;
 import jline.MultiCompletor;
@@ -88,6 +90,30 @@ public class Shell
 	protected ConsoleReader getInput()
 	{
 		return this.in;
+	}
+	
+	protected ShellProcessor getShellProcessor()
+	{
+		return shellProcessor;
+	}
+
+	protected void setShellProcessor(ShellProcessor shellProcessor)
+	{
+		this.shellProcessor = shellProcessor;
+	}
+
+	public Map<String, Object> getMapCommands()
+	{
+		if (this.shellProcessor != null)
+			return this.shellProcessor.getMapCommands();
+		else
+			return null;
+	}
+
+	public void setMapCommands(Map<String, Object> mapCommands)
+	{
+		if (this.shellProcessor != null)
+			this.shellProcessor.setMapCommands(mapCommands);	
 	}
 	
 	public void launch()
