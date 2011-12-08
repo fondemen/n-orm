@@ -25,6 +25,11 @@ public class ShellProcessor
 		this.mapCommands = new HashMap<String, Object>();
 		this.mapCommands.put(CommandList.class.getName(), new CommandList(shell));
 		
+		this.updateProcessorCommands();
+	}
+	
+	public void updateProcessorCommands()
+	{
 		processorCommands = new HashMap<String, Method>();
 		for (Object o : mapCommands.values())
 		{
@@ -35,7 +40,7 @@ public class ShellProcessor
 			}
 		}
 	}
-	
+
 	public String getEscapeCommand()
 	{
 		return this.escapeCommand;
@@ -112,7 +117,8 @@ public class ShellProcessor
 							currentTokenIndex += parameterTypes.length;
 						}
 					}
-					m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
+					Object result = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
+					shell.println("method invoke: " + result);
 				}
 				catch (Exception e)
 				{

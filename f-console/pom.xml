@@ -10,6 +10,7 @@
 	<artifactId>f_console</artifactId>
 	<name>n-orm console</name>
 	<version>${project.parent.version}</version>
+<!-- 	<version>50.0.1</version> -->
 	<packaging>jar</packaging>
 
 	<description>n-orm is neither an object-database mapping, nor it addresses specifically relational databases. Its name was chosen as a reference to the No-SQL movement. 
@@ -22,6 +23,34 @@ Different data stores are possible, especially column-oriented data stores such 
 		<developerConnection>scm:hg:https://n-orm.googlecode.com/hg/</developerConnection>
 		<url>http://n-orm.googlecode.com/hg/</url>
 	</scm>
+	
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>2.2.1</version>
+				<configuration>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+					<archive>
+						<manifest>
+							<mainClass>com.googlecode.n_orm.console.Launcher</mainClass>
+						</manifest>
+					</archive>
+				</configuration>
+				<executions>
+		          <execution>
+		            <id>make-assembly</id> <!-- this is used for inheritance merges -->
+		            <phase>package</phase> <!-- bind to the packaging phase -->
+		            <goals>
+		              <goal>single</goal>
+		            </goals>
+		          </execution>
+		        </executions>
+			</plugin>
+		</plugins>
+	</build>
 	
 	<repositories>
 		<repository>
@@ -60,6 +89,13 @@ Different data stores are possible, especially column-oriented data stores such 
 			<groupId>commons-beanutils</groupId>
 			<artifactId>commons-beanutils</artifactId>
 			<version>1.8.3</version>
+		</dependency>
+		<dependency>
+			<groupId>com.googlecode.n_orm</groupId>
+			<artifactId>storage</artifactId>
+			<version>${project.parent.version}</version>
+			<type>jar</type>
+			<scope>compile</scope>
 		</dependency>
 	</dependencies>
 </project>

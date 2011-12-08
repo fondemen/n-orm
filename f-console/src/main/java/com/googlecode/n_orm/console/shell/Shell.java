@@ -2,6 +2,9 @@ package com.googlecode.n_orm.console.shell;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import jline.Completor;
@@ -26,14 +29,28 @@ public class Shell
 		this.shellProcessor = new ShellProcessor(this);
 		this.prompt = "n-orm$ ";
 		
+		this.updateProcessorCommands();
+	}
+	
+	@SuppressWarnings("unchecked")
+	public void updateProcessorCommands()
+	{
+		this.shellProcessor.updateProcessorCommands();
+		
 		SimpleCompletor simpleCompletor = new SimpleCompletor(this.shellProcessor.getCommands().toArray(EMPTY_STRING_ARRAY));
+		
 //		ArgumentCompletor argCompletor = new ArgumentCompletor(
-//				new SimpleCompletor[] {
-//						new SimpleCompletor(new String[] {"test"}),
-//						new SimpleCompletor(new String[] {"test1", "test2"})
-//						});
+//		new SimpleCompletor[] {
+//				new SimpleCompletor(new String[] {"test"}),
+//				new SimpleCompletor(new String[] {"test1", "test2"})
+//				});
 		
 		MultiCompletor multiCompletor = new MultiCompletor(new Completor[] {/*argCompletor, */simpleCompletor});
+		Completor[] listCompletor;
+		listCompletor = (Completor[]) this.in.getCompletors().toArray(new Completor[0]);
+		for (int i = 0; i < listCompletor.length; i++)
+			if (this.in.removeCompletor(listCompletor[i]))
+				i--;
 		this.in.addCompletor(multiCompletor);
 	}
 	
