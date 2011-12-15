@@ -216,6 +216,17 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #getCachedVersion()
 	 */
 	void activateIfNotAlready(String... families) throws DatabaseNotReachedException;
+
+	/**
+	 * Retrieves information that have not been activated yet from the store and put it into this persisting element.
+	 * Column families (the set of simple properties is considered as a column family) that have already been activated by whatever mean (e.g. {@link #activateColumnFamily(String, Object, Object)}) will not be activated.
+	 * This means that if a constraint were passed at a previous activation time, it will be preserved.
+	 * @param families names of the families to activate even if they are not annotated with {@link ImplicitActivation} (see {@link #getColumnFamily(String)})
+	 * @param lastActivationTimeoutMs the maximum duration (in ms) at which last actual activation was performed. E.g. if last activation happened at 12:00 and method is called at 12:10 while this parameter is set to 3600000 (1 min), activation will happen anyway ; if parameter is set to 40000000, activation will not be performed
+	 * @throws IllegalArgumentException in case a given column family does not exists
+	 * @see #getCachedVersion()
+	 */
+	void activateIfNotAlready(long lastActivationTimeoutMs, String... families) throws DatabaseNotReachedException;
 	
 	/**
 	 * Activates a given column family (does not activate included persisting elements).
@@ -251,6 +262,18 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	/**
 	 * Activates a given column family (does not activate included persisting elements) in case it was not done before (with any possible activation method).
 	 * The column family won't be loaded if a previous activation was done, even if a constraint was given by {@link #activateColumnFamily(String, Object, Object)} or {@link #activateColumnFamilyIfNotAlready(String, Object, Object)}.
+	 * @param lastActivationTimeoutMs the maximum duration (in ms) at which last actual activation was performed. E.g. if last activation happened at 12:00 and method is called at 12:10 while this parameter is set to 3600000 (1 min), activation will happen anyway ; if parameter is set to 40000000, activation will not be performed
+	 * @param name name of the column family
+	 * @throws UnknownColumnFamily in case this column family does not exist
+	 * @throws DatabaseNotReachedException
+	 * @see #getColumnFamily(String)
+	 * @see #getCachedVersion()
+	 */
+	void activateColumnFamilyIfNotAlready(String name, long lastActivationTimeoutMs) throws UnknownColumnFamily, DatabaseNotReachedException;
+	
+	/**
+	 * Activates a given column family (does not activate included persisting elements) in case it was not done before (with any possible activation method).
+	 * The column family won't be loaded if a previous activation was done, even if a constraint was given by {@link #activateColumnFamily(String, Object, Object)} or {@link #activateColumnFamilyIfNotAlready(String, Object, Object)}.
 	 * @param name name of the column family
 	 * @param from the minimal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
 	 * @param to the maximal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
@@ -259,7 +282,21 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #getColumnFamily(String)
 	 * @see #getCachedVersion()
 	 */
-	void activateColumnFamilyIfNotAlready(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
+	void activateColumnFamilyIfNotAlready(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;	
+	
+	/**
+	 * Activates a given column family (does not activate included persisting elements) in case it was not done before (with any possible activation method).
+	 * The column family won't be loaded if a previous activation was done, even if a constraint was given by {@link #activateColumnFamily(String, Object, Object)} or {@link #activateColumnFamilyIfNotAlready(String, Object, Object)}.
+	 * @param lastActivationTimeoutMs the maximum duration (in ms) at which last actual activation was performed. E.g. if last activation happened at 12:00 and method is called at 12:10 while this parameter is set to 3600000 (1 min), activation will happen anyway ; if parameter is set to 40000000, activation will not be performed
+	 * @param name name of the column family
+	 * @param from the minimal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
+	 * @param to the maximal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
+	 * @throws UnknownColumnFamily in case this column family does not exist
+	 * @throws DatabaseNotReachedException
+	 * @see #getColumnFamily(String)
+	 * @see #getCachedVersion()
+	 */
+	void activateColumnFamilyIfNotAlready(String name, long lastActivationTimeoutMs, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
 	/**
 	 * To be equal, two persisting elements must implement the same class and have the same identifier, no matter they have same values for properties and column families.
