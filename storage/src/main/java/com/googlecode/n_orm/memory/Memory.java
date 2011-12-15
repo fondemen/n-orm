@@ -107,13 +107,13 @@ public class Memory implements Store {
 		}
 		
 		public final T put(String key, T value) {
-			generalLock.writeLock().lock();
+			generalLock.readLock().lock();
 			ReentrantReadWriteLock lock = this.getLock(key);
 			lock.writeLock().lock();
 			try {
 				return map.put(key, value);
 			} finally {
-				generalLock.writeLock().unlock();
+				generalLock.readLock().unlock();
 				lock.writeLock().unlock();
 			}
 		}
@@ -124,13 +124,13 @@ public class Memory implements Store {
 					return null;
 				}
 			}
-			generalLock.writeLock().lock();
 			ReentrantReadWriteLock lock = this.getLock(key);
 			lock.writeLock().lock();
+			generalLock.readLock().lock();
 			try {
 				return map.remove(key);
 			} finally {
-				generalLock.writeLock().unlock();
+				generalLock.readLock().unlock();
 				lock.writeLock().unlock();
 				synchronized(locks) {
 					locks.remove(key);
@@ -139,11 +139,11 @@ public class Memory implements Store {
 		}
 		
 		public final Set<String> getKeys() {
-			generalLock.readLock().lock();
+			generalLock.writeLock().lock();
 			try {
 				return new TreeSet<String>(map.keySet());
 			} finally {
-				generalLock.readLock().unlock();
+				generalLock.writeLock().unlock();
 			}
 		}
 		
@@ -195,7 +195,7 @@ public class Memory implements Store {
 
 				public synchronized void incr(String key, Number increment) {
 					assert increment.longValue() != 0 : "Received a 0 increment for table" + Table.this.name + ", row " + Row.this.key + ", family " + this.name + ", qualifier " + key; 
-					generalLock.writeLock().lock();
+					generalLock.readLock().lock();
 					ReentrantReadWriteLock lock = this.getLock(key);
 					lock.writeLock().lock();
 					try {
@@ -225,7 +225,7 @@ public class Memory implements Store {
 						}
 						this.map.put(key, val);
 					} finally {
-						generalLock.writeLock().unlock();
+						generalLock.readLock().unlock();
 						lock.writeLock().unlock();
 					}
 				}
