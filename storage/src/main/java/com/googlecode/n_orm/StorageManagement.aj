@@ -232,18 +232,34 @@ public aspect StorageManagement {
 			cf.activate();
 	}
 	
+	public void PersistingElement.activateColumnFamilyIfNotAlready(String name, long timeout) throws DatabaseNotReachedException {
+		ColumnFamily<?> cf = this.getColumnFamily(name);
+		if (!cf.isActivated(timeout))
+			cf.activate();
+	}
+	
 	public void PersistingElement.activateColumnFamilyIfNotAlready(String name, Object fromObject, Object toObject) throws DatabaseNotReachedException {
 		ColumnFamily<?> cf = this.getColumnFamily(name);
 		if (!cf.isActivated())
 			cf.activate(fromObject, toObject);
 	}
 	
+	public void PersistingElement.activateColumnFamilyIfNotAlready(String name, long timeout, Object fromObject, Object toObject) throws DatabaseNotReachedException {
+		ColumnFamily<?> cf = this.getColumnFamily(name);
+		if (!cf.isActivated(timeout))
+			cf.activate(fromObject, toObject);
+	}
+	
 	public void PersistingElement.activateIfNotAlready(String... families) throws DatabaseNotReachedException {
-		this.activate(false, families);
+		this.activate(Long.MAX_VALUE, families);
+	}
+	
+	public void PersistingElement.activateIfNotAlready(long timeout, String... families) throws DatabaseNotReachedException {
+		this.activate(timeout, families);
 	}
 	
 	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
-		this.activate(true, families);
+		this.activate(-1, families);
 	}
 	
 	public void PersistingElement.activate(Object... families) throws DatabaseNotReachedException {
@@ -257,10 +273,10 @@ public aspect StorageManagement {
 		this.activate(fams);
 	}
 
-	private void PersistingElement.activate(boolean force, String... families) throws DatabaseNotReachedException {
+	private void PersistingElement.activate(long timeout, String... families) throws DatabaseNotReachedException {
 		this.checkIsValid();
 		
-		Set<String> toBeActivated = getActualFamiliesToBeActivated(force, families);
+		Set<String> toBeActivated = getActualFamiliesToBeActivated(timeout, families);
 		
 		if (! toBeActivated.isEmpty()) {
 			Map<String, Map<String, byte[]>> rawData = this.getStore().get(this, this.getTable(), this.getIdentifier(), toBeActivated);
@@ -305,13 +321,13 @@ public aspect StorageManagement {
 		return element;
 	}
 
-	private Set<String> PersistingElement.getActualFamiliesToBeActivated(boolean force, String... families) {
+	private Set<String> PersistingElement.getActualFamiliesToBeActivated(long timeout, String... families) {
 		Set<String> toBeActivated = StorageManagement.getAutoActivatedFamilies(this.getClass(), families);
 
-		if (!force) {
+		if (timeout > 0) {
 			for (String family : new TreeSet<String>(toBeActivated)) {
 				ColumnFamily<?> cf = this.getColumnFamily(family);
-				if (cf.isActivated())
+				if (cf.isActivated(timeout))
 					toBeActivated.remove(family);
 			}
 		}
