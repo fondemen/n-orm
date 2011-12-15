@@ -4,35 +4,27 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintStream;
-import java.lang.reflect.Field;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.net.ConnectException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.logging.Handler;
+import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
-import java.util.logging.StreamHandler;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
@@ -40,6 +32,7 @@ import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.TableExistsException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownScannerException;
+import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -64,23 +57,16 @@ import org.apache.hadoop.hbase.io.hfile.Compression;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.zookeeper.ZKConfig;
-import org.apache.hadoop.io.SetFile;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.ZooKeeper.States;
 import org.apache.zookeeper.recipes.lock.SharedExclusiveLock;
 import org.codehaus.plexus.util.DirectoryScanner;
 
 import com.googlecode.n_orm.Callback;
-import com.googlecode.n_orm.ColumnFamiliyManagement;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.EmptyCloseableIterator;
-import com.googlecode.n_orm.Incrementing;
-import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.PropertyManagement;
@@ -94,18 +80,12 @@ import com.googlecode.n_orm.hbase.actions.DeleteAction;
 import com.googlecode.n_orm.hbase.actions.ExistsAction;
 import com.googlecode.n_orm.hbase.actions.GetAction;
 import com.googlecode.n_orm.hbase.actions.IncrementAction;
-import com.googlecode.n_orm.hbase.actions.PutAction;
 import com.googlecode.n_orm.hbase.actions.ScanAction;
 import com.googlecode.n_orm.hbase.actions.TruncateAction;
 import com.googlecode.n_orm.hbase.mapreduce.ActionJob;
-import com.googlecode.n_orm.hbase.mapreduce.LocalFormat;
-import com.googlecode.n_orm.hbase.mapreduce.RowCounter;
-import com.googlecode.n_orm.hbase.mapreduce.Truncator;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
-import com.googlecode.n_orm.storeapi.Row;
-import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
 
 /**
  * The HBase store found according to its configuration folder.
@@ -305,7 +285,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	private volatile boolean restarting = false;
 	private final Object restartMutex = new Object();
 	private Configuration config;
-	private HBaseAdmin admin;
+	private HBaseAdmin admin = null;
 	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
 	public HTablePool tablesC;
 	
@@ -349,28 +329,28 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			this.config = properties;
 		}
 
-		if (this.admin == null)
+		HBaseAdmin admin;
 			try {
 				logger.fine("Connecting HBase admin for store " + this.hashCode());
-				this.setAdmin(new HBaseAdmin(this.config));
+				admin = createAdmin();
 				logger.fine("Connected HBase admin for store " + this.hashCode());
-				if (!this.admin.isMasterRunning()) {
+				if (!admin.isMasterRunning()) {
 					errorLogger.severe("No HBase master running for store " + this.hashCode());
 					throw new DatabaseNotReachedException(new MasterNotRunningException());
 				}
 			} catch (Exception e) {
-				errorLogger.severe("Could not cpnnect HBase for store " + this.hashCode() + " (" +e.getMessage() +')');
+				errorLogger.severe("Could not connect HBase for store " + this.hashCode() + " (" +e.getMessage() +')');
 				throw new DatabaseNotReachedException(e);
 			}
 		
 		this.tablesC = new HTablePool(this.getConf(), Integer.MAX_VALUE);
 		
-		//Wait fo Zookeeper availability
+		//Wait for Zookeeper availability
 		int maxRetries = 100;
 		ZooKeeper zk = null;
 		do {
 			try {
-				zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+				zk = admin.getConnection().getZooKeeperWatcher().getZooKeeper();
 			} catch (Exception x) {
 				try {
 					Thread.sleep(50);
@@ -383,7 +363,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 		
 		try {
-			String[] host = this.admin.getConnection().getZooKeeperWatcher().getQuorum().split(",")[0].split(":");
+			String[] host = admin.getConnection().getZooKeeperWatcher().getQuorum().split(",")[0].split(":");
 			this.host = host[0].trim();
 			if (host.length > 1)
 				this.port = Integer.parseInt(host[1].trim());
@@ -396,6 +376,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		logger.info("Started store " + this.hashCode());
 
 		this.wasStarted = true;
+	}
+
+	protected HBaseAdmin createAdmin() throws MasterNotRunningException,
+			ZooKeeperConnectionException {
+		return this.admin != null ? this.admin : new HBaseAdmin(this.config);
 	}
 
 	/**
@@ -520,7 +505,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	/**
 	 * Whether existing columns have to be altered if they don't use the correct compressor.
 	 * Default value is false.
-	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #setForceCompression(boolean)} to true and different values for {@link Store#setCompression(String)} : column families might be altered in an endless loop !
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #setForceCompression(boolean)} to true and different values for {@link #setCompression(String)} : column families might be altered in an endless loop !
 	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
 	 * see {@link #getCompression()}
 	 */
@@ -536,7 +521,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	}
 
 	/**
-	 * Whether counts (e.g. {@link Store#count(String, Constraint)}) should use a map/reduce job.
+	 * Whether counts (e.g. {@link #count(String, Constraint)}) should use a map/reduce job.
 	 * Default value is false.
 	 * Map/reduce jobs are usually hard to run, so if this method is faster in case of large data on large cluster, it should be avoided on small clusters.
 	 */
@@ -667,13 +652,49 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			this.maxRetries = null;
 	}
 	
-	public HBaseAdmin getAdmin() {
-		return this.admin;
+	/**
+	 * Last version for the admin object ; this object is re-created for each query
+	 */
+	public HBaseAdmin getAdmin() throws DatabaseNotReachedException {
+		try {
+			return this.createAdmin();
+		} catch (Throwable e) {
+			throw new DatabaseNotReachedException(e);
+		}
+	}
+	
+
+	public class LazyAdmin {
+		private HBaseAdmin admin;
+
+		public HBaseAdmin getAdmin() throws DatabaseNotReachedException {
+			if (admin == null) {
+				this.recreateAdmin();
+			}
+			return admin;
+		}
+
+		public void setAdmin(HBaseAdmin admin) {
+			this.admin = admin;
+		}
+		
+		public void recreateAdmin() {
+			admin = Store.this.getAdmin();
+		}
+	}
+	public LazyAdmin createLazyAdmin() throws DatabaseNotReachedException {
+		return new LazyAdmin();
 	}
 
+	/**
+	 * Setting the admin object to be used for each query.
+	 * Setting this to null will (re-)enable default behaviour which is creating an admin object for each query.
+	 * Should be called before the store is started (or {@link #restart()} it manually).
+	 */
 	public void setAdmin(HBaseAdmin admin) {
 		this.admin = admin;
-		this.setConf(admin.getConfiguration());
+		if (admin != null)
+			this.setConf(admin.getConfiguration());
 	}
 	
 	protected String mangleTableName(String table) {
@@ -726,7 +747,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				this.tablesD.clear();
 			}
 			this.config = HBaseConfiguration.create(this.config);
-			this.admin = null;
+			//this.admin = null;
 			this.wasStarted = false;
 			this.start();
 		} finally {
@@ -737,7 +758,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected void handleProblem(Throwable e, String table, String... expectedFamilies) throws DatabaseNotReachedException {		
+	protected void handleProblem(LazyAdmin admin, Throwable e, String table, String... expectedFamilies) throws DatabaseNotReachedException {		
 		while (e instanceof UndeclaredThrowableException)
 			e = ((UndeclaredThrowableException)e).getCause();
 		
@@ -746,7 +767,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		
 		if ((e instanceof TableNotFoundException) || e.getMessage().contains(TableNotFoundException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
-			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", e);
+			errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", e);
 			HTableDescriptor td = this.tablesD.get(table);
 			if (td != null) {
 				this.uncache(table);
@@ -754,29 +775,29 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				for (HColumnDescriptor cd : td.getColumnFamilies()) {
 					expectedFams.add(cd.getNameAsString());
 				}
-				this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
+				this.getTableDescriptor(admin, td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
 			} else
 				throw new DatabaseNotReachedException(e);
 		} else if ((e instanceof NotServingRegionException) || e.getMessage().contains(NotServingRegionException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			
 			try {
-				if (this.admin.tableExists(table) && this.admin.isTableDisabled(table)) { //First detect the error
-					errorLogger.log(Level.INFO, "It seems that table " + table + " was disabled ; enabling", e);
-					synchronized (this.sharedLockTable(table)) {
+				if (admin.getAdmin().tableExists(table) && admin.getAdmin().isTableDisabled(table)) { //First detect the error
+					errorLogger.log(Level.FINE, "It seems that table " + table + " was disabled ; enabling", e);
+					synchronized (this.sharedLockTable(admin, table)) {
 						try {
-							if (this.admin.tableExists(table) && this.admin.isTableDisabled(table)) { //Double check once the lock is acquired
-								synchronized(this.exclusiveLockTable(table)) {
+							if (admin.getAdmin().tableExists(table) && admin.getAdmin().isTableDisabled(table)) { //Double check once the lock is acquired
+								synchronized(this.exclusiveLockTable(admin, table)) {
 									try {
-										if (this.admin.tableExists(table) && this.admin.isTableDisabled(table))
-											this.admin.enableTable(table);
+										if (admin.getAdmin().tableExists(table) && admin.getAdmin().isTableDisabled(table))
+											admin.getAdmin().enableTable(table);
 									} finally {
-										this.exclusiveUnlockTable(table);
+										this.exclusiveUnlockTable(admin, table);
 									}
 								}
 							}
 						} finally {
-							this.sharedUnlockTable(table);
+							this.sharedUnlockTable(admin, table);
 						}
 					}
 				} else
@@ -786,7 +807,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			}
 		} else if ((e instanceof NoSuchColumnFamilyException) || e.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
-			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", e);
+			errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", e);
 			HTableDescriptor td = this.tablesD.get(table);
 			if (td != null) {
 				this.uncache(table);
@@ -794,16 +815,16 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				for (HColumnDescriptor cd : td.getColumnFamilies()) {
 					expectedFams.add(cd.getNameAsString());
 				}
-				this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
+				this.getTableDescriptor(admin, td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
 			} else
 				throw new DatabaseNotReachedException(e);
 		} else if ((e instanceof ConnectException) || e.getMessage().contains(ConnectException.class.getSimpleName())) {
-			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
+			errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
 			HConnectionManager.deleteConnection(this.config, true);
 			restart();
 		} else if (e instanceof IOException) {
 			if (e.getMessage().contains("closed") || (e instanceof ScannerTimeoutException) || e.getMessage().contains("timeout") || (e instanceof UnknownScannerException)) {
-				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " ; restarting store", e);
+				errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " ; restarting store", e);
 				restart();
 				return;
 			}
@@ -812,36 +833,48 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected <R> R tryPerform(Action<R> action, String tableName, String... expectedFamilies) throws DatabaseNotReachedException {
-		HTable table = this.getTable(tableName, expectedFamilies);
+	/**
+	 * @param admin can be modified in case of problem
+	 */
+	protected <R> R tryPerform(LazyAdmin admin, Action<R> action, String tableName, String... expectedFamilies) throws DatabaseNotReachedException {
+		HTable[] table = {this.getTable(admin, tableName, expectedFamilies)};
 		try {
-			return this.tryPerform(action, table, expectedFamilies);
+			return this.tryPerform(admin, action, table, expectedFamilies);
 		} finally {
-			this.returnTable(action.getTable());
+			this.returnTable(table[0]);
 		}
 		
 	}
 	
 	/**
 	 * Performs an action. Table should be replaced by action.getTable() as it can change in case of problem handling (like a connection lost).
+	 * @param admin in/out parameter (admin[0] is actually used) ; can be modified in case of problem
+	 * @param table in/out parameter (table[0] is actually used) ; can be modified in case of problem
 	 */
-	protected <R> R tryPerform(Action<R> action, HTable table, String... expectedFamilies) throws DatabaseNotReachedException {	
-		action.setTable(table);
+	protected <R> R tryPerform(LazyAdmin admin, Action<R> action, HTable [] table, String... expectedFamilies) throws DatabaseNotReachedException {
+		assert table.length == 1 && table[0] != null;
+		assert admin != null;
+		action.setTable(table[0]);
 		try {
 			return action.perform();
 		} catch (Throwable e) {
-			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
-			
-			String tableName = Bytes.toString(table.getTableName());
+			try {
+				admin.recreateAdmin();
+			} catch (Throwable f) {
+				errorLogger.log(Level.SEVERE,"Cannot recover from error while performing a" + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), f);
+				throw new DatabaseNotReachedException(f);
+			}
+			String tableName = Bytes.toString(table[0].getTableName());
 			HTablePool tp = this.tablesC;
-			this.handleProblem(e, tableName, expectedFamilies);
+			this.handleProblem(admin, e, tableName, expectedFamilies);
 			if (tp != this.tablesC) { //Store was restarted ; we should get a new table client
-				table = this.getTable(tableName, expectedFamilies);
-				action.setTable(table);
+				table[0] = this.getTable(admin, tableName, expectedFamilies);
+				action.setTable(table[0]);
 			}
 			try {
-				errorLogger.log(Level.INFO, "Retrying to perform again erroneous " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
-				return action.perform();
+				R ret = action.perform();
+				errorLogger.log(Level.INFO, "Recovered an error while performing a " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
+				return ret;
 			} catch (Exception f) {
 				errorLogger.log(Level.SEVERE, "Cannot recover from error while performing a" + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
 				throw new DatabaseNotReachedException(f);
@@ -849,22 +882,22 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected SharedExclusiveLock getLock(String table) throws DatabaseNotReachedException {
+	protected SharedExclusiveLock getLock(LazyAdmin admin, String table) throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
 		synchronized (this.locks) {
 			SharedExclusiveLock ret = this.locks.get(table);
 			ZooKeeper zk;
 			try {
 				try {
-					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+					zk = admin.getAdmin().getConnection().getZooKeeperWatcher().getZooKeeper();
 				} catch (NullPointerException x) { //Lost zookeeper ?
 					this.restart();
-					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+					zk = admin.getAdmin().getConnection().getZooKeeperWatcher().getZooKeeper();
 				}
 				if (!zk.getState().isAlive()) {
 					errorLogger.log(Level.WARNING, "Zookeeper connection lost ; restarting...");
 					this.restart();
-					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+					zk = admin.getAdmin().getConnection().getZooKeeperWatcher().getZooKeeper();
 				}
 			} catch (Exception e1) {
 				throw new DatabaseNotReachedException(e1);
@@ -872,7 +905,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			
 			if (ret == null) {
 				try {
-					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+					zk = admin.getAdmin().getConnection().getZooKeeperWatcher().getZooKeeper();
 					String dir = "/n-orm/schemalock/" + table;
 					if (zk.exists("/n-orm", false) == null)  {
 						zk.create("/n-orm", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -899,11 +932,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected Object sharedLockTable(String table) throws DatabaseNotReachedException {
+	protected Object sharedLockTable(LazyAdmin admin, String table) throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
 		SharedExclusiveLock lock;
 		try {
-			lock = this.getLock(table);
+			lock = this.getLock(admin, table);
 		} catch(Exception x) {
 			//Giving up
 			logger.log(Level.WARNING, "Cannot get shared lock on " + table + " ; continuing anyway", x);
@@ -920,9 +953,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected void sharedUnlockTable(String table) throws DatabaseNotReachedException {
+	protected void sharedUnlockTable(LazyAdmin admin, String table) throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
-		SharedExclusiveLock lock = this.getLock(table);
+		SharedExclusiveLock lock = this.getLock(admin, table);
 		synchronized (lock) {
 			if (lock.getCurrentSharedLock() != null) {
 				try {
@@ -936,12 +969,12 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected SharedExclusiveLock exclusiveLockTable(String table) throws DatabaseNotReachedException {
+	protected SharedExclusiveLock exclusiveLockTable(LazyAdmin admin, String table) throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
-		SharedExclusiveLock lock = this.getLock(table);
+		SharedExclusiveLock lock = this.getLock(admin, table);
 		synchronized (lock) {
 			if (lock.getCurrentSharedLock() != null) {
-				this.sharedUnlockTable(table);
+				this.sharedUnlockTable(admin, table);
 				this.sharedExclusiveLockedTables.add(table);
 			}
 			try {
@@ -954,9 +987,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected void exclusiveUnlockTable(String table) {
+	protected void exclusiveUnlockTable(LazyAdmin admin, String table) {
 		table = this.mangleTableName(table);
-		SharedExclusiveLock lock = this.getLock(table);
+		SharedExclusiveLock lock = this.getLock(admin, table);
 		synchronized (lock) {
 			try {
 				if (lock.getCurrentExclusiveLock() != null)
@@ -966,29 +999,29 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			} finally {
 				if (this.sharedExclusiveLockedTables.contains(table)) {
 					this.sharedExclusiveLockedTables.remove(table);
-					this.sharedLockTable(table);
+					this.sharedLockTable(admin, table);
 				}
 			}
 		}
 	}
 
-	protected boolean hasTable(String name) throws DatabaseNotReachedException {
+	protected boolean hasTable(LazyAdmin admin, String name) throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
 		if (this.tablesD.containsKey(name))
 			return true;
 
-		return hasTableNoCache(name);
+		return hasTableNoCache(admin, name);
 	}
 
-	private boolean hasTableNoCache(String name) {
+	private boolean hasTableNoCache(LazyAdmin admin, String name) {
 		name = this.mangleTableName(name);
 		try {
 			boolean ret;
-			synchronized(this.sharedLockTable(name)) {
+			synchronized(this.sharedLockTable(admin, name)) {
 				try {
-					ret = this.admin.tableExists(name);
+					ret = admin.getAdmin().tableExists(name);
 				} finally {
-					this.sharedUnlockTable(name);
+					this.sharedUnlockTable(admin, name);
 				}
 			}
 			if (!ret &&this.tablesD.containsKey(name)) {
@@ -1000,17 +1033,17 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected HTableDescriptor getTableDescriptor(String name, String... expectedFamilies) {
+	protected HTableDescriptor getTableDescriptor(LazyAdmin admin, String name, String... expectedFamilies) {
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
 		boolean created = false;
 		synchronized (this.tablesD) {
 			if (!this.tablesD.containsKey(name)) {
 				try {
-					synchronized(this.sharedLockTable(name)) {
+					synchronized(this.sharedLockTable(admin, name)) {
 						try {
 							logger.fine("Unknown table " + name + " for store " + this.hashCode());
-							if (!this.admin.tableExists(name)) {
+							if (!admin.getAdmin().tableExists(name)) {
 								logger.info("Table " + name + " not found ; creating with column families " + Arrays.toString(expectedFamilies));
 								td = new HTableDescriptor(name);
 								if (expectedFamilies != null) {
@@ -1024,27 +1057,27 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 										}
 									}
 								}
-								synchronized(this.exclusiveLockTable(name)) {
+								synchronized(this.exclusiveLockTable(admin, name)) {
 									try {
-										this.admin.createTable(td);
+										admin.getAdmin().createTable(td);
 										logger.info("Table " + name + " created with column families " + Arrays.toString(expectedFamilies));
 										created = true;
 									} catch (TableExistsException x) {
 										//Already done by another process...
-										td = this.admin.getTableDescriptor(Bytes.toBytes(name));
+										td = admin.getAdmin().getTableDescriptor(Bytes.toBytes(name));
 										logger.fine("Got descriptor for table " + name);
 									} finally {
-										this.exclusiveUnlockTable(name);
-										assert this.getLock(name).getCurrentSharedLock() != null;
+										this.exclusiveUnlockTable(admin, name);
+										assert this.getLock(admin, name).getCurrentSharedLock() != null;
 									}
 								}
 							} else {
-								td = this.admin.getTableDescriptor(Bytes.toBytes(name));
+								td = admin.getAdmin().getTableDescriptor(Bytes.toBytes(name));
 								logger.fine("Got descriptor for table " + name);
 							}
 							this.cache(name, td);
 						} finally {
-							this.sharedUnlockTable(name);
+							this.sharedUnlockTable(admin, name);
 						}
 					}
 				} catch (Exception x) {
@@ -1056,24 +1089,24 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 
 		if (!created && expectedFamilies != null && expectedFamilies.length>0) {
-			this.enforceColumnFamiliesExists(td, expectedFamilies);
+			this.enforceColumnFamiliesExists(admin, td, expectedFamilies);
 		}
 		
 		return td;
 	}
 
-	protected HTable getTable(String name, String... expectedFamilies)
+	protected HTable getTable(LazyAdmin admin, String name, String... expectedFamilies)
 			throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
 		
 		//Checking that this table actually exists with the expected column families
-		this.getTableDescriptor(name, expectedFamilies);
+		this.getTableDescriptor(admin, name, expectedFamilies);
 		
 		try {
 			return (HTable)this.tablesC.getTable(name);
 		} catch (Exception x) {
-			this.handleProblem(x, name, expectedFamilies);
-			this.getTableDescriptor(name, expectedFamilies);
+			this.handleProblem(admin, x, name, expectedFamilies);
+			this.getTableDescriptor(admin, name, expectedFamilies);
 			return (HTable)this.tablesC.getTable(name);
 		}
 	}
@@ -1082,10 +1115,10 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		this.tablesC.putTable(table);
 	}
 
-	protected boolean hasColumnFamily(String table, String family)
+	protected boolean hasColumnFamily(LazyAdmin admin, String table, String family)
 			throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
-		if (!this.hasTable(table))
+		if (!this.hasTable(admin, table))
 			return false;
 
 		HTableDescriptor td;
@@ -1095,13 +1128,13 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		if (td != null && td.hasFamily(Bytes.toBytes(family)))
 			return true;
 		synchronized (this.tablesD) {
-			synchronized (this.sharedLockTable(table)) {
+			synchronized (this.sharedLockTable(admin, table)) {
 				try {
-					td = this.admin.getTableDescriptor(Bytes.toBytes(table));
+					td = admin.getAdmin().getTableDescriptor(Bytes.toBytes(table));
 				} catch (Exception e) {
 					throw new DatabaseNotReachedException(e);
 				} finally {
-					this.sharedUnlockTable(table);
+					this.sharedUnlockTable(admin, table);
 				}
 			}
 			this.cache(table, td);
@@ -1109,7 +1142,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		return td.hasFamily(Bytes.toBytes(family));
 	}
 
-	private void enforceColumnFamiliesExists(HTableDescriptor tableD,
+	private void enforceColumnFamiliesExists(LazyAdmin admin, HTableDescriptor tableD,
 			String... columnFamilies) throws DatabaseNotReachedException {
 		assert tableD != null;
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.length);
@@ -1124,16 +1157,16 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				boolean hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
 				if (!recreated && (!familyExists || !hasCorrectCompressor)) {
 					logger.fine("Table " + tableName + " is not known to have family " + cf + " propertly configured: checking from HBase");
-					synchronized (this.sharedLockTable(tableName)) {
+					synchronized (this.sharedLockTable(admin, tableName)) {
 						try {
-							tableD = this.admin.getTableDescriptor(tableD.getName());
+							tableD = admin.getAdmin().getTableDescriptor(tableD.getName());
 						} catch (Exception e) {
 							errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
-							this.handleProblem(e, tableName);
-							this.getTableDescriptor(tableName, columnFamilies);
+							this.handleProblem(admin, e, tableName);
+							this.getTableDescriptor(admin, tableName, columnFamilies);
 							return;
 						} finally {
-							this.sharedUnlockTable(tableName);
+							this.sharedUnlockTable(admin, tableName);
 						}
 					}
 					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
@@ -1157,33 +1190,33 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 						logger.info("Table " + tableD.getNameAsString() + " is missing families " + toBeAdded.toString() + ": altering");
 					if (!toBeCompressed.isEmpty())
 						logger.info("Table " + tableD.getNameAsString() + " compressed with " + this.compression + " has the wrong compressor for families " + toBeCompressed.toString() + ": altering");
-					synchronized (this.exclusiveLockTable(tableName)) {
+					synchronized (this.exclusiveLockTable(admin, tableName)) {
 						try {
 							try {
-								this.admin.disableTable(tableD.getName());
+								admin.getAdmin().disableTable(tableD.getName());
 							} catch (TableNotFoundException x) {
-								this.handleProblem(x, tableName);
-								this.admin.disableTable(tableD.getName());
+								this.handleProblem(admin, x, tableName);
+								admin.getAdmin().disableTable(tableD.getName());
 							}
-							if (! this.admin.isTableDisabled(tableD.getName()))
+							if (! admin.getAdmin().isTableDisabled(tableD.getName()))
 								throw new IOException("Not able to disable table " + tableName);
 							logger.info("Table " + tableD.getNameAsString() + " disabled");
 							for (HColumnDescriptor hColumnDescriptor : toBeAdded) {
 								try {
-									this.admin.addColumn(tableD.getName(),hColumnDescriptor);
+									admin.getAdmin().addColumn(tableD.getName(),hColumnDescriptor);
 								} catch (TableNotFoundException x) {
-									this.handleProblem(x, tableName);
-									this.admin.addColumn(tableD.getName(),hColumnDescriptor);
+									this.handleProblem(admin, x, tableName);
+									admin.getAdmin().addColumn(tableD.getName(),hColumnDescriptor);
 								}
 							}
 							for (HColumnDescriptor hColumnDescriptor : toBeCompressed) {
 								hColumnDescriptor.setCompressionType(this.compression);
-								this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
+								admin.getAdmin().modifyColumn(tableD.getName(), hColumnDescriptor);
 							}
 							boolean done = true;
 							do {
 								Thread.sleep(10);
-								tableD = this.admin.getTableDescriptor(tableD.getName());
+								tableD = admin.getAdmin().getTableDescriptor(tableD.getName());
 								for (int i = 0; done && i < toBeAdded.size(); i++) {
 									done = done && tableD.hasFamily(toBeAdded.get(i).getName());
 								}
@@ -1193,8 +1226,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 									done = done && actualFamily != null && expectedFamily.getCompressionType().equals(actualFamily.getCompressionType());
 								}
 							} while (!done);
-							this.admin.enableTable(tableD.getName());
-							if (! this.admin.isTableEnabled(tableD.getName()))
+							admin.getAdmin().enableTable(tableD.getName());
+							if (! admin.getAdmin().isTableEnabled(tableD.getName()))
 								throw new IOException("Not able to enable table " + tableName);
 							logger.info("Table " + tableD.getNameAsString() + " enabled");
 							for (int i = 0; done && i < toBeAdded.size(); i++) {
@@ -1210,7 +1243,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 							this.cache(tableName, tableD);
 							logger.info("Table " + tableD.getNameAsString() + " altered");
 						} finally {
-							this.exclusiveUnlockTable(tableName);
+							this.exclusiveUnlockTable(admin, tableName);
 						}
 					}
 				} catch (Exception e) {
@@ -1280,7 +1313,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	@Override
 	public Map<String, Map<String, byte[]>> get(String table, String id,
 			Set<String> families) throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
+		LazyAdmin admin = this.createLazyAdmin();
+		
+		if (!this.hasTable(admin, table))
 			return null;
 		
 		Get g = new Get(Bytes.toBytes(id));
@@ -1288,7 +1323,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			g.addFamily(Bytes.toBytes(family));
 		}
 
-		Result r = this.tryPerform(new GetAction(g), table, families.toArray(new String[families.size()]));
+		Result r = this.tryPerform(admin, new GetAction(g), table, families.toArray(new String[families.size()]));
 		if (r.isEmpty())
 			return null;
 		
@@ -1314,6 +1349,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {
+		LazyAdmin admin = this.createLazyAdmin();
+		
 		Set<String> families = new HashSet<String>();
 		if (changed !=null) families.addAll(changed.keySet());
 		if (removed != null) families.addAll(removed.keySet());
@@ -1322,7 +1359,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 		
 		String[] famAr = families.toArray(new String[families.size()]);
-		HTable t = this.getTable(table, famAr);
+		HTable[] t = {this.getTable(admin, table, famAr)};
 
 		try {
 			byte[] row = Bytes.toBytes(id);
@@ -1387,18 +1424,16 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			
 			if (! actions.isEmpty()) {
 				act = new BatchAction(actions);
-				this.tryPerform(act, t, famAr);
-				t = act.getTable();
+				this.tryPerform(admin, act, t, famAr);
 			}
 			
 			if (rowInc != null) {
 				act = new IncrementAction(rowInc);
-				this.tryPerform(act, t, famAr);
-				t = act.getTable();
+				this.tryPerform(admin, act, t, famAr);
 			}
 		} finally {
 			if (t != null)
-				this.returnTable(t);
+				this.returnTable(t[0]);
 		}
 	}
 	
@@ -1435,11 +1470,12 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	@Override
 	public void delete(String table, String id)
 			throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
+		LazyAdmin admin = this.createLazyAdmin();
+		if (!this.hasTable(admin, table))
 			return;
 //		this.delete(table, id, true);
 		Delete d = new Delete(Bytes.toBytes(id));
-		this.tryPerform(new DeleteAction(d), table);
+		this.tryPerform(admin, new DeleteAction(d), table);
 	}
 
 //	public void delete(String table, String id, boolean flush)
@@ -1470,35 +1506,38 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	@Override
 	public boolean exists(String table, String row, String family)
 			throws DatabaseNotReachedException {
-		if (!this.hasColumnFamily(table, family))
+		LazyAdmin admin = this.createLazyAdmin();
+		if (!this.hasColumnFamily(admin, table, family))
 			return false;
 
 		Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));
 		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-		return this.tryPerform(new ExistsAction(g), table);
+		return this.tryPerform(admin, new ExistsAction(g), table);
 	}
 
 	@Override
 	public boolean exists(String table, String row)
 			throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
+		LazyAdmin admin = this.createLazyAdmin();
+		if (!this.hasTable(admin, table))
 			return false;
 
 		Get g = new Get(Bytes.toBytes(row));
 		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-		return this.tryPerform(new ExistsAction(g), table);
+		return this.tryPerform(admin, new ExistsAction(g), table);
 	}
 
 	@Override
 	public byte[] get(String table, String row, String family, String key)
 			throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
+		LazyAdmin admin = this.createLazyAdmin();
+		if (!this.hasTable(admin, table))
 			return null;
 
 		Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
 				Bytes.toBytes(key));
 
-		Result result = this.tryPerform(new GetAction(g), table, family);
+		Result result = this.tryPerform(admin, new GetAction(g), table, family);
 		
 		if (result.isEmpty())
 			return null;
@@ -1514,7 +1553,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	@Override
 	public Map<String, byte[]> get(String table, String id, String family,
 			Constraint c) throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
+		LazyAdmin admin = this.createLazyAdmin();
+		if (!this.hasTable(admin, table))
 			return null;
 
 		Get g = new Get(Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
@@ -1523,7 +1563,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			g.setFilter(createFamilyConstraint(c));
 		}
 
-		Result r = this.tryPerform(new GetAction(g), table, family);
+		Result r = this.tryPerform(admin, new GetAction(g), table, family);
 		if (r.isEmpty())
 			return null;
 		
@@ -1538,34 +1578,37 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 
 	@Override
 	public long count(String table, Constraint c) throws DatabaseNotReachedException {
-		if (! this.hasTable(table))
+		LazyAdmin admin = this.createLazyAdmin();
+		if (! this.hasTable(admin, table))
 			return 0;
 		
-		return this.tryPerform(new CountAction(this, this.getScan(c)), table);
+		return this.tryPerform(admin, new CountAction(this, this.getScan(c)), table);
 	}
 
 	@Override
 	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(String table, Constraint c,
 			 int limit, Set<String> families) throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
+		LazyAdmin admin = this.createLazyAdmin();
+		if (!this.hasTable(admin, table))
 			return new EmptyCloseableIterator();
 		
 		String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
 		Scan s = this.getScan(c, famAr);
 		s.setFilter(this.addFilter(s.getFilter(), new PageFilter(limit)));
 		
-		ResultScanner r = this.tryPerform(new ScanAction(s), table, famAr);
+		ResultScanner r = this.tryPerform(admin, new ScanAction(s), table, famAr);
 		return new CloseableIterator(this, table, c, limit, families, r, families != null);
 	}
 
 	public void truncate(String table, Constraint c) throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
+		LazyAdmin admin = this.createLazyAdmin();
+		if (!this.hasTable(admin, table))
 			return;
 		
 		logger.info("Truncating table " + table);
 		
 		TruncateAction action = new TruncateAction(this, this.getScan(c));
-		this.tryPerform(action, table);
+		this.tryPerform(admin, action, table);
 		
 		logger.info("Truncated table " + table);
 	}
@@ -1575,7 +1618,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			final String table, Constraint c, Set<String> families, Class<E> elementClass,
 			Process<AE> action, final Callback callback)
 			throws DatabaseNotReachedException {
-		if (! this.hasTable(table)) {
+		LazyAdmin admin = this.createLazyAdmin();
+		if (! this.hasTable(admin, table)) {
 			if (callback != null)
 				callback.processCompleted();
 			return;
@@ -1584,7 +1628,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		try {
 			String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
 			//Checking that cf are all there so that process will work
-			this.getTableDescriptor(table, famAr);
+			this.getTableDescriptor(admin, table, famAr);
 			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, famAr), action, elementClass, famAr);
 			logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
 			if (callback != null) {
