@@ -7,7 +7,6 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.util.Bytes;
 
-import com.googlecode.n_orm.hbase.Store.LazyAdmin;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.Row;
@@ -61,12 +60,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 			this.constraint = new Constraint(Bytes.toString(currentKey) + Character.MIN_VALUE, this.constraint == null ? null : this.constraint.getEndKey());
 		}
 		
-		LazyAdmin admin = store.createLazyAdmin();
-		try {
-			store.handleProblem(admin, x, table, families == null ? null : families.toArray(new String[families.size()]));
-		} finally {
-			admin.close();
-		}
+		store.handleProblem(store.createLazyAdmin(), x, table, families == null ? null : families.toArray(new String[families.size()]));
 		CloseableIterator newResult = (CloseableIterator) store.get(table, constraint, limit, families);
 		this.setResult(newResult.result);
 	}
@@ -119,12 +113,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 		try {
 			result.close();
 		} catch (RuntimeException x) {
-			LazyAdmin admin = store.createLazyAdmin();
-			try {
-				store.handleProblem(admin, x, table, families == null ? null : families.toArray(new String[families.size()]));
-			} finally {
-				admin.close();
-			}
+			store.handleProblem(store.createLazyAdmin(), x, table, families == null ? null : families.toArray(new String[families.size()]));
 		}
 	}
 }
