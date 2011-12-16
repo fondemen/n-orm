@@ -343,7 +343,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				throw new DatabaseNotReachedException(e);
 			}
 		
-		this.tablesC = new HTablePool(this.config, Integer.MAX_VALUE);
+		this.tablesC = new HTablePool(this.getConf(), Integer.MAX_VALUE);
 		
 		//Wait for Zookeeper availability
 		int maxRetries = 100;
@@ -380,11 +380,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 
 	protected HBaseAdmin createAdmin() throws MasterNotRunningException,
 			ZooKeeperConnectionException {
-		if (this.admin != null)
-			return this.admin;
-		HBaseAdmin ret = new HBaseAdmin(this.config);
-		
-		return ret;
+		return this.admin != null ? this.admin : new HBaseAdmin(this.config);
 	}
 
 	/**
@@ -679,17 +675,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 
 		public void setAdmin(HBaseAdmin admin) {
-			this.close();
 			this.admin = admin;
 		}
 		
 		public void recreateAdmin() {
-			this.setAdmin(Store.this.getAdmin());
-		}
-		
-		public void close() {
-			if (this.admin != null)
-				HConnectionManager.deleteConnection(this.admin.getConfiguration(), true);
+			admin = Store.this.getAdmin();
 		}
 	}
 	public LazyAdmin createLazyAdmin() throws DatabaseNotReachedException {
@@ -757,7 +747,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				this.tablesD.clear();
 			}
 			this.config = HBaseConfiguration.create(this.config);
-			HConnectionManager.deleteAllConnections(true);
+			//this.admin = null;
 			this.wasStarted = false;
 			this.start();
 		} finally {
@@ -775,9 +765,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		if (e instanceof DatabaseNotReachedException)
 			throw (DatabaseNotReachedException)e;
 		
-		String message = e == null ? "" : e.getMessage();
-		if (message == null) message = "";
-		if ((e instanceof TableNotFoundException) || message.contains(TableNotFoundException.class.getSimpleName())) {
+		if ((e instanceof TableNotFoundException) || e.getMessage().contains(TableNotFoundException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", e);
 			HTableDescriptor td = this.tablesD.get(table);
@@ -790,7 +778,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				this.getTableDescriptor(admin, td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
 			} else
 				throw new DatabaseNotReachedException(e);
-		} else if ((e instanceof NotServingRegionException) || message.contains(NotServingRegionException.class.getSimpleName())) {
+		} else if ((e instanceof NotServingRegionException) || e.getMessage().contains(NotServingRegionException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			
 			try {
@@ -817,7 +805,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			} catch (IOException f) {
 				throw new DatabaseNotReachedException(f);
 			}
-		} else if ((e instanceof NoSuchColumnFamilyException) || message.contains(NoSuchColumnFamilyException.class.getSimpleName())) {
+		} else if ((e instanceof NoSuchColumnFamilyException) || e.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", e);
 			HTableDescriptor td = this.tablesD.get(table);
@@ -830,12 +818,12 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				this.getTableDescriptor(admin, td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
 			} else
 				throw new DatabaseNotReachedException(e);
-		} else if ((e instanceof ConnectException) || message.contains(ConnectException.class.getSimpleName())) {
+		} else if ((e instanceof ConnectException) || e.getMessage().contains(ConnectException.class.getSimpleName())) {
 			errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
 			HConnectionManager.deleteConnection(this.config, true);
 			restart();
 		} else if (e instanceof IOException) {
-			if (message.contains("closed") || (e instanceof ScannerTimeoutException) || message.contains("timeout") || (e instanceof UnknownScannerException)) {
+			if (e.getMessage().contains("closed") || (e instanceof ScannerTimeoutException) || e.getMessage().contains("timeout") || (e instanceof UnknownScannerException)) {
 				errorLogger.log(Level.FINE, "Trying to recover from exception for store " + this.hashCode() + " ; restarting store", e);
 				restart();
 				return;
@@ -1326,36 +1314,33 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	public Map<String, Map<String, byte[]>> get(String table, String id,
 			Set<String> families) throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
-		try {
-			if (!this.hasTable(admin, table))
-				return null;
-			
-			Get g = new Get(Bytes.toBytes(id));
-			for (String family : families) {
-				g.addFamily(Bytes.toBytes(family));
-			}
-	
-			Result r = this.tryPerform(admin, new GetAction(g), table, families.toArray(new String[families.size()]));
-			if (r.isEmpty())
-				return null;
-			
-			Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String, byte[]>>();
-			if (!r.isEmpty()) {
-				for (KeyValue kv : r.list()) {
-					String familyName = Bytes.toString(kv.getFamily());
-					Map<String, byte[]> fam = ret.get(familyName);
-					if (fam == null) {
-						fam = new TreeMap<String, byte[]>();
-						ret.put(familyName, fam);
-					}
-					fam.put(Bytes.toString(kv.getQualifier()),
-							kv.getValue());
-				}
-			}
-			return ret;
-		} finally {
-			admin.close();
+		
+		if (!this.hasTable(admin, table))
+			return null;
+		
+		Get g = new Get(Bytes.toBytes(id));
+		for (String family : families) {
+			g.addFamily(Bytes.toBytes(family));
 		}
+
+		Result r = this.tryPerform(admin, new GetAction(g), table, families.toArray(new String[families.size()]));
+		if (r.isEmpty())
+			return null;
+		
+		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String, byte[]>>();
+		if (!r.isEmpty()) {
+			for (KeyValue kv : r.list()) {
+				String familyName = Bytes.toString(kv.getFamily());
+				Map<String, byte[]> fam = ret.get(familyName);
+				if (fam == null) {
+					fam = new TreeMap<String, byte[]>();
+					ret.put(familyName, fam);
+				}
+				fam.put(Bytes.toString(kv.getQualifier()),
+						kv.getValue());
+			}
+		}
+		return ret;
 	}
 
 	@Override
@@ -1365,93 +1350,90 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
+		
+		Set<String> families = new HashSet<String>();
+		if (changed !=null) families.addAll(changed.keySet());
+		if (removed != null) families.addAll(removed.keySet());
+		if (increments != null) families.addAll(increments.keySet());
+		
+		families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		
+		String[] famAr = families.toArray(new String[families.size()]);
+		HTable[] t = {this.getTable(admin, table, famAr)};
+
 		try {
-			Set<String> families = new HashSet<String>();
-			if (changed !=null) families.addAll(changed.keySet());
-			if (removed != null) families.addAll(removed.keySet());
-			if (increments != null) families.addAll(increments.keySet());
+			byte[] row = Bytes.toBytes(id);
 			
-			families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
-			
-			String[] famAr = families.toArray(new String[families.size()]);
-			HTable[] t = {this.getTable(admin, table, famAr)};
 	
-			try {
-				byte[] row = Bytes.toBytes(id);
-				
-		
-				List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2);
-		
-				Put rowPut = null;
-				if (changed != null && !changed.isEmpty()) {
-					rowPut = new Put(row);
-					for (Entry<String, Map<String, byte[]>> family : changed.entrySet()) {
-						byte[] cf = Bytes.toBytes(family.getKey());
-						for (Entry<String, byte[]> col : family.getValue().entrySet()) {
-							rowPut.add(cf, Bytes.toBytes(col.getKey()), col.getValue());
-						}
+			List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2);
+	
+			Put rowPut = null;
+			if (changed != null && !changed.isEmpty()) {
+				rowPut = new Put(row);
+				for (Entry<String, Map<String, byte[]>> family : changed.entrySet()) {
+					byte[] cf = Bytes.toBytes(family.getKey());
+					for (Entry<String, byte[]> col : family.getValue().entrySet()) {
+						rowPut.add(cf, Bytes.toBytes(col.getKey()), col.getValue());
 					}
-					if (rowPut.getFamilyMap().isEmpty())
-						rowPut = null;
-					else
-						actions.add(rowPut);
 				}
-		
-				Delete rowDel = null;
-				if (removed != null && !removed.isEmpty()) {
-					rowDel = new Delete(row);
-					for (Entry<String, Set<String>> family : removed.entrySet()) {
-						byte[] cf = Bytes.toBytes(family.getKey());
-						for (String key : family.getValue()) {
-							rowDel.deleteColumns(cf, Bytes.toBytes(key));
-						}
-		
-					}
-					if (rowDel.getFamilyMap().isEmpty())
-						rowDel = null;
-					else
-						actions.add(rowDel);
-				}
-				
-				Increment rowInc = null;
-				if (increments != null && !increments.isEmpty()) {
-					rowInc = new Increment(row);
-					for (Entry<String, Map<String, Number>> incrs : increments.entrySet()) {
-						byte[] cf = Bytes.toBytes(incrs.getKey());
-						for (Entry<String, Number> inc : incrs.getValue().entrySet()) {
-							rowInc.addColumn(cf, Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
-						}
-					}
-					if (rowInc.getFamilyMap().isEmpty())
-						rowInc = null;
-					//Can't add that to actions :(
-				}
-		
-				//An empty object is to be stored...
-				if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
-					rowPut = new Put(row);
-					rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
+				if (rowPut.getFamilyMap().isEmpty())
+					rowPut = null;
+				else
 					actions.add(rowPut);
+			}
+	
+			Delete rowDel = null;
+			if (removed != null && !removed.isEmpty()) {
+				rowDel = new Delete(row);
+				for (Entry<String, Set<String>> family : removed.entrySet()) {
+					byte[] cf = Bytes.toBytes(family.getKey());
+					for (String key : family.getValue()) {
+						rowDel.deleteColumns(cf, Bytes.toBytes(key));
+					}
+	
 				}
-				
-				
-				Action<?> act;
-				
-				if (! actions.isEmpty()) {
-					act = new BatchAction(actions);
-					this.tryPerform(admin, act, t, famAr);
+				if (rowDel.getFamilyMap().isEmpty())
+					rowDel = null;
+				else
+					actions.add(rowDel);
+			}
+			
+			Increment rowInc = null;
+			if (increments != null && !increments.isEmpty()) {
+				rowInc = new Increment(row);
+				for (Entry<String, Map<String, Number>> incrs : increments.entrySet()) {
+					byte[] cf = Bytes.toBytes(incrs.getKey());
+					for (Entry<String, Number> inc : incrs.getValue().entrySet()) {
+						rowInc.addColumn(cf, Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
+					}
 				}
-				
-				if (rowInc != null) {
-					act = new IncrementAction(rowInc);
-					this.tryPerform(admin, act, t, famAr);
-				}
-			} finally {
-				if (t != null)
-					this.returnTable(t[0]);
+				if (rowInc.getFamilyMap().isEmpty())
+					rowInc = null;
+				//Can't add that to actions :(
+			}
+	
+			//An empty object is to be stored...
+			if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
+				rowPut = new Put(row);
+				rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
+				actions.add(rowPut);
+			}
+			
+			
+			Action<?> act;
+			
+			if (! actions.isEmpty()) {
+				act = new BatchAction(actions);
+				this.tryPerform(admin, act, t, famAr);
+			}
+			
+			if (rowInc != null) {
+				act = new IncrementAction(rowInc);
+				this.tryPerform(admin, act, t, famAr);
 			}
 		} finally {
-			admin.close();
+			if (t != null)
+				this.returnTable(t[0]);
 		}
 	}
 	
@@ -1489,15 +1471,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	public void delete(String table, String id)
 			throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
-		try {
-			if (!this.hasTable(admin, table))
-				return;
-	//		this.delete(table, id, true);
-			Delete d = new Delete(Bytes.toBytes(id));
-			this.tryPerform(admin, new DeleteAction(d), table);
-		} finally {
-			admin.close();
-		}
+		if (!this.hasTable(admin, table))
+			return;
+//		this.delete(table, id, true);
+		Delete d = new Delete(Bytes.toBytes(id));
+		this.tryPerform(admin, new DeleteAction(d), table);
 	}
 
 //	public void delete(String table, String id, boolean flush)
@@ -1529,53 +1507,41 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	public boolean exists(String table, String row, String family)
 			throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
-		try {
-			if (!this.hasColumnFamily(admin, table, family))
-				return false;
-	
-			Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));
-			g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-			return this.tryPerform(admin, new ExistsAction(g), table);
-		} finally {
-			admin.close();
-		}
+		if (!this.hasColumnFamily(admin, table, family))
+			return false;
+
+		Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));
+		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
+		return this.tryPerform(admin, new ExistsAction(g), table);
 	}
 
 	@Override
 	public boolean exists(String table, String row)
 			throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
-		try {
-			if (!this.hasTable(admin, table))
-				return false;
-	
-			Get g = new Get(Bytes.toBytes(row));
-			g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-			return this.tryPerform(admin, new ExistsAction(g), table);
-		} finally {
-			admin.close();
-		}
+		if (!this.hasTable(admin, table))
+			return false;
+
+		Get g = new Get(Bytes.toBytes(row));
+		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
+		return this.tryPerform(admin, new ExistsAction(g), table);
 	}
 
 	@Override
 	public byte[] get(String table, String row, String family, String key)
 			throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
-		try {
-			if (!this.hasTable(admin, table))
-				return null;
-	
-			Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
-					Bytes.toBytes(key));
-	
-			Result result = this.tryPerform(admin, new GetAction(g), table, family);
-			
-			if (result.isEmpty())
-				return null;
-			return result.value();
-		} finally {
-			admin.close();
-		}
+		if (!this.hasTable(admin, table))
+			return null;
+
+		Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
+				Bytes.toBytes(key));
+
+		Result result = this.tryPerform(admin, new GetAction(g), table, family);
+		
+		if (result.isEmpty())
+			return null;
+		return result.value();
 	}
 
 	@Override
@@ -1588,79 +1554,63 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	public Map<String, byte[]> get(String table, String id, String family,
 			Constraint c) throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
-		try {
-			if (!this.hasTable(admin, table))
-				return null;
-	
-			Get g = new Get(Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
-	
-			if (c != null) {
-				g.setFilter(createFamilyConstraint(c));
-			}
-	
-			Result r = this.tryPerform(admin, new GetAction(g), table, family);
-			if (r.isEmpty())
-				return null;
-			
-			Map<String, byte[]> ret = new HashMap<String, byte[]>();
-			if (!r.isEmpty()) {
-				for (KeyValue kv : r.raw()) {
-					ret.put(Bytes.toString(kv.getQualifier()), kv.getValue());
-				}
-			}
-			return ret;
-		} finally {
-			admin.close();
+		if (!this.hasTable(admin, table))
+			return null;
+
+		Get g = new Get(Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
+
+		if (c != null) {
+			g.setFilter(createFamilyConstraint(c));
 		}
+
+		Result r = this.tryPerform(admin, new GetAction(g), table, family);
+		if (r.isEmpty())
+			return null;
+		
+		Map<String, byte[]> ret = new HashMap<String, byte[]>();
+		if (!r.isEmpty()) {
+			for (KeyValue kv : r.raw()) {
+				ret.put(Bytes.toString(kv.getQualifier()), kv.getValue());
+			}
+		}
+		return ret;
 	}
 
 	@Override
 	public long count(String table, Constraint c) throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
-		try {
-			if (! this.hasTable(admin, table))
-				return 0;
-			
-			return this.tryPerform(admin, new CountAction(this, this.getScan(c)), table);
-		} finally {
-			admin.close();
-		}
+		if (! this.hasTable(admin, table))
+			return 0;
+		
+		return this.tryPerform(admin, new CountAction(this, this.getScan(c)), table);
 	}
 
 	@Override
 	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(String table, Constraint c,
 			 int limit, Set<String> families) throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
-		try {
-			if (!this.hasTable(admin, table))
-				return new EmptyCloseableIterator();
-			
-			String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
-			Scan s = this.getScan(c, famAr);
-			s.setFilter(this.addFilter(s.getFilter(), new PageFilter(limit)));
-			
-			ResultScanner r = this.tryPerform(admin, new ScanAction(s), table, famAr);
-			return new CloseableIterator(this, table, c, limit, families, r, families != null);
-		} finally {
-			admin.close();
-		}
+		if (!this.hasTable(admin, table))
+			return new EmptyCloseableIterator();
+		
+		String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
+		Scan s = this.getScan(c, famAr);
+		s.setFilter(this.addFilter(s.getFilter(), new PageFilter(limit)));
+		
+		ResultScanner r = this.tryPerform(admin, new ScanAction(s), table, famAr);
+		return new CloseableIterator(this, table, c, limit, families, r, families != null);
 	}
 
 	public void truncate(String table, Constraint c) throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
-		try {
-			if (!this.hasTable(admin, table))
-				return;
-			
-			logger.info("Truncating table " + table);
-			
-			TruncateAction action = new TruncateAction(this, this.getScan(c));
-			this.tryPerform(admin, action, table);
-			
-			logger.info("Truncated table " + table);
-		} finally {
-			admin.close();
-		}
+		if (!this.hasTable(admin, table))
+			return;
+		
+		logger.info("Truncating table " + table);
+		
+		TruncateAction action = new TruncateAction(this, this.getScan(c));
+		this.tryPerform(admin, action, table);
+		
+		logger.info("Truncated table " + table);
 	}
 
 	@Override
@@ -1669,51 +1619,47 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			Process<AE> action, final Callback callback)
 			throws DatabaseNotReachedException {
 		LazyAdmin admin = this.createLazyAdmin();
+		if (! this.hasTable(admin, table)) {
+			if (callback != null)
+				callback.processCompleted();
+			return;
+		}
+		final Class<?> actionClass = action.getClass();
 		try {
-			if (! this.hasTable(admin, table)) {
-				if (callback != null)
-					callback.processCompleted();
-				return;
-			}
-			final Class<?> actionClass = action.getClass();
-			try {
-				String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
-				//Checking that cf are all there so that process will work
-				this.getTableDescriptor(admin, table, famAr);
-				final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, famAr), action, elementClass, famAr);
-				logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
-				if (callback != null) {
-					new Thread() {
-	
-						@Override
-						public void run() {
-							try {
-								if (job.waitForCompletion(false)) {
-									callback.processCompleted();
-								} else {
-									throw new RuntimeException("Unknown reason");
-								}
-							} catch (Throwable x) {
-								errorLogger.log(Level.WARNING, "Could not perform server-side process " + actionClass.getName() + " on table " + table, x);
-								if (callback != null) {
-									callback.processCompletedInError(x);
-								}
+			String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
+			//Checking that cf are all there so that process will work
+			this.getTableDescriptor(admin, table, famAr);
+			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, famAr), action, elementClass, famAr);
+			logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
+			if (callback != null) {
+				new Thread() {
+
+					@Override
+					public void run() {
+						try {
+							if (job.waitForCompletion(false)) {
+								callback.processCompleted();
+							} else {
+								throw new RuntimeException("Unknown reason");
+							}
+						} catch (Throwable x) {
+							errorLogger.log(Level.WARNING, "Could not perform server-side process " + actionClass.getName() + " on table " + table, x);
+							if (callback != null) {
+								callback.processCompletedInError(x);
 							}
 						}
-						
-					}.start();
-				} else
-					job.submit();
-	
-				logger.log(Level.FINE, "Server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode() + " done !");
-			} catch (Throwable x) {
-				errorLogger.log(Level.WARNING, "Could not perform server-side process " + actionClass.getName() + " on table " + table, x);
-				if (callback != null) {
-					callback.processCompletedInError(x);
-				}
+					}
+					
+				}.start();
+			} else
+				job.submit();
+
+			logger.log(Level.FINE, "Server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode() + " done !");
+		} catch (Throwable x) {
+			errorLogger.log(Level.WARNING, "Could not perform server-side process " + actionClass.getName() + " on table " + table, x);
+			if (callback != null) {
+				callback.processCompletedInError(x);
 			}
-		} finally {
-			admin.close();
 		}
 	}
 
