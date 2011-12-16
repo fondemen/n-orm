@@ -5,6 +5,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
@@ -51,7 +52,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 
 	protected void handleProblem(RuntimeException x) {
 		//Failure handling
-		//Only one failure per scan (next or hasNext) accepted
+		//Only one failure per scan accepted
 		if (this.reCreated)
 			throw x;
 		this.reCreated = true;
@@ -59,8 +60,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 		if (this.currentKey != null) {
 			this.constraint = new Constraint(Bytes.toString(currentKey) + Character.MIN_VALUE, this.constraint == null ? null : this.constraint.getEndKey());
 		}
-		
-		store.handleProblem(store.createLazyAdmin(), x, table, families == null ? null : families.toArray(new String[families.size()]));
+		store.handleProblem(x, table, families == null ? null : families.toArray(new String[families.size()]));
 		CloseableIterator newResult = (CloseableIterator) store.get(table, constraint, limit, families);
 		this.setResult(newResult.result);
 	}
@@ -113,7 +113,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 		try {
 			result.close();
 		} catch (RuntimeException x) {
-			store.handleProblem(store.createLazyAdmin(), x, table, families == null ? null : families.toArray(new String[families.size()]));
+			store.handleProblem(x, table, families == null ? null : families.toArray(new String[families.size()]));
 		}
 	}
 }
