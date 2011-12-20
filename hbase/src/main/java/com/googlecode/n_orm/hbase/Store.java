@@ -8,6 +8,7 @@ import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,6 +23,12 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -62,6 +69,7 @@ import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.io.hfile.Compression;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
+import org.apache.hadoop.hbase.ipc.HBaseRPC;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.zookeeper.ZKConfig;
@@ -309,6 +317,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
 	public HTablePool tablesC;
 	
+	private Integer clientTimeout = null;
+	
 	private Integer scanCaching = null;
 	private Algorithm compression;
 	private boolean forceCompression = false;
@@ -343,11 +353,14 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			properties.set(CONF_HOST_KEY, this.getHost());
 			properties.setInt(CONF_PORT_KEY, this.getPort());
 
-			if (this.maxRetries != null)
-				properties.set(CONF_MAXRETRIES_KEY, this.maxRetries.toString());
-
 			this.config = properties;
 		}
+
+		if (this.maxRetries != null)
+			this.config.set(CONF_MAXRETRIES_KEY, this.maxRetries.toString());
+		
+		if (this.clientTimeout != null)
+			this.config.set(HConstants.HBASE_RPC_TIMEOUT_KEY, this.clientTimeout.toString());
 
 		if (this.admin == null)
 			try {
@@ -359,7 +372,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 					throw new DatabaseNotReachedException(new MasterNotRunningException());
 				}
 			} catch (Exception e) {
-				errorLogger.severe("Could not cpnnect HBase for store " + this.hashCode() + " (" +e.getMessage() +')');
+				errorLogger.severe("Could not connect HBase for store " + this.hashCode() + " (" +e.getMessage() +')');
 				throw new DatabaseNotReachedException(e);
 			}
 		
@@ -440,6 +453,21 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		if (maxRetries <= 0)
 			throw new IllegalArgumentException("Cannot retry less than once");
 		this.maxRetries = Integer.valueOf(maxRetries);
+	}
+
+	/**
+	 * Maximum duration in milliseconds a request can last.
+	 */
+	public Integer getClientTimeout() {
+		return clientTimeout;
+	}
+
+	/**
+	 * Maximum duration in milliseconds a request can last.
+	 * <code>null</code> means default value (see {@link HConstants#DEFAULT_HBASE_RPC_TIMEOUT}).
+	 */
+	public void setClientTimeout(Integer clientTimeout) {
+		this.clientTimeout = clientTimeout;
 	}
 
 	/**
@@ -744,7 +772,12 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		if (e instanceof DatabaseNotReachedException)
 			throw (DatabaseNotReachedException)e;
 		
-		if ((e instanceof TableNotFoundException) || e.getMessage().contains(TableNotFoundException.class.getSimpleName())) {
+		String msg = e.getMessage();
+		if (msg == null) msg = "";
+		
+		//System.err.println("====================== handling " + e + " with message " + msg);
+		
+		if ((e instanceof TableNotFoundException) || msg.contains(TableNotFoundException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", e);
 			HTableDescriptor td = this.tablesD.get(table);
@@ -754,10 +787,14 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				for (HColumnDescriptor cd : td.getColumnFamilies()) {
 					expectedFams.add(cd.getNameAsString());
 				}
-				this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
+				try {
+					this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
+				} catch (Exception x) {
+					throw new DatabaseNotReachedException(x);
+				}
 			} else
 				throw new DatabaseNotReachedException(e);
-		} else if ((e instanceof NotServingRegionException) || e.getMessage().contains(NotServingRegionException.class.getSimpleName())) {
+		} else if ((e instanceof NotServingRegionException) || msg.contains(NotServingRegionException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			
 			try {
@@ -784,7 +821,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			} catch (IOException f) {
 				throw new DatabaseNotReachedException(f);
 			}
-		} else if ((e instanceof NoSuchColumnFamilyException) || e.getMessage().contains(NoSuchColumnFamilyException.class.getSimpleName())) {
+		} else if ((e instanceof NoSuchColumnFamilyException) || msg.contains(NoSuchColumnFamilyException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", e);
 			HTableDescriptor td = this.tablesD.get(table);
@@ -794,20 +831,27 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				for (HColumnDescriptor cd : td.getColumnFamilies()) {
 					expectedFams.add(cd.getNameAsString());
 				}
-				this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
+				try {
+					this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
+				} catch (Exception x) {
+					throw new DatabaseNotReachedException(x);
+				}
 			} else
 				throw new DatabaseNotReachedException(e);
-		} else if ((e instanceof ConnectException) || e.getMessage().contains(ConnectException.class.getSimpleName())) {
+		} else if ((e instanceof ConnectException) || msg.contains(ConnectException.class.getSimpleName())) {
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
 			HConnectionManager.deleteConnection(this.config, true);
 			restart();
+		} else if ((e instanceof SocketTimeoutException) || (e instanceof TimeoutException)) {
+			errorLogger.log(Level.INFO, "Timeout while requesting " + table + " (max duration is set to " + this.config.get(HConstants.HBASE_RPC_TIMEOUT_KEY, Integer.toString(HConstants.DEFAULT_HBASE_RPC_TIMEOUT)) + "ms)", e);
 		} else if (e instanceof IOException) {
-			if (e.getMessage().contains("closed") || (e instanceof ScannerTimeoutException) || e.getMessage().contains("timeout") || (e instanceof UnknownScannerException)) {
+			if (msg.contains("closed") || (e instanceof ScannerTimeoutException) || msg.contains("timeout") || (e instanceof UnknownScannerException)) {
 				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " ; restarting store", e);
 				restart();
-				return;
+			} else {
+				throw new DatabaseNotReachedException(e);
 			}
-			
+		} else {
 			throw new DatabaseNotReachedException(e);
 		}
 	}
@@ -825,7 +869,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	/**
 	 * Performs an action. Table should be replaced by action.getTable() as it can change in case of problem handling (like a connection lost).
 	 */
-	protected <R> R tryPerform(Action<R> action, HTable table, String... expectedFamilies) throws DatabaseNotReachedException {	
+	protected <R> R tryPerform(final Action<R> action, HTable table, String... expectedFamilies) throws DatabaseNotReachedException {	
 		action.setTable(table);
 		try {
 			return action.perform();
@@ -1000,7 +1044,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected HTableDescriptor getTableDescriptor(String name, String... expectedFamilies) {
+	protected HTableDescriptor getTableDescriptor(String name, String... expectedFamilies) throws Exception {
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
 		boolean created = false;
@@ -1048,7 +1092,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 						}
 					}
 				} catch (Exception x) {
-					throw new DatabaseNotReachedException(x);
+					throw x;
 				}
 			} else {
 				td = this.tablesD.get(name);
@@ -1066,14 +1110,17 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
 		
-		//Checking that this table actually exists with the expected column families
-		this.getTableDescriptor(name, expectedFamilies);
-		
 		try {
-			return (HTable)this.tablesC.getTable(name);
-		} catch (Exception x) {
-			this.handleProblem(x, name, expectedFamilies);
+			//Checking that this table actually exists with the expected column families
 			this.getTableDescriptor(name, expectedFamilies);
+			return (HTable)this.tablesC.getTable(name);
+		} catch (Throwable x) {
+			this.handleProblem(x, name, expectedFamilies);
+			try {
+				this.getTableDescriptor(name, expectedFamilies);
+			} catch (Exception y) {
+				throw new DatabaseNotReachedException(x);
+			}
 			return (HTable)this.tablesC.getTable(name);
 		}
 	}
@@ -1130,7 +1177,11 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 						} catch (Exception e) {
 							errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
 							this.handleProblem(e, tableName);
-							this.getTableDescriptor(tableName, columnFamilies);
+							try {
+								this.getTableDescriptor(tableName, columnFamilies);
+							} catch (Exception x) {
+								throw new DatabaseNotReachedException(x);
+							}
 							return;
 						} finally {
 							this.sharedUnlockTable(tableName);

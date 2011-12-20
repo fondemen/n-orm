@@ -12,8 +12,12 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HConnection;
@@ -23,6 +27,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.hbase.HBaseLauncher;
 import com.googlecode.n_orm.hbase.Store;
@@ -420,5 +425,65 @@ public class ConcurrentTest {
 			store1.setCompression("none");
 			store2.setCompression("none");
 		}
+	}
+	
+	@Test(expected=Test.None.class)
+	public void connectionClosedAfterRestart() throws SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+
+		store1.restart();
+		
+		HConnection cm = store1.getAdmin().getConnection();
+		Method closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
+		closeM.setAccessible(true);
+		closeM.invoke(cm, true);
+		
+		store1.get("t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		
+		assertTrue(store1.exists("t1", "row"));
+	}
+	
+	//@Test(expected=DatabaseNotReachedException.class)
+	@Test
+	public void requestTimeout() throws Throwable {
+//		ExecutorService es = Executors.newCachedThreadPool();
+//		try {
+			store1.setClientTimeout(1);
+			store1.restart();
+
+			assertEquals("1", store1.getConf().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			assertEquals("1", store1.getAdmin().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			assertEquals("1", store1.getAdmin().getConnection().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			
+			//Cannot reliably fail the connection (has to respond 4 times consequently in less than a ms)
+//			final Throwable [] error = {null /*the expected exception*/, null /*any unexpected exception*/};
+//	
+//			//Overkilling the connection
+//			for (int i = 0; i < 1000; ++i)
+//				es.submit(new Runnable() {
+//
+//					@Override
+//					public void run() {
+//						try {
+//							store1.storeChanges("t1", "row", null, null, null);
+//							store1.get("t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+//						} catch (DatabaseNotReachedException t) {
+//							error[0] = t;
+//						} catch (Throwable t) {
+//							error[1] = t;
+//						}
+//					}
+//					
+//				});
+//			es.shutdown();
+//			es.awaitTermination(10, TimeUnit.SECONDS);
+//			assertNull(error[1]);
+//			if (error[0] != null)
+//				throw error[0];
+//		} catch (Exception x) {
+//			x.printStackTrace();
+//		} finally {
+//			store1.setClientTimeout(null);
+//			store1.restart();
+//		}
 	}
 }
