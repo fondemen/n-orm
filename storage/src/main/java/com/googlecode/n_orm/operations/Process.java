@@ -17,7 +17,9 @@ import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingMixin;
+import com.googlecode.n_orm.ProcessCanceller;
 import com.googlecode.n_orm.ProcessException;
+import com.googlecode.n_orm.TimeoutCanceller;
 import com.googlecode.n_orm.ProcessException.Problem;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
@@ -97,7 +99,7 @@ public class Process {
 			return true;
 		}
 	}
-
+	
 	private static class ProcessRunnable<AE extends PersistingElement, E extends AE> implements Runnable, Serializable {
 		private static final long serialVersionUID = 3707496852314499064L;
 		
@@ -131,10 +133,10 @@ public class Process {
 
 	private Process() {}
 
-	public static <AE extends PersistingElement, E extends AE> ProcessReport<E> processElements(final Class<E> clazz, Constraint c, final com.googlecode.n_orm.Process<AE> processAction, int limit, String[] families, int threadNumber, long timeout, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+	public static <AE extends PersistingElement, E extends AE> ProcessReport<E> processElements(final Class<E> clazz, Constraint c, final com.googlecode.n_orm.Process<AE> processAction, int limit, String[] families, int threadNumber, ProcessCanceller cancel, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		ProcessReport<E> ret = new ProcessReport<E>();
 		long start = System.currentTimeMillis();
-		long end = (threadNumber == 1 || start > Long.MAX_VALUE - timeout) ? Long.MAX_VALUE : start+timeout;
+		//long end = (threadNumber == 1 || start > Long.MAX_VALUE - timeout) ? Long.MAX_VALUE : start+timeout;
 		//final CloseableIterator<E> it = findElement(clazz, c, limit, families);
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		final Set<String> toBeActivated = families == null ? null : StorageManagement.getAutoActivatedFamilies(clazz, families);
@@ -151,13 +153,13 @@ public class Process {
 			ret.performing = new ArrayList<Future<?>>(threadNumber);
 			while (keys.hasNext()) {
 				final Row data = keys.next();
-				if (end < System.currentTimeMillis())
-					throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
+				if (cancel != null && cancel.isCancelled())
+					throw new InterruptedException(cancel.getErrorMessage(processAction));
 				//Cleaning performing from done until there is room for another execution
 				while (ret.getPerforming().size() >= threadNumber) {
 					Thread.sleep(25); //Hopefully, some execution will be done
-					if (end < System.currentTimeMillis())
-						throw new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date());
+					if (cancel != null && cancel.isCancelled())
+						throw new InterruptedException(cancel.getErrorMessage(processAction));
 				}
 				Runnable r = new ProcessRunnable<AE,E>(toBeActivated, data, clazz,
 						processAction, problems);
@@ -175,8 +177,9 @@ public class Process {
 			if (executor != null) {
 				if (ownsExecutor) {
 					executor.shutdown();
-					if (!executor.awaitTermination(timeout, TimeUnit.MILLISECONDS)) {
-						exceptions.add(new InterruptedException("Timeout: process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start) + " should have finised at " + new Date(end) + " after " + timeout + "ms but is still running at " + new Date()));
+					long to = cancel instanceof TimeoutCanceller ? ((TimeoutCanceller)cancel).getDuration() : 60000;
+					if (!executor.awaitTermination(to, TimeUnit.MILLISECONDS)) {
+						exceptions.add(new InterruptedException("Timeout while expecting termination for process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start)));
 					}
 				}
 			}
@@ -198,7 +201,7 @@ public class Process {
 			new Thread() {
 				public void run() {
 					try {
-						processElements(clazz, c, process, limit, families, threadNumber, timeout, null);
+						processElements(clazz, c, process, limit, families, threadNumber, new TimeoutCanceller(timeout), null);
 						if (callback != null)
 							callback.processCompleted();
 					} catch (Throwable e) {
