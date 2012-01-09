@@ -3,9 +3,11 @@ package com.googlecode.n_orm.hbase;
 import java.util.Iterator;
 import java.util.Set;
 
+import org.apache.hadoop.hbase.UnknownScannerException;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.ScannerTimeoutException;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
@@ -60,7 +62,12 @@ final class CloseableIterator implements CloseableKeyIterator {
 		if (this.currentKey != null) {
 			this.constraint = new Constraint(Bytes.toString(currentKey) + Character.MIN_VALUE, this.constraint == null ? null : this.constraint.getEndKey());
 		}
-		store.handleProblem(x, table, families == null ? null : families.toArray(new String[families.size()]));
+		if ((x.getCause() instanceof ScannerTimeoutException) || x.getMessage().contains(ScannerTimeoutException.class.getSimpleName())
+				|| (x.getCause() instanceof UnknownScannerException) || x.getMessage().contains(UnknownScannerException.class.getSimpleName())) {
+			Store.logger.warning("Got exception " + x.getMessage() + " ; consider lowering scanCahing or improve scanner timeout at the HBase level");
+		} else {
+			store.handleProblem(x, table, families == null ? null : families.toArray(new String[families.size()]));
+		}
 		CloseableIterator newResult = (CloseableIterator) store.get(table, constraint, limit, families);
 		this.setResult(newResult.result);
 	}
