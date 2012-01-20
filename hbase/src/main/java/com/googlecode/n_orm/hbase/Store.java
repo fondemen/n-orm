@@ -94,6 +94,7 @@ import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.cache.Cache;
+import com.googlecode.n_orm.hbase.HBaseSchema.SettableBoolean;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.hbase.actions.Action;
 import com.googlecode.n_orm.hbase.actions.BatchAction;
@@ -323,6 +324,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	private Algorithm compression;
 	private boolean forceCompression = false;
 	
+	private boolean inMemory = false;
+	private boolean forceInMemory = false;
+	
 	private boolean countMapRed = false;
 	private boolean truncateMapRed = false;
 	
@@ -523,17 +527,28 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			this.compression = null;
 		} else {
 			for (String cmp : compression.split("-or-")) {
-				if (unavailableCompressors.contains(cmp))
-					continue;
-				try {
-					this.compression = Compression.getCompressionAlgorithmByName(cmp);
+				Algorithm newCompression = this.getCompressionByName(cmp);
+				if (newCompression != null) {
+					this.compression = newCompression;
 					break;
-				} catch (Exception x) {
-					unavailableCompressors.add(cmp);
-					logger.warning("Could not use compression " + cmp);
 				}
 			}
 		}
+	}
+	
+	protected Algorithm getCompressionByName(String requestedCompression) {
+		if (requestedCompression.length() > 0) {
+			if (unavailableCompressors.contains(requestedCompression))
+				return null;
+			try {
+				return Compression.getCompressionAlgorithmByName(requestedCompression);
+			} catch (Exception x) {
+				unavailableCompressors.add(requestedCompression);
+				logger.log(Level.WARNING, "Cannot not use compression " + requestedCompression, x);
+				return null;
+			}
+		} else
+			return null;
 	}
 
 	/**
@@ -554,6 +569,39 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	 */
 	public void setForceCompression(boolean forceCompression) {
 		this.forceCompression = forceCompression;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setInMemory(boolean)} set. 
+	 */
+	public boolean isInMemory() {
+		return inMemory;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setInMemory(boolean)} set.
+	 * Default value is false.
+	 */
+	public void setInMemory(boolean inMemory) {
+		this.inMemory = inMemory;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setInMemory(boolean)} setting.
+	 * see {@link #isInMemory()()}
+	 */
+	public boolean isForceInMemory() {
+		return forceInMemory;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setInMemory(boolean)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #setForceInMemory(boolean)} to true and different values for {@link Store#setCompression(String)} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * see {@link #isInMemory()()}
+	 */
+	public void setForceInMemory(boolean forceInMemory) {
+		this.forceInMemory = forceInMemory;
 	}
 
 	/**
@@ -1270,6 +1318,82 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				}
 
 			}
+		}
+	}
+	
+	private static class ModifiedColumnFamily {
+		public Class<? extends PersistingElement> persistingClass;
+		
+		public HBaseSchema classLevelSchemaSpecificities;
+		
+		public HTableDescriptor table;
+		public boolean tableAltered = false;
+		
+		public List<HColumnDescriptor> alteredColumnFamilies = new ArrayList<HColumnDescriptor>();
+	}
+	protected void getAddColumnFamily(ModifiedColumnFamily descriptor, String familyName) {
+		HBaseSchema columnFamilyLevelSchemaSpecificities = null;
+		boolean cfFound = false;
+		for (Field cf : com.googlecode.n_orm.ColumnFamiliyManagement.getInstance().getColumnFamilies(descriptor.persistingClass)) {
+			if (cf.getName().equals(familyName)) {
+				columnFamilyLevelSchemaSpecificities = cf.getAnnotation(HBaseSchema.class);
+				cfFound = true;
+				break;
+			}
+		}
+		assert cfFound : "Could not find column family " + familyName + " in class " + descriptor.persistingClass.getName();
+
+		//Getting compression setting
+		boolean forceCompression = this.forceCompression;
+		Compression.Algorithm compression = this.compression;
+		for (HBaseSchema schemaSpecificities : new HBaseSchema[] {descriptor.classLevelSchemaSpecificities, columnFamilyLevelSchemaSpecificities}) {
+			switch (schemaSpecificities.forceCompression()) {
+			case FALSE: forceCompression = true; break;
+			case TRUE: forceCompression = true; break;
+			}
+
+			Algorithm requiredCompression = this.getCompressionByName(schemaSpecificities.compression());
+			if (requiredCompression != null)
+				compression = requiredCompression;
+		}
+		
+		//Getting in-memory setting
+		boolean forceInMemory = this.forceInMemory;
+		boolean inMemory = this.inMemory;
+		for (HBaseSchema schemaSpecificities : new HBaseSchema[] {descriptor.classLevelSchemaSpecificities, columnFamilyLevelSchemaSpecificities}) {
+			switch (schemaSpecificities.forceInMemory()) {
+			case FALSE: forceInMemory = true; break;
+			case TRUE: forceInMemory = true; break;
+			}
+
+			switch (schemaSpecificities.inMemory()) {
+			case FALSE: inMemory = true; break;
+			case TRUE: inMemory = true; break;
+			}
+		}
+		
+		byte [] famB = Bytes.toBytes(familyName);
+		if (!descriptor.table.hasFamily(famB)) {
+			HColumnDescriptor famD = new HColumnDescriptor(famB);
+			if (this.compression != null)
+				famD.setCompressionType(this.compression);
+			descriptor.table.addFamily(famD);
+			descriptor.tableAltered = true;
+		} else {
+			boolean columnIsToBeAltered = false;
+			HColumnDescriptor actualColumn = descriptor.table.getFamily(famB);
+			
+			if (forceCompression && !compression.equals(actualColumn.getCompressionType())) {
+				actualColumn.setCompressionType(compression);
+				columnIsToBeAltered = true;
+			}
+			if (forceInMemory && inMemory != actualColumn.isInMemory()) {
+				actualColumn.setInMemory(inMemory);
+				columnIsToBeAltered = true;
+			}
+			
+			if (columnIsToBeAltered)
+				descriptor.alteredColumnFamilies.add(actualColumn);
 		}
 	}
 	
