@@ -485,9 +485,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * @return the used compression, or null if not set (equivalent to the HBase default value - none)
 	 */
 	public String getCompression() {
-		if (compression == null)
+		if (getCompressionAlgorithm() == null)
 			return null;
-		return compression.getName();
+		return getCompressionAlgorithm().getName();
 	}
 
 	/**
@@ -501,7 +501,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			this.compression = null;
 		} else {
 			for (String cmp : compression.split("-or-")) {
-				Algorithm newCompression = this.getCompressionByName(cmp);
+				Algorithm newCompression = getCompressionByName(cmp);
 				if (newCompression != null) {
 					this.compression = newCompression;
 					break;
@@ -510,7 +510,11 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 	}
 	
-	protected Algorithm getCompressionByName(String requestedCompression) {
+	public Algorithm getCompressionAlgorithm() {
+		return compression;
+	}
+
+	protected static Algorithm getCompressionByName(String requestedCompression) {
 		if (requestedCompression.length() > 0) {
 			if (unavailableCompressors.contains(requestedCompression))
 				return null;
@@ -1076,8 +1080,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 										byte [] famB = Bytes.toBytes(fam.getKey());
 										if (!td.hasFamily(famB)) {
 											HColumnDescriptor famD = new HColumnDescriptor(famB);
-											if (this.compression != null)
-												famD.setCompressionType(this.compression);
+											if (this.getCompressionAlgorithm() != null)
+												famD.setCompressionType(this.getCompressionAlgorithm());
 											td.addFamily(famD);
 										}
 									}
@@ -1169,7 +1173,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 		return td.hasFamily(Bytes.toBytes(family));
 	}
-
+	
 	private void enforceColumnFamiliesExists(HTableDescriptor tableD, Class<? extends PersistingElement> clazz, 
 			Map<String, Field> columnFamilies) throws DatabaseNotReachedException {
 		assert tableD != null;
@@ -1182,7 +1186,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				byte[] cfname = Bytes.toBytes(cf.getKey());
 				HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
 				boolean familyExists = family != null;
-				boolean hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
+				boolean hasCorrectCompressor = familyExists ? this.getCompressionAlgorithm() == null || !this.forceCompression || family.getCompressionType().equals(this.getCompressionAlgorithm()) : true;
 				if (!recreated && (!familyExists || !hasCorrectCompressor)) {
 					logger.fine("Table " + tableName + " is not known to have family " + cf + " propertly configured: checking from HBase");
 					synchronized (this.sharedLockTable(tableName)) {
@@ -1203,14 +1207,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					}
 					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
 					familyExists = family != null;
-					hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
+					hasCorrectCompressor = familyExists ? this.getCompressionAlgorithm() == null || !this.forceCompression || family.getCompressionType().equals(this.getCompressionAlgorithm()) : true;
 					this.cache(tableName, tableD);
 					recreated = true;
 				}
 				if (!familyExists) {
 					HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
-					if (this.compression != null)
-						newFamily.setCompressionType(this.compression);
+					if (this.getCompressionAlgorithm() != null)
+						newFamily.setCompressionType(this.getCompressionAlgorithm());
 					toBeAdded.add(newFamily);
 				} else if (!hasCorrectCompressor) {
 					toBeCompressed.add(family);
@@ -1221,7 +1225,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					if (!toBeAdded.isEmpty())
 						logger.info("Table " + tableD.getNameAsString() + " is missing families " + toBeAdded.toString() + ": altering");
 					if (!toBeCompressed.isEmpty())
-						logger.info("Table " + tableD.getNameAsString() + " compressed with " + this.compression + " has the wrong compressor for families " + toBeCompressed.toString() + ": altering");
+						logger.info("Table " + tableD.getNameAsString() + " compressed with " + this.getCompressionAlgorithm() + " has the wrong compressor for families " + toBeCompressed.toString() + ": altering");
 					synchronized (this.exclusiveLockTable(tableName)) {
 						try {
 							try {
@@ -1242,7 +1246,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 								}
 							}
 							for (HColumnDescriptor hColumnDescriptor : toBeCompressed) {
-								hColumnDescriptor.setCompressionType(this.compression);
+								hColumnDescriptor.setCompressionType(this.getCompressionAlgorithm());
 								this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
 							}
 							boolean done = true;
@@ -1293,24 +1297,23 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		public HBaseSchema classLevelSchemaSpecificities;
 		
 		public HTableDescriptor table;
+		public boolean tableFoundFromBase = false;
 		public boolean tableAltered = false;
 		
 		public List<HColumnDescriptor> alteredColumnFamilies = new ArrayList<HColumnDescriptor>();
 	}
-	protected void getAddColumnFamily(ModifiedColumnFamily descriptor, String familyName) {
-		HBaseSchema columnFamilyLevelSchemaSpecificities = null;
-		Field cf = ColumnFamiliyManagement.getInstance().getColumnFamilies(descriptor.persistingClass).get(familyName);
-		if (cf == null) {
-			assert false : "Could not find column family " + familyName + " in class " + descriptor.persistingClass.getName();
-		} else {
-			columnFamilyLevelSchemaSpecificities = cf.getAnnotation(HBaseSchema.class);
-		}
-
-		HBaseSchema[] schemaDescriptorsInOrder = new HBaseSchema[] {descriptor.classLevelSchemaSpecificities, columnFamilyLevelSchemaSpecificities};
+	protected void getAddColumnFamily(ModifiedColumnFamily descriptor, String familyName, Field familyField) {
+		HBaseSchema columnFamilyLevelSchemaSpecificities = familyField == null ? null : familyField.getAnnotation(HBaseSchema.class);
 		
+		List<HBaseSchema> schemaDescriptorsInOrder = new ArrayList<HBaseSchema>(2);
+		if (descriptor.classLevelSchemaSpecificities != null)
+			schemaDescriptorsInOrder.add(descriptor.classLevelSchemaSpecificities);
+		if (columnFamilyLevelSchemaSpecificities != null)
+			schemaDescriptorsInOrder.add(columnFamilyLevelSchemaSpecificities);
+
 		//Getting compression setting
 		boolean forceCompression = this.forceCompression;
-		Compression.Algorithm compression = this.compression;
+		Compression.Algorithm compression = this.getCompressionAlgorithm();
 		for (HBaseSchema schemaSpecificities : schemaDescriptorsInOrder) {
 			switch (schemaSpecificities.forceCompression()) {
 			case FALSE: forceCompression = false; break;
@@ -1336,30 +1339,60 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			case TRUE: inMemory = true; break;
 			}
 		}
+
 		
+		//Run 1 (only in case table descriptor was retrieved from the base): checking ok and then retrieving table descriptor if failed
+		//Run 2: registering alterations (if any)
 		byte [] famB = Bytes.toBytes(familyName);
-		if (!descriptor.table.hasFamily(famB)) {
-			HColumnDescriptor famD = new HColumnDescriptor(famB);
-			if (compression != null)
-				famD.setCompressionType(compression);
-			famD.setInMemory(inMemory);
-			descriptor.table.addFamily(famD);
-			descriptor.tableAltered = true;
-		} else {
-			boolean columnIsToBeAltered = false;
-			HColumnDescriptor actualColumn = descriptor.table.getFamily(famB);
-			
-			if (forceCompression && !compression.equals(actualColumn.getCompressionType())) {
-				actualColumn.setCompressionType(compression);
-				columnIsToBeAltered = true;
+		for (int run = descriptor.tableFoundFromBase ? 1 : 2; run <= 2; ++run) {
+			boolean change = false;
+			if (!descriptor.table.hasFamily(famB)) {
+				change = true;
+				if (run == 2) {
+					HColumnDescriptor famD = new HColumnDescriptor(famB);
+					if (compression != null)
+						famD.setCompressionType(compression);
+					famD.setInMemory(inMemory);
+					descriptor.table.addFamily(famD);
+					descriptor.tableAltered = true;
+				}
+			} else {
+				HColumnDescriptor actualColumn = descriptor.table.getFamily(famB);
+				
+				if (forceCompression && !compression.equals(actualColumn.getCompressionType())) {
+					actualColumn.setCompressionType(compression);
+					change = true;
+				}
+				if (forceInMemory && inMemory != actualColumn.isInMemory()) {
+					actualColumn.setInMemory(inMemory);
+					change = true;
+				}
+				
+				if (change && run == 2) {
+					descriptor.alteredColumnFamilies.add(actualColumn);
+				}
 			}
-			if (forceInMemory && inMemory != actualColumn.isInMemory()) {
-				actualColumn.setInMemory(inMemory);
-				columnIsToBeAltered = true;
+		
+			String tableName = descriptor.table.getNameAsString();
+			if (change && run == 1) {
+				synchronized (this.sharedLockTable(tableName)) {
+					try {
+						descriptor.table = this.admin.getTableDescriptor(descriptor.table.getName());
+					} catch (Exception e) {
+						errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
+						this.handleProblem(e, descriptor.persistingClass, tableName, null);
+						try {
+							descriptor.table = this.admin.getTableDescriptor(descriptor.table.getName());
+						} catch (Exception x) {
+							throw new DatabaseNotReachedException(x);
+						}
+					} finally {
+						this.sharedUnlockTable(tableName);
+					}
+				}
+				this.cache(tableName, descriptor.table);
+				descriptor.tableFoundFromBase = true;
 			}
-			
-			if (columnIsToBeAltered)
-				descriptor.alteredColumnFamilies.add(actualColumn);
 		}
 	}
 	
