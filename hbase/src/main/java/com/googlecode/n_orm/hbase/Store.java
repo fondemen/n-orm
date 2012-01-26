@@ -4,18 +4,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
@@ -23,23 +19,14 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
-import java.util.logging.StreamHandler;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
@@ -69,17 +56,12 @@ import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.io.hfile.Compression;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
-import org.apache.hadoop.hbase.ipc.HBaseRPC;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.zookeeper.ZKConfig;
-import org.apache.hadoop.io.SetFile;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.ZooKeeper.States;
 import org.apache.zookeeper.recipes.lock.SharedExclusiveLock;
 import org.codehaus.plexus.util.DirectoryScanner;
 
@@ -87,14 +69,11 @@ import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.ColumnFamiliyManagement;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.EmptyCloseableIterator;
-import com.googlecode.n_orm.Incrementing;
-import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.cache.Cache;
-import com.googlecode.n_orm.hbase.HBaseSchema.SettableBoolean;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.hbase.actions.Action;
 import com.googlecode.n_orm.hbase.actions.BatchAction;
@@ -103,18 +82,13 @@ import com.googlecode.n_orm.hbase.actions.DeleteAction;
 import com.googlecode.n_orm.hbase.actions.ExistsAction;
 import com.googlecode.n_orm.hbase.actions.GetAction;
 import com.googlecode.n_orm.hbase.actions.IncrementAction;
-import com.googlecode.n_orm.hbase.actions.PutAction;
 import com.googlecode.n_orm.hbase.actions.ScanAction;
 import com.googlecode.n_orm.hbase.actions.TruncateAction;
 import com.googlecode.n_orm.hbase.mapreduce.ActionJob;
-import com.googlecode.n_orm.hbase.mapreduce.LocalFormat;
-import com.googlecode.n_orm.hbase.mapreduce.RowCounter;
-import com.googlecode.n_orm.hbase.mapreduce.Truncator;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
-import com.googlecode.n_orm.storeapi.Row;
-import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
+import com.googlecode.n_orm.storeapi.GenericStore;
 
 /**
  * The HBase store found according to its configuration folder.
@@ -138,7 +112,7 @@ import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
  * By default, all known jars are sent (which might become a problem is same jars are sent over and over).
  * You can change this using e.g. {@link #setMapRedSendJars(boolean)}.
  */
-public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n_orm.storeapi.GenericStore, ActionnableStore {
+public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableStore, GenericStore {
 
 	private static final String CONF_MAXRETRIES_KEY = "hbase.client.retries.number";
 
@@ -813,7 +787,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected void handleProblem(Throwable e, String table, String... expectedFamilies) throws DatabaseNotReachedException {		
+	protected void handleProblem(Throwable e, Class<? extends PersistingElement> clazz, String table, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {		
 		while (e instanceof UndeclaredThrowableException)
 			e = ((UndeclaredThrowableException)e).getCause();
 		
@@ -831,12 +805,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			HTableDescriptor td = this.tablesD.get(table);
 			if (td != null) {
 				this.uncache(table);
-				Set<String> expectedFams = new TreeSet<String>(Arrays.asList(expectedFamilies));
-				for (HColumnDescriptor cd : td.getColumnFamilies()) {
-					expectedFams.add(cd.getNameAsString());
-				}
 				try {
-					this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
+					this.getTableDescriptor(clazz, td.getNameAsString(), expectedFamilies);
 				} catch (Exception x) {
 					throw new DatabaseNotReachedException(x);
 				}
@@ -875,12 +845,8 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			HTableDescriptor td = this.tablesD.get(table);
 			if (td != null) {
 				this.uncache(table);
-				Set<String> expectedFams = new TreeSet<String>(Arrays.asList(expectedFamilies));
-				for (HColumnDescriptor cd : td.getColumnFamilies()) {
-					expectedFams.add(cd.getNameAsString());
-				}
 				try {
-					this.getTableDescriptor(td.getNameAsString(), expectedFams.toArray(new String[expectedFams.size()]));
+					this.getTableDescriptor(clazz, td.getNameAsString(), expectedFamilies);
 				} catch (Exception x) {
 					throw new DatabaseNotReachedException(x);
 				}
@@ -904,10 +870,10 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected <R> R tryPerform(Action<R> action, String tableName, String... expectedFamilies) throws DatabaseNotReachedException {
-		HTable table = this.getTable(tableName, expectedFamilies);
+	protected <R> R tryPerform(Action<R> action, Class<? extends PersistingElement> clazz,  String tableName, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {
+		HTable table = this.getTable(clazz, tableName, expectedFamilies);
 		try {
-			return this.tryPerform(action, table, expectedFamilies);
+			return this.tryPerform(action, table, clazz, expectedFamilies);
 		} finally {
 			this.returnTable(action.getTable());
 		}
@@ -917,7 +883,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	/**
 	 * Performs an action. Table should be replaced by action.getTable() as it can change in case of problem handling (like a connection lost).
 	 */
-	protected <R> R tryPerform(final Action<R> action, HTable table, String... expectedFamilies) throws DatabaseNotReachedException {	
+	protected <R> R tryPerform(final Action<R> action, HTable table, Class<? extends PersistingElement> clazz, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {	
 		action.setTable(table);
 		try {
 			return action.perform();
@@ -926,9 +892,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			
 			String tableName = Bytes.toString(table.getTableName());
 			HTablePool tp = this.tablesC;
-			this.handleProblem(e, tableName, expectedFamilies);
+			this.handleProblem(e, clazz, tableName, expectedFamilies);
 			if (tp != this.tablesC) { //Store was restarted ; we should get a new table client
-				table = this.getTable(tableName, expectedFamilies);
+				table = this.getTable(clazz, tableName, expectedFamilies);
 				action.setTable(table);
 			}
 			try {
@@ -1092,7 +1058,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 	}
 	
-	protected HTableDescriptor getTableDescriptor(String name, String... expectedFamilies) throws Exception {
+	protected HTableDescriptor getTableDescriptor(Class<? extends PersistingElement> clazz, String name, Map<String, Field> expectedFamilies) throws Exception {
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
 		boolean created = false;
@@ -1103,13 +1069,13 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 						try {
 							logger.fine("Unknown table " + name + " for store " + this.hashCode());
 							if (!this.admin.tableExists(name)) {
-								logger.info("Table " + name + " not found ; creating with column families " + Arrays.toString(expectedFamilies));
+								logger.info("Table " + name + " not found ; creating" + (expectedFamilies == null ? "" : " with column families " + expectedFamilies.keySet().toString()));
 								td = new HTableDescriptor(name);
 								if (expectedFamilies != null) {
-									for (String fam : expectedFamilies) {
-										byte [] famB = Bytes.toBytes(fam);
+									for (Entry<String, Field> fam : expectedFamilies.entrySet()) {
+										byte [] famB = Bytes.toBytes(fam.getKey());
 										if (!td.hasFamily(famB)) {
-											HColumnDescriptor famD = new HColumnDescriptor(fam);
+											HColumnDescriptor famD = new HColumnDescriptor(famB);
 											if (this.compression != null)
 												famD.setCompressionType(this.compression);
 											td.addFamily(famD);
@@ -1119,7 +1085,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 								synchronized(this.exclusiveLockTable(name)) {
 									try {
 										this.admin.createTable(td);
-										logger.info("Table " + name + " created with column families " + Arrays.toString(expectedFamilies));
+										logger.info("Table " + name + " created");
 										created = true;
 									} catch (TableExistsException x) {
 										//Already done by another process...
@@ -1147,25 +1113,25 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			}
 		}
 
-		if (!created && expectedFamilies != null && expectedFamilies.length>0) {
-			this.enforceColumnFamiliesExists(td, expectedFamilies);
+		if (!created && expectedFamilies != null && expectedFamilies.size()>0) {
+			this.enforceColumnFamiliesExists(td, clazz, expectedFamilies);
 		}
 		
 		return td;
 	}
 
-	protected HTable getTable(String name, String... expectedFamilies)
+	protected HTable getTable(Class<? extends PersistingElement> clazz, String name, Map<String, Field> expectedFamilies)
 			throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
 		
 		try {
 			//Checking that this table actually exists with the expected column families
-			this.getTableDescriptor(name, expectedFamilies);
+			this.getTableDescriptor(clazz, name, expectedFamilies);
 			return (HTable)this.tablesC.getTable(name);
 		} catch (Throwable x) {
-			this.handleProblem(x, name, expectedFamilies);
+			this.handleProblem(x, clazz, name, expectedFamilies);
 			try {
-				this.getTableDescriptor(name, expectedFamilies);
+				this.getTableDescriptor(clazz, name, expectedFamilies);
 			} catch (Exception y) {
 				throw new DatabaseNotReachedException(x);
 			}
@@ -1204,16 +1170,16 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		return td.hasFamily(Bytes.toBytes(family));
 	}
 
-	private void enforceColumnFamiliesExists(HTableDescriptor tableD,
-			String... columnFamilies) throws DatabaseNotReachedException {
+	private void enforceColumnFamiliesExists(HTableDescriptor tableD, Class<? extends PersistingElement> clazz, 
+			Map<String, Field> columnFamilies) throws DatabaseNotReachedException {
 		assert tableD != null;
-		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.length);
-		List<HColumnDescriptor> toBeCompressed = new ArrayList<HColumnDescriptor>(columnFamilies.length);
+		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.size());
+		List<HColumnDescriptor> toBeCompressed = new ArrayList<HColumnDescriptor>(columnFamilies.size());
 		String tableName = tableD.getNameAsString();
 		synchronized (tableD) {
 			boolean recreated = false; //Whether table descriptor was just retrieved from HBase admin
-			for (String cf : columnFamilies) {
-				byte[] cfname = Bytes.toBytes(cf);
+			for (Entry<String, Field> cf : columnFamilies.entrySet()) {
+				byte[] cfname = Bytes.toBytes(cf.getKey());
 				HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
 				boolean familyExists = family != null;
 				boolean hasCorrectCompressor = familyExists ? this.compression == null || !this.forceCompression || family.getCompressionType().equals(this.compression) : true;
@@ -1224,9 +1190,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 							tableD = this.admin.getTableDescriptor(tableD.getName());
 						} catch (Exception e) {
 							errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
-							this.handleProblem(e, tableName);
+							this.handleProblem(e, clazz, tableName, null);
 							try {
-								this.getTableDescriptor(tableName, columnFamilies);
+								this.getTableDescriptor(clazz, tableName, columnFamilies);
 							} catch (Exception x) {
 								throw new DatabaseNotReachedException(x);
 							}
@@ -1261,7 +1227,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 							try {
 								this.admin.disableTable(tableD.getName());
 							} catch (TableNotFoundException x) {
-								this.handleProblem(x, tableName);
+								this.handleProblem(x, clazz, tableName, null);
 								this.admin.disableTable(tableD.getName());
 							}
 							if (! this.admin.isTableDisabled(tableD.getName()))
@@ -1271,7 +1237,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 								try {
 									this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 								} catch (TableNotFoundException x) {
-									this.handleProblem(x, tableName);
+									this.handleProblem(x, clazz, tableName, null);
 									this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 								}
 							}
@@ -1333,22 +1299,21 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	}
 	protected void getAddColumnFamily(ModifiedColumnFamily descriptor, String familyName) {
 		HBaseSchema columnFamilyLevelSchemaSpecificities = null;
-		boolean cfFound = false;
-		for (Field cf : com.googlecode.n_orm.ColumnFamiliyManagement.getInstance().getColumnFamilies(descriptor.persistingClass)) {
-			if (cf.getName().equals(familyName)) {
-				columnFamilyLevelSchemaSpecificities = cf.getAnnotation(HBaseSchema.class);
-				cfFound = true;
-				break;
-			}
+		Field cf = ColumnFamiliyManagement.getInstance().getColumnFamilies(descriptor.persistingClass).get(familyName);
+		if (cf == null) {
+			assert false : "Could not find column family " + familyName + " in class " + descriptor.persistingClass.getName();
+		} else {
+			columnFamilyLevelSchemaSpecificities = cf.getAnnotation(HBaseSchema.class);
 		}
-		assert cfFound : "Could not find column family " + familyName + " in class " + descriptor.persistingClass.getName();
 
+		HBaseSchema[] schemaDescriptorsInOrder = new HBaseSchema[] {descriptor.classLevelSchemaSpecificities, columnFamilyLevelSchemaSpecificities};
+		
 		//Getting compression setting
 		boolean forceCompression = this.forceCompression;
 		Compression.Algorithm compression = this.compression;
-		for (HBaseSchema schemaSpecificities : new HBaseSchema[] {descriptor.classLevelSchemaSpecificities, columnFamilyLevelSchemaSpecificities}) {
+		for (HBaseSchema schemaSpecificities : schemaDescriptorsInOrder) {
 			switch (schemaSpecificities.forceCompression()) {
-			case FALSE: forceCompression = true; break;
+			case FALSE: forceCompression = false; break;
 			case TRUE: forceCompression = true; break;
 			}
 
@@ -1360,14 +1325,14 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		//Getting in-memory setting
 		boolean forceInMemory = this.forceInMemory;
 		boolean inMemory = this.inMemory;
-		for (HBaseSchema schemaSpecificities : new HBaseSchema[] {descriptor.classLevelSchemaSpecificities, columnFamilyLevelSchemaSpecificities}) {
+		for (HBaseSchema schemaSpecificities : schemaDescriptorsInOrder) {
 			switch (schemaSpecificities.forceInMemory()) {
-			case FALSE: forceInMemory = true; break;
+			case FALSE: forceInMemory = false; break;
 			case TRUE: forceInMemory = true; break;
 			}
 
 			switch (schemaSpecificities.inMemory()) {
-			case FALSE: inMemory = true; break;
+			case FALSE: inMemory = false; break;
 			case TRUE: inMemory = true; break;
 			}
 		}
@@ -1375,8 +1340,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		byte [] famB = Bytes.toBytes(familyName);
 		if (!descriptor.table.hasFamily(famB)) {
 			HColumnDescriptor famD = new HColumnDescriptor(famB);
-			if (this.compression != null)
-				famD.setCompressionType(this.compression);
+			if (compression != null)
+				famD.setCompressionType(compression);
+			famD.setInMemory(inMemory);
 			descriptor.table.addFamily(famD);
 			descriptor.tableAltered = true;
 		} else {
@@ -1395,6 +1361,33 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			if (columnIsToBeAltered)
 				descriptor.alteredColumnFamilies.add(actualColumn);
 		}
+	}
+	
+	protected Map<String, Field> toMap(String family, Field field) {
+		if (family == null)
+			return null;
+		
+		Map<String, Field> ret = new TreeMap<String, Field>();
+		ret.put(family, field == null ? null : (family.equals(field.getName()) ? field : null));
+		return ret;
+	}
+	
+	protected Map<String, Field> toMap(Set<String> families, Map<String, Field> fields) {
+		Map<String, Field> ret = new TreeMap<String, Field>();
+		
+		for (String family : families) {
+			ret.put(family, null);
+		}
+		
+		if (fields != null) {
+			for (Entry<String, Field> field : fields.entrySet()) {
+				if (ret.containsKey(field.getKey())) {
+					ret.put(field.getKey(), field.getValue());
+				}
+			}
+		}
+		
+		return ret;
 	}
 	
 	////////////////////////////////////////////////////////////////////
@@ -1428,7 +1421,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		return f;
 	}
 
-	protected Scan getScan(Constraint c, String... families) throws DatabaseNotReachedException {
+	protected Scan getScan(Constraint c, Map<String, Field> families) throws DatabaseNotReachedException {
 		Scan s = new Scan();
 		if (this.scanCaching != null)
 			s.setCaching(this.getScanCaching());
@@ -1441,7 +1434,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 		
 		if (families != null) {
-			for (String fam : families) {
+			for (String fam : families.keySet()) {
 				s.addFamily(Bytes.toBytes(fam));
 			}
 		} else {
@@ -1453,17 +1446,17 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	}
 
 	@Override
-	public Map<String, Map<String, byte[]>> get(String table, String id,
-			Set<String> families) throws DatabaseNotReachedException {
+	public Map<String, Map<String, byte[]>> get(PersistingElement elt, String table, String id,
+			Map<String, Field> families) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return null;
 		
 		Get g = new Get(Bytes.toBytes(id));
-		for (String family : families) {
+		for (String family : families.keySet()) {
 			g.addFamily(Bytes.toBytes(family));
 		}
 
-		Result r = this.tryPerform(new GetAction(g), table, families.toArray(new String[families.size()]));
+		Result r = this.tryPerform(new GetAction(g), elt == null ? null : elt.getClass(), table, families);
 		if (r.isEmpty())
 			return null;
 		
@@ -1484,7 +1477,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	}
 
 	@Override
-	public void storeChanges(String table, String id,
+	public void storeChanges(PersistingElement elt, Map<String, Field> changedFields, String table, String id,
 			Map<String, Map<String, byte[]>> changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
@@ -1495,9 +1488,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		if (increments != null) families.addAll(increments.keySet());
 		
 		families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		Map<String, Field> fams = this.toMap(families, changedFields);
 		
-		String[] famAr = families.toArray(new String[families.size()]);
-		HTable t = this.getTable(table, famAr);
+		HTable t = this.getTable(elt == null ? null : elt.getClass(), table, fams);
 
 		try {
 			byte[] row = Bytes.toBytes(id);
@@ -1562,13 +1555,13 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			
 			if (! actions.isEmpty()) {
 				act = new BatchAction(actions);
-				this.tryPerform(act, t, famAr);
+				this.tryPerform(act, t, elt == null ? null : elt.getClass(), fams);
 				t = act.getTable();
 			}
 			
 			if (rowInc != null) {
 				act = new IncrementAction(rowInc);
-				this.tryPerform(act, t, famAr);
+				this.tryPerform(act, t, elt == null ? null : elt.getClass(), fams);
 				t = act.getTable();
 			}
 		} finally {
@@ -1576,104 +1569,48 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 				this.returnTable(t);
 		}
 	}
-	
-	
-
-//	@Override
-//	public void delete(PersistingElement elt, String table, String id)
-//			throws DatabaseNotReachedException {
-//		if (!this.hasTable(table))
-//			return;
-//		
-//		boolean hasIncrements = false;
-//		Class<? extends PersistingElement> clazz = elt.getClass();
-//		PropertyManagement pm = PropertyManagement.getInstance();
-//		for (Field field : pm.getProperties(clazz)) {
-//			if (field.isAnnotationPresent(Incrementing.class)) {
-//				hasIncrements = true;
-//				break;
-//			}
-//		}
-//		if (!hasIncrements) {
-//			ColumnFamiliyManagement cf = ColumnFamiliyManagement.getInstance();
-//			for (Field field : cf.getColumnFamilies(clazz)) {
-//				if (field.isAnnotationPresent(Incrementing.class)) {
-//					hasIncrements = true;
-//					break;
-//				}
-//			}
-//		}
-//		
-//		this.delete(table, id, hasIncrements);
-//	}
 
 	@Override
-	public void delete(String table, String id)
+	public void delete(PersistingElement elt, String table, String id)
 			throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return;
-//		this.delete(table, id, true);
 		Delete d = new Delete(Bytes.toBytes(id));
-		this.tryPerform(new DeleteAction(d), table);
+		this.tryPerform(new DeleteAction(d), elt == null ? null : elt.getClass(), table, null);
 	}
 
-//	public void delete(String table, String id, boolean flush)
-//			throws DatabaseNotReachedException {
-//
-//		HTable t = this.getTable(table);
-//		try {
-//			byte[] ident = Bytes.toBytes(id);
-//			Delete rowDel = new Delete(ident);
-//			this.tryPerform(new DeleteAction(rowDel), t);
-//			
-//			if (flush) {
-//				//In case the sent object has incrementing columns, table MUST be flushed (HBase bug HBASE-3725)
-//				//See https://issues.apache.org/jira/browse/HBASE-3725
-//				try {
-//					t.flushCommits();
-//					HRegionLocation rloc = t.getRegionLocation(ident);
-//					this.getAdmin().getConnection().getHRegionConnection(rloc.getServerAddress()).flushRegion(rloc.getRegionInfo());
-//				} catch (Exception e) {
-//					logger.log(Level.WARNING, "Could not flush table " + table + " after deleting " + id, e);
-//				}
-//			}
-//		} finally {
-//			this.returnTable(t);
-//		}
-//	}
-
 	@Override
-	public boolean exists(String table, String row, String family)
+	public boolean exists(PersistingElement elt, Field columnFamily, String table, String row, String family)
 			throws DatabaseNotReachedException {
 		if (!this.hasColumnFamily(table, family))
 			return false;
 
 		Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));
 		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-		return this.tryPerform(new ExistsAction(g), table);
+		return this.tryPerform(new ExistsAction(g), elt == null ? null : elt.getClass(), table, null);
 	}
 
 	@Override
-	public boolean exists(String table, String row)
+	public boolean exists(PersistingElement elt, String table, String row)
 			throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return false;
 
 		Get g = new Get(Bytes.toBytes(row));
 		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-		return this.tryPerform(new ExistsAction(g), table);
+		return this.tryPerform(new ExistsAction(g), elt == null ? null : elt.getClass(), table, null);
 	}
 
 	@Override
-	public byte[] get(String table, String row, String family, String key)
+	public byte[] get(PersistingElement elt, Field property, String table, String row, String family, String key)
 			throws DatabaseNotReachedException {
-		if (!this.hasTable(table))
+		if (! this.hasColumnFamily(table, family))
 			return null;
 
 		Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
 				Bytes.toBytes(key));
 
-		Result result = this.tryPerform(new GetAction(g), table, family);
+		Result result = this.tryPerform(new GetAction(g), elt == null ? null : elt.getClass(), table, this.toMap(family, property));
 		
 		if (result.isEmpty())
 			return null;
@@ -1681,13 +1618,15 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	}
 
 	@Override
-	public Map<String, byte[]> get(String table, String id, String family)
+	public Map<String, byte[]> get(PersistingElement elt,
+			Field columnFamily, String table, String id, String family)
 			throws DatabaseNotReachedException {
-		return this.get(table, id, family, (Constraint) null);
+		return this.get(elt, columnFamily, table, id, family, (Constraint) null);
 	}
 
 	@Override
-	public Map<String, byte[]> get(String table, String id, String family,
+	public Map<String, byte[]> get(PersistingElement elt,
+			Field columnFamily, String table, String id, String family,
 			Constraint c) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return null;
@@ -1698,7 +1637,7 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 			g.setFilter(createFamilyConstraint(c));
 		}
 
-		Result r = this.tryPerform(new GetAction(g), table, family);
+		Result r = this.tryPerform(new GetAction(g), elt == null ? null : elt.getClass(), table, toMap(family, columnFamily));
 		if (r.isEmpty())
 			return null;
 		
@@ -1712,42 +1651,41 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 	}
 
 	@Override
-	public long count(String table, Constraint c) throws DatabaseNotReachedException {
+	public long count(Class<? extends PersistingElement> type, String table, Constraint c) throws DatabaseNotReachedException {
 		if (! this.hasTable(table))
 			return 0;
 		
-		return this.tryPerform(new CountAction(this, this.getScan(c)), table);
+		return this.tryPerform(new CountAction(this, this.getScan(c, null)), type, table, null);
 	}
 
 	@Override
-	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(String table, Constraint c,
-			 int limit, Set<String> families) throws DatabaseNotReachedException {
+	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(Class<? extends PersistingElement> type, String table, Constraint c,
+			 int limit, Map<String, Field> families) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return new EmptyCloseableIterator();
 		
-		String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
-		Scan s = this.getScan(c, famAr);
+		Scan s = this.getScan(c, families);
 		s.setFilter(this.addFilter(s.getFilter(), new PageFilter(limit)));
 		
-		ResultScanner r = this.tryPerform(new ScanAction(s), table, famAr);
-		return new CloseableIterator(this, table, c, limit, families, r, families != null);
+		ResultScanner r = this.tryPerform(new ScanAction(s), type, table, families);
+		return new CloseableIterator(this, type, table, c, limit, families, r, families != null);
 	}
 
-	public void truncate(String table, Constraint c) throws DatabaseNotReachedException {
+	public void truncate(Class<? extends PersistingElement> clazz, String table, Constraint c) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return;
 		
 		logger.info("Truncating table " + table);
 		
-		TruncateAction action = new TruncateAction(this, this.getScan(c));
-		this.tryPerform(action, table);
+		TruncateAction action = new TruncateAction(this, this.getScan(c, null));
+		this.tryPerform(action, clazz, table, null);
 		
 		logger.info("Truncated table " + table);
 	}
 
 	@Override
 	public <AE extends PersistingElement, E extends AE> void process(
-			final String table, Constraint c, Set<String> families, Class<E> elementClass,
+			final String table, Constraint c, Map<String, Field> families, Class<E> elementClass,
 			Process<AE> action, final Callback callback)
 			throws DatabaseNotReachedException {
 		if (! this.hasTable(table)) {
@@ -1757,10 +1695,9 @@ public class Store /*extends TypeAwareStoreWrapper*/ implements com.googlecode.n
 		}
 		final Class<?> actionClass = action.getClass();
 		try {
-			String[] famAr = families == null ? null : families.toArray(new String[families.size()]);
 			//Checking that cf are all there so that process will work
-			this.getTableDescriptor(table, famAr);
-			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, famAr), action, elementClass, famAr);
+			this.getTableDescriptor(elementClass, table, families);
+			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, families), action, elementClass, families.keySet().toArray(new String[families.size()]));
 			logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
 			if (callback != null) {
 				new Thread() {
