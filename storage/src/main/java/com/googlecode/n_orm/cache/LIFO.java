@@ -39,22 +39,37 @@ public class LIFO<T> implements Iterable<T> {
 		
 	};
 	
+	/**
+	 * Iterator over the {@link LIFO} starting from the tail.
+	 * This iterator should be used by only one thread so as to avoid synchronization.
+	 * Might iterate over removed elements or stop too soon or too late... but there won't have any {@link ConcurrentModificationException} !
+	 */
 	private class LIFOIterator implements Iterator<T> {
 		private Node<T> next;
 		private Node<T> previous;
 		boolean removed = false;
+		private final Thread authorized;
 		
 		public LIFOIterator() {
+			this.authorized = Thread.currentThread();
 			this.next = getFirstElement();
+		}
+		
+		protected void checkAccess() {
+			Thread cur = Thread.currentThread();
+			if (cur != this.authorized)
+				throw new IllegalStateException(cur.toString() + " with id " + cur.getId() + " is not allowed to acccess iterator for thread " + this.authorized + " with id " + this.authorized.getId());
 		}
 
 		@Override
 		public boolean hasNext() {
+			this.checkAccess();
 			return next != null;
 		}
 
 		@Override
 		public T next() {
+			this.checkAccess();
 			if (this.next == null)
 				throw new IllegalStateException("Iterator is empty");
 			T ret = this.next.element;
@@ -66,6 +81,7 @@ public class LIFO<T> implements Iterable<T> {
 
 		@Override
 		public void remove() {
+			this.checkAccess();
 			if (removed)
 				return;
 			if (previous == null)
@@ -74,8 +90,8 @@ public class LIFO<T> implements Iterable<T> {
 				if (actualList == this.previous) {
 					pop();
 					this.previous = null;
-				} else if (this.previous.head == null) { //We've been too far (some pops happened since last next)
-					this.previous = null;
+				} else if (this.previous.head == null) { //We've been too far (some pops or remove happened since last next)
+					this.previous = null; //and not next = null since if there were a remove from another thread, iterator should continue
 				} else {
 					Node<T> head = this.previous.head;
 					Node<T> tail = this.previous.tail;
