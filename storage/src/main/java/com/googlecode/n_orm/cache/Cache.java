@@ -1,13 +1,10 @@
 package com.googlecode.n_orm.cache;
 
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -27,7 +24,6 @@ import com.googlecode.n_orm.PersistingElement;
 public class Cache {
 	
 	private static class CleanerThread extends Thread {
-		final LIFO<Cache> available = new LIFO<Cache>();
 
 		@Override
 		public void run() {
@@ -45,7 +41,7 @@ public class Cache {
 			
 			try {
 				long now = System.currentTimeMillis();
-				available.clear();
+				LIFO<Cache> available = new LIFO<Cache>();
 				
 				try {
 					
@@ -60,15 +56,14 @@ public class Cache {
 							synchronized(perThreadCaches) {
 								cache = perThreadCaches.remove(t);
 							}
-							if (cache != null)
+							if (cache != null) {
 								available.push(cache);
-							cache.stopped = now;
+								cache.stopped = now;
+							}
 						} else {
 							cache = perThreadCaches.get(t);
 							if (cache == null) {
-								synchronized(perThreadCaches) {
-									perThreadCaches.remove(t);
-								}
+								//Nothing to do ; cache is gone
 							} else if (cache.cache != null && cache.stopped == -1) {
 								cache.shouldCleanup = true;
 							} else {
@@ -244,9 +239,7 @@ availableCachesCheck:while (ai.hasNext()) {
 		Cache res = findCache(Thread.currentThread());
 		
 		if (res == null) {
-			synchronized(availableCaches) {
-				res = (Cache) availableCaches.pop(); //Most recent in the queue ; if closed, all the others in availableCaches should be closed...
-			}
+			res = (Cache) availableCaches.pop(); //Most recent in the queue ; if closed, all the others in availableCaches should be closed...
 			if (res != null) {
 				synchronized(res) {
 					if (res.isClosed())
@@ -331,8 +324,9 @@ availableCachesCheck:while (ai.hasNext()) {
 	
 	protected void checkState() {
 		assert !this.isClosed();
-		if (this.thread != Thread.currentThread())
-			throw new IllegalStateException(Thread.currentThread().toString() + " with id " + Thread.currentThread().getId() + " is not allowed to acccess cache for " + (this.thread.isAlive() ? "alive" : "dead") + " " + this.thread + " with id " + this.thread.getId());
+		Thread cur = Thread.currentThread();
+		if (this.thread != cur)
+			throw new IllegalStateException(cur.toString() + " with id " + cur.getId() + " is not allowed to acccess cache for " + (this.thread.isAlive() ? "alive" : "dead") + " " + this.thread + " with id " + this.thread.getId());
 		this.cleanIfNecessary();
 	}
 	
@@ -345,7 +339,7 @@ availableCachesCheck:while (ai.hasNext()) {
 	 * @return the element with the eldest last usage (null if cache is empty)
 	 */
 	private Element cleanInvalidElements() {
-		this.shouldCleanup = true;
+		this.shouldCleanup = false;
 		Element eldest = null;
 		Iterator<Entry<String, Element>> it = cache.entrySet().iterator();
 		while (it.hasNext()) {
