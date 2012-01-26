@@ -1,15 +1,17 @@
 package com.googlecode.n_orm.hbase;
 
+import java.lang.reflect.Field;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hbase.UnknownScannerException;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.ScannerTimeoutException;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.Row;
@@ -18,18 +20,20 @@ final class CloseableIterator implements CloseableKeyIterator {
 	private ResultScanner result;
 	private Iterator<Result> iterator;
 	private final boolean sendValues;
+	private final Class<? extends PersistingElement> clazz;
 	private final String table;
 	private Constraint constraint;
 	private int limit;
-	private final Set<String> families;
+	private final Map<String, Field> families;
 	private final Store store;
 	private boolean reCreated = false;
 	
 	private byte[] currentKey = null;
 
-	CloseableIterator(Store store, String table, Constraint constraint, int limit, Set<String> families, ResultScanner res, boolean sendValues) {
+	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, String table, Constraint constraint, int limit, Map<String, Field> families, ResultScanner res, boolean sendValues) {
 		this.store = store;
 		this.sendValues = sendValues;
+		this.clazz = clazz;
 		this.table = table;
 		this.constraint = constraint;
 		this.limit = limit;
@@ -66,9 +70,9 @@ final class CloseableIterator implements CloseableKeyIterator {
 				|| (x.getCause() instanceof UnknownScannerException) || x.getMessage().contains(UnknownScannerException.class.getSimpleName())) {
 			Store.logger.warning("Got exception " + x.getMessage() + " ; consider lowering scanCahing or improve scanner timeout at the HBase level");
 		} else {
-			store.handleProblem(x, table, families == null ? null : families.toArray(new String[families.size()]));
+			store.handleProblem(x, this.clazz, table, this.families);
 		}
-		CloseableIterator newResult = (CloseableIterator) store.get(table, constraint, limit, families);
+		CloseableIterator newResult = (CloseableIterator) store.get(clazz, table, constraint, limit, families);
 		this.setResult(newResult.result);
 	}
 
@@ -120,7 +124,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 		try {
 			result.close();
 		} catch (RuntimeException x) {
-			store.handleProblem(x, table, families == null ? null : families.toArray(new String[families.size()]));
+			store.handleProblem(x, this.clazz, table, this.families);
 		}
 	}
 }

@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -119,21 +120,21 @@ public aspect ColumnFamiliyManagement {
 		return Set.class.equals(type) || Map.class.equals(type) || SetColumnFamily.class.isAssignableFrom(type) || MapColumnFamily.class.isAssignableFrom(type);
 	}
 
-	private Map<Class<?>, Set<Field>> typeColumnFamilies = new HashMap<Class<?>, Set<Field>>();
+	private Map<Class<?>, Map<String, Field>> typeColumnFamilies = new HashMap<Class<?>, Map<String, Field>>();
 	
 	/**
 	 * Finds in a class the fields that are column families
 	 */
-	public Set<Field> getColumnFamilies(Class<? extends PersistingElement> clazz) {
+	public Map<String, Field> getColumnFamilies(Class<? extends PersistingElement> clazz) {
 		synchronized (typeColumnFamilies) {
-			Set<Field> ret = this.typeColumnFamilies.get(clazz);
+			Map<String, Field> ret = this.typeColumnFamilies.get(clazz);
 			if (ret == null) {
-				ret = new HashSet<Field>();
+				ret = new TreeMap<String, Field>();
 				Class<?> c = clazz;
 				do {
 					for (Field field : c.getDeclaredFields()) {
 						if (isCollectionFamily(field))
-							ret.add(field);
+							ret.put(field.getName(), field);
 					}
 					c = c.getSuperclass();
 				} while (c != null);
@@ -141,6 +142,19 @@ public aspect ColumnFamiliyManagement {
 			}
 			return ret;
 		}
+	}
+	
+
+	public Set<Field> getColumnFamilies(Class<? extends PersistingElement> clazz, Set<String> columnFamilyNames) {
+		Map<String, Field> cfs = this.getColumnFamilies(clazz);
+		Set<Field> ret = new HashSet<Field>();
+		for (String fieldName : columnFamilyNames) {
+			Field f = cfs.get(fieldName);
+			if (f == null)
+				throw new IllegalArgumentException("Cannot find column family " + fieldName + " in " + clazz.getName());
+			ret.add(f);
+		}
+		return ret;
 	}
 	
 	//@Transient private boolean PersistingElement.inPOJOMode = false; //Must be @Transient and not transient: in case the persisting element was serialized in pojo mode, it must be deserialized in pojo mode
