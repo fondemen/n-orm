@@ -1,13 +1,17 @@
 package com.googlecode.n_orm.operations;
 
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -35,7 +39,7 @@ public class Process {
 		private T lastProcessedElement;
 		private Row lastProcessedElementData;
 		private Class<T> clazz;
-		private Set<String> toBeActivated;
+		private Map<String, Field> toBeActivated;
 		private long durationInMillis;
 		private List<Future<?>> performing;
 		
@@ -103,13 +107,13 @@ public class Process {
 	private static class ProcessRunnable<AE extends PersistingElement, E extends AE> implements Runnable, Serializable {
 		private static final long serialVersionUID = 3707496852314499064L;
 		
-		private final Set<String> toBeActivated;
+		private final Map<String, Field> toBeActivated;
 		private final Row data;
 		private final Class<E> clazz;
 		private final com.googlecode.n_orm.Process<AE> processAction;
 		private final List<Problem> problems;
 	
-		private ProcessRunnable(Set<String> toBeActivated, Row data,
+		private ProcessRunnable(Map<String, Field> toBeActivated, Row data,
 				Class<E> clazz, com.googlecode.n_orm.Process<AE> processAction,
 				List<Problem> problems) {
 			this.toBeActivated = toBeActivated;
@@ -139,10 +143,10 @@ public class Process {
 		//long end = (threadNumber == 1 || start > Long.MAX_VALUE - timeout) ? Long.MAX_VALUE : start+timeout;
 		//final CloseableIterator<E> it = findElement(clazz, c, limit, families);
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
-		final Set<String> toBeActivated = families == null ? null : StorageManagement.getAutoActivatedFamilies(clazz, families);
+		final Map<String, Field> toBeActivated = families == null ? null : StorageManagement.getAutoActivatedFamilies(clazz, families);
 		ret.toBeActivated = toBeActivated;
 		ret.clazz = clazz;
-		final CloseableKeyIterator keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
+		final CloseableKeyIterator keys = store.get(clazz, PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
 		boolean ownsExecutor = executor == null;
 		if (ownsExecutor) {
 			executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
@@ -195,7 +199,7 @@ public class Process {
 		
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		if (store instanceof ActionnableStore) {
-			Set<String> autoActivatedFamilies = StorageManagement.getAutoActivatedFamilies(clazz, families);
+			Map<String, Field> autoActivatedFamilies = StorageManagement.getAutoActivatedFamilies(clazz, families);
 			((ActionnableStore)store).process(PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies, clazz, process, callback);
 		} else {
 			new Thread() {
