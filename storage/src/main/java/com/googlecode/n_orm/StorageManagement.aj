@@ -74,6 +74,7 @@ public aspect StorageManagement {
 			Persisting annotation = this.getClass().getAnnotation(Persisting.class);
 			
 			PropertyManagement pm = PropertyManagement.getInstance();
+			Map<String, Field> changedFields = new TreeMap<String, Field>();
 			Map<String, Map<String, byte[]>> changed = new TreeMap<String, Map<String,byte[]>>(), localChanges;
 			Map<String, Set<String>> deleted = new TreeMap<String, Set<String>>();
 			Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String,Number>>();
@@ -81,14 +82,15 @@ public aspect StorageManagement {
 			if (!propsIncrs.isEmpty()) {
 				Map<String,Number> realPropsIncrs = new TreeMap<String, Number>();
 				for (Entry<String, Number> incr : propsIncrs.entrySet()) {
-					if (incr.getValue().longValue() != 0)
+					if (incr.getValue().longValue() != 0) {
 						realPropsIncrs.put(incr.getKey(), incr.getValue());
+						changedFields.put(incr.getKey(), pm.getProperty(this.getClass(), incr.getKey()));
+					}
 				}
 				if (!realPropsIncrs.isEmpty())
 					increments.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, realPropsIncrs);
 			}
 			Collection<ColumnFamily<?>> families = this.getColumnFamilies();
-			Map<String, Field> changedFields = new TreeMap<String, Field>();
 			for (ColumnFamily<?> family : families) {
 				Field cfField = family.getProperty();
 				Set<String> changedKeys = family.changedKeySet();
@@ -134,23 +136,18 @@ public aspect StorageManagement {
 				Set<String> incrementedKeys = family.incrementedKeySet();
 				if (!incrementedKeys.isEmpty()) {
 					Map<String, Number> familyIncr = new TreeMap<String,Number>();
-					if (cfField != null)
-						changedFields.put(cfField.getName(), cfField);
 					for (String key : incrementedKeys) {
 						Number incr = family.getIncrement(key);
 						if (incr.longValue() != 0) {
 							familyIncr.put(key, incr);
-							if (cfField == null) { //It's a property
-								Field propField = pm.getProperty(this.getClass(), key);
-								if (propField != null)
-									changedFields.put(propField.getName(), propField);
-								else
-									assert false : "Property column family for " + this.getClass().getName() + " refers to a missing property " + key;
-							}
+							assert cfField != null : "Increments for properties should not be processed there";
 						}
 					}
-					if (!familyIncr.isEmpty())
+					if (!familyIncr.isEmpty()) {
 						increments.put(family.getName(), familyIncr);
+						if (cfField != null)
+							changedFields.put(cfField.getName(), cfField);
+					}
 				}
 			}
 			
