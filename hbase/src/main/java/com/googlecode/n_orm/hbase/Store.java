@@ -74,6 +74,7 @@ import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.cache.Cache;
+import com.googlecode.n_orm.hbase.PropertyUtils.HColumnFamilyProperty;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.hbase.actions.Action;
 import com.googlecode.n_orm.hbase.actions.BatchAction;
@@ -1174,21 +1175,39 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		return td.hasFamily(Bytes.toBytes(family));
 	}
 	
+	private boolean asExpected(HColumnDescriptor columnDescriptor, Class<? extends PersistingElement> clazz, Field cfField) {
+		if (columnDescriptor == null) {
+			return false;
+		} else {
+			for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
+				if(hprop.alter(columnDescriptor, this, clazz, cfField)) {
+					return false;
+				}
+			}
+			return true;
+		}
+	}
+	
+	private void setValues(HColumnDescriptor columnDescriptor, Class<? extends PersistingElement> clazz, Field cfField) {
+		for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
+			hprop.setValue(columnDescriptor, this, clazz, cfField);
+		}
+	}
+	
 	private void enforceColumnFamiliesExists(HTableDescriptor tableD, Class<? extends PersistingElement> clazz, 
 			Map<String, Field> columnFamilies) throws DatabaseNotReachedException {
 		assert tableD != null;
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.size());
-		List<HColumnDescriptor> toBeCompressed = new ArrayList<HColumnDescriptor>(columnFamilies.size());
+		List<HColumnDescriptor> toBeAltered = new ArrayList<HColumnDescriptor>(columnFamilies.size());
 		String tableName = tableD.getNameAsString();
 		synchronized (tableD) {
 			boolean recreated = false; //Whether table descriptor was just retrieved from HBase admin
 			for (Entry<String, Field> cf : columnFamilies.entrySet()) {
 				byte[] cfname = Bytes.toBytes(cf.getKey());
 				HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
-				boolean familyExists = family != null;
-				boolean hasCorrectCompressor = familyExists ? this.getCompressionAlgorithm() == null || !this.forceCompression || family.getCompressionType().equals(this.getCompressionAlgorithm()) : true;
-				if (!recreated && (!familyExists || !hasCorrectCompressor)) {
-					logger.fine("Table " + tableName + " is not known to have family " + cf + " propertly configured: checking from HBase");
+				boolean asExpected = this.asExpected(family, clazz, cf.getValue());
+				if (!recreated && !asExpected) {
+					logger.fine("Table " + tableName + " is not known to have family " + cf.getKey() + " properly configured: checking from HBase");
 					synchronized (this.sharedLockTable(tableName)) {
 						try {
 							tableD = this.admin.getTableDescriptor(tableD.getName());
@@ -1206,26 +1225,25 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 						}
 					}
 					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
-					familyExists = family != null;
-					hasCorrectCompressor = familyExists ? this.getCompressionAlgorithm() == null || !this.forceCompression || family.getCompressionType().equals(this.getCompressionAlgorithm()) : true;
+					asExpected = this.asExpected(family, clazz, cf.getValue());
 					this.cache(tableName, tableD);
 					recreated = true;
 				}
-				if (!familyExists) {
+				if (family == null) {
 					HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
-					if (this.getCompressionAlgorithm() != null)
-						newFamily.setCompressionType(this.getCompressionAlgorithm());
+					this.setValues(newFamily, clazz, cf.getValue());
 					toBeAdded.add(newFamily);
-				} else if (!hasCorrectCompressor) {
-					toBeCompressed.add(family);
+				} else if (!asExpected) {
+					this.setValues(family, clazz, cf.getValue());
+					toBeAltered.add(family);
 				}
 			}
-			if (!toBeAdded.isEmpty() || !toBeCompressed.isEmpty()) {
+			if (!toBeAdded.isEmpty() || !toBeAltered.isEmpty()) {
 				try {
 					if (!toBeAdded.isEmpty())
 						logger.info("Table " + tableD.getNameAsString() + " is missing families " + toBeAdded.toString() + ": altering");
-					if (!toBeCompressed.isEmpty())
-						logger.info("Table " + tableD.getNameAsString() + " compressed with " + this.getCompressionAlgorithm() + " has the wrong compressor for families " + toBeCompressed.toString() + ": altering");
+					if (!toBeAltered.isEmpty())
+						logger.info("Table " + tableD.getNameAsString() + " has wrong properties for families " + toBeAltered.toString() + ": altering");
 					synchronized (this.exclusiveLockTable(tableName)) {
 						try {
 							try {
@@ -1245,9 +1263,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 									this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 								}
 							}
-							for (HColumnDescriptor hColumnDescriptor : toBeCompressed) {
-								hColumnDescriptor.setCompressionType(this.getCompressionAlgorithm());
-								this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
+							for (HColumnDescriptor hColumnDescriptor : toBeAltered) {
+								try {
+									this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
+								} catch (TableNotFoundException x) {
+									this.handleProblem(x, clazz, tableName, null);
+									this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
+								}
 							}
 							boolean done = true;
 							do {
@@ -1256,25 +1278,44 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 								for (int i = 0; done && i < toBeAdded.size(); i++) {
 									done = done && tableD.hasFamily(toBeAdded.get(i).getName());
 								}
-								for (int i = 0; done && i < toBeCompressed.size(); ++i) {
-									HColumnDescriptor expectedFamily = toBeCompressed.get(i);
+								for (int i = 0; done && i < toBeAltered.size(); ++i) {
+									HColumnDescriptor expectedFamily = toBeAltered.get(i);
 									HColumnDescriptor actualFamily = tableD.getFamily(expectedFamily.getName());
-									done = done && actualFamily != null && expectedFamily.getCompressionType().equals(actualFamily.getCompressionType());
+									done = done && actualFamily != null;
+									if (done) {
+										for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
+											done = done && hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()));
+										}
+									}
 								}
 							} while (!done);
-							this.admin.enableTable(tableD.getName());
-							if (! this.admin.isTableEnabled(tableD.getName()))
-								throw new IOException("Not able to enable table " + tableName);
+							try {
+								this.admin.enableTable(tableD.getName());
+								if (!this.admin.isTableEnabled(tableD.getName()))
+									throw new IOException();
+							} catch (Exception x) {
+								this.handleProblem(x, clazz, tableName, null);
+								this.admin.enableTable(tableD.getName());
+								if (!this.admin.isTableEnabled(tableD.getName()))
+									throw new IOException("SEVERE: cannot enable table " + tableName);
+							}
 							logger.info("Table " + tableD.getNameAsString() + " enabled");
+							
+							//Checking post-condition
 							for (int i = 0; done && i < toBeAdded.size(); i++) {
 								if (!tableD.hasFamily(toBeAdded.get(i).getName()))
 									throw new IOException("Table " + tableName + " is still lacking familiy " + toBeAdded.get(i).getNameAsString());
 							}
-							for (int i = 0; done && i < toBeCompressed.size(); ++i) {
-								HColumnDescriptor expectedFamily = toBeCompressed.get(i);
+							for (int i = 0; done && i < toBeAltered.size(); ++i) {
+								HColumnDescriptor expectedFamily = toBeAltered.get(i);
 								HColumnDescriptor actualFamily = tableD.getFamily(expectedFamily.getName());
-								if (actualFamily == null || !expectedFamily.getCompressionType().equals(actualFamily.getCompressionType()))
-									throw new IOException("Table " + tableName + " is still having wrong compressor for familiy " + expectedFamily.getNameAsString());
+								if (actualFamily == null)
+									throw new IOException("Table " + tableName + " is now lacking familiy " + expectedFamily.getNameAsString());
+								for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
+									if (!hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()))) {
+										throw new IOException("Table " + tableName + " still has family " + expectedFamily.getNameAsString() + " with property " + hprop + " not set to " + hprop.getValue(this, clazz, columnFamilies.get(expectedFamily.getNameAsString())));
+									}
+								}
 							}
 							this.cache(tableName, tableD);
 							logger.info("Table " + tableD.getNameAsString() + " altered");
@@ -1287,111 +1328,6 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					throw new DatabaseNotReachedException(e);
 				}
 
-			}
-		}
-	}
-	
-	private static class ModifiedColumnFamily {
-		public Class<? extends PersistingElement> persistingClass;
-		
-		public HBaseSchema classLevelSchemaSpecificities;
-		
-		public HTableDescriptor table;
-		public boolean tableFoundFromBase = false;
-		public boolean tableAltered = false;
-		
-		public List<HColumnDescriptor> alteredColumnFamilies = new ArrayList<HColumnDescriptor>();
-	}
-	protected void getAddColumnFamily(ModifiedColumnFamily descriptor, String familyName, Field familyField) {
-		HBaseSchema columnFamilyLevelSchemaSpecificities = familyField == null ? null : familyField.getAnnotation(HBaseSchema.class);
-		
-		List<HBaseSchema> schemaDescriptorsInOrder = new ArrayList<HBaseSchema>(2);
-		if (descriptor.classLevelSchemaSpecificities != null)
-			schemaDescriptorsInOrder.add(descriptor.classLevelSchemaSpecificities);
-		if (columnFamilyLevelSchemaSpecificities != null)
-			schemaDescriptorsInOrder.add(columnFamilyLevelSchemaSpecificities);
-
-		//Getting compression setting
-		boolean forceCompression = this.forceCompression;
-		Compression.Algorithm compression = this.getCompressionAlgorithm();
-		for (HBaseSchema schemaSpecificities : schemaDescriptorsInOrder) {
-			switch (schemaSpecificities.forceCompression()) {
-			case FALSE: forceCompression = false; break;
-			case TRUE: forceCompression = true; break;
-			}
-
-			Algorithm requiredCompression = this.getCompressionByName(schemaSpecificities.compression());
-			if (requiredCompression != null)
-				compression = requiredCompression;
-		}
-		
-		//Getting in-memory setting
-		boolean forceInMemory = this.forceInMemory;
-		boolean inMemory = this.inMemory;
-		for (HBaseSchema schemaSpecificities : schemaDescriptorsInOrder) {
-			switch (schemaSpecificities.forceInMemory()) {
-			case FALSE: forceInMemory = false; break;
-			case TRUE: forceInMemory = true; break;
-			}
-
-			switch (schemaSpecificities.inMemory()) {
-			case FALSE: inMemory = false; break;
-			case TRUE: inMemory = true; break;
-			}
-		}
-
-		
-		//Run 1 (only in case table descriptor was retrieved from the base): checking ok and then retrieving table descriptor if failed
-		//Run 2: registering alterations (if any)
-		byte [] famB = Bytes.toBytes(familyName);
-		for (int run = descriptor.tableFoundFromBase ? 1 : 2; run <= 2; ++run) {
-			boolean change = false;
-			if (!descriptor.table.hasFamily(famB)) {
-				change = true;
-				if (run == 2) {
-					HColumnDescriptor famD = new HColumnDescriptor(famB);
-					if (compression != null)
-						famD.setCompressionType(compression);
-					famD.setInMemory(inMemory);
-					descriptor.table.addFamily(famD);
-					descriptor.tableAltered = true;
-				}
-			} else {
-				HColumnDescriptor actualColumn = descriptor.table.getFamily(famB);
-				
-				if (forceCompression && !compression.equals(actualColumn.getCompressionType())) {
-					actualColumn.setCompressionType(compression);
-					change = true;
-				}
-				if (forceInMemory && inMemory != actualColumn.isInMemory()) {
-					actualColumn.setInMemory(inMemory);
-					change = true;
-				}
-				
-				if (change && run == 2) {
-					descriptor.alteredColumnFamilies.add(actualColumn);
-				}
-			}
-		
-			String tableName = descriptor.table.getNameAsString();
-			if (change && run == 1) {
-				synchronized (this.sharedLockTable(tableName)) {
-					try {
-						descriptor.table = this.admin.getTableDescriptor(descriptor.table.getName());
-					} catch (Exception e) {
-						errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
-						this.handleProblem(e, descriptor.persistingClass, tableName, null);
-						try {
-							descriptor.table = this.admin.getTableDescriptor(descriptor.table.getName());
-						} catch (Exception x) {
-							throw new DatabaseNotReachedException(x);
-						}
-					} finally {
-						this.sharedUnlockTable(tableName);
-					}
-				}
-				this.cache(tableName, descriptor.table);
-				descriptor.tableFoundFromBase = true;
 			}
 		}
 	}

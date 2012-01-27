@@ -19,6 +19,8 @@ public class PropertyUtils {
 
 	public static abstract class HBaseProperty<T> {
 		
+		abstract String getName();
+		
 		abstract T readValue(HBaseSchema ann); 
 		
 		abstract T getDefaultValue(Store store);
@@ -42,16 +44,33 @@ public class PropertyUtils {
 			
 			return this.getDefaultValue(store);
 		}
+		
+		@Override
+		public String toString() {
+			return this.getName();
+		}
 	}
 
 	public static abstract class HColumnFamilyProperty<T> extends HBaseProperty<T> {
 		abstract boolean hasValue(T value, HColumnDescriptor cf);
 		
+		public boolean hasValue(HColumnDescriptor cf, Store store, Class<? extends PersistingElement> clazz, Field field) {
+			T value = this.getValue(store, clazz, field);
+			return this.isSet(value) ? this.hasValue(value, cf) : true;
+		}
+		
 		public abstract void setValue(T value, HColumnDescriptor cf);
+		
+		public void setValue(HColumnDescriptor cf, Store store, Class<? extends PersistingElement> clazz, Field field) {
+			T value = this.getValue(store, clazz, field);
+			if (this.isSet(value)) {
+				this.setValue(value, cf);
+			}
+		}
 		
 		public boolean alter(HColumnDescriptor cf, Store store, Class<? extends PersistingElement> clazz, Field field) {
 			T value = this.getValue(store, clazz, field);
-			if (this.isSet(value) && !hasValue(value, cf)) {
+			if (this.isSet(value) && !this.hasValue(value, cf)) {
 				this.setValue(value, cf);
 				return true;
 			} else {
@@ -61,7 +80,7 @@ public class PropertyUtils {
 		
 	}
 
-	private static abstract class ForcingHBaseProperty extends HBaseProperty<Boolean> {
+	private static abstract class ShouldForceHBaseProperty extends HBaseProperty<Boolean> {
 		static Boolean getBoolean(HBaseSchema.SettableBoolean value) {
 			switch (value) {
 			case UNSET: return null;
@@ -80,14 +99,14 @@ public class PropertyUtils {
 	
 		@Override
 		Boolean readValue(HBaseSchema ann) {
-			return this.getBoolean(this.readRawValue(ann));
+			return getBoolean(this.readRawValue(ann));
 		}		
 	}
 
 	private static abstract class ForcableHBaseProperty<T> extends HColumnFamilyProperty<T> {
-		private ForcingHBaseProperty forcedProperty;
+		private ShouldForceHBaseProperty forcedProperty;
 		
-		public ForcableHBaseProperty(ForcingHBaseProperty forcedProperty) {
+		public ForcableHBaseProperty(ShouldForceHBaseProperty forcedProperty) {
 			this.forcedProperty = forcedProperty;
 		}
 		
@@ -95,7 +114,7 @@ public class PropertyUtils {
 		public boolean alter(HColumnDescriptor cf, Store store,
 				Class<? extends PersistingElement> clazz, Field field) {
 			Boolean shouldForce = this.forcedProperty.getValue(store, clazz, field);
-			if (this.forcedProperty.isSet(shouldForce) && shouldForce == Boolean.TRUE) {
+			if (this.forcedProperty.isSet(shouldForce) && Boolean.TRUE.equals(shouldForce)) {
 				return super.alter(cf, store, clazz, field);
 			} else {
 				return false;
@@ -103,7 +122,7 @@ public class PropertyUtils {
 		}
 	}
 
-	private static class CompressorForcedProperty extends ForcingHBaseProperty {
+	private static class CompressorForcedProperty extends ShouldForceHBaseProperty {
 		@Override
 		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
 			return ann.forceCompression();
@@ -112,6 +131,11 @@ public class PropertyUtils {
 		@Override
 		Boolean getDefaultValue(Store store) {
 			return store.isForceCompression();
+		}
+
+		@Override
+		String getName() {
+			return "force compression";
 		}
 	
 	}
@@ -145,9 +169,14 @@ public class PropertyUtils {
 		boolean isSet(Algorithm value) {
 			return value != null;
 		}
+
+		@Override
+		String getName() {
+			return "compression";
+		}
 	}
 
-	private static class InMemoryForcedProperty extends ForcingHBaseProperty {
+	private static class InMemoryForcedProperty extends ShouldForceHBaseProperty {
 		@Override
 		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
 			return ann.forceInMemory();
@@ -156,6 +185,11 @@ public class PropertyUtils {
 		@Override
 		Boolean getDefaultValue(Store store) {
 			return store.isForceInMemory();
+		}
+
+		@Override
+		String getName() {
+			return "force inMemory";
 		}
 	
 	}
@@ -167,7 +201,7 @@ public class PropertyUtils {
 	
 		@Override
 		boolean hasValue(Boolean value, HColumnDescriptor cf) {
-			return cf.isInMemory();
+			return cf.isInMemory() == value.booleanValue();
 		}
 	
 		@Override
@@ -177,7 +211,7 @@ public class PropertyUtils {
 	
 		@Override
 		Boolean readValue(HBaseSchema ann) {
-			return ForcingHBaseProperty.getBoolean(ann.inMemory());
+			return ShouldForceHBaseProperty.getBoolean(ann.inMemory());
 		}
 	
 		@Override
@@ -188,6 +222,11 @@ public class PropertyUtils {
 		@Override
 		boolean isSet(Boolean value) {
 			return value != null;
+		}
+
+		@Override
+		String getName() {
+			return "inMemory";
 		}
 	}
 
