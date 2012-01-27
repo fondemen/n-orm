@@ -3,6 +3,7 @@ package com.googlecode.n_orm;
 import java.io.FileInputStream;
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
@@ -73,6 +74,7 @@ public aspect StorageManagement {
 			Persisting annotation = this.getClass().getAnnotation(Persisting.class);
 			
 			PropertyManagement pm = PropertyManagement.getInstance();
+			Map<String, Field> changedFields = new TreeMap<String, Field>();
 			Map<String, Map<String, byte[]>> changed = new TreeMap<String, Map<String,byte[]>>(), localChanges;
 			Map<String, Set<String>> deleted = new TreeMap<String, Set<String>>();
 			Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String,Number>>();
@@ -80,23 +82,34 @@ public aspect StorageManagement {
 			if (!propsIncrs.isEmpty()) {
 				Map<String,Number> realPropsIncrs = new TreeMap<String, Number>();
 				for (Entry<String, Number> incr : propsIncrs.entrySet()) {
-					if (incr.getValue().longValue() != 0)
+					if (incr.getValue().longValue() != 0) {
 						realPropsIncrs.put(incr.getKey(), incr.getValue());
+						changedFields.put(incr.getKey(), pm.getProperty(this.getClass(), incr.getKey()));
+					}
 				}
 				if (!realPropsIncrs.isEmpty())
 					increments.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, realPropsIncrs);
 			}
 			Collection<ColumnFamily<?>> families = this.getColumnFamilies();
 			for (ColumnFamily<?> family : families) {
+				Field cfField = family.getProperty();
 				Set<String> changedKeys = family.changedKeySet();
 				if (!changedKeys.isEmpty()) {
 					Map<String, byte[]> familyChanges = new TreeMap<String, byte[]>();
 					Set<String> familyDeleted = new TreeSet<String>();
-					Field cfField = family.getProperty();
+					if (cfField != null)
+						changedFields.put(cfField.getName(), cfField);
 					for (String key : changedKeys) {
-						if (family.wasDeleted(key))
+						if (family.wasDeleted(key)) {
 							familyDeleted.add(key);
-						else {
+							if (cfField == null) { //It's a property
+								Field propField = pm.getProperty(this.getClass(), key);
+								if (propField != null)
+									changedFields.put(propField.getName(), propField);
+								else
+									assert false : "Property column family for " + this.getClass().getName() + " refers to a missing property " + key;
+							}
+						} else {
 							//No need for auto-loading for it is a changed value
 							Object element = family.getElement(key);
 							Class<?> expected;
@@ -106,6 +119,7 @@ public aspect StorageManagement {
 								Field propField = ((PropertyManagement.Property)element).getField();
 								if (propField == null) //Property that was activated but which has disappeared
 									continue;
+								changedFields.put(propField.getName(), propField);
 								expected = propField.getType();
 							} else {
 								assert false;
@@ -124,11 +138,16 @@ public aspect StorageManagement {
 					Map<String, Number> familyIncr = new TreeMap<String,Number>();
 					for (String key : incrementedKeys) {
 						Number incr = family.getIncrement(key);
-						if (incr.longValue() != 0)
+						if (incr.longValue() != 0) {
 							familyIncr.put(key, incr);
+							assert cfField != null : "Increments for properties should not be processed there";
+						}
 					}
-					if (!familyIncr.isEmpty())
+					if (!familyIncr.isEmpty()) {
 						increments.put(family.getName(), familyIncr);
+						if (cfField != null)
+							changedFields.put(cfField.getName(), cfField);
+					}
 				}
 			}
 			
@@ -145,6 +164,7 @@ public aspect StorageManagement {
 				for (Field key : this.getKeys()) {
 					try {
 						changedProperties.put(key.getName(), ConversionTools.convert(pm.readValue(this, key), key.getType()));
+						changedFields.put(key.getName(), key);
 					} catch (RuntimeException e) {
 						throw e;
 					} catch (Exception e) {
@@ -156,7 +176,7 @@ public aspect StorageManagement {
 			
 			if (!(this.exists == Boolean.TRUE && changed.isEmpty() && deleted.isEmpty() && increments.isEmpty())) {
 				
-				this.getStore().storeChanges(this, this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
+				this.getStore().storeChanges(this, changedFields, this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
 	
 				propsIncrs.clear();
 				for(ColumnFamily<?> family : families) {
@@ -170,7 +190,7 @@ public aspect StorageManagement {
 					PersistingMixin px = PersistingMixin.getInstance();
 					//The next line to avoid repeating all properties in superclasses
 					if (!annotation.storeAlsoInSuperClasses()) {
-						changed.clear(); deleted.clear(); increments.clear();
+						changed.clear(); deleted.clear(); increments.clear(); changedFields.clear();
 					}
 //					Map<String, byte[]> classColumn = new TreeMap<String, byte[]>();
 //					String clsName = this.getClass().getName();
@@ -178,7 +198,7 @@ public aspect StorageManagement {
 //					changed.put(CLASS_COLUMN_FAMILY, classColumn);
 					String ident = this.getFullIdentifier();
 					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
-						this.getStore().storeChanges(this, px.getTable(sc), ident, changed, deleted, increments);
+						this.getStore().storeChanges(this, changedFields, px.getTable(sc), ident, changed, deleted, increments);
 					}
 				}
 			}
@@ -276,11 +296,11 @@ public aspect StorageManagement {
 	private void PersistingElement.activate(long timeout, String... families) throws DatabaseNotReachedException {
 		this.checkIsValid();
 		
-		Set<String> toBeActivated = getActualFamiliesToBeActivated(timeout, families);
+		Map<String, Field> toBeActivated = getActualFamiliesToBeActivated(timeout, families);
 		
 		if (! toBeActivated.isEmpty()) {
 			Map<String, Map<String, byte[]>> rawData = this.getStore().get(this, this.getTable(), this.getIdentifier(), toBeActivated);
-			activateFromRawData(toBeActivated, rawData);
+			activateFromRawData(toBeActivated.keySet(), rawData);
 		}
 	}
 
@@ -321,11 +341,11 @@ public aspect StorageManagement {
 		return element;
 	}
 
-	private Set<String> PersistingElement.getActualFamiliesToBeActivated(long timeout, String... families) {
-		Set<String> toBeActivated = StorageManagement.getAutoActivatedFamilies(this.getClass(), families);
+	private Map<String, Field> PersistingElement.getActualFamiliesToBeActivated(long timeout, String... families) {
+		Map<String, Field> toBeActivated = StorageManagement.getAutoActivatedFamilies(this.getClass(), families);
 
 		if (timeout > 0) {
-			for (String family : new TreeSet<String>(toBeActivated)) {
+			for (String family : new TreeSet<String>(toBeActivated.keySet())) {
 				ColumnFamily<?> cf = this.getColumnFamily(family);
 				if (cf.isActivated(timeout))
 					toBeActivated.remove(family);
@@ -339,30 +359,31 @@ public aspect StorageManagement {
 	 * This function takes care of the property column family and any {@link ImplicitActivation} marked column family.
 	 * @param clazz the class of the element where column families should be found
 	 * @param families the desired set of families
-	 * @return a set of names for families to be activated
+	 * @return names/fields for families to be activated
 	 */
-	public static Set<String> getAutoActivatedFamilies(Class<? extends PersistingElement> clazz, String... families) {
+	public static Map<String, Field> getAutoActivatedFamilies(Class<? extends PersistingElement> clazz, String... families) {
 		ColumnFamiliyManagement cfm = ColumnFamiliyManagement.getInstance();
-		Set<String> toBeActivated = new TreeSet<String>();
+		Map<String, Field> toBeActivated = new TreeMap<String, Field>();
 		
 		if (families == null)
 			return toBeActivated;
 		
-		toBeActivated.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		toBeActivated.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, null);
 		
-		Set<String> cfs = new TreeSet<String>();
-		cfs.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
-		for (Field cff : cfm.getColumnFamilies(clazz)) {
-			if (cff.getAnnotation(ImplicitActivation.class) != null)
-				toBeActivated.add(cff.getName());
-			cfs.add(cff.getName());
+		Map<String, Field> knownFamilies = cfm.getColumnFamilies(clazz);
+		for (Entry<String, Field> cff : knownFamilies.entrySet()) {
+			if (cff.getValue().getAnnotation(ImplicitActivation.class) != null)
+				toBeActivated.put(cff.getKey(), cff.getValue());
 		}
 		
 		if (families != null) {
 			for (String family : families) {
-				if (! cfs.contains(family))
+				if (PropertyManagement.PROPERTY_COLUMNFAMILY_NAME.equals(family))
+					continue;
+				Field f = knownFamilies.get(family); 
+				if (f == null)
 					throw new IllegalArgumentException("Unknown column family " + family + " in class " + clazz);
-				toBeActivated.add(family);
+				toBeActivated.put(family, f);
 			}
 		}
 		return toBeActivated;
@@ -395,18 +416,19 @@ public aspect StorageManagement {
 	 * @param data the raw data as can be found in a data store
 	 */
 	public static <T extends PersistingElement> T createElementFromRow(final Class<T> clazz,
-			final Set<String> toBeActivated, Row data) {
+			final Map<String, Field> toBeActivated, Row data) {
 		T elt = ConversionTools.convertFromString(clazz, data.getKey());
 		((PersistingElement)elt).exists = Boolean.TRUE;
 		//assert (toBeActivated == null) == ((data.getValues() == null)  || (data.getValues().entrySet().isEmpty())); //may be false (e.g. no properties)
 		if (toBeActivated != null) { //the element should be activated
-			Set<String> tba = toBeActivated, missingCf = null;
+			Map<String, Field> tba = toBeActivated;
+			Set<String> missingCf = null;
 			Set<String> dataKeys = data.getValues().keySet();
-			if (! dataKeys.containsAll(toBeActivated)) {
-				missingCf = new TreeSet<String>(toBeActivated);
+			if (! dataKeys.containsAll(toBeActivated.keySet())) {
+				missingCf = new TreeSet<String>(toBeActivated.keySet());
 				missingCf.removeAll(dataKeys);
-				tba = new TreeSet<String>(toBeActivated);
-				tba.retainAll(dataKeys);
+				tba = new TreeMap<String, Field>(toBeActivated);
+				tba.keySet().retainAll(dataKeys);
 				Iterator<String> mci = missingCf.iterator();
 				while (mci.hasNext()) {
 					if (elt.getColumnFamily(mci.next()).isActivated())
@@ -415,7 +437,7 @@ public aspect StorageManagement {
 			}
 			
 			if (!tba.isEmpty()) {
-				elt.activateFromRawData(tba, data.getValues());
+				elt.activateFromRawData(tba.keySet(), data.getValues());
 			}
 			
 			if (missingCf != null && !missingCf.isEmpty()) {
@@ -427,8 +449,8 @@ public aspect StorageManagement {
 	
 	public static <T extends PersistingElement> CloseableIterator<T> findElement(final Class<T> clazz, Constraint c, final int limit, String... families) throws DatabaseNotReachedException {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
-		final Set<String> toBeActivated = families == null ? null : getAutoActivatedFamilies(clazz, families);
-		final CloseableKeyIterator keys = store.get(PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
+		final Map<String, Field> toBeActivated = families == null ? null : getAutoActivatedFamilies(clazz, families);
+		final CloseableKeyIterator keys = store.get(clazz, PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
 		try {
 			CloseableIterator<T> ret = new CloseableIterator<T>() {
 				private int returned = 0;
@@ -486,7 +508,7 @@ public aspect StorageManagement {
 	
 	public static <T extends PersistingElement> long countElements(Class<T> clazz, Constraint c) {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
-		return store.count(PersistingMixin.getInstance().getTable(clazz), c);
+		return store.count(clazz, PersistingMixin.getInstance().getTable(clazz), c);
 	}
 	
 //	/**
