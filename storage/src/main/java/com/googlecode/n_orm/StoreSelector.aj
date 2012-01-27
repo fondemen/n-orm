@@ -18,9 +18,9 @@ import org.apache.commons.beanutils.PropertyUtils;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.storeapi.SimpleStore;
 import com.googlecode.n_orm.storeapi.Store;
-import com.googlecode.n_orm.storeapi.TypeAwareStore;
-import com.googlecode.n_orm.storeapi.TypeAwareStoreWrapper;
+import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
 import com.googlecode.n_orm.StoreSelector;
 
 public aspect StoreSelector {
@@ -57,9 +57,9 @@ public aspect StoreSelector {
 	private Map<String, StoreProperties> classStores = new TreeMap<String, StoreProperties>();
 	private Map<String, StoreProperties> packageStores = new TreeMap<String, StoreProperties>();
 	
-	private transient TypeAwareStore PersistingElement.store = null;
+	private transient Store PersistingElement.store = null;
 	
-	public TypeAwareStore PersistingElement.getStore() {
+	public Store PersistingElement.getStore() {
 		if (this.store == null)
 			synchronized(this) {
 				if (this.store == null)
@@ -75,14 +75,14 @@ public aspect StoreSelector {
 	public void PersistingElement.setStore(Store store) {
 		if (this.store != null)
 			throw new IllegalStateException("A store is already registered for object " + (this.getIdentifier() == null ? "" : this.getIdentifier()) + " of class " + this.getClass().getName());
-		this.store = StoreSelector.getInstance().toTypeAwareStore(store);
+		this.store = store;
 	}
 	
-	public TypeAwareStore toTypeAwareStore(Store store) {
-		if (store instanceof TypeAwareStore) {
-			return (TypeAwareStore)store;
+	public Store toTypeAwareStore(SimpleStore store) {
+		if (store instanceof Store) {
+			return (Store)store;
 		} else {
-			return TypeAwareStoreWrapper.getWrapper(store);
+			return SimpleStoreWrapper.getWrapper(store);
 		}
 	}
 	
@@ -159,6 +159,17 @@ public aspect StoreSelector {
     		this.classStores.put(clazz.getName(), new StoreProperties(properties, clazz.getPackage().getName()));
     	}
     }
+    
+    //For test purpose.
+    public void setPropertiesFor(Class<? extends PersistingElement> clazz, Store store) {
+    	synchronized (this.getLock(clazz)) {
+    		Properties props = new Properties();
+    		props.setProperty(STORE_DRIVERCLASS_PROPERTY, store.getClass().getName());
+    		StoreProperties sprop = new StoreProperties(new Properties(), clazz.getPackage().getName());
+    		sprop.store = store;
+    		this.classStores.put(clazz.getName(), sprop);
+    	}
+    }
 	
 	public synchronized Store getStoreFor(Class<? extends PersistingElement> clazz) throws DatabaseNotReachedException {
 		synchronized (this.getLock(clazz)) {
@@ -190,8 +201,8 @@ public aspect StoreSelector {
 				assert ret.store == null && ret.properties != null;
 				Properties properties = ret.properties;
 	
-				@SuppressWarnings("unchecked")
-				Class<Store> storeClass = (Class<Store>) Class.forName(properties.getProperty(STORE_DRIVERCLASS_PROPERTY));
+				Class<?> storeClass = Class.forName(properties.getProperty(STORE_DRIVERCLASS_PROPERTY));
+				Object store;
 				if (properties.containsKey(STORE_DRIVERCLASS_STATIC_ACCESSOR)) {
 					String accessorName = properties.getProperty(STORE_DRIVERCLASS_STATIC_ACCESSOR);
 					Method accessor = null;
@@ -218,19 +229,26 @@ public aspect StoreSelector {
 						args.add(val);
 						i++;
 					}
-					ret.store = (Store) accessor.invoke(null, args.toArray());
+					store = accessor.invoke(null, args.toArray());
 				} else if (properties.containsKey(STORE_DRIVERCLASS_SINGLETON_PROPERTY))
-					ret.store = (Store) PropertyManagement.getInstance().readValue(null, storeClass.getField(properties.getProperty(STORE_DRIVERCLASS_SINGLETON_PROPERTY)));
+					store = PropertyManagement.getInstance().readValue(null, storeClass.getField(properties.getProperty(STORE_DRIVERCLASS_SINGLETON_PROPERTY)));
 				else
-					ret.store = storeClass.newInstance();
+					store = storeClass.newInstance();
 				
-				assert ret.store != null;
+				assert store != null;
 				
-				for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(ret.store)) {
-					if (PropertyUtils.isWriteable(ret.store, property.getName()) && properties.containsKey(property.getName())) {
-						PropertyUtils.setProperty(ret.store, property.getName(), ConvertUtils.convert(properties.getProperty(property.getName()), property.getPropertyType()));
+				for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(store)) {
+					if (PropertyUtils.isWriteable(store, property.getName()) && properties.containsKey(property.getName())) {
+						PropertyUtils.setProperty(store, property.getName(), ConvertUtils.convert(properties.getProperty(property.getName()), property.getPropertyType()));
 					}
 				}
+				
+				if (store instanceof Store)
+					ret.store = (Store)store;
+				else if (store instanceof SimpleStore)
+					ret.store = SimpleStoreWrapper.getWrapper((SimpleStore)store);
+				else
+					throw new IllegalArgumentException("Error while getting store for class " + clazz.getName() + ": found store " + store.toString() + " of class " + store.getClass().getName() + " which is not compatible with " + Store.class.getName() + " or " + SimpleStore.class.getName());
 	
 				ret.store.start();
 				classStores.put(clazz.getName(), ret);

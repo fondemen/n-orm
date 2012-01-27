@@ -14,7 +14,7 @@ import com.googlecode.n_orm.memory.Memory.Table.Row;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
-import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.storeapi.SimpleStore;
 
 /**
  * Reference implementation for a store.
@@ -22,7 +22,7 @@ import com.googlecode.n_orm.storeapi.Store;
  * It is well suited for testing.
  * This store is thread-safe.
  */
-public class Memory implements Store {
+public class Memory implements SimpleStore {
 	public static final Memory INSTANCE = new Memory();
 	
 	private static class RowResult implements com.googlecode.n_orm.storeapi.Row, Comparable<RowResult> {

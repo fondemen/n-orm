@@ -20,11 +20,11 @@ import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.storeapi.SimpleStore;
 import com.googlecode.n_orm.storeapi.Store;
-import com.googlecode.n_orm.storeapi.TypeAwareStore;
 
 /**
- * Persisting elements are elements that can be stored and retrieved from a {@link Store}.
+ * Persisting elements are elements that can be stored and retrieved from a {@link SimpleStore}.
  * To make a class persisting, do not implement this interface, but rather declare the annotation {@link Persisting}.
  * @see Persisting
  */
@@ -44,7 +44,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	/**
 	 * The store used for this persisting element.
 	 */
-	TypeAwareStore getStore();
+	Store getStore();
 	
 	/**
 	 * Sets the store used for this persisting element. Note that in most case, you do not need to use this method as stores are automatically discovered.
@@ -152,7 +152,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * </p>
 	 * @throws DatabaseNotReachedException in case the store cannot store this persisting object (e.g. cannot connect to database)
 	 * @see #getIdentifier()
-	 * @see Store
+	 * @see SimpleStore
 	 */
 	void store() throws DatabaseNotReachedException;
 	

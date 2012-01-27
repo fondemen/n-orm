@@ -99,13 +99,8 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * activated, regardless of the fact they are declared in this class or in a subclass.
 	 */
 	public SearchableClassConstraintBuilder<T> andActivateAllFamilies() {
-		Set<Field> knownCfs = ColumnFamiliyManagement.getInstance().getColumnFamilies(getClazz());
-		this.toBeActivated = new String[knownCfs.size()];
-		int i = 0;
-		for (Field cf : knownCfs) {
-			this.toBeActivated[i] = cf.getName();
-			++i;
-		}
+		Set<String> knownCfs = ColumnFamiliyManagement.getInstance().getColumnFamilies(getClazz()).keySet();
+		this.toBeActivated = knownCfs.toArray(new String[knownCfs.size()]);
 		return this;
 	}
 	
