@@ -6,7 +6,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import com.googlecode.n_orm.cf.ColumnFamily;
-import com.googlecode.n_orm.storeapi.TypeAwareStore;
+import com.googlecode.n_orm.storeapi.Store;
 
 
 public aspect EventManagement {
@@ -51,7 +51,7 @@ public aspect EventManagement {
 		}
 	}
 	
-	after (PersistingElement self) returning: call(void TypeAwareStore+.storeChanges(..)) && withincode(void PersistingElement+.store()) && this(self)  {
+	after (PersistingElement self) returning: call(void Store+.storeChanges(..)) && withincode(void PersistingElement+.store()) && this(self)  {
 		self.isStored = true;
 	}
 	
