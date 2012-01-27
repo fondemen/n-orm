@@ -22,7 +22,7 @@ import com.googlecode.n_orm.cf.ColumnFamily;
 public @interface HBaseSchema {
 	public static enum SettableBoolean {
 		/**
-		 * A value to state that the set property should not be considered
+		 * A value to state that the set property should not be considered and rather found from store (or class-level {@link HBaseSchema} in case this annotation annotated a column family)
 		 */
 		UNSET,
 		TRUE,
