@@ -159,6 +159,17 @@ public aspect StoreSelector {
     		this.classStores.put(clazz.getName(), new StoreProperties(properties, clazz.getPackage().getName()));
     	}
     }
+    
+    //For test purpose.
+    public void setPropertiesFor(Class<? extends PersistingElement> clazz, Store store) {
+    	synchronized (this.getLock(clazz)) {
+    		Properties props = new Properties();
+    		props.setProperty(STORE_DRIVERCLASS_PROPERTY, store.getClass().getName());
+    		StoreProperties sprop = new StoreProperties(new Properties(), clazz.getPackage().getName());
+    		sprop.store = store;
+    		this.classStores.put(clazz.getName(), sprop);
+    	}
+    }
 	
 	public synchronized Store getStoreFor(Class<? extends PersistingElement> clazz) throws DatabaseNotReachedException {
 		synchronized (this.getLock(clazz)) {
