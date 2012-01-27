@@ -82,6 +82,11 @@
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
+		<!-- dependency>
+			<groupId>org.aspectj</groupId>
+			<artifactId>aspectjtools</artifactId>
+			<version>${aspectj.version}</version>
+		</dependency -->
 	</dependencies>
 
 	<!-- reporting> <plugins> <plugin> <groupId>org.codehaus.mojo</groupId> 
