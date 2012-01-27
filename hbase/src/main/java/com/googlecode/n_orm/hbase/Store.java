@@ -74,6 +74,7 @@ import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.cache.Cache;
+import com.googlecode.n_orm.hbase.PropertyUtils.HBaseProperty;
 import com.googlecode.n_orm.hbase.PropertyUtils.HColumnFamilyProperty;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.hbase.actions.Action;
@@ -109,6 +110,7 @@ import com.googlecode.n_orm.storeapi.GenericStore;
  * compression=gz &#35;can be 'none', 'gz', 'lzo', or 'snappy' (default is 'none') ; in the latter two cases, take great care that those compressors are available for all nodes of your hbase cluster
  * <br></code>
  * One important property to configure is {@link #setScanCaching(Integer)}.<br>
+ * Most properties can be overloaded at class or column-family level by using the annotation {@link HBaseSchema}. 
  * This store supports remote processes (see {@link StorageManagement#processElementsRemotely(Class, Constraint, Process, Callback, int, String...)} and {@link SearchableClassConstraintBuilder#remoteForEach(Process, Callback)}) as it implements {@link ActionnableStore} by using HBase/Hadoop Map-only jobs. However, be careful when configuring your hadoop: all jars containing your process and n-orm (with dependencies) should be available.
  * By default, all known jars are sent (which might become a problem is same jars are sent over and over).
  * You can change this using e.g. {@link #setMapRedSendJars(boolean)}.
@@ -1081,8 +1083,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 										byte [] famB = Bytes.toBytes(fam.getKey());
 										if (!td.hasFamily(famB)) {
 											HColumnDescriptor famD = new HColumnDescriptor(famB);
-											if (this.getCompressionAlgorithm() != null)
-												famD.setCompressionType(this.getCompressionAlgorithm());
+											this.setValues(famD, clazz, fam.getValue());
 											td.addFamily(famD);
 										}
 									}
