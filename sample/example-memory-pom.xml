@@ -9,7 +9,9 @@
 	<properties>
 		<java.version>1.6</java.version>
 		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
+		<aspectj.version>1.6.12</aspectj.version>
 		<plugin.aspectj.version>1.4</plugin.aspectj.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 	<build>
 		<plugins>
@@ -55,6 +57,13 @@
 						</goals>
 					</execution>
 				</executions>
+				<dependencies>
+					<dependency>
+						<groupId>org.aspectj</groupId>
+						<artifactId>aspectjtools</artifactId>
+						<version>${aspectj.version}</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 		</plugins>
 
@@ -73,6 +82,13 @@
 			<version>4.8.2</version>
 			<type>jar</type>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.aspectj</groupId>
+			<artifactId>aspectjrt</artifactId>
+			<version>${aspectj.version}</version>
+			<type>jar</type>
+			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
