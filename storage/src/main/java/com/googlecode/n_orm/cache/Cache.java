@@ -111,10 +111,13 @@ availableCachesCheck:while (ai.hasNext()) {
 						}
 						synchronized(cache) {
 							if ((cache.stopped+(timeToLiveSeconds*1000)) < now) {
-								cache.close();
 								ai.remove();
-							} else if (!isValid(cache.thread)) {
-								cache.cleanInvalidElements();
+								cache.close();
+							} else if (cache.isClosed()) {
+								ai.remove();
+							} else if (isValid(cache.thread)) {
+								ai.remove();
+								assert perThreadCaches.get(cache.thread) == cache;
 							}
 						}
 					}
@@ -246,6 +249,7 @@ availableCachesCheck:while (ai.hasNext()) {
 						res = null;
 					else {
 						res.init();
+						res.cleanInvalidElements();
 						logger.finer("Reusing existing cache for thread " + res.thread);
 					}
 				}
@@ -338,7 +342,7 @@ availableCachesCheck:while (ai.hasNext()) {
 	/**
 	 * @return the element with the eldest last usage (null if cache is empty)
 	 */
-	private Element cleanInvalidElements() {
+	private synchronized Element cleanInvalidElements() {
 		this.shouldCleanup = false;
 		Element eldest = null;
 		Iterator<Entry<String, Element>> it = cache.entrySet().iterator();
