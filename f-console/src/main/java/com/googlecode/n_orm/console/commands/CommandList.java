@@ -1,10 +1,10 @@
 package com.googlecode.n_orm.console.commands;
 
-import org.codehaus.groovy.control.CompilationFailedException;
-import com.googlecode.n_orm.console.annotations.Trigger;
-import com.googlecode.n_orm.console.shell.Shell;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
+import org.codehaus.groovy.control.CompilationFailedException;
+import com.googlecode.n_orm.console.shell.Shell;
+import com.googlecode.n_orm.consoleannotations.Trigger;
 
 public class CommandList
 {
@@ -35,5 +35,11 @@ public class CommandList
 		GroovyShell shell = new GroovyShell(binding);
 		Object value = shell.evaluate("println 'Hello World!'; x = 123; return val * 10");
 		this.shell.print("val = " + value.toString());
+	}
+	
+	@Trigger
+	public int getZero()
+	{
+		return 0;
 	}
 }
