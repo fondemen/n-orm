@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Set;
@@ -469,7 +470,7 @@ public aspect StorageManagement {
 				@Override
 				public T next() {
 					if (!this.hasNext())
-						throw new IllegalStateException("The list is empty");
+						throw new NoSuchElementException();
 					Row data = keys.next();
 					try {
 						return createElementFromRow(clazz, toBeActivated, data);
