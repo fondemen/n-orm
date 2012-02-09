@@ -11,7 +11,7 @@ import com.googlecode.n_orm.performance.PerformanceInserts;
 @RunWith(Suite.class)
 @SuiteClasses(value={
 		// PerformanceInserts.class,
-		BasicPerformanceTest.class,
+		BasicPerformanceTest.class
 })
 
 public class PerformanceTests {
