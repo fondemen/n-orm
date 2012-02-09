@@ -13,6 +13,7 @@ import java.io.ObjectOutputStream;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.NavigableSet;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
@@ -94,7 +95,6 @@ public class BasicPerformanceTest {
 		}
 	}
 	 
-	@Ignore
 	 @Test public void insert1kEmptyBS() throws DatabaseNotReachedException {
 		 
 		 BookStore p;
@@ -106,7 +106,6 @@ public class BasicPerformanceTest {
 
 	 }
 	 
-	@Ignore
 	 @Test public void insert1kNonEmptyBS() throws DatabaseNotReachedException {
 		 BookStore p;
 		 
@@ -117,7 +116,6 @@ public class BasicPerformanceTest {
 		 }
 	 }
 	 
-	@Ignore
 	 @Test public void insertAndStore1kNonEmptyBS() throws DatabaseNotReachedException {
 		 BookStore p;
 		 
@@ -128,7 +126,6 @@ public class BasicPerformanceTest {
 		 }
 	 }
 	
-	@Ignore
 	 @Test public void insertAnddelete1kBS() throws DatabaseNotReachedException {
 		 BookStore p;
 		 
@@ -154,12 +151,14 @@ public class BasicPerformanceTest {
 		 CloseableIterator<RealBook> storeBooks = StorageManagement.findElements().ofClass(RealBook.class)
 					.withKey("bookStore").setTo(bssut)
 					.withKey("sellerDate").lessOrEqualsThan(new Date(2014, 1, 1))
-					.withAtMost(10).elements().iterate();
+					.withAtMost(1000).elements().iterate();
 
 		 int count = 0;
-		 while(storeBooks.next() != null) {
-			 count++;
-		 }
+		 try {
+			 while(storeBooks.next() != null) {
+				 count++;
+			 }
+		 } catch (NoSuchElementException x) {}
 		 assertEquals(1000, count);
 		 
 	 }
