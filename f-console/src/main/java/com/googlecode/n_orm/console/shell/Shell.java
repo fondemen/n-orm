@@ -2,11 +2,7 @@ package com.googlecode.n_orm.console.shell;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
-
 import jline.Completor;
 import jline.ConsoleReader;
 import jline.MultiCompletor;

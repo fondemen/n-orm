@@ -1,21 +1,18 @@
 package com.googlecode.n_orm.console.shell;
 
 import static org.easymock.EasyMock.*;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.junit.Before;
 import org.junit.Test;
-import org.w3c.dom.ls.LSInput;
-
 import com.googlecode.n_orm.console.commands.CommandList;
-import com.googlecode.n_orm.console.shell.Shell;
-import com.googlecode.n_orm.console.shell.ShellProcessor;
 
 public class ShellProcessorTest
 {
@@ -37,6 +34,15 @@ public class ShellProcessorTest
 		mapCommands.put(CommandList.class.getName(), tmp);
 		sut.setMapCommands(mapCommands);
 		assertEquals(mapCommands, sut.getMapCommands());
+	}
+	
+	@Test
+	public void accessorsMapShellVariablesTest()
+	{
+		Map<String, Object> mapShellVariables = new HashMap<String, Object>();
+		mapShellVariables.put("var", 0);
+		sut.setMapShellVariables(mapShellVariables);
+		assertEquals(mapShellVariables, sut.getMapShellVariables());
 	}
 	
 	@Test
@@ -76,7 +82,7 @@ public class ShellProcessorTest
 		String unknownCommand = "unknowncommand";
 		String errorMessage = "n-orm: " + unknownCommand + ": command not found";
 		
-		shell.print(errorMessage);
+		shell.println(errorMessage);
 		replay(shell);
 		this.sut.treatLine(unknownCommand);
 		verify(shell);
@@ -90,7 +96,7 @@ public class ShellProcessorTest
 		String args = "newPrompt anotherParameter";
 		String errorMessage = "Command format error: " + command + "(java.lang.String)";
 		
-		shell.print(errorMessage);
+		shell.println(errorMessage);
 		replay(shell);
 		this.sut.treatLine(command + " " + args);
 		verify(shell);
@@ -105,7 +111,7 @@ public class ShellProcessorTest
 		String groovyCommand = "groovy";
 		String errorMessage = "n-orm: " + "null" + ": command error";
 		
-		shell.print(errorMessage);
+		shell.println(errorMessage);
 		replay(shell);
 		this.sut.treatLine(groovyCommand);
 		verify(shell);
@@ -114,5 +120,62 @@ public class ShellProcessorTest
 		Map<String, Object> tmp = new HashMap<String, Object>();
 		tmp.put(CommandList.class.getName(), this.mapCommands);
 		sut.setMapCommands(tmp);
+	}
+	
+	@Test
+	public void treatLineWithReturnResultTest()
+	{
+		String command = "getZero";
+		String resultMessage = "method result: 0";
+		
+		shell.println(resultMessage);
+		replay(shell);
+		this.sut.treatLine(command);
+		verify(shell);
+		reset(shell);
+	}
+	
+	@Test
+	public void variableAffectationTest()
+	{
+		String affectationCommand = "getZero > var";
+		String resultMessageAffectation = "method result: 0";
+		
+		shell.println(resultMessageAffectation);
+		replay(shell);
+		this.sut.treatLine(affectationCommand);
+		verify(shell);
+	}
+	
+	@Test
+	public void variableDisplayTest()
+	{	
+		String displayCommand = "var";
+		String resultMessageDisplay = "0";
+		Map<String, Object> mapShellVariables = new HashMap<String, Object>();
+		mapShellVariables.put(displayCommand, resultMessageDisplay);
+		sut.setMapShellVariables(mapShellVariables);
+		
+		shell.println(resultMessageDisplay);
+		replay(shell);
+		this.sut.treatLine(displayCommand);
+		verify(shell);
+		reset(shell);
+	}
+	
+	@Test
+	public void variableDisplayNullTest()
+	{	
+		String displayCommand = "var";
+		String resultMessageDisplay = displayCommand + " is null";
+		Map<String, Object> mapShellVariables = new HashMap<String, Object>();
+		mapShellVariables.put(displayCommand, null);
+		sut.setMapShellVariables(mapShellVariables);
+		
+		shell.println(resultMessageDisplay);
+		replay(shell);
+		this.sut.treatLine(displayCommand);
+		verify(shell);
+		reset(shell);
 	}
 }

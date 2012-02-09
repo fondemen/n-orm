@@ -10,7 +10,6 @@
 	<artifactId>f_console</artifactId>
 	<name>n-orm console</name>
 	<version>${project.parent.version}</version>
-<!-- 	<version>50.0.1</version> -->
 	<packaging>jar</packaging>
 
 	<description>n-orm is neither an object-database mapping, nor it addresses specifically relational databases. Its name was chosen as a reference to the No-SQL movement. 
@@ -49,14 +48,42 @@ Different data stores are possible, especially column-oriented data stores such 
 		          </execution>
 		        </executions>
 			</plugin>
+			
+			<plugin>
+		        <groupId>org.codehaus.mojo</groupId>
+		        <artifactId>aspectj-maven-plugin</artifactId>
+		        <version>1.4</version>
+		        <configuration>
+	                <source>1.6</source>
+	                <target>1.6</target>
+	                <complianceLevel>1.6</complianceLevel>
+	                <aspectLibraries>
+                        <aspectLibrary>
+	                        <groupId>com.googlecode.n_orm</groupId>
+	                        <artifactId>storage</artifactId>
+                        </aspectLibrary>
+	                </aspectLibraries>
+		        </configuration>
+		        <executions>
+		                
+		        </executions>
+			</plugin>
 		</plugins>
+		
 	</build>
+	
+	
 	
 	<repositories>
 		<repository>
             <id>jline</id>
             <name>JLine Project Repository</name>
             <url>http://jline.sourceforge.net/m2repo</url>
+        </repository>
+        <repository>
+            <id>org.sonatype.oss.public</id>
+            <name>OSS public</name>
+            <url>http://oss.sonatype.org/content/groups/public</url>
         </repository>
 	</repositories>
 	
@@ -94,7 +121,14 @@ Different data stores are possible, especially column-oriented data stores such 
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
 			<version>${project.parent.version}</version>
-			<type>jar</type>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+	        <groupId>com.googlecode.n_orm</groupId>
+	        <artifactId>storage</artifactId>
+	        <version>${project.parent.version}</version>
+	        <type>jar</type>
 			<scope>compile</scope>
 		</dependency>
 	</dependencies>
