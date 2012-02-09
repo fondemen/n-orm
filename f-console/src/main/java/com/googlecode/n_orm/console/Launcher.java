@@ -1,9 +1,6 @@
 package com.googlecode.n_orm.console;
 
 import java.io.IOException;
-
-import org.junit.runner.notification.StoppedByUserException;
-
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.console.shell.Shell;
 

@@ -5,25 +5,28 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import groovy.lang.GroovyShell;
 import org.apache.commons.beanutils.ConvertUtils;
-import org.codehaus.groovy.control.CompilationFailedException;
-import com.googlecode.n_orm.console.annotations.Trigger;
+import com.googlecode.n_orm.consoleannotations.Trigger;
 import com.googlecode.n_orm.console.commands.CommandList;
 
 public class ShellProcessor
 {
+	// Fields
 	private Shell shell;
-	private String escapeCommand;
 	private Map<String, Object> mapCommands;
 	private Map<String, Method> processorCommands;
+	private Map<String, Object> mapShellVariables;
+	private Object lastCommandResult;
+	private String escapeCommand = "exit";
+	private String affectationCommand = ">";
 	
 	public ShellProcessor(Shell shell)
 	{
 		this.shell = shell;
-		this.escapeCommand = "exit";
 		this.mapCommands = new HashMap<String, Object>();
 		this.mapCommands.put(CommandList.class.getName(), new CommandList(shell));
+		this.mapShellVariables = new HashMap<String, Object>();
+		this.lastCommandResult = null;
 		
 		this.updateProcessorCommands();
 	}
@@ -56,6 +59,17 @@ public class ShellProcessor
 		this.mapCommands = mapCommands;
 	}
 	
+	
+	public Map<String, Object> getMapShellVariables()
+	{
+		return mapShellVariables;
+	}
+
+	public void setMapShellVariables(Map<String, Object> mapShellVariables)
+	{
+		this.mapShellVariables = mapShellVariables;
+	}
+
 	public List<String> getCommands()
 	{
 		ArrayList<String> result = new ArrayList<String>();
@@ -84,26 +98,37 @@ public class ShellProcessor
 	
 	private void executeManualCommand(String query)
 	{
+		// Get all the tokens of the query
 		String[] tokens = query.split(" ");
 		int currentTokenIndex = 0;
 		
+		// Execute every commands in the query
 		while (currentTokenIndex < tokens.length)
 		{
-			if (processorCommands.containsKey(tokens[currentTokenIndex]))
+			// Get the command
+			String command = tokens[currentTokenIndex];
+			currentTokenIndex++;
+			
+			// Check if this is a command on an object or on the shell (variable affectation, etc)
+			if (command.equals(affectationCommand))
 			{
-				String command = tokens[currentTokenIndex];
+				mapShellVariables.put(tokens[currentTokenIndex], lastCommandResult);
 				currentTokenIndex++;
+			}
+			else if (processorCommands.containsKey(command)) // The command must be registered in the processor
+			{
 				try
 				{
 					Method m = processorCommands.get(command);
 					Class<?>[] parameterTypes = m.getParameterTypes();
-					
+					// Find parameters of the command
 					Object[] params = new Object[parameterTypes.length];
 					if (parameterTypes.length > 0)
 					{
+						// Check the format of the command and get the parameters
 						if (tokens.length - currentTokenIndex != parameterTypes.length)
 						{
-							shell.print("Command format error: " + m.toString().substring(
+							shell.println("Command format error: " + m.toString().substring(
 									m.toString().substring(0, m.toString().lastIndexOf("(")).lastIndexOf(".") + 1, // Last "." before parameters
 									m.toString().length())
 									);
@@ -117,17 +142,29 @@ public class ShellProcessor
 							currentTokenIndex += parameterTypes.length;
 						}
 					}
-					Object result = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
-					shell.println("method invoke: " + result);
+					
+					// Execute the command
+					lastCommandResult = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
+					
+					// Print the result on the shell (if there is a result)
+					if (lastCommandResult != null)
+						shell.println("method result: " + lastCommandResult.toString());
 				}
 				catch (Exception e)
 				{
-					shell.print("n-orm: " + e.getMessage() + ": command error");
+					shell.println("n-orm: " + e.getMessage() + ": command error");
 				}
 			}
-			else
+			else if (mapShellVariables.containsKey(command)) // If this is an action on a variable of the shell
 			{
-				shell.print("n-orm: " + tokens[currentTokenIndex] + ": command not found");
+				if (mapShellVariables.get(command) != null)
+					shell.println(mapShellVariables.get(command).toString());
+				else
+					shell.println(command + " is null");
+			}
+			else // The command is unknown, move to the next one in case we know it
+			{
+				shell.println("n-orm: " + command + ": command not found");
 				currentTokenIndex++;
 			}
 		}
