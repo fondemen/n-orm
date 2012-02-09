@@ -40,6 +40,7 @@ import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.consoleannotations.Trigger;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.query.ConstraintBuilder;
 import com.googlecode.n_orm.storeapi.Constraint;
@@ -486,7 +487,8 @@ public aspect StorageManagement {
 			found.close();
 		}
 	}
-
+	
+	@Trigger
 	public static ConstraintBuilder findElements() {
 		return new ConstraintBuilder();
 	}
