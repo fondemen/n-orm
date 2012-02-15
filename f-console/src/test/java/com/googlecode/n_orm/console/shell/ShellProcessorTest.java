@@ -4,7 +4,6 @@ import static org.easymock.EasyMock.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,12 +17,15 @@ public class ShellProcessorTest
 {
 	private ShellProcessor sut;
 	private Shell shell = createMock(Shell.class);
-	private CommandList mapCommands = createMockBuilder(CommandList.class).withConstructor(Shell.class).withArgs(shell).createMock();
+	//private CommandList mapCommands = createMockBuilder(CommandList.class).withConstructor(Shell.class).withArgs(shell).createMock();
+	private CommandList mapCommands = new CommandList(shell);
 	
 	@Before
 	public void createSut()
 	{
 		this.sut = new ShellProcessor(shell);
+		this.sut.getMapCommands().put(CommandList.class.getName(), mapCommands);
+		this.sut.updateProcessorCommands();
 	}
 	
 	@Test
@@ -54,19 +56,31 @@ public class ShellProcessorTest
 		for (int i = 0; i < tmp1.length; i++)
 			tmp3.add(tmp1[i].getName());
 		tmp2.remove(sut.getEscapeCommand());
+		tmp2.remove(sut.getResetCommand());
 		assertTrue(tmp3.containsAll(tmp2));
+	}
+	
+	@Test
+	public void treatResetTest()
+	{
+		String command = sut.getResetCommand();
+		this.sut.treatLine(command);
+		assertTrue(sut.isShellProcessorReseted());
 	}
 	
 	@Test
 	public void treatLineWithArgsTest()
 	{
-		String tmp = "newPrompt";
+		String command = "changePrompt";
+		String args = "newPrompt$";
 		
-		mapCommands.changePrompt(tmp);
-		replay(mapCommands);
-		this.sut.treatLine("changePrompt " + tmp);
-		verify(mapCommands);
-		reset(mapCommands);
+		shell.updateProcessorCommands();
+		shell.setPrompt(Shell.DEFAULT_PROMPT_START + Shell.DEFAULT_PROMPT_END);
+		mapCommands.changePrompt(args);
+		replay(shell);
+		this.sut.treatLine(command + " " + args);
+		verify(shell);
+		reset(shell);
 	}
 	
 	@Test
@@ -77,7 +91,7 @@ public class ShellProcessorTest
 	}
 	
 	@Test
-	public void treatLineUnknownCommandTest() throws UnsupportedEncodingException
+	public void treatLineUnknownCommandTest()
 	{
 		String unknownCommand = "unknowncommand";
 		String errorMessage = "n-orm: " + unknownCommand + ": command not found";
@@ -90,10 +104,10 @@ public class ShellProcessorTest
 	}
 	
 	@Test
-	public void treatLineWrongParametersTest() throws UnsupportedEncodingException
+	public void treatLineWrongParametersTest()
 	{
 		String command = "changePrompt";
-		String args = "newPrompt anotherParameter";
+		String args = "";
 		String errorMessage = "Command format error: " + command + "(java.lang.String)";
 		
 		shell.println(errorMessage);
@@ -104,22 +118,19 @@ public class ShellProcessorTest
 	}
 	
 	@Test
-	public void treatLineWithErrorTest()
+	public void treatLineThrowsExceptionTest()
 	{
-		sut.setMapCommands(null);
+		this.sut.setMapCommands(null);
 		
-		String groovyCommand = "groovy";
+		String command = "changePrompt";
+		String args = "newPrompt$";
 		String errorMessage = "n-orm: " + "null" + ": command error";
 		
 		shell.println(errorMessage);
 		replay(shell);
-		this.sut.treatLine(groovyCommand);
+		this.sut.treatLine(command + " " + args);
 		verify(shell);
 		reset(shell);
-		
-		Map<String, Object> tmp = new HashMap<String, Object>();
-		tmp.put(CommandList.class.getName(), this.mapCommands);
-		sut.setMapCommands(tmp);
 	}
 	
 	@Test
@@ -128,6 +139,8 @@ public class ShellProcessorTest
 		String command = "getZero";
 		String resultMessage = "method result: 0";
 		
+		shell.updateProcessorCommands();
+		shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
 		shell.println(resultMessage);
 		replay(shell);
 		this.sut.treatLine(command);
@@ -138,9 +151,13 @@ public class ShellProcessorTest
 	@Test
 	public void variableAffectationTest()
 	{
-		String affectationCommand = "getZero > var";
+		String varName = "var";
+		String command = "getZero";
+		String affectationCommand = command + " > " + varName;
 		String resultMessageAffectation = "method result: 0";
 		
+		shell.updateProcessorCommands();
+		shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
 		shell.println(resultMessageAffectation);
 		replay(shell);
 		this.sut.treatLine(affectationCommand);
@@ -156,6 +173,8 @@ public class ShellProcessorTest
 		mapShellVariables.put(displayCommand, resultMessageDisplay);
 		sut.setMapShellVariables(mapShellVariables);
 		
+		shell.updateProcessorCommands();
+		shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + displayCommand + Shell.DEFAULT_PROMPT_END);
 		shell.println(resultMessageDisplay);
 		replay(shell);
 		this.sut.treatLine(displayCommand);

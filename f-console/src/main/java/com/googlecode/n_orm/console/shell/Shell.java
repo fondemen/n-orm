@@ -11,6 +11,8 @@ import jline.SimpleCompletor;
 public class Shell
 {
 	private static final String[] EMPTY_STRING_ARRAY = new String[0];
+	public static final String DEFAULT_PROMPT_START = "n-orm";
+	public static final String DEFAULT_PROMPT_END = "$ ";
 	
 	private ConsoleReader in;
 	private PrintStream out;
@@ -23,7 +25,7 @@ public class Shell
 		this.out = System.out;
 		this.in = new ConsoleReader();
 		this.shellProcessor = new ShellProcessor(this);
-		this.prompt = "n-orm$ ";
+		this.prompt = DEFAULT_PROMPT_START + "$ ";
 		
 		this.updateProcessorCommands();
 	}
@@ -80,7 +82,7 @@ public class Shell
 		this.prompt = prompt;
 	}
 	
-	protected String getPrompt()
+	public String getCurrentPrompt()
 	{
 		return this.prompt;
 	}
@@ -127,6 +129,12 @@ public class Shell
 	{
 		if (this.shellProcessor != null)
 			this.shellProcessor.setMapCommands(mapCommands);	
+	}
+	
+	public void putEntryMapCommand(String key, Object value)
+	{
+		if (this.shellProcessor != null)
+			this.shellProcessor.putEntryMapCommand(key, value);
 	}
 	
 	public void launch()

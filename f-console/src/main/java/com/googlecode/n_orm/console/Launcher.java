@@ -9,9 +9,7 @@ public class Launcher
 	public static void main(String[] args) throws IOException
 	{
 		Shell shell = new Shell();
-//		shell.getMapCommands().clear();
-		shell.getMapCommands().put(StorageManagement.class.getName(), new StorageManagement());
-		shell.updateProcessorCommands();
+		shell.putEntryMapCommand(StorageManagement.class.getName(), new StorageManagement());
 		shell.launch();
 	}
 }
