@@ -1,8 +1,8 @@
 package com.googlecode.n_orm.console.commands;
 
 import static org.easymock.EasyMock.*;
+import static org.junit.Assert.*;
 import java.io.IOException;
-import org.codehaus.groovy.control.CompilationFailedException;
 import org.junit.Before;
 import org.junit.Test;
 import com.googlecode.n_orm.console.shell.Shell;
@@ -19,18 +19,6 @@ public class CommandListTest
 	}
 	
 	@Test
-	public void exportTest()
-	{
-		String param = "aParameter";
-		
-		shell.print("export command called successfully, param=" + param);
-		replay(shell);
-		sut.export(param);
-		verify(shell);
-		reset(shell);
-	}
-	
-	@Test
 	public void changePromptTest()
 	{
 		String newPrompt = "newPrompt$";
@@ -43,12 +31,14 @@ public class CommandListTest
 	}
 	
 	@Test
-	public void groovyTest() throws CompilationFailedException
+	public void getZeroTest()
 	{
-		shell.print("val = 20");
-		replay(shell);
-		sut.groovy();
-		verify(shell);
-		reset(shell);
+		assertEquals(0, sut.getZero());
+	}
+	
+	@Test
+	public void getConstantStringTest()
+	{
+		assertSame("hello world", sut.getConstantString());
 	}
 }
