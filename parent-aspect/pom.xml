@@ -12,7 +12,7 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<properties>
-		<aspectj.version>1.6.11</aspectj.version>
+		<aspectj.version>1.6.12</aspectj.version>
 		<aspectj.plugin.version>1.4</aspectj.plugin.version>
 	</properties>
 
@@ -53,6 +53,13 @@
 						</goals>
 					</execution>
 				</executions>
+				<dependencies>
+					<dependency>
+						<groupId>org.aspectj</groupId>
+						<artifactId>aspectjtools</artifactId>
+						<version>${aspectj.version}</version>
+					</dependency>
+				</dependencies>
 			</plugin>
 
 			<plugin>

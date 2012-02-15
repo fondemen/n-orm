@@ -1,12 +1,12 @@
 package com.googlecode.n_orm;
 
+import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
 
-import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
-import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.Store;
 
 public class DummyStore implements Store {
 	
@@ -41,78 +41,80 @@ public class DummyStore implements Store {
 	}
 
 	@Override
-	public byte[] get(String table, String row, String family, String key) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public void delete(String table, String id)
+	public void delete(PersistingElement elt, String table, String id)
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
 		
 	}
 
 	@Override
-	public boolean exists(String table, String row, String family)
+	public boolean exists(PersistingElement elt, String table, String row)
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
-	public boolean exists(String table, String row)
+	public boolean exists(PersistingElement elt, Field columnFamily,
+			String table, String row, String family)
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
-	public CloseableKeyIterator get(String table, Constraint c, int limit, Set<String> families)
+	public byte[] get(PersistingElement elt, Field property, String table,
+			String row, String family, String key)
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	public void storeChanges(String table, String id,
-			Map<String, Map<String, byte[]>> changed,
-			Map<String, Set<String>> removed,
-			Map<String, Map<String, Number>> increments)
-			throws DatabaseNotReachedException {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public Map<String, Map<String, byte[]>> get(String table, String id,
-			Set<String> families) throws DatabaseNotReachedException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Map<String, byte[]> get(String table, String id, String family)
+	public Map<String, byte[]> get(PersistingElement elt, Field columnFamily,
+			String table, String id, String family)
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	public Map<String, byte[]> get(String table, String id, String family,
+	public Map<String, byte[]> get(PersistingElement elt, Field columnFamily,
+			String table, String id, String family, Constraint c)
+			throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public long count(Class<? extends PersistingElement> type, String table,
 			Constraint c) throws DatabaseNotReachedException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public long count(String table, Constraint c)
-			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
 		return 0;
 	}
 
-	public void truncate(String table, Constraint c)
+	@Override
+	public CloseableKeyIterator get(Class<? extends PersistingElement> type,
+			String table, Constraint c, int limit, Map<String, Field> families)
+			throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Map<String, Map<String, byte[]>> get(PersistingElement elt,
+			String table, String id, Map<String, Field> families)
+			throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public void storeChanges(PersistingElement elt,
+			Map<String, Field> changedFields, String table, String id,
+			Map<String, Map<String, byte[]>> changed,
+			Map<String, Set<String>> removed,
+			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
 		
