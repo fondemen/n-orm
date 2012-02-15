@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.beanutils.ConvertUtils;
 import com.googlecode.n_orm.consoleannotations.Trigger;
-import com.googlecode.n_orm.console.commands.CommandList;
 
 public class ShellProcessor
 {
@@ -16,17 +15,17 @@ public class ShellProcessor
 	private Map<String, Object> mapCommands;
 	private Map<String, Method> processorCommands;
 	private Map<String, Object> mapShellVariables;
-	private Object lastCommandResult;
-	private String escapeCommand = "exit";
+	private String escapeCommand = "quit";
+	private String resetCommand = "reset";
 	private String affectationCommand = ">";
+	private boolean isShellProcessorReseted = true;
+	private Object context = null;
 	
 	public ShellProcessor(Shell shell)
 	{
 		this.shell = shell;
 		this.mapCommands = new HashMap<String, Object>();
-		this.mapCommands.put(CommandList.class.getName(), new CommandList(shell));
 		this.mapShellVariables = new HashMap<String, Object>();
-		this.lastCommandResult = null;
 		
 		this.updateProcessorCommands();
 	}
@@ -49,6 +48,11 @@ public class ShellProcessor
 		return this.escapeCommand;
 	}
 	
+	public String getResetCommand()
+	{
+		return resetCommand;
+	}
+	
 	public Map<String, Object> getMapCommands()
 	{
 		return mapCommands;
@@ -59,6 +63,11 @@ public class ShellProcessor
 		this.mapCommands = mapCommands;
 	}
 	
+	public void putEntryMapCommand(String key, Object value)
+	{
+		this.mapCommands.put(key, value);
+		shell.updateProcessorCommands();
+	}
 	
 	public Map<String, Object> getMapShellVariables()
 	{
@@ -74,6 +83,7 @@ public class ShellProcessor
 	{
 		ArrayList<String> result = new ArrayList<String>();
 		result.add(this.escapeCommand);
+		result.add(this.resetCommand);
 		result.addAll(processorCommands.keySet());
 		return result;
 	}
@@ -82,21 +92,15 @@ public class ShellProcessor
 	{
 		if (text.replaceAll("\\s+$", "").equals(escapeCommand))
 			shell.doStop();
-		else
+		else if (text.replaceAll("\\s+$", "").equals(resetCommand))
 		{
-//			executeGroovyCommand(text);
-			executeManualCommand(text);
+			this.doReset();
 		}
+		else
+			executeQuery(text.replaceAll("\\s+", " "));
 	}
-//	
-//	private void executeGroovyCommand(String query) throws CompilationFailedException
-//	{
-//		GroovyShell shell = new GroovyShell();
-//		Object value = shell.evaluate(query);
-//		this.shell.print(value.toString());
-//	}
-	
-	private void executeManualCommand(String query)
+
+	private void executeQuery(String query)
 	{
 		// Get all the tokens of the query
 		String[] tokens = query.split(" ");
@@ -112,8 +116,23 @@ public class ShellProcessor
 			// Check if this is a command on an object or on the shell (variable affectation, etc)
 			if (command.equals(affectationCommand))
 			{
-				mapShellVariables.put(tokens[currentTokenIndex], lastCommandResult);
+				mapShellVariables.put(tokens[currentTokenIndex], this.context);
 				currentTokenIndex++;
+			}
+			else if (mapShellVariables.containsKey(command)) // If this is an action on a variable of the shell
+			{
+				if (mapShellVariables.get(command) != null)
+				{
+					Object context = mapShellVariables.get(command);
+					shell.println(context.toString());
+					this.context = context;
+					
+					// Change the prompt of the shell and update the completors
+					this.shell.updateProcessorCommands();
+					this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
+				}
+				else
+					shell.println(command + " is null");
 			}
 			else if (processorCommands.containsKey(command)) // The command must be registered in the processor
 			{
@@ -126,7 +145,7 @@ public class ShellProcessor
 					if (parameterTypes.length > 0)
 					{
 						// Check the format of the command and get the parameters
-						if (tokens.length - currentTokenIndex != parameterTypes.length)
+						if (tokens.length - currentTokenIndex < parameterTypes.length)
 						{
 							shell.println("Command format error: " + m.toString().substring(
 									m.toString().substring(0, m.toString().lastIndexOf("(")).lastIndexOf(".") + 1, // Last "." before parameters
@@ -144,23 +163,24 @@ public class ShellProcessor
 					}
 					
 					// Execute the command
-					lastCommandResult = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
+					this.context = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
 					
 					// Print the result on the shell (if there is a result)
-					if (lastCommandResult != null)
-						shell.println("method result: " + lastCommandResult.toString());
+					if (this.context != null)
+					{
+						this.isShellProcessorReseted = false;
+						// Change the prompt of the shell and update the completors
+						this.shell.updateProcessorCommands();
+						this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
+						shell.println("method result: " + this.context.toString());
+					}
+					else // Reset the shell in this case
+						this.doReset();
 				}
 				catch (Exception e)
 				{
 					shell.println("n-orm: " + e.getMessage() + ": command error");
 				}
-			}
-			else if (mapShellVariables.containsKey(command)) // If this is an action on a variable of the shell
-			{
-				if (mapShellVariables.get(command) != null)
-					shell.println(mapShellVariables.get(command).toString());
-				else
-					shell.println(command + " is null");
 			}
 			else // The command is unknown, move to the next one in case we know it
 			{
@@ -169,4 +189,28 @@ public class ShellProcessor
 			}
 		}
 	}
+	
+	private void doReset()
+	{
+		this.context = null;
+		this.isShellProcessorReseted = true;
+		this.shell.updateProcessorCommands();
+		this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + Shell.DEFAULT_PROMPT_END);
+	}
+	
+	protected boolean isShellProcessorReseted()
+	{
+		return this.isShellProcessorReseted;
+	}
+	
+	/*
+	 findElements
+	 	ofClass
+	 		display list of params
+	 			withKey *param*					<------------
+	 				|setTo *param*							|
+	 				|between *param1* and *param2*		-----
+	 					go (un jour)
+	 
+	 */
 }

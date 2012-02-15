@@ -108,11 +108,6 @@ Different data stores are possible, especially column-oriented data stores such 
             <version>0.9.9</version>
         </dependency>
         <dependency>
-            <groupId>groovy</groupId>
-            <artifactId>groovy-all-1.0-jsr</artifactId>
-            <version>05</version>
-        </dependency>
-        <dependency>
 			<groupId>commons-beanutils</groupId>
 			<artifactId>commons-beanutils</artifactId>
 			<version>1.8.3</version>

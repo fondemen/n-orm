@@ -8,10 +8,10 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.Map;
-
 import jline.ConsoleReader;
 import org.junit.Before;
 import org.junit.Test;
+import com.googlecode.n_orm.console.commands.CommandList;
 
 public class ShellTest
 {
@@ -22,6 +22,7 @@ public class ShellTest
 	public void createSut() throws IOException
 	{
 		this.sut = new Shell();
+		this.sut.putEntryMapCommand(CommandList.class.getName(), new CommandList(this.sut));
 	}
 	
 	@Test
@@ -29,7 +30,7 @@ public class ShellTest
 	{
 		String tmp = "newPrompt";
 		sut.setPrompt(tmp);
-		assertEquals(tmp, sut.getPrompt());
+		assertEquals(tmp, sut.getCurrentPrompt());
 	}
 	
 	@Test
