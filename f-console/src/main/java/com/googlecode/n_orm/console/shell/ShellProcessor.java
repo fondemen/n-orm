@@ -3,8 +3,10 @@ package com.googlecode.n_orm.console.shell;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import org.apache.commons.beanutils.ConvertUtils;
 import com.googlecode.n_orm.consoleannotations.Trigger;
 
@@ -16,9 +18,10 @@ public class ShellProcessor
 	private Map<String, Method> processorCommands;
 	private Map<String, Object> mapShellVariables;
 	private String escapeCommand = "quit";
+	private String zeroCommand = "zero";
 	private String resetCommand = "reset";
 	private String affectationCommand = ">";
-	private boolean isShellProcessorReseted = true;
+	private boolean isShellProcessorZeroed = true;
 	private Object context = null;
 	
 	public ShellProcessor(Shell shell)
@@ -33,6 +36,12 @@ public class ShellProcessor
 	public void updateProcessorCommands()
 	{
 		processorCommands = new HashMap<String, Method>();
+		// List all variables
+		Iterator<Entry<String, Object>> it = mapShellVariables.entrySet().iterator();
+		while (it.hasNext())
+			processorCommands.put(it.next().getKey(), null);
+		
+		// List all annotated methods
 		for (Object o : mapCommands.values())
 		{
 			for (Method m : o.getClass().getDeclaredMethods())
@@ -46,6 +55,11 @@ public class ShellProcessor
 	public String getEscapeCommand()
 	{
 		return this.escapeCommand;
+	}
+	
+	public String getZeroCommand()
+	{
+		return zeroCommand;
 	}
 	
 	public String getResetCommand()
@@ -83,6 +97,7 @@ public class ShellProcessor
 	{
 		ArrayList<String> result = new ArrayList<String>();
 		result.add(this.escapeCommand);
+		result.add(this.zeroCommand);
 		result.add(this.resetCommand);
 		result.addAll(processorCommands.keySet());
 		return result;
@@ -90,12 +105,13 @@ public class ShellProcessor
 	
 	public void treatLine(String text)
 	{
-		if (text.replaceAll("\\s+$", "").equals(escapeCommand))
+		String textWithoutSpaceAtTheEnd = text.replaceAll("\\s+$", "");
+		if (textWithoutSpaceAtTheEnd.equals(escapeCommand))
 			shell.doStop();
-		else if (text.replaceAll("\\s+$", "").equals(resetCommand))
-		{
+		else if (textWithoutSpaceAtTheEnd.equals(zeroCommand))
+			this.doZero();
+		else if (textWithoutSpaceAtTheEnd.equals(resetCommand))
 			this.doReset();
-		}
 		else
 			executeQuery(text.replaceAll("\\s+", " "));
 	}
@@ -118,6 +134,8 @@ public class ShellProcessor
 			{
 				mapShellVariables.put(tokens[currentTokenIndex], this.context);
 				currentTokenIndex++;
+				// Update the completors
+				this.shell.updateProcessorCommands();
 			}
 			else if (mapShellVariables.containsKey(command)) // If this is an action on a variable of the shell
 			{
@@ -168,14 +186,14 @@ public class ShellProcessor
 					// Print the result on the shell (if there is a result)
 					if (this.context != null)
 					{
-						this.isShellProcessorReseted = false;
+						this.isShellProcessorZeroed = false;
 						// Change the prompt of the shell and update the completors
 						this.shell.updateProcessorCommands();
 						this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
 						shell.println("method result: " + this.context.toString());
 					}
-					else // Reset the shell in this case
-						this.doReset();
+					else // Zero the shell in this case
+						this.doZero();
 				}
 				catch (Exception e)
 				{
@@ -190,17 +208,23 @@ public class ShellProcessor
 		}
 	}
 	
-	private void doReset()
+	private void doZero()
 	{
 		this.context = null;
-		this.isShellProcessorReseted = true;
+		this.isShellProcessorZeroed = true;
 		this.shell.updateProcessorCommands();
 		this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + Shell.DEFAULT_PROMPT_END);
 	}
 	
-	protected boolean isShellProcessorReseted()
+	private void doReset()
 	{
-		return this.isShellProcessorReseted;
+		this.mapShellVariables.clear();
+		doZero();
+	}
+	
+	protected boolean isShellProcessorZeroed()
+	{
+		return this.isShellProcessorZeroed;
 	}
 	
 	/*

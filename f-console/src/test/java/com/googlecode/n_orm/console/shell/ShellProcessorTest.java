@@ -17,7 +17,6 @@ public class ShellProcessorTest
 {
 	private ShellProcessor sut;
 	private Shell shell = createMock(Shell.class);
-	//private CommandList mapCommands = createMockBuilder(CommandList.class).withConstructor(Shell.class).withArgs(shell).createMock();
 	private CommandList mapCommands = new CommandList(shell);
 	
 	@Before
@@ -56,8 +55,17 @@ public class ShellProcessorTest
 		for (int i = 0; i < tmp1.length; i++)
 			tmp3.add(tmp1[i].getName());
 		tmp2.remove(sut.getEscapeCommand());
+		tmp2.remove(sut.getZeroCommand());
 		tmp2.remove(sut.getResetCommand());
 		assertTrue(tmp3.containsAll(tmp2));
+	}
+	
+	@Test
+	public void treatZeroTest()
+	{
+		String command = sut.getZeroCommand();
+		this.sut.treatLine(command);
+		assertTrue(sut.isShellProcessorZeroed());
 	}
 	
 	@Test
@@ -65,7 +73,8 @@ public class ShellProcessorTest
 	{
 		String command = sut.getResetCommand();
 		this.sut.treatLine(command);
-		assertTrue(sut.isShellProcessorReseted());
+		assertTrue(sut.isShellProcessorZeroed());
+		assertTrue(sut.getMapShellVariables().isEmpty());
 	}
 	
 	@Test
@@ -158,6 +167,7 @@ public class ShellProcessorTest
 		
 		shell.updateProcessorCommands();
 		shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
+		shell.updateProcessorCommands();
 		shell.println(resultMessageAffectation);
 		replay(shell);
 		this.sut.treatLine(affectationCommand);
