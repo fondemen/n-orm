@@ -36,7 +36,7 @@ public abstract class ColumnFamily<T> {
 	protected final Map<String, Number> increments;
 	protected final boolean addOnly;
 	
-	protected boolean activated = false;
+	protected long lastActivation = -1;
 	
 	public ColumnFamily() { //For compile-time purpose only ; should be replaced by Around of ColumnFamilyManagement
 		this.clazz = null;
@@ -44,7 +44,6 @@ public abstract class ColumnFamily<T> {
 		this.name = null;
 		this.owner = null;
 		this.ownerTable = null;
-		this.activated = false;
 		this.increments = null;
 		this.addOnly = false;
 	}
@@ -97,11 +96,27 @@ public abstract class ColumnFamily<T> {
 	}
 
 	public boolean isActivated() {
-		return activated;
+		return this.lastActivation > 0;
+	}
+
+	/**
+	 * Whether this column family was activated during the last <code>timeout</code> period.
+	 * @param timeout negative value means at any time ; {@link Long#MAX_VALUE} bypasses clock read
+	 * @return
+	 */
+	public boolean isActivated(long timeout) {
+		return this.lastActivation > 0 && (timeout < 0 ? true : (timeout == Long.MAX_VALUE || System.currentTimeMillis() - timeout < this.lastActivation));
 	}
 
 	public void setActivated() {
-		activated = true;
+		this.lastActivation = System.currentTimeMillis();
+	}
+	
+	/**
+	 * The date (epoch) at which the column familu was last activated.
+	 */
+	public long getActivationDate() {
+		return this.lastActivation;
 	}
 	
 	public void assertIsActivated(String messageToDescribeTheContextOfTheCheck) throws IllegalStateException {
@@ -135,15 +150,11 @@ public abstract class ColumnFamily<T> {
 		for (Entry<String, byte[]> entry : rawData.entrySet()) {
 			this.collection.put(entry.getKey(), this.preparePut(entry.getKey(), entry.getValue()));
 		}
-		markActivated();
+		setActivated();
 		this.storeToPOJO();
 		assert ! this.hasChanged();
 	}
 
-	private void markActivated() {
-		this.activated = true;
-	}
-	
 	protected T preparePut(String key, byte [] rep) {
 		return ConversionTools.convert(this.clazz, rep);
 	}

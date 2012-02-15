@@ -62,8 +62,8 @@ public class MapRedTest {
 	@After
 	public void truncate() throws IOException {
 		store.setTruncateMapRed(false);
-		store.truncate(tableName, (Constraint)null);
-		assertEquals(0, store.count(tableName, (Constraint)null));
+		store.truncate(null, tableName, (Constraint)null);
+		assertEquals(0, store.count(null, tableName, (Constraint)null));
 		store.setTruncateMapRed(true);
 		
 		Scan scan = new Scan();
@@ -82,7 +82,7 @@ public class MapRedTest {
 	
 	protected long count() {
 		store.setCountMapRed(false);
-		long ret = store.count(tableName, (Constraint)null);
+		long ret = store.count(null, tableName, (Constraint)null);
 		store.setCountMapRed(true);
 		return ret;
 	}
@@ -93,42 +93,42 @@ public class MapRedTest {
 			Map<String, byte[]> changes = new TreeMap<String, byte[]>();
 			changes.put("aval", new byte[] {1, 2, 3, 4});
 			changed.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changes );
-			store.storeChanges(tableName, UUID.randomUUID().toString(), changed, null, null);
+			store.storeChanges(null, null, tableName, UUID.randomUUID().toString(), changed, null, null);
 		}
 	}
 
 	@Test
 	public void count0() {
-		assertEquals(0, store.count(tableName, (Constraint)null));
+		assertEquals(0, store.count(null, tableName, (Constraint)null));
 	}
 	
 	@Test
 	public void count1() {
 		this.createElements(1);
-		assertEquals(1, store.count(tableName, (Constraint)null));
+		assertEquals(1, store.count(null, tableName, (Constraint)null));
 	}
 	
 	@Test
 	public void count100() {
 		this.createElements(100);
-		assertEquals(100, store.count(tableName, (Constraint)null));
+		assertEquals(100, store.count(null, tableName, (Constraint)null));
 	}
 	
 	@Test
 	public void truncate0() {
-		store.truncate(tableName, (Constraint)null);
+		store.truncate(null, tableName, (Constraint)null);
 	}
 	
 	@Test
 	public void truncate1() {
 		this.createElements(1);
-		store.truncate(tableName, (Constraint)null);
+		store.truncate(null, tableName, (Constraint)null);
 	}
 	
 	@Test
 	public void truncate100() {
 		this.createElements(100);
-		store.truncate(tableName, (Constraint)null);
+		store.truncate(null, tableName, (Constraint)null);
 	}
 
 }
