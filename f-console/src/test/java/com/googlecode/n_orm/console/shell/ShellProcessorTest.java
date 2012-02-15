@@ -50,7 +50,7 @@ public class ShellProcessorTest
 	public void getCommandsTest()
 	{
 		Method[] tmp1 = mapCommands.getClass().getDeclaredMethods();
-		List<String> tmp2 = sut.getCommands();
+		List<String> tmp2 = sut.getCommandsAsString();
 		List<String> tmp3 = new ArrayList<String>();
 		for (int i = 0; i < tmp1.length; i++)
 			tmp3.add(tmp1[i].getName());
