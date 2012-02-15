@@ -15,7 +15,7 @@ import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.cf.SetColumnFamily;
-import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.storeapi.SimpleStore;
 
 /**
  * This annotation must be placed on any element with persistence capabilities ; such annotated classes automatically implement and offer services defined by {@link PersistingElement} (e.g. activation or storage).
@@ -32,7 +32,7 @@ import com.googlecode.n_orm.storeapi.Store;
  * A persisting element whose identifier is known can be created using {@link StorageManagement#getElement(Class, String)}.
  * In any case, found elements still have to be activated using {@link PersistingElement#activate(String...)}. 
  * So far, key-based search is the only supported approach to search persisting elements. It is also for the more efficient way for most data store (especially distributed hashtable based stores such as column-oriented databases).
- * </p><p>A {@link Store} is used to store persisting elements.
+ * </p><p>A {@link SimpleStore} is used to store persisting elements.
  * A persisting element will be stored as a row in the {@link #table()} corresponding to the class with key (i.e. its qualifier or index) given by {@link PersistingElement#getIdentifier()}.
  * Its non-key properties are stored in a column family named "props" (as defined in {@link PropertyManagement#PROPERTY_COLUMNFAMILY_NAME}). Keys are also stored there if the annotation defined {@link #storeKeys()} as true.
  * Column families ({@link Set} and {@link Map} attributes) are merely stored in column families of the data store.

@@ -15,9 +15,9 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
 
 /**
- * A restriction to a {@link Store} search.
- * In case this restriction applies to a table (as in {@link Store#get(String, Constraint, int, Set)}, returned rows should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
- * In case this restrictions applies to a column family (as in {@link Store#get(String, String, String, Constraint)}, returned columns should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
+ * A restriction to a {@link SimpleStore} search.
+ * In case this restriction applies to a table (as in {@link SimpleStore#get(String, Constraint, int, Set)}, returned rows should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
+ * In case this restrictions applies to a column family (as in {@link SimpleStore#get(String, String, String, Constraint)}, returned columns should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
  */
 public class Constraint {
 	
