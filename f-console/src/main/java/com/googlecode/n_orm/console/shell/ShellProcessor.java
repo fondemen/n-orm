@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.commons.beanutils.ConvertUtils;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.consoleannotations.Trigger;
 
 public class ShellProcessor
@@ -41,12 +42,24 @@ public class ShellProcessor
 		while (it.hasNext())
 			processorCommands.put(it.next().getKey(), null);
 		
-		// List all annotated methods
-		for (Object o : mapCommands.values())
+		if (this.isShellProcessorZeroed)
 		{
-			for (Method m : o.getClass().getDeclaredMethods())
+			// List all Trigger annotated methods
+			for (Object o : mapCommands.values())
 			{
-				if (m.getAnnotation(Trigger.class) != null)
+				for (Method m : o.getClass().getDeclaredMethods())
+				{
+					if (m.getAnnotation(Trigger.class) != null)
+						processorCommands.put(m.getName(), m);
+				}
+			}
+		}
+		else
+		{
+			// List all Continuator annotated methods
+			for (Method m : this.context.getClass().getDeclaredMethods())
+			{
+				if (m.getAnnotation(Continuator.class) != null)
 					processorCommands.put(m.getName(), m);
 			}
 		}
@@ -93,13 +106,20 @@ public class ShellProcessor
 		this.mapShellVariables = mapShellVariables;
 	}
 
-	public List<String> getCommands()
+	public List<String> getCommandsAsString()
 	{
 		ArrayList<String> result = new ArrayList<String>();
 		result.add(this.escapeCommand);
 		result.add(this.zeroCommand);
 		result.add(this.resetCommand);
 		result.addAll(processorCommands.keySet());
+		return result;
+	}
+	
+	public List<Method> getCommandsAsMethod()
+	{
+		ArrayList<Method> result = new ArrayList<Method>();
+		result.addAll(processorCommands.values());
 		return result;
 	}
 	
@@ -144,6 +164,7 @@ public class ShellProcessor
 					Object context = mapShellVariables.get(command);
 					shell.println(context.toString());
 					this.context = context;
+					this.isShellProcessorZeroed = false;
 					
 					// Change the prompt of the shell and update the completors
 					this.shell.updateProcessorCommands();
@@ -174,7 +195,16 @@ public class ShellProcessor
 						else
 						{
 							for (int i = 0; i < parameterTypes.length; i++)
-								params[i] = ConvertUtils.convert(tokens[currentTokenIndex + i], parameterTypes[i]);
+								if (parameterTypes[i].equals(Class.class))
+								{	// Need to get the full name of the class
+									String key = shell.getMapClassNames().get(tokens[currentTokenIndex + i]);
+									if (key != null)
+										params[i] = ConvertUtils.convert(key, parameterTypes[i]);
+									else
+										params[i] = null;
+								}
+								else
+									params[i] = ConvertUtils.convert(tokens[currentTokenIndex + i], parameterTypes[i]);
 							
 							currentTokenIndex += parameterTypes.length;
 						}
