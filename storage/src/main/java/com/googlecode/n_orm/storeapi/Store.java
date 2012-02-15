@@ -1,9 +1,11 @@
 package com.googlecode.n_orm.storeapi;
 
+import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.PersistingElement;
 
 /**
  * The interface that defines what a data store should implement.
@@ -19,95 +21,79 @@ public interface Store {
 	/**
 	 * Called once the store is created ; only one store is instanciated with the same properties.
 	 */
-	void start() throws DatabaseNotReachedException;
-	
-	//void add(String table, String id, String family, String key, byte[] value);
-	//void remove(String table, String id, String family, String key);
-	
-	/**
-	 * Tests for a row.
-	 */
-	boolean exists(String table, String row) throws DatabaseNotReachedException;
+	public void start() throws DatabaseNotReachedException;
 	
 	/**
 	 * Tests whether a column family is empty.
 	 */
-	boolean exists(String table, String row, String family) throws DatabaseNotReachedException;
-	
-//	/**
-//	 * Tests for a key.
-//	 */
-//	boolean exists(String table, String row, String family, String key) throws DatabaseNotReachedException;
-	
+	public void delete(PersistingElement elt, String table, String id)
+			throws DatabaseNotReachedException;
+	/**
+	 * Tests for a row.
+	 */
+	public boolean exists(PersistingElement elt, String table,
+			String row) throws DatabaseNotReachedException;
+
+	/**
+	 * Tests whether a column family is empty.
+	 */
+	public boolean exists(PersistingElement elt, Field columnFamily,
+			String table, String row, String family)
+			throws DatabaseNotReachedException;
+
 	/**
 	 * Rows matching constraint sorted according to their key in ascending order.
-	 * @param families TODO
 	 */
-	CloseableKeyIterator get(String table, Constraint c, int limit, Set<String> families) throws DatabaseNotReachedException;
+	public CloseableKeyIterator get(
+			Class<? extends PersistingElement> type,
+			String table, Constraint c, int limit, Map<String, Field> families)
+			throws DatabaseNotReachedException;
 	
 	/**
 	 * Returns an element from a family.
 	 */
-	byte [] get(String table, String row, String family, String key) throws DatabaseNotReachedException;
-	
+	public byte[] get(PersistingElement elt, Field property,
+			String table, String row, String family, String key)
+			throws DatabaseNotReachedException;
+
 	/**
 	 * Returns all elements in a family ; no side-effect.
 	 * In case one element is missing, null is returned.
 	 */
-	Map<String, byte[]> get(String table, String id, String family) throws DatabaseNotReachedException;
-	
+	public Map<String, byte[]> get(PersistingElement elt,
+			Field columnFamily, String table, String id, String family)
+			throws DatabaseNotReachedException;
+
 	/**
 	 * Returns all elements in a family ; no side-effect.
 	 * In case one element is missing, null is returned.
 	 */
-	Map<String, byte[]> get(String table, String id, String family, Constraint c) throws DatabaseNotReachedException;
-	
+	public Map<String, byte[]> get(PersistingElement elt,
+			Field columnFamily, String table, String id, String family,
+			Constraint c) throws DatabaseNotReachedException;
+
 	/**
 	 * Returns all elements in families ; no side-effect.
 	 * In case one element is missing, null is returned.
 	 */
-	Map<String, Map<String, byte[]>> get(String table, String id, Set<String> families) throws DatabaseNotReachedException;
-	
+	public Map<String, Map<String, byte[]>> get(PersistingElement elt,
+			String table, String id,
+			Map<String, Field> families) throws DatabaseNotReachedException;
 	/**
 	 * Stores given piece of information.
 	 * In case an element is missing in the data store (table, row, family, ...), it is created.
 	 */
-	void storeChanges(String table, String id, Map<String, Map<String, byte[]>> changed, Map<String, Set<String>> removed, Map<String, Map<String, Number>> increments) throws DatabaseNotReachedException;
-	
-	/**
-	 * Deletes the given row
-	 */
-	void delete(String table, String id) throws DatabaseNotReachedException;
+	public void storeChanges(PersistingElement elt,
+			Map<String, Field> changedFields, String table, String id,
+			Map<String, Map<String, byte[]>> changed,
+			Map<String, Set<String>> removed,
+			Map<String, Map<String, Number>> increments)
+			throws DatabaseNotReachedException;
 
 	/**
 	 * Counts the number of element satisfying the constraint.
 	 */
-	long count(String table, Constraint c)
-			throws DatabaseNotReachedException;
+	public long count(Class<? extends PersistingElement> type,
+			String table, Constraint c) throws DatabaseNotReachedException;
 
-//	/**
-//	 * Deletes all elements satisfying the constraint
-//	 */
-//	void truncate(String table, Constraint c)
-//			throws DatabaseNotReachedException;
-	
-//	/**
-//	 * Counts the number of elements in the table.
-//	 * In case the table is missing, 0 is returned.
-//	 */
-//	int count(String table) throws DatabaseNotReachedException;
-
-//	/**
-//	 * Counts the number of elements in the family.
-//	 * In case the an element is missing (table, row, family, ...), 0 is returned.
-//	 */
-//	int count(String table, String row, String family) throws DatabaseNotReachedException;
-
-
-//	/**
-//	 * Counts the number of elements satisfying a constraint in the family.
-//	 * In case the an element is missing (table, row, family, ...), 0 is returned.
-//	 */
-//	int count(String ownerTable, String identifier, String name,
-//			Constraint constraint) throws DatabaseNotReachedException;
 }

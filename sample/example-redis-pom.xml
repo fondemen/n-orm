@@ -3,16 +3,16 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>sample</artifactId>
-	<version>hbase-${hbase.version}-n_orm-${n-orm.version}</version>
+	<version>0.0.1-SNAPSHOT</version>
 	<name>Sample n-orm project</name>
 	<description>Simple starter project.</description>
 	<properties>
 		<java.version>1.6</java.version>
 		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
-		<hbase.version>0.90.3</hbase.version>
 		<aspectj.version>1.6.12</aspectj.version>
 		<plugin.aspectj.version>1.4</plugin.aspectj.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<jedis.version>2.0.0</jedis.version>
 	</properties>
 	<build>
 		<plugins>
@@ -27,8 +27,11 @@
 					<excludes>
 						<!-- excluding business model as it must be compiled using AspectJ -->
 						<exclude>**/*.java</exclude>
-						<!-- no need to exclude tests as no persisting class is defined there -->
 					</excludes>
+					<testExcludes>
+						<!-- Excluding HBaseTestLauncher as we'll use the Memory store -->
+						<excludes>**/HBase*.java</excludes>
+					</testExcludes>
 				</configuration>
 			</plugin>
 
@@ -63,22 +66,15 @@
 					</dependency>
 				</dependencies>
 			</plugin>
-
-			<plugin>
-				<artifactId>maven-assembly-plugin</artifactId>
-				<version>2.2.1</version>
-				<configuration>
-					<descriptorRefs>
-						<descriptorRef>jar-with-dependencies</descriptorRef>
-					</descriptorRefs>
-					<archive>
-						<manifest>
-							<mainClass>com.googlecode.n_orm.sample.businessmodel.Main</mainClass>
-						</manifest>
-					</archive>
-				</configuration>
-			</plugin>
 		</plugins>
+
+		<!-- Using store that points to the Memory store instead of the default 
+			HBase store.properties from src/main/resources -->
+		<testResources>
+			<testResource>
+				<directory>src/test/redis-resources</directory>
+			</testResource>
+		</testResources>
 	</build>
 	<dependencies>
 		<dependency>
@@ -89,44 +85,36 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>com.googlecode.n_orm</groupId>
-			<artifactId>storage</artifactId>
-			<version>${n-orm.version}</version>
-			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
 			<groupId>org.aspectj</groupId>
 			<artifactId>aspectjrt</artifactId>
 			<version>${aspectj.version}</version>
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
-
-		<!-- HBase-specific dependencies -->
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
-			<artifactId>hbase</artifactId>
-			<version>hbase-${hbase.version}-n-orm-${n-orm.version}</version>
-			<type>jar</type>
-			<scope>compile</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.googlecode.n_orm</groupId>
-			<artifactId>hbase</artifactId>
-			<version>hbase-${hbase.version}-n-orm-${n-orm.version}</version>
+			<artifactId>storage</artifactId>
+			<version>${n-orm.version}</version>
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
+
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
-			<artifactId>hbase-test-deps</artifactId>
-			<version>hbase-${hbase.version}-SNAPSHOT</version>
-			<type>pom</type>
-			<scope>test</scope>
+			<artifactId>redis</artifactId>
+			<version>jedis-${jedis.version}-n-orm-${n-orm.version}</version>
+			<type>jar</type>
+			<scope>compile</scope>
 		</dependency>
-
-
+		
+		<dependency>
+			<!-- Necessary because of the @HBaseSchema annotation used in Book ; otherwise could be removed -->
+			<groupId>com.googlecode.n_orm</groupId>
+			<artifactId>hbase</artifactId>
+			<version>hbase-0.90.3-n-orm-0.0.1-SNAPSHOT</version> <!-- first version with this feature -->
+			<type>jar</type>
+			<scope>provided</scope>
+		</dependency>
 	</dependencies>
 	<repositories>
 		<repository>
@@ -135,34 +123,4 @@
 			<url>http://oss.sonatype.org/content/groups/public</url>
 		</repository>
 	</repositories>
-
-	<profiles>
-		<profile>
-			<id>hbase-cdh</id>
-			<properties>
-				<hbase.version>0.90.3-cdh3u1</hbase.version>
-				<hadoop.version>0.20.2-cdh3u1</hadoop.version>
-			</properties>
-
-			<repositories>
-
-				<repository>
-					<id>cdh.releases.repo</id>
-					<url>https://repository.cloudera.com/content/repositories/releases</url>
-					<name>CDH Releases Repository</name>
-					<snapshots>
-						<enabled>false</enabled>
-					</snapshots>
-				</repository>
-				<repository>
-					<id>cdh.snapshots.repo</id>
-					<url>https://repository.cloudera.com/content/repositories/snapshots</url>
-					<name>CDH Snapshots Repository</name>
-					<snapshots>
-						<enabled>true</enabled>
-					</snapshots>
-				</repository>
-			</repositories>
-		</profile>
-	</profiles>
 </project>
