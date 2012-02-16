@@ -80,7 +80,7 @@ public class Shell
 				{
 					for (Class<?> c : m.getParameterTypes())
 					{
-						if (c.getClass().equals(Class.class))
+						if (c.equals(Class.class))
 						{ // In this case we make an argument completor with the name of all the classes of the project
 							argCompletor = new ArgumentCompletor(
 									new SimpleCompletor[] {
@@ -108,15 +108,20 @@ public class Shell
 		methodAsString.add(shellProcessor.getZeroCommand());
 		methodAsString.add(shellProcessor.getResetCommand());
 		methodAsString.add(shellProcessor.getShowCommand());
-		methodAsString.add(shellProcessor.getNewCommand());
+		// To create new persisting objects
+		ArgumentCompletor argCompletorNew = new ArgumentCompletor(
+				new SimpleCompletor[] {
+					new SimpleCompletor(new String[] {shellProcessor.getNewCommand()}),
+					new SimpleCompletor(this.mapClassNames.toArray(EMPTY_STRING_ARRAY))
+				});
 		
 		// Create the completors
 		SimpleCompletor simpleCompletor = new SimpleCompletor(methodAsString.toArray(EMPTY_STRING_ARRAY));
 		MultiCompletor multiCompletor = null;
 		if (argCompletor == null)
-			multiCompletor = new MultiCompletor(new Completor[] {simpleCompletor});
+			multiCompletor = new MultiCompletor(new Completor[] {argCompletorNew, simpleCompletor});
 		else
-			multiCompletor = new MultiCompletor(new Completor[] {argCompletor, simpleCompletor});
+			multiCompletor = new MultiCompletor(new Completor[] {argCompletorNew, argCompletor, simpleCompletor});
 		
 		// Update jline completor
 		Completor[] listCompletor;
