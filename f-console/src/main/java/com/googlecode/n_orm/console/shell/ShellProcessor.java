@@ -354,8 +354,11 @@ public class ShellProcessor
 		if (args.length > 0)
 		{
 			int offset = 0;
-			if (args[args.length - 2].equals(this.affectationCommand))
-				offset = 2;
+			if (args.length > 2)
+			{
+				if (args[args.length - 2].equals(this.affectationCommand))
+					offset = 2;
+			}
 			try
 			{
 				// The first argument must be the name of the class
@@ -419,22 +422,4 @@ public class ShellProcessor
 	{
 		return this.isShellProcessorZeroed;
 	}
-	
-	/*
-	 findElements
-	 	ofClass
-	 		display list of params
-	 			withKey *param*					<------------
-	 				|setTo *param*							|
-	 				|between *param1* and *param2*		-----
-	 					go (un jour)
-	 
-	 charger juste les classes annotées Persisting (laisser le chemin complet)
-	 
-	 new Personne > a
-	 a name
-	 
-	 show result => affiche propriétés dans un tableau (beanutils)
-	 
-	 */
 }
