@@ -1,5 +1,6 @@
 package com.googlecode.n_orm.console.shell;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -8,6 +9,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.beanutils.ConvertUtils;
 import org.apache.commons.beanutils.PropertyUtils;
 import com.googlecode.n_orm.consoleannotations.Continuator;
@@ -74,7 +77,7 @@ public class ShellProcessor
 				{
 					Method m = PropertyUtils.getReadMethod(PropertyUtils.getPropertyDescriptor(this.context, p.getName()));
 					if (m != null)
-						processorCommands.put(p.getName(), m);
+						processorCommands.put(m.getName(), m);
 				}
 				catch (Exception e) { }
 			}
@@ -154,16 +157,17 @@ public class ShellProcessor
 	public void treatLine(String text)
 	{
 		String textToTreat = text.replaceAll("\\s+", " ");
-		String textWithoutSpaceAtTheEnd = textToTreat.replaceAll("\\s+$", "");
-		if (textWithoutSpaceAtTheEnd.equals(escapeCommand))
+		String firstCommand = textToTreat.split(" ")[0];
+		
+		if (firstCommand.equals(escapeCommand))
 			shell.doStop();
-		else if (textWithoutSpaceAtTheEnd.equals(zeroCommand))
+		else if (firstCommand.equals(zeroCommand))
 			this.doZero();
-		else if (textWithoutSpaceAtTheEnd.equals(resetCommand))
+		else if (firstCommand.equals(resetCommand))
 			this.doReset();
-		else if (textWithoutSpaceAtTheEnd.equals(showCommand))
+		else if (firstCommand.equals(showCommand))
 			this.doShow(textToTreat);
-		else if (textWithoutSpaceAtTheEnd.equals(newCommand))
+		else if (firstCommand.equals(newCommand))
 			this.doNew(textToTreat);
 		else
 			executeQuery(textToTreat);
@@ -171,8 +175,7 @@ public class ShellProcessor
 
 	private void executeQuery(String query)
 	{
-		// Get all the tokens of the query
-		String[] tokens = query.split(" ");
+		String[] tokens = getTokens(query);
 		int currentTokenIndex = 0;
 		
 		// Execute every commands in the query
@@ -243,10 +246,14 @@ public class ShellProcessor
 					// Print the result on the shell (if there is a result)
 					if (this.context != null)
 					{
-						this.isShellProcessorZeroed = false;
-						// Change the prompt of the shell and update the completors
-						this.shell.updateProcessorCommands();
-						this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
+						// In the case where we just display a result, we don't change the context
+						if (!this.context.getClass().equals(String.class))
+						{
+							this.isShellProcessorZeroed = false;
+							// Change the prompt of the shell and update the completors
+							this.shell.updateProcessorCommands();
+							this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
+						}
 						shell.println("method result: " + this.context.toString());
 					}
 					else // Zero the shell in this case
@@ -284,9 +291,73 @@ public class ShellProcessor
 		
 	}
 	
+	@SuppressWarnings("rawtypes")
 	private void doNew(String textToTreat)
 	{
+		String[] args = getTokens(textToTreat.replaceFirst(this.newCommand + " ", ""));
 		
+		if (args.length > 0)
+		{
+			int offset = 0;
+			if (args[args.length - 2].equals(this.affectationCommand))
+				offset = 2;
+			try
+			{
+				// The first argument must be the name of the class
+				Class clazz = (Class) ConvertUtils.convert(args[0], Class.class);
+				
+				for (Constructor c : clazz.getConstructors())
+					if (c.getParameterTypes().length == args.length - 1 - offset)
+					{
+						Object[] params = new Object[c.getParameterTypes().length];
+						for (int i = 1; i < args.length - offset; i++)
+							params[i - 1] = ConvertUtils.convert(args[i], c.getParameterTypes()[i - 1]);
+						
+						this.context = c.newInstance(params);
+						shell.println("n-orm: " + args[0] + " created successfully");
+					}
+				
+				// Check if there is an affectation
+				if (offset != 0)
+				{
+					mapShellVariables.put(args[args.length - 1], this.context);
+					// Update the completors
+					this.shell.updateProcessorCommands();
+				}
+			} catch (Exception e)
+			{
+				shell.println("n-orm: " + args[0] + ": constructor error");
+			}
+		}
+	}
+	
+	private String[] getTokens(String query)
+	{
+		// Pay attention on the string with multiple words delimited by quotes
+		String tmpString = " #########";
+		Pattern pattern = Pattern.compile("\"([^\"]*)\"");
+		Matcher matcher = pattern.matcher(query);
+		
+		HashMap<String, String> tmpMap = new HashMap<String, String>();
+		while (matcher.find())
+		{
+			String betweenQuotes = matcher.group(1);
+			String replacement = tmpString + tmpMap.size() + " ";
+			tmpMap.put(replacement.trim(), betweenQuotes);
+			query = query.replaceFirst("\"" + betweenQuotes + "\"", replacement);
+		}
+		
+		// Get all the tokens of the query
+		query = query.replaceAll("\\s+", " ");
+		String[] tokens = query.split(" ");
+		for (int i = 0; i < tokens.length; i++)
+		{
+			for (String s : tmpMap.keySet())
+				if (tokens[i].contains(s))
+					tokens[i] = tokens[i].replaceFirst(s, tmpMap.get(s));
+		}
+		
+		return tokens;
 	}
 	
 	protected boolean isShellProcessorZeroed()
