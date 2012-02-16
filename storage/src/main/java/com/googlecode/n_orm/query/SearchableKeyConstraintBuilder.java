@@ -2,6 +2,7 @@ package com.googlecode.n_orm.query;
 
 import java.lang.reflect.Field;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 
 
 public class SearchableKeyConstraintBuilder<T extends PersistingElement> extends KeyConstraintBuilder<T> {
@@ -10,7 +11,8 @@ public class SearchableKeyConstraintBuilder<T extends PersistingElement> extends
 			Field key) {
 		super(cb, key);
 	}
-
+	
+	@Continuator
 	public SearchableClassConstraintBuilder<T> setTo(Object value) {
 		return (SearchableClassConstraintBuilder<T>) super.setToInt(value);
 	}
@@ -23,6 +25,7 @@ public class SearchableKeyConstraintBuilder<T extends PersistingElement> extends
 		return (SearchableClassConstraintBuilder<T>) super.greaterOrEqualsThanInt(value);
 	}
 	
+	@Continuator
 	public SearchableRangeKeyConstraintBuilder<T> between(Object value) {
 		return new SearchableRangeKeyConstraintBuilder<T>((SearchableClassConstraintBuilder<T>) this.getConstraintBuilder(), this.getKey(), value);
 	}
