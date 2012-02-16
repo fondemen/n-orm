@@ -1,5 +1,6 @@
 package com.googlecode.n_orm.console.shell;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.commons.beanutils.ConvertUtils;
+import org.apache.commons.beanutils.PropertyUtils;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.consoleannotations.Trigger;
 
@@ -21,6 +23,8 @@ public class ShellProcessor
 	private String escapeCommand = "quit";
 	private String zeroCommand = "zero";
 	private String resetCommand = "reset";
+	private String showCommand = "show";
+	private String newCommand = "new";
 	private String affectationCommand = ">";
 	private boolean isShellProcessorZeroed = true;
 	private Object context = null;
@@ -62,6 +66,18 @@ public class ShellProcessor
 				if (m.getAnnotation(Continuator.class) != null)
 					processorCommands.put(m.getName(), m);
 			}
+			
+			// List all properties of the context and add them as Continuators
+			for (Field p : this.context.getClass().getDeclaredFields())
+			{
+				try
+				{
+					Method m = PropertyUtils.getReadMethod(PropertyUtils.getPropertyDescriptor(this.context, p.getName()));
+					if (m != null)
+						processorCommands.put(p.getName(), m);
+				}
+				catch (Exception e) { }
+			}
 		}
 	}
 
@@ -78,6 +94,16 @@ public class ShellProcessor
 	public String getResetCommand()
 	{
 		return resetCommand;
+	}
+	
+	public String getShowCommand()
+	{
+		return showCommand;
+	}
+	
+	public String getNewCommand()
+	{
+		return newCommand;
 	}
 	
 	public Map<String, Object> getMapCommands()
@@ -112,6 +138,8 @@ public class ShellProcessor
 		result.add(this.escapeCommand);
 		result.add(this.zeroCommand);
 		result.add(this.resetCommand);
+		result.add(this.showCommand);
+		result.add(this.newCommand);
 		result.addAll(processorCommands.keySet());
 		return result;
 	}
@@ -125,15 +153,20 @@ public class ShellProcessor
 	
 	public void treatLine(String text)
 	{
-		String textWithoutSpaceAtTheEnd = text.replaceAll("\\s+$", "");
+		String textToTreat = text.replaceAll("\\s+", " ");
+		String textWithoutSpaceAtTheEnd = textToTreat.replaceAll("\\s+$", "");
 		if (textWithoutSpaceAtTheEnd.equals(escapeCommand))
 			shell.doStop();
 		else if (textWithoutSpaceAtTheEnd.equals(zeroCommand))
 			this.doZero();
 		else if (textWithoutSpaceAtTheEnd.equals(resetCommand))
 			this.doReset();
+		else if (textWithoutSpaceAtTheEnd.equals(showCommand))
+			this.doShow(textToTreat);
+		else if (textWithoutSpaceAtTheEnd.equals(newCommand))
+			this.doNew(textToTreat);
 		else
-			executeQuery(text.replaceAll("\\s+", " "));
+			executeQuery(textToTreat);
 	}
 
 	private void executeQuery(String query)
@@ -195,23 +228,17 @@ public class ShellProcessor
 						else
 						{
 							for (int i = 0; i < parameterTypes.length; i++)
-								if (parameterTypes[i].equals(Class.class))
-								{	// Need to get the full name of the class
-									String key = shell.getMapClassNames().get(tokens[currentTokenIndex + i]);
-									if (key != null)
-										params[i] = ConvertUtils.convert(key, parameterTypes[i]);
-									else
-										params[i] = null;
-								}
-								else
-									params[i] = ConvertUtils.convert(tokens[currentTokenIndex + i], parameterTypes[i]);
+								params[i] = ConvertUtils.convert(tokens[currentTokenIndex + i], parameterTypes[i]);
 							
 							currentTokenIndex += parameterTypes.length;
 						}
 					}
 					
 					// Execute the command
-					this.context = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
+					if (this.context != null)
+						this.context = m.invoke(this.context, params);
+					else
+						this.context = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
 					
 					// Print the result on the shell (if there is a result)
 					if (this.context != null)
@@ -252,6 +279,16 @@ public class ShellProcessor
 		doZero();
 	}
 	
+	private void doShow(String textToTreat)
+	{
+		
+	}
+	
+	private void doNew(String textToTreat)
+	{
+		
+	}
+	
 	protected boolean isShellProcessorZeroed()
 	{
 		return this.isShellProcessorZeroed;
@@ -265,6 +302,13 @@ public class ShellProcessor
 	 				|setTo *param*							|
 	 				|between *param1* and *param2*		-----
 	 					go (un jour)
+	 
+	 charger juste les classes annotées Persisting (laisser le chemin complet)
+	 
+	 new Personne > a
+	 a name
+	 
+	 show result => affiche propriétés dans un tableau (beanutils)
 	 
 	 */
 }
