@@ -126,5 +126,12 @@ Different data stores are possible, especially column-oriented data stores such 
 	        <type>jar</type>
 			<scope>compile</scope>
 		</dependency>
+		<dependency>
+			<groupId>com.googlecode.n_orm</groupId>
+	        <artifactId>sample</artifactId>
+	        <version>${project.parent.version}</version>
+	        <type>jar</type>
+			<scope>compile</scope>
+		</dependency>
 	</dependencies>
 </project>

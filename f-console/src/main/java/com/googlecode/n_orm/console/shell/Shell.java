@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import jline.ArgumentCompletor;
@@ -12,7 +11,7 @@ import jline.Completor;
 import jline.ConsoleReader;
 import jline.MultiCompletor;
 import jline.SimpleCompletor;
-
+import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.console.util.PackageExplorer;
 
 public class Shell
@@ -21,6 +20,7 @@ public class Shell
 		{
 			"com.googlecode.n_orm"
 		};
+	
 	private static final String[] EMPTY_STRING_ARRAY = new String[0];
 	public static final String DEFAULT_PROMPT_START = "n-orm";
 	public static final String DEFAULT_PROMPT_END = "$ ";
@@ -30,7 +30,7 @@ public class Shell
 	private ShellProcessor shellProcessor;
 	private boolean mustStop = true;
 	private String prompt;
-	private Map<String, String> mapClassNames;
+	private List<String> mapClassNames;
 	
 	public Shell() throws IOException
 	{
@@ -39,28 +39,24 @@ public class Shell
 		this.shellProcessor = new ShellProcessor(this);
 		this.prompt = DEFAULT_PROMPT_START + "$ ";
 		
-		this.updateProcessorCommands();
+		this.mapClassNames = this.findAllPersistingClassNames();
 		
-		this.mapClassNames = this.findAllClassNames();
+		this.updateProcessorCommands();
 	}
 	
-	@SuppressWarnings("rawtypes")
-	private Map<String, String> findAllClassNames()
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private List<String> findAllPersistingClassNames()
 	{
-		HashMap<String, String> result = new HashMap<String, String>();
-		try
-		{	
-			List<Class> tmp = new ArrayList<Class>();
-			for (String s : PACKAGES_TO_EXPLORE)
-				tmp.addAll(PackageExplorer.getClasses(s));
-			
-			for (Class c : tmp)
-				result.put(c.getSimpleName(), c.getName());
-		}
-		catch (Exception e)
-		{
-			System.out.println(e.getMessage());
-		}
+		ArrayList<String> result = new ArrayList<String>();
+		
+		List<Class> tmp = new ArrayList<Class>();
+		for (String s : PACKAGES_TO_EXPLORE)
+			tmp.addAll(PackageExplorer.getClasses(s));
+		
+		for (Class c : tmp)
+			if (c.getAnnotation(Persisting.class) != null)
+				result.add(c.getName());
+		
 		return result;
 	}
 
@@ -89,7 +85,7 @@ public class Shell
 							argCompletor = new ArgumentCompletor(
 									new SimpleCompletor[] {
 											new SimpleCompletor(new String[] {m.getName()}),
-											new SimpleCompletor(this.mapClassNames.keySet().toArray(EMPTY_STRING_ARRAY))
+											new SimpleCompletor(this.mapClassNames.toArray(EMPTY_STRING_ARRAY))
 											});
 						}
 						else
@@ -111,6 +107,8 @@ public class Shell
 		methodAsString.add(shellProcessor.getEscapeCommand());
 		methodAsString.add(shellProcessor.getZeroCommand());
 		methodAsString.add(shellProcessor.getResetCommand());
+		methodAsString.add(shellProcessor.getShowCommand());
+		methodAsString.add(shellProcessor.getNewCommand());
 		
 		// Create the completors
 		SimpleCompletor simpleCompletor = new SimpleCompletor(methodAsString.toArray(EMPTY_STRING_ARRAY));
@@ -212,11 +210,6 @@ public class Shell
 	{
 		if (this.shellProcessor != null)
 			this.shellProcessor.putEntryMapCommand(key, value);
-	}
-	
-	public Map<String, String> getMapClassNames()
-	{
-		return mapClassNames;
 	}
 	
 	public void launch()

@@ -57,6 +57,8 @@ public class ShellProcessorTest
 		tmp2.remove(sut.getEscapeCommand());
 		tmp2.remove(sut.getZeroCommand());
 		tmp2.remove(sut.getResetCommand());
+		tmp2.remove(sut.getShowCommand());
+		tmp2.remove(sut.getNewCommand());
 		assertTrue(tmp3.containsAll(tmp2));
 	}
 	
