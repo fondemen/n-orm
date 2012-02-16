@@ -19,7 +19,7 @@ public class Launcher
 		shell.launch();
 	}
 	
-	private static void initMemoryBase()
+	public static void initMemoryBase()
 	{
 		BookStore obs = new BookStore("cnaf");
 		obs.setAddress("Turing str. 41");

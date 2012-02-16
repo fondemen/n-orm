@@ -9,9 +9,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import org.junit.Before;
 import org.junit.Test;
+import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.console.commands.CommandList;
+import com.googlecode.n_orm.sample.businessmodel.BookStore;
 
 public class ShellProcessorTest
 {
@@ -60,6 +63,15 @@ public class ShellProcessorTest
 		tmp2.remove(sut.getShowCommand());
 		tmp2.remove(sut.getNewCommand());
 		assertTrue(tmp3.containsAll(tmp2));
+	}
+	
+	@Test
+	public void treatEmptyCommandTest()
+	{
+		String command = "";
+		this.sut.treatLine(command);
+		assertTrue(sut.isShellProcessorZeroed());
+		assertTrue(sut.getMapShellVariables().isEmpty());
 	}
 	
 	@Test
@@ -208,5 +220,78 @@ public class ShellProcessorTest
 		this.sut.treatLine(displayCommand);
 		verify(shell);
 		reset(shell);
+	}
+	
+	@Test
+	public void treatShowTest()
+	{
+		String command = sut.getShowCommand() + " var";
+		
+		TreeSet<BookStore> set = new TreeSet<BookStore>();
+		set.add(new BookStore("test"));
+		
+		Map<String, Object> mapShellVariables = new HashMap<String, Object>();
+		mapShellVariables.put("var", set);
+		sut.setMapShellVariables(mapShellVariables);
+		
+//		shell.println("Variable type: " + BookStore.class);
+//		shell.println("name: test");
+//		shell.println("address: null");
+		
+//		replay(shell);
+		this.sut.treatLine(command);
+//		verify(shell);
+//		reset(shell);
+	}
+	
+	@Test
+	public void treatNewTest()
+	{
+		String command = sut.getNewCommand() + " " + BookStore.class.getName();
+		
+//		shell.println("Variable type: " + BookStore.class);
+//		shell.println("name: test");
+//		shell.println("address: null");
+		
+//		replay(shell);
+		this.sut.treatLine(command);
+//		verify(shell);
+//		reset(shell);
+	}
+	
+	@Test
+	public void treatNewWithAffectationTest()
+	{
+		String command = sut.getNewCommand() + " " + BookStore.class.getName() + " > a";
+		
+		this.sut.treatLine(command);
+		assertTrue(sut.getMapShellVariables().containsKey("a"));
+	}
+	
+	@Test
+	public void treatNewWithErrorTest()
+	{
+		String command = sut.getNewCommand() + " " + BookStore.class.getName() + "uhieg ehuig";
+		
+		this.sut.treatLine(command);
+	}
+	
+	@Test
+	public void treatCommandWithParamsWithSpacesTest()
+	{
+		String command = sut.getNewCommand() + "\"test test test test\"";
+		
+		this.sut.treatLine(command);
+	}
+	
+	@Test
+	public void treatWithModelClassesTest()
+	{
+		sut.putEntryMapCommand(StorageManagement.class.getName(), new StorageManagement());
+		sut.updateProcessorCommands();
+		String command = "findElements";
+		this.sut.treatLine(command);
+		String command2 = "ofClass " + BookStore.class.getName();
+		this.sut.treatLine(command2);
 	}
 }
