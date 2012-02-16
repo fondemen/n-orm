@@ -11,7 +11,8 @@ public class Launcher
 {
 	public static void main(String[] args) throws IOException
 	{
-		initMemoryBase();
+		if (args.length > 0 && args[0].equals("init"))
+			initMemoryBase();
 		
 		Shell shell = new Shell();
 		shell.putEntryMapCommand(StorageManagement.class.getName(), new StorageManagement());
@@ -31,15 +32,12 @@ public class Launcher
 		bs = StorageManagement.getElementWithKeys(BookStore.class, "cnaf");
 		assert obs.equals(bs);
 		
-		assert 0 == StorageManagement.findElements().ofClass(Book.class)
-		        .withKey("bookStore").setTo(obs).count();
+		assert 0 == StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(obs).count();
 		
 		Book b = new Book(obs, "n-orm for dummies", new Date());
-//		b.setReceptionDate(new Date());
 		b.setNumber((short) 10);
 		b.store();
 		
-		assert 1 == StorageManagement.findElements().ofClass(Book.class)
-		        .withKey("bookStore").setTo(obs).count();
+		assert 1 == StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(obs).count();
 	}
 }
