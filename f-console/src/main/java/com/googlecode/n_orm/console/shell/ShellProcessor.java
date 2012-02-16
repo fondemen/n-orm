@@ -4,6 +4,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.beanutils.ConvertUtils;
 import org.apache.commons.beanutils.PropertyUtils;
+import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.consoleannotations.Trigger;
 
@@ -176,6 +178,9 @@ public class ShellProcessor
 	private void executeQuery(String query)
 	{
 		String[] tokens = getTokens(query);
+		if (tokens.length == 0)
+			return;
+			
 		int currentTokenIndex = 0;
 		
 		// Execute every commands in the query
@@ -231,7 +236,14 @@ public class ShellProcessor
 						else
 						{
 							for (int i = 0; i < parameterTypes.length; i++)
-								params[i] = ConvertUtils.convert(tokens[currentTokenIndex + i], parameterTypes[i]);
+							{
+								// Check if the param is not a variable
+								String s = tokens[currentTokenIndex + i];
+								if (this.mapShellVariables.containsKey(s))
+									params[i] = this.mapShellVariables.get(s);
+								else
+									params[i] = ConvertUtils.convert(s, parameterTypes[i]);
+							}
 							
 							currentTokenIndex += parameterTypes.length;
 						}
@@ -286,9 +298,52 @@ public class ShellProcessor
 		doZero();
 	}
 	
+	@SuppressWarnings("rawtypes")
 	private void doShow(String textToTreat)
 	{
+		String[] args = getTokens(textToTreat.replaceFirst(this.showCommand + " ", ""));
 		
+		if (args.length > 0)
+		{
+			if (mapShellVariables.containsKey(args[0]))
+			{
+				Object localContext = mapShellVariables.get(args[0]);
+				ArrayList<String> values = new ArrayList<String>();
+				
+				// List all properties of the context and add them as Continuators
+				if (localContext instanceof Collection)
+				{
+					Collection c = (Collection)localContext;
+					Iterator it = c.iterator();
+					while (it.hasNext())
+					{
+						Object o = it.next();
+						if (o.getClass().getAnnotation(Persisting.class) != null)
+						{
+							values.add("Variable type: " + o.getClass().getName());
+							for (Field p : o.getClass().getDeclaredFields())
+							{
+								try
+								{
+									Method m = PropertyUtils.getReadMethod(PropertyUtils.getPropertyDescriptor(o, p.getName()));
+									if (m != null)
+									{
+										Object result = m.invoke(ConvertUtils.convert(o, o.getClass()));
+										values.add(p.getName() + ": " + (result == null ? "null" : result.toString()));
+									}
+								}
+								catch (Exception e) { }
+							}
+							values.add("");
+						}
+					}
+				}
+				
+				// Print on the shell
+				for (String s : values)
+					shell.println(s);
+			}
+		}
 	}
 	
 	@SuppressWarnings("rawtypes")
