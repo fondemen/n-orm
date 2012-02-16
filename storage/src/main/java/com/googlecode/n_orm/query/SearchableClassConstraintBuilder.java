@@ -2,14 +2,11 @@ package com.googlecode.n_orm.query;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
-
 import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.ColumnFamiliyManagement;
@@ -22,6 +19,7 @@ import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StorageManagement.ExportReport;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.WaitingCallBack;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.Store;
@@ -66,7 +64,8 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 			Field f) {
 		return new SearchableKeyConstraintBuilder<T>(this, f);
 	}
-
+	
+	@Continuator
 	public LimitConstraintBuilder<T> withAtMost(int limit) {
 		return new LimitConstraintBuilder<T>(this, limit);
 	}
@@ -126,6 +125,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
 	 * @throws DatabaseNotReachedException
 	 */
+	@Continuator
 	public NavigableSet<T> go() throws DatabaseNotReachedException {
 		if (hasNoLimit())
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
@@ -167,10 +167,12 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * Runs the query to find the number of matching elements.
 	 * Any limit set by {@link #withAtMost(int)} will be ignored.
 	 */
+	@Continuator
 	public long count() throws DatabaseNotReachedException {
 		return StorageManagement.countElements(this.getClazz(), this.getConstraint());
 	}
-
+	
+	@Continuator
 	public SearchableKeyConstraintBuilder<T> withKey(String key) {
 		return (SearchableKeyConstraintBuilder<T>) this.withKeyInt(key);
 	}
