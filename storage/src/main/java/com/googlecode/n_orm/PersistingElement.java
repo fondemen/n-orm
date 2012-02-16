@@ -20,6 +20,7 @@ import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.TypeAwareStore;
 
@@ -154,6 +155,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #getIdentifier()
 	 * @see Store
 	 */
+	@Continuator
 	void store() throws DatabaseNotReachedException;
 	
 	/**

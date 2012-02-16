@@ -40,6 +40,7 @@ import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.consoleannotations.Trigger;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.query.ConstraintBuilder;
@@ -75,6 +76,7 @@ public aspect StorageManagement {
 		this.exists= Boolean.FALSE;
 	}
 	
+	@Continuator
 	public void PersistingElement.store() throws DatabaseNotReachedException {
 		this.checkIsValid();
 		
