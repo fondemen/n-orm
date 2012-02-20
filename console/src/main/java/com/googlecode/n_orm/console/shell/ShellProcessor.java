@@ -102,6 +102,9 @@ public class ShellProcessor
 					Method m = PropertyUtils.getReadMethod(pd);
 					if (m != null)
 						processorCommands.put(m.getName(), m);
+					m = PropertyUtils.getWriteMethod(pd);
+					if (m != null)
+						processorCommands.put(m.getName(), m);
 				}
 				catch (Exception e) { }
 			}
@@ -288,7 +291,7 @@ public class ShellProcessor
 					
 					// Print the result on the shell (if there is a result)
 					if (lastResult == null) // Zero the shell in this case
-						this.doZero();
+						shell.println("method result: null");
 					else {
 						// In the case where we just display a result, we don't change the context
 						if (!(lastResult instanceof String) && !(lastResult instanceof Number) && !(lastResult instanceof Boolean))
@@ -437,6 +440,7 @@ public class ShellProcessor
 			} catch (Exception e)
 			{
 				shell.println("n-orm: " + args[0] + ": constructor error");
+				e.printStackTrace();
 			}
 		}
 	}
