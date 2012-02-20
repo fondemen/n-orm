@@ -213,6 +213,8 @@ public class ShellProcessor
 			
 		int currentTokenIndex = 0;
 		
+		Object lastResult = this.getContextElement();
+		
 		// Execute every commands in the query
 		while (currentTokenIndex < tokens.length)
 		{
@@ -223,7 +225,7 @@ public class ShellProcessor
 			// Check if this is a command on an object or on the shell (variable affectation, etc)
 			if (command.equals(affectationCommand))
 			{
-				mapShellVariables.put(tokens[currentTokenIndex], this.getContextElement());
+				mapShellVariables.put(tokens[currentTokenIndex], lastResult);
 				currentTokenIndex++;
 				// Update the completors
 				this.shell.updateProcessorCommands();
@@ -232,10 +234,10 @@ public class ShellProcessor
 			{
 				if (mapShellVariables.get(command) != null)
 				{
-					Object context = mapShellVariables.get(command);
-					shell.println(context.toString());
+					lastResult = mapShellVariables.get(command);
+					shell.println(lastResult.toString());
 					this.context.clear();
-					this.context.add(new ContextElement(context, command));
+					this.context.add(new ContextElement(lastResult, command));
 					
 					// Change the prompt of the shell and update the completors
 					updatePrompt();
@@ -279,24 +281,23 @@ public class ShellProcessor
 					}
 					
 					// Execute the command
-					Object result;
 					if (this.context.isEmpty())
-						result = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
+						lastResult = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
 					else
-						result = m.invoke(this.getContextElement(), params);
+						lastResult = m.invoke(this.getContextElement(), params);
 					
 					// Print the result on the shell (if there is a result)
-					if (result == null) // Zero the shell in this case
+					if (lastResult == null) // Zero the shell in this case
 						this.doZero();
 					else {
 						// In the case where we just display a result, we don't change the context
-						if (!(result instanceof String))
+						if (!(lastResult instanceof String) && !(lastResult instanceof Number) && !(lastResult instanceof Boolean))
 						{
 							// Change the prompt of the shell and update the completors
-							this.context.push(new ContextElement(result, command));
+							this.context.push(new ContextElement(lastResult, command));
 							updatePrompt();
 						}
-						shell.println("method result: " + result.toString());
+						shell.println("method result: " + lastResult.toString());
 					}
 				}
 				catch (Exception e)
