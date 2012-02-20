@@ -3,17 +3,61 @@ package com.googlecode.n_orm.console.util;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.logging.Level;
 
 import org.apache.commons.beanutils.ConvertUtils;
 
 public class PackageExplorer
 {	
+	private static Collection<String> cpLocations;
+	
+	static {
+		// Get all the entries from the CLASSPATH
+		String [] entries = System.getProperty("java.class.path").split(System.getProperty("path.separator"));
+		cpLocations = new ArrayList<String>(entries.length);
+		for (String cpEntry : entries) {
+			cpLocations.add(cpEntry);
+		}
+	}
+	
+	public static void addSearchEntry(String classPathEntry) {
+		File f = new File(classPathEntry);
+		if (!f.exists()) {
+			System.err.println(classPathEntry + " is not a source location");
+			return;
+		} else if (!f.isDirectory() && (f.isFile() && !classPathEntry.endsWith(".jar"))) {
+			System.err.println(classPathEntry + " is neither a directory nor a JAR file");
+			return;
+		}
+			
+		cpLocations.add(classPathEntry);
+		Class<URLClassLoader> sysclass = URLClassLoader.class;
+		URLClassLoader sysloader = (URLClassLoader) ClassLoader.getSystemClassLoader();
+		try {
+			Method method = sysclass
+					.getDeclaredMethod("addURL", new Class[] { URL.class });
+			method.setAccessible(true);
+			method.invoke(sysloader, new Object[] { f.toURI().toURL() });
+		} catch (Throwable t) {
+			System.err.println("Warning: could not add source location " + classPathEntry);
+		}
+	}
+	
+	public static Set<String> getLocations() {
+		return new TreeSet<String>(cpLocations);
+	}
+	
 	/**
 	 * This method allows us to list all the classes of a package (and sub packages)
 	 * 
@@ -25,17 +69,14 @@ public class PackageExplorer
 	{
 		// Create the result list
 		ArrayList<Class> classes = new ArrayList<Class>();
-	 
-		// Get all the entries from the CLASSPATH
-		String [] entries = System.getProperty("java.class.path").split(System.getProperty("path.separator"));
-	 
+		
 		// For each entry, check if this is a directory or a jar
-		for (int i = 0; i < entries.length; i++)
+		for (String cpLocation : cpLocations)
 		{
-			if (entries[i].endsWith(".jar"))
-				classes.addAll(treatJar(entries[i], pckgName));
+			if (cpLocation.endsWith(".jar"))
+				classes.addAll(treatJar(cpLocation, pckgName));
 			else
-				classes.addAll(treatDirectory(entries[i], pckgName));
+				classes.addAll(treatDirectory(cpLocation, pckgName));
 		}
 	 
 		return classes;
@@ -76,10 +117,13 @@ public class PackageExplorer
 	@SuppressWarnings("rawtypes")
 	private static void addClassesToListForDirectory(List<Class> classes, File dir, String pckgName)
 	{
+		if (pckgName.length() > 0 && !pckgName.endsWith("."))
+			pckgName = pckgName + ".";
+		
 		for (File f : dir.listFiles())
 		{
 			if (f.isDirectory())
-				addClassesToListForDirectory(classes, f, pckgName + "." + f.getName());
+				addClassesToListForDirectory(classes, f, pckgName + f.getName());
 		}
 		
 		// We filter entries
@@ -91,7 +135,7 @@ public class PackageExplorer
 		{
 			try
 			{
-				classes.add((Class) ConvertUtils.convert(pckgName + "." + list[i].getName().split("\\.")[0], Class.class));
+				classes.add((Class) ConvertUtils.convert(pckgName + list[i].getName().split("\\.")[0], Class.class));
 			}
 			catch (Exception e) { }
 		}
@@ -124,8 +168,10 @@ public class PackageExplorer
 					// If the name of the entry start with the package path and ends with .class
 					if (element.getName().startsWith(pkgPath) && element.getName().endsWith(".class"))
 					{
-						String nomFichier = element.getName().substring(pckgName.length() + 1);
-						classes.add((Class) ConvertUtils.convert(pckgName + "." + nomFichier.split("\\.")[0].replace("/", "."), Class.class));
+						String nomFichier = element.getName();
+						nomFichier = nomFichier.substring(0, nomFichier.length()-6);
+						nomFichier = nomFichier.replace("/", ".");
+						classes.add((Class) ConvertUtils.convert(nomFichier, Class.class));
 					}
 				}
 				catch (Exception e) { }

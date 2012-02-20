@@ -274,6 +274,7 @@ public class ShellProcessor
 				catch (Exception e)
 				{
 					shell.println("n-orm: " + e.getMessage() + ": command error");
+					e.printStackTrace();
 				}
 			}
 			else // The command is unknown, move to the next one in case we know it
