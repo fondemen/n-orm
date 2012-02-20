@@ -1,5 +1,6 @@
 package com.googlecode.n_orm.console.shell;
 
+import java.beans.PropertyDescriptor;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -14,6 +15,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.beanutils.ConvertUtils;
 import org.apache.commons.beanutils.PropertyUtils;
+import org.apache.commons.beanutils.PropertyUtilsBean;
+
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.consoleannotations.Trigger;
@@ -73,11 +76,11 @@ public class ShellProcessor
 			}
 			
 			// List all properties of the context and add them as Continuators
-			for (Field p : this.context.getClass().getDeclaredFields())
+			for (PropertyDescriptor pd : PropertyUtils.getPropertyDescriptors(this.context))
 			{
 				try
 				{
-					Method m = PropertyUtils.getReadMethod(PropertyUtils.getPropertyDescriptor(this.context, p.getName()));
+					Method m = PropertyUtils.getReadMethod(pd);
 					if (m != null)
 						processorCommands.put(m.getName(), m);
 				}
