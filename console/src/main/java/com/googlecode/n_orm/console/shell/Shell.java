@@ -98,13 +98,15 @@ public class Shell
 		}
 		
 		// Add the shell processor variables if needed
-		if (shellProcessor.isShellProcessorZeroed())
+		if (shellProcessor.getContextElement() == null)
 			methodAsString.addAll(shellProcessor.getMapShellVariables().keySet());
 		
 		// Add the shell processor commands
 		methodAsString.add(shellProcessor.getEscapeCommand());
 		methodAsString.add(shellProcessor.getZeroCommand());
 		methodAsString.add(shellProcessor.getResetCommand());
+		if (shellProcessor.getContextElement()!=null)
+			methodAsString.add(shellProcessor.getUpCommand());
 		methodAsString.add(shellProcessor.getShowCommand());
 		// To create new persisting objects
 		ArgumentCompletor argCompletorNew = new ArgumentCompletor(
@@ -239,6 +241,7 @@ public class Shell
 			catch (Exception e)
 			{
 				println("n-orm: " + e.getMessage() + ": command error");
+				e.printStackTrace();
 				mustStop = true;
 			}
 		}

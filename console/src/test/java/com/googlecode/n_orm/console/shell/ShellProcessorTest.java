@@ -1,9 +1,7 @@
 package com.googlecode.n_orm.console.shell;
 
 import static org.easymock.EasyMock.*;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,6 +12,7 @@ import org.junit.Before;
 import org.junit.Test;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.console.commands.CommandList;
+import com.googlecode.n_orm.console.commands.CommandList.Bean;
 
 public class ShellProcessorTest
 {
@@ -61,6 +60,7 @@ public class ShellProcessorTest
 		tmp2.remove(sut.getResetCommand());
 		tmp2.remove(sut.getShowCommand());
 		tmp2.remove(sut.getNewCommand());
+		tmp2.remove(sut.getUpCommand());
 		assertTrue(tmp3.containsAll(tmp2));
 	}
 	
@@ -69,7 +69,7 @@ public class ShellProcessorTest
 	{
 		String command = "";
 		this.sut.treatLine(command);
-		assertTrue(sut.isShellProcessorZeroed());
+		assertNull(sut.getContextElement());
 		assertTrue(sut.getMapShellVariables().isEmpty());
 	}
 	
@@ -78,7 +78,7 @@ public class ShellProcessorTest
 	{
 		String command = sut.getZeroCommand();
 		this.sut.treatLine(command);
-		assertTrue(sut.isShellProcessorZeroed());
+		assertNull(sut.getContextElement());
 	}
 	
 	@Test
@@ -86,7 +86,7 @@ public class ShellProcessorTest
 	{
 		String command = sut.getResetCommand();
 		this.sut.treatLine(command);
-		assertTrue(sut.isShellProcessorZeroed());
+		assertNull(sut.getContextElement());
 		assertTrue(sut.getMapShellVariables().isEmpty());
 	}
 	
@@ -292,5 +292,64 @@ public class ShellProcessorTest
 		this.sut.treatLine(command);
 		String command2 = "ofClass " + BookStore.class.getName();
 		this.sut.treatLine(command2);
+	}
+	
+	@Test
+	public void stackTest() {
+		String command = "getBean", command2 = "getVal", command3 = "getClone";
+		String args = "avalue";
+		
+		shell.updateProcessorCommands();
+		shell.setPrompt(Shell.DEFAULT_PROMPT_START + ':' + command + Shell.DEFAULT_PROMPT_END);
+		shell.println("method result: Bean(" + args + ')');
+		replay(shell);
+		this.sut.treatLine(command + " " + args);
+		this.sut.updateProcessorCommands();
+		verify(shell);
+		reset(shell);
+		Bean b = (Bean) this.sut.getContextElement();
+		assertNotNull(b);
+		assertEquals(args, b.getVal());
+		
+		shell.println("method result: " + args);
+		replay(shell);
+		this.sut.treatLine("getVal");
+		verify(shell);
+		reset(shell);
+		assertSame(b, this.sut.getContextElement());
+
+		shell.updateProcessorCommands();
+		shell.setPrompt(Shell.DEFAULT_PROMPT_START + ':' + command + '.' + command3 + Shell.DEFAULT_PROMPT_END);
+		shell.println("method result: Bean(" + args + ')');
+		replay(shell);
+		this.sut.treatLine(command3);
+		verify(shell);
+		reset(shell);
+		Bean b2 = (Bean) this.sut.getContextElement();
+		assertEquals(args, b2.getVal());
+		assertNotSame(b, b2);
+
+		shell.updateProcessorCommands();
+		shell.setPrompt(Shell.DEFAULT_PROMPT_START + ':' + command + Shell.DEFAULT_PROMPT_END);
+		shell.println("Bean(" + args + ')');
+		replay(shell);
+		this.sut.treatLine("up");
+		verify(shell);
+		reset(shell);
+		assertSame(b, this.sut.getContextElement());
+		
+		shell.updateProcessorCommands();
+		shell.setPrompt(Shell.DEFAULT_PROMPT_START + Shell.DEFAULT_PROMPT_END);
+		replay(shell);
+		this.sut.treatLine("up");
+		verify(shell);
+		reset(shell);
+		assertNull(this.sut.getContextElement());
+		
+		replay(shell);
+		this.sut.treatLine("up");
+		verify(shell);
+		reset(shell);
+		assertNull(this.sut.getContextElement());
 	}
 }
