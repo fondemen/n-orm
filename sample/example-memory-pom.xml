@@ -69,6 +69,11 @@
 
 		<!-- Using store that points to the Memory store instead of the default 
 			HBase store.properties from src/main/resources -->
+		<resources>
+			<resource>
+				<directory>src/main/memory-resources</directory>
+			</resource>
+		</resources>
 		<testResources>
 			<testResource>
 				<directory>src/test/memory-resources</directory>

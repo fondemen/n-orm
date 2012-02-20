@@ -66,10 +66,30 @@
 					</dependency>
 				</dependencies>
 			</plugin>
+
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>2.2.1</version>
+				<configuration>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+					<archive>
+						<manifest>
+							<mainClass>com.googlecode.n_orm.sample.businessmodel.Main</mainClass>
+						</manifest>
+					</archive>
+				</configuration>
+			</plugin>
 		</plugins>
 
 		<!-- Using store that points to the Memory store instead of the default 
 			HBase store.properties from src/main/resources -->
+		<resources>
+			<resource>
+				<directory>src/test/redis-resources</directory>
+			</resource>
+		</resources>
 		<testResources>
 			<testResource>
 				<directory>src/test/redis-resources</directory>
