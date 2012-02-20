@@ -96,8 +96,7 @@ public class ShellProcessorTest
 		String command = "changePrompt";
 		String args = "newPrompt$";
 		
-		shell.updateProcessorCommands();
-		shell.setPrompt(Shell.DEFAULT_PROMPT_START + Shell.DEFAULT_PROMPT_END);
+		shell.println("method result: null");
 		mapCommands.changePrompt(args);
 		replay(shell);
 		this.sut.treatLine(command + " " + args);
