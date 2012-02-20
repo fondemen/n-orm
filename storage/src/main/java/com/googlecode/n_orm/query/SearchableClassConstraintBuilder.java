@@ -7,6 +7,7 @@ import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.ColumnFamiliyManagement;
@@ -14,11 +15,14 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.ImplicitActivation;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
+import com.googlecode.n_orm.ProcessCanceller;
 import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.StorageManagement;
-import com.googlecode.n_orm.StorageManagement.ExportReport;
 import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.TimeoutCanceller;
 import com.googlecode.n_orm.WaitingCallBack;
+import com.googlecode.n_orm.operations.ImportExport;
+import com.googlecode.n_orm.operations.Process.ProcessReport;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
@@ -94,13 +98,8 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * activated, regardless of the fact they are declared in this class or in a subclass.
 	 */
 	public SearchableClassConstraintBuilder<T> andActivateAllFamilies() {
-		Set<Field> knownCfs = ColumnFamiliyManagement.getInstance().getColumnFamilies(getClazz());
-		this.toBeActivated = new String[knownCfs.size()];
-		int i = 0;
-		for (Field cf : knownCfs) {
-			this.toBeActivated[i] = cf.getName();
-			++i;
-		}
+		Set<String> knownCfs = ColumnFamiliyManagement.getInstance().getColumnFamilies(getClazz()).keySet();
+		this.toBeActivated = knownCfs.toArray(new String[knownCfs.size()]);
 		return this;
 	}
 	
@@ -189,8 +188,8 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
-	public void forEach(Process<T> action) throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		this.forEach(action, 1, 0);
+	public ProcessReport<T> forEach(Process<T> action) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		return this.forEach(action, 1, 0);
 	}
 	
 	/**
@@ -200,16 +199,71 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * In case you only use one thread, process will be performed in this thread.<br>
 	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
 	 * @param action the action to be performed over each element of the query.
+	 * @param threadNumber the maximum number of concurrent threads
 	 * @param timeoutMs the max allowed time to execute this task ; useless in case threadNumber is 1
 	 * @throws DatabaseNotReachedException
 	 * @throws InterruptedException in case threads are interrupted or timeout is reached
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
-	public void forEach(Process<T> action, int threadNumber, long timeoutMs) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+	public ProcessReport<T> forEach(Process<T> action, int threadNumber, long timeoutMs) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		return this.forEach(action, threadNumber, timeoutMs, null);
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query using parallel threads.
+	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Invoking this method is blocking until execution is completed.<br>
+	 * In case you only use one thread, process will be performed in this thread.<br>
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
+	 * @param action the action to be performed over each element of the query.
+	 * @param threadNumber the maximum number of concurrent threads
+	 * @param canceller a canceller object regularly observed while performing request ; in case this object responds <code>false</code> after invoked {@link com.googlecode.n_orm.ProcessCanceller#isCancelled()}, this methods returns a {@link ProcessException} with message found by {@link com.googlecode.n_orm.ProcessCanceller#getErrorMessage(com.googlecode.n_orm.operations.Process)}
+	 * @throws DatabaseNotReachedException
+	 * @throws InterruptedException in case threads are interrupted or canceler responds <code>false</code> to {@link com.googlecode.n_orm.ProcessCanceller#isCancelled()}
+	 * @throws ProcessException in case some process sent an exception while running
+	 */
+	public ProcessReport<T> forEach(Process<T> action, int threadNumber, com.googlecode.n_orm.ProcessCanceller canceller) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		return this.forEach(action, threadNumber, canceller, null);
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query using parallel threads ; method might return before process is ended.
+	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Invoking this method can be blocking as long as threadNumber is less that the number of elements to be treated.<br>
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
+	 * @param action the action to be performed over each element of the query.
+	 * @param threadNumber the maximum number of concurrent threads
+	 * @param timeoutMs the max allowed time to execute this task ; useless in case threadNumber is 1
+	 * @param executor the executor to run process ; you need to call {@link ExecutorService#awaitTermination(long, java.util.concurrent.TimeUnit)} to be sure that all elements are processed ; if null, this method is equivalent to {@link #forEach(Process, int, long)}
+	 * @throws DatabaseNotReachedException
+	 * @throws InterruptedException in case threads are interrupted or timeout is reached
+	 * @throws ProcessException in case some process sent an exception while running
+	 */
+	public ProcessReport<T> forEach(Process<T> action, int threadNumber, long timeoutMs, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
 		if (hasNoLimit())
 			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
-		StorageManagement.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, timeoutMs);
+		return com.googlecode.n_orm.operations.Process.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, new com.googlecode.n_orm.TimeoutCanceller(timeoutMs), executor);
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query using parallel threads ; method might return before process is ended.
+	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Invoking this method can be blocking as long as threadNumber is less that the number of elements to be treated.<br>
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
+	 * @param action the action to be performed over each element of the query.
+	 * @param threadNumber the maximum number of concurrent threads
+	 * @param canceller a canceller object regularly observed while performing request ; in case this object responds <code>false</code> after invoked {@link com.googlecode.n_orm.ProcessCanceller#isCancelled()}, this methods returns a {@link ProcessException} with message found by {@link com.googlecode.n_orm.ProcessCanceller#getErrorMessage(com.googlecode.n_orm.operations.Process)}
+	 * @param executor the executor to run process ; you need to call {@link ExecutorService#awaitTermination(long, java.util.concurrent.TimeUnit)} to be sure that all elements are processed ; if null, this method is equivalent to {@link #forEach(Process, int, long)}
+	 * @throws DatabaseNotReachedException
+	 * @throws InterruptedException in case threads are interrupted or canceler responds <code>false</code> to {@link com.googlecode.n_orm.ProcessCanceller#isCancelled()}
+	 * @throws ProcessException in case some process sent an exception while running
+	 */
+	public ProcessReport<T> forEach(Process<T> action, int threadNumber, com.googlecode.n_orm.ProcessCanceller canceller, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
+		if (hasNoLimit())
+			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
+		return com.googlecode.n_orm.operations.Process.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, canceller, executor);
 	}
 	
 	/**
@@ -233,7 +287,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 			limit = -1;
 		else
 			limit = this.limit;
-		StorageManagement.processElementsRemotely(this.getClazz(), this.getConstraint(), action, callBack, limit, this.toBeActivated, threadNumber, timeout);
+		com.googlecode.n_orm.operations.Process.processElementsRemotely(this.getClazz(), this.getConstraint(), action, callBack, limit, this.toBeActivated, threadNumber, timeout);
 	}
 	
 	/**
@@ -248,7 +302,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 			long exported = 0;
 			Constraint c = this.getConstraint();
 			do {
-				ExportReport ex = StorageManagement.exportPersistingElements(StorageManagement.findElement(this.getClazz(), c, Integer.MAX_VALUE, this.toBeActivated), out);
+				com.googlecode.n_orm.operations.ImportExport.ExportReport ex = ImportExport.exportPersistingElements(StorageManagement.findElement(this.getClazz(), c, Integer.MAX_VALUE, this.toBeActivated), out);
 				exported+=ex.getExportedElements();
 				if (ex.getExportedElements() < Integer.MAX_VALUE)
 					return exported;
@@ -256,7 +310,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 					c = new Constraint(ex.getElement().getIdentifier()+Character.MIN_VALUE, c.getEndKey());
 			} while (true);
 		} else {
-			return StorageManagement.exportPersistingElements(this.iterate(), out).getExportedElements();
+			return ImportExport.exportPersistingElements(this.iterate(), out).getExportedElements();
 		}
 	}
 }

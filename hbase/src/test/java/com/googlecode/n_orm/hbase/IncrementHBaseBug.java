@@ -49,25 +49,25 @@ public class IncrementHBaseBug {
 		Map<String, Map<String, Number>> all_incrs = new TreeMap<String, Map<String,Number>>();
 		Map<String, Number> incrs = new TreeMap<String, Number>();
 		all_incrs.put(testIncrCF, incrs);
-		store.storeChanges(testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, null, testTable, testKey, null, null, all_incrs );
 	}
 
 	@Test
-	public void testNoDelete() {
+	public void testNodelete() {
 		Map<String, Map<String, Number>> all_incrs = new TreeMap<String, Map<String,Number>>();
 		Map<String, Number> incrs = new TreeMap<String, Number>();
 		all_incrs.put(testIncrCF, incrs);
 		incrs.put(testIncrC, 1);
-		store.storeChanges(testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, null, testTable, testKey, null, null, all_incrs );
 		
-		byte[] data = store.get(testTable, testKey, testIncrCF, testIncrC);
+		byte[] data = store.get(null, null, testTable, testKey, testIncrCF, testIncrC);
 		assertNotNull(data);
 		int read = ConversionTools.convert(int.class, data);
 		assertEquals(1, read);
 		
-		store.storeChanges(testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, null, testTable, testKey, null, null, all_incrs );
 		
-		data = store.get(testTable, testKey, testIncrCF, testIncrC);
+		data = store.get(null, null, testTable, testKey, testIncrCF, testIncrC);
 		assertNotNull(data);
 		read = ConversionTools.convert(int.class, data);
 		assertEquals(2, read);
@@ -75,23 +75,23 @@ public class IncrementHBaseBug {
 
 	@Test
 	@Ignore
-	public void testDelete() {
+	public void testdelete() {
 		Map<String, Map<String, Number>> all_incrs = new TreeMap<String, Map<String,Number>>();
 		Map<String, Number> incrs = new TreeMap<String, Number>();
 		all_incrs.put(testIncrCF, incrs);
 		incrs.put(testIncrC, 1);
-		store.storeChanges(testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, null, testTable, testKey, null, null, all_incrs );
 		
-		byte[] data = store.get(testTable, testKey, testIncrCF, testIncrC);
+		byte[] data = store.get(null, null, testTable, testKey, testIncrCF, testIncrC);
 		assertNotNull(data);
 		int read = ConversionTools.convert(int.class, data);
 		assertEquals(1, read);
 		
-		store.delete(testTable, testKey);
+		store.delete(null, testTable, testKey);
 		
-		store.storeChanges(testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, null, testTable, testKey, null, null, all_incrs );
 		
-		data = store.get(testTable, testKey, testIncrCF, testIncrC);
+		data = store.get(null, null, testTable, testKey, testIncrCF, testIncrC);
 		assertNotNull(data);
 		read = ConversionTools.convert(int.class, data);
 		assertEquals(1, read); //Naive implementation of delete would return 2
@@ -108,20 +108,20 @@ public class IncrementHBaseBug {
 		Map<String, Number> incrs = new TreeMap<String, Number>();
 		all_incrs.put(testIncrCF, incrs);
 		incrs.put(testIncrC, 1);
-		store.storeChanges(testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, null, testTable, testKey, null, null, all_incrs );
 		
 		byte[] data; int read;
-//		data = store.get(testTable, testKey, testIncrCF, testIncrC);
+//		data = store.get(null, null, testTable, testKey, testIncrCF, testIncrC);
 //		assertNotNull(data);
 //		read = ConversionTools.convert(int.class, data);
 //		assertEquals(1, read);
 		
 		store.getAdmin().flush(testTable);
-		store.delete(testTable, testKey);
+		store.delete(null, testTable, testKey);
 		
-		store.storeChanges(testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, null, testTable, testKey, null, null, all_incrs );
 		
-		data = store.get(testTable, testKey, testIncrCF, testIncrC);
+		data = store.get(null, null, testTable, testKey, testIncrCF, testIncrC);
 		assertNotNull(data);
 		read = ConversionTools.convert(int.class, data);
 		assertEquals(1, read); //Naive implementation of delete would return 2
