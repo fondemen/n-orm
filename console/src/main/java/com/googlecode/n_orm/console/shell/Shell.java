@@ -16,21 +16,31 @@ import com.googlecode.n_orm.console.util.PackageExplorer;
 
 public class Shell
 {
-	private static final String[] PACKAGES_TO_EXPLORE = new String[]
-		{
-			"com.googlecode.n_orm"
-		};
 	
 	private static final String[] EMPTY_STRING_ARRAY = new String[0];
 	public static final String DEFAULT_PROMPT_START = "n-orm";
 	public static final String DEFAULT_PROMPT_END = "$ ";
+	
+	private static List<String> mapClassNames;
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private static List<String> findAllPersistingClassNames()
+	{
+		ArrayList<String> result = new ArrayList<String>();
+		
+		for (Class c : PackageExplorer.getClasses(""))
+			if (c.getAnnotation(Persisting.class) != null)
+				result.add(c.getName());
+		
+		return result;
+	}
 	
 	private ConsoleReader in;
 	private PrintStream out;
 	private ShellProcessor shellProcessor;
 	private boolean mustStop = true;
 	private String prompt;
-	private List<String> mapClassNames;
+	
 	
 	public Shell() throws IOException
 	{
@@ -39,25 +49,13 @@ public class Shell
 		this.shellProcessor = new ShellProcessor(this);
 		this.prompt = DEFAULT_PROMPT_START + "$ ";
 		
-		this.mapClassNames = this.findAllPersistingClassNames();
+		if (mapClassNames == null) {
+			System.out.print("Loading persisting classes from " + PackageExplorer.getLocations() + "...");
+			mapClassNames = findAllPersistingClassNames();
+			System.out.println("found " + mapClassNames.size());
+		}
 		
 		this.updateProcessorCommands();
-	}
-	
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private List<String> findAllPersistingClassNames()
-	{
-		ArrayList<String> result = new ArrayList<String>();
-		
-		List<Class> tmp = new ArrayList<Class>();
-		for (String s : PACKAGES_TO_EXPLORE)
-			tmp.addAll(PackageExplorer.getClasses(s));
-		
-		for (Class c : tmp)
-			if (c.getAnnotation(Persisting.class) != null)
-				result.add(c.getName());
-		
-		return result;
 	}
 
 	@SuppressWarnings("unchecked")
