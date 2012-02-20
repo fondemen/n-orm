@@ -161,8 +161,6 @@ public class ShellProcessorTest
 		String command = "getZero";
 		String resultMessage = "method result: 0";
 		
-		shell.updateProcessorCommands();
-		shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
 		shell.println(resultMessage);
 		replay(shell);
 		this.sut.treatLine(command);
@@ -179,11 +177,19 @@ public class ShellProcessorTest
 		String resultMessageAffectation = "method result: 0";
 		
 		shell.updateProcessorCommands();
-		shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
-		shell.updateProcessorCommands();
 		shell.println(resultMessageAffectation);
 		replay(shell);
 		this.sut.treatLine(affectationCommand);
+		verify(shell);
+		reset(shell);
+		
+		assertEquals(0, this.sut.getMapShellVariables().get(varName));
+
+		shell.println("0");
+		shell.updateProcessorCommands();
+		shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + varName + Shell.DEFAULT_PROMPT_END);
+		replay(shell);
+		this.sut.treatLine(varName);
 		verify(shell);
 	}
 	
