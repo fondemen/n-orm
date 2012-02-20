@@ -8,9 +8,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Stack;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.beanutils.ConvertUtils;
@@ -23,6 +25,16 @@ import com.googlecode.n_orm.consoleannotations.Trigger;
 
 public class ShellProcessor
 {
+	private final class ContextElement {
+		public final Object element;
+		public final String command;
+		public ContextElement(Object element, String command) {
+			super();
+			this.element = element;
+			this.command = command;
+		}
+	}
+		
 	// Fields
 	private Shell shell;
 	private Map<String, Object> mapCommands;
@@ -31,11 +43,11 @@ public class ShellProcessor
 	private String escapeCommand = "quit";
 	private String zeroCommand = "zero";
 	private String resetCommand = "reset";
+	private String upCommand = "up";
 	private String showCommand = "show";
 	private String newCommand = "new";
 	private String affectationCommand = ">";
-	private boolean isShellProcessorZeroed = true;
-	private Object context = null;
+	private Stack<ContextElement> context = new Stack<ContextElement>();
 	
 	public ShellProcessor(Shell shell)
 	{
@@ -46,6 +58,12 @@ public class ShellProcessor
 		this.updateProcessorCommands();
 	}
 	
+	public Object getContextElement() {
+		if (this.context.isEmpty())
+			return null;
+		return this.context.peek().element;
+	}
+	
 	public void updateProcessorCommands()
 	{
 		processorCommands = new HashMap<String, Method>();
@@ -54,7 +72,8 @@ public class ShellProcessor
 		while (it.hasNext())
 			processorCommands.put(it.next().getKey(), null);
 		
-		if (this.isShellProcessorZeroed)
+		Object contextElement = this.getContextElement();
+		if (contextElement == null)
 		{
 			// List all Trigger annotated methods
 			for (Object o : mapCommands.values())
@@ -69,14 +88,14 @@ public class ShellProcessor
 		else
 		{
 			// List all Continuator annotated methods
-			for (Method m : this.context.getClass().getDeclaredMethods())
+			for (Method m : contextElement.getClass().getDeclaredMethods())
 			{
 				if (m.getAnnotation(Continuator.class) != null)
 					processorCommands.put(m.getName(), m);
 			}
 			
 			// List all properties of the context and add them as Continuators
-			for (PropertyDescriptor pd : PropertyUtils.getPropertyDescriptors(this.context))
+			for (PropertyDescriptor pd : PropertyUtils.getPropertyDescriptors(contextElement))
 			{
 				try
 				{
@@ -102,6 +121,11 @@ public class ShellProcessor
 	public String getResetCommand()
 	{
 		return resetCommand;
+	}
+	
+	public String getUpCommand()
+	{
+		return upCommand;
 	}
 	
 	public String getShowCommand()
@@ -146,6 +170,7 @@ public class ShellProcessor
 		result.add(this.escapeCommand);
 		result.add(this.zeroCommand);
 		result.add(this.resetCommand);
+		result.add(this.upCommand);
 		result.add(this.showCommand);
 		result.add(this.newCommand);
 		result.addAll(processorCommands.keySet());
@@ -170,6 +195,8 @@ public class ShellProcessor
 			this.doZero();
 		else if (firstCommand.equals(resetCommand))
 			this.doReset();
+		else if (firstCommand.equals(upCommand))
+			this.doUp();
 		else if (firstCommand.equals(showCommand))
 			this.doShow(textToTreat);
 		else if (firstCommand.equals(newCommand))
@@ -196,7 +223,7 @@ public class ShellProcessor
 			// Check if this is a command on an object or on the shell (variable affectation, etc)
 			if (command.equals(affectationCommand))
 			{
-				mapShellVariables.put(tokens[currentTokenIndex], this.context);
+				mapShellVariables.put(tokens[currentTokenIndex], this.getContextElement());
 				currentTokenIndex++;
 				// Update the completors
 				this.shell.updateProcessorCommands();
@@ -207,12 +234,11 @@ public class ShellProcessor
 				{
 					Object context = mapShellVariables.get(command);
 					shell.println(context.toString());
-					this.context = context;
-					this.isShellProcessorZeroed = false;
+					this.context.clear();
+					this.context.add(new ContextElement(context, command));
 					
 					// Change the prompt of the shell and update the completors
-					this.shell.updateProcessorCommands();
-					this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
+					updatePrompt();
 				}
 				else
 					shell.println(command + " is null");
@@ -253,26 +279,25 @@ public class ShellProcessor
 					}
 					
 					// Execute the command
-					if (this.context != null)
-						this.context = m.invoke(this.context, params);
+					Object result;
+					if (this.context.isEmpty())
+						result = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
 					else
-						this.context = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
+						result = m.invoke(this.getContextElement(), params);
 					
 					// Print the result on the shell (if there is a result)
-					if (this.context != null)
-					{
-						// In the case where we just display a result, we don't change the context
-						if (!this.context.getClass().equals(String.class))
-						{
-							this.isShellProcessorZeroed = false;
-							// Change the prompt of the shell and update the completors
-							this.shell.updateProcessorCommands();
-							this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + ":" + command + Shell.DEFAULT_PROMPT_END);
-						}
-						shell.println("method result: " + this.context.toString());
-					}
-					else // Zero the shell in this case
+					if (result == null) // Zero the shell in this case
 						this.doZero();
+					else {
+						// In the case where we just display a result, we don't change the context
+						if (!(result instanceof String))
+						{
+							// Change the prompt of the shell and update the completors
+							this.context.push(new ContextElement(result, command));
+							updatePrompt();
+						}
+						shell.println("method result: " + result.toString());
+					}
 				}
 				catch (Exception e)
 				{
@@ -287,11 +312,22 @@ public class ShellProcessor
 			}
 		}
 	}
+
+	private void updatePrompt() {
+		String cmd = "";
+		for (ContextElement c : this.context) {
+			if (cmd.length() == 0)
+				cmd = ":" + c.command;
+			else
+				cmd = cmd + '.' + c.command;
+		}
+		this.shell.updateProcessorCommands();
+		this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + cmd + Shell.DEFAULT_PROMPT_END);
+	}
 	
 	private void doZero()
 	{
-		this.context = null;
-		this.isShellProcessorZeroed = true;
+		this.context.clear();
 		this.shell.updateProcessorCommands();
 		this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + Shell.DEFAULT_PROMPT_END);
 	}
@@ -300,6 +336,17 @@ public class ShellProcessor
 	{
 		this.mapShellVariables.clear();
 		doZero();
+	}
+	
+	private void doUp()
+	{
+		if (this.context.isEmpty())
+			return;
+		this.context.pop();
+		Object newContext = this.getContextElement();
+		if (newContext != null)
+		shell.println(newContext.toString());
+		this.updatePrompt();
 	}
 	
 	@SuppressWarnings("rawtypes")
@@ -375,16 +422,16 @@ public class ShellProcessor
 						for (int i = 1; i < args.length - offset; i++)
 							params[i - 1] = ConvertUtils.convert(args[i], c.getParameterTypes()[i - 1]);
 						
-						this.context = c.newInstance(params);
+						this.context.push(new ContextElement(c.newInstance(params), "new " + clazz.getSimpleName()));
 						shell.println("n-orm: " + args[0] + " created successfully");
+						this.updatePrompt();
 					}
 				
 				// Check if there is an affectation
 				if (offset != 0)
 				{
-					mapShellVariables.put(args[args.length - 1], this.context);
-					// Update the completors
-					this.shell.updateProcessorCommands();
+					mapShellVariables.put(args[args.length - 1], this.getContextElement());
+					this.updatePrompt();
 				}
 			} catch (Exception e)
 			{
@@ -420,10 +467,5 @@ public class ShellProcessor
 		}
 		
 		return tokens;
-	}
-	
-	protected boolean isShellProcessorZeroed()
-	{
-		return this.isShellProcessorZeroed;
 	}
 }
