@@ -78,6 +78,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * Requests for some more family activations while executing the query, in addition to simple properties and families marked as {@link ImplicitActivation}.
 	 * @param families the names of the families to be activated (i.e. name of the {@link Map} or {@link Set} property).
 	 */
+	@Continuator
 	public SearchableClassConstraintBuilder<T> andActivate(String... families) {
 		if (this.toBeActivated == null)
 			this.toBeActivated = families;
@@ -97,6 +98,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * This remark does not hold for properties, which are all
 	 * activated, regardless of the fact they are declared in this class or in a subclass.
 	 */
+	@Continuator
 	public SearchableClassConstraintBuilder<T> andActivateAllFamilies() {
 		Set<String> knownCfs = ColumnFamiliyManagement.getInstance().getColumnFamilies(getClazz()).keySet();
 		this.toBeActivated = knownCfs.toArray(new String[knownCfs.size()]);
@@ -111,6 +113,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @return element with given id and class ; null if not found
 	 * @throws DatabaseNotReachedException
 	 */
+	@Continuator
 	public T withId(String id) throws DatabaseNotReachedException {
 		T ret = StorageManagement.getElement(getClazz(), id);
 		if (toBeActivated != null)
@@ -137,6 +140,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit, that has to be closed once performed.
 	 * @throws DatabaseNotReachedException
 	 */
+	@Continuator
 	public CloseableIterator<T> iterate() throws DatabaseNotReachedException {
 		if (hasNoLimit())
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
@@ -150,6 +154,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @return A (possibly null) element matching the query.
 	 * @throws DatabaseNotReachedException
 	 */
+	@Continuator
 	public T any()  throws DatabaseNotReachedException {
 		CloseableIterator<T> found = StorageManagement.findElement(this.getClazz(), this.getConstraint(), 1, this.toBeActivated);
 		try {
@@ -176,6 +181,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 		return (SearchableKeyConstraintBuilder<T>) this.withKeyInt(key);
 	}
 
+	@Continuator
 	public SearchableKeyConstraintBuilder<T> andWithKey(String key) {
 		return this.withKey(key);
 	}

@@ -4,6 +4,7 @@ import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingMixin;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 
 public privileged aspect PersistingMixin {
 	private static PersistingMixin INSTANCE;
@@ -51,7 +52,8 @@ public privileged aspect PersistingMixin {
 		
 		return this.getIdentifier().equals(((PersistingElement)rhs).getIdentifier());
 	}
-	
+
+	@Continuator
 	public int PersistingElement.hashCode() {
 		return this.getFullIdentifier().hashCode();
 	}
