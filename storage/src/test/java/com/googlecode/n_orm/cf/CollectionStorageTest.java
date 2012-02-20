@@ -145,8 +145,33 @@ public class CollectionStorageTest {
 	public void autoActivation() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
 		copy.activate();
+		assertHadAQuery();
 		assertTrue(((ColumnFamily<Element>)copy.getColumnFamily("elements")).isActivated());
 	}
+	
+	@Test
+	public void ifNotAlready() throws DatabaseNotReachedException {
+		Container copy = new Container(sut.key);
+		copy.activateIfNotAlready();
+		assertHadAQuery();
+		copy.activateIfNotAlready();
+		assertHadNoQuery();
+		copy.activateIfNotAlready();
+		assertHadNoQuery();
+	}
+	
+	@Test
+	public void ifNotAlreadyTimeouted() throws DatabaseNotReachedException, InterruptedException {
+		Container copy = new Container(sut.key);
+		copy.activateIfNotAlready(99);
+		assertHadAQuery();
+		copy.activateIfNotAlready(99);
+		assertHadNoQuery();
+		Thread.sleep(100);
+		copy.activateIfNotAlready(99);
+		assertHadAQuery();
+	}
+	
 	@Test
 	public void storeRetrieveElements() throws DatabaseNotReachedException {
 		Container copy = new Container(sut.key);
@@ -337,6 +362,19 @@ public class CollectionStorageTest {
 		sut.activateColumnFamilyIfNotAlready("elements");
 		this.assertHadNoQuery();
 		sut.activateColumnFamilyIfNotAlready("elements");
+		this.assertHadNoQuery();
+		sut.activateColumnFamily("elements");
+		this.assertHadAQuery();
+	}
+	
+	@Test
+	public void multipleActivationsTimeouted() throws InterruptedException {
+		sut.activateColumnFamily("elements");
+		this.assertHadAQuery();
+		Thread.sleep(100);
+		sut.activateColumnFamilyIfNotAlready("elements", 99);
+		this.assertHadAQuery();
+		sut.activateColumnFamilyIfNotAlready("elements", 99);
 		this.assertHadNoQuery();
 		sut.activateColumnFamily("elements");
 		this.assertHadAQuery();

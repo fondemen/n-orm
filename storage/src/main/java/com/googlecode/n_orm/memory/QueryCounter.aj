@@ -25,7 +25,7 @@ public aspect QueryCounter {
 	
 	private transient volatile Method Memory.running = null;
 	
-	protected pointcut runningQuery(Memory self) : execution(* com.googlecode.n_orm.storeapi.Store.*(..)) && !execution(void com.googlecode.n_orm.storeapi.Store.start()) && target(self);
+	protected pointcut runningQuery(Memory self) : execution(* com.googlecode.n_orm.storeapi.SimpleStore.*(..)) && !execution(void com.googlecode.n_orm.storeapi.SimpleStore.start()) && target(self);
 	
 	before(Memory self): runningQuery(self) && if(self.running == null) {
 		self.running = ((MethodSignature)thisJoinPointStaticPart.getSignature()).getMethod();

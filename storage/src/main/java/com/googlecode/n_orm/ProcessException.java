@@ -2,6 +2,7 @@ package com.googlecode.n_orm;
 
 import java.util.List;
 
+import com.googlecode.n_orm.operations.Process.ProcessReport;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 import com.googlecode.n_orm.storeapi.Row;
 
@@ -77,12 +78,14 @@ public class ProcessException extends Exception {
 	}
 	
 	private final Process<? extends PersistingElement> process;
+	private final ProcessReport<? extends PersistingElement> report;
 	private final List<Problem> problems;
 	private final List<Throwable> otherExceptions;
 	
-	public ProcessException(Process<? extends PersistingElement> p, List<Problem> problems, List<Throwable> otherExceptions) {
-		super("Problem while executing process " + p.getClass().getName() + ':' + buildMessage(problems, otherExceptions));
+	public ProcessException(Process<? extends PersistingElement> p, ProcessReport<? extends PersistingElement> report, List<Problem> problems, List<Throwable> otherExceptions) {
+		super("Problem while executing process " + p.getClass().getName() + ':' + buildMessage(problems, otherExceptions), otherExceptions.isEmpty() ? problems.get(0).getReportedProblem() : otherExceptions.get(0));
 		this.process = p;
+		this.report = report;
 		this.problems = problems;
 		this.otherExceptions = otherExceptions;
 	}

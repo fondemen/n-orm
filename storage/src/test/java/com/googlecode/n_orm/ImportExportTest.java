@@ -19,6 +19,7 @@ import java.util.Set;
 import org.junit.After;
 import org.junit.Test;
 
+import com.googlecode.n_orm.operations.ImportExport;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class ImportExportTest {
@@ -65,7 +66,7 @@ public class ImportExportTest {
 		KeyManagement.getInstance().cleanupKnownPersistingElements();
 		
 		//Importing stored elements
-		StorageManagement.importPersistingElements(new ByteArrayInputStream(out.toByteArray()));
+		ImportExport.importPersistingElements(new ByteArrayInputStream(out.toByteArray()));
 		assertEquals(knownBooks.size(), query.count());
 		
 		//Checking database
@@ -113,7 +114,7 @@ public class ImportExportTest {
 		 
 		 KeyManagement.getInstance().cleanupKnownPersistingElements();
 
-		 StorageManagement.importPersistingElements(new FileInputStream(f));
+		 ImportExport.importPersistingElements(new FileInputStream(f));
 		 NavigableSet<Book> unserializedBooks = searchQuery.go();
 		 
 		 assertEquals(originalBooks, unserializedBooks);
@@ -153,7 +154,7 @@ public class ImportExportTest {
 		 
 		 KeyManagement.getInstance().cleanupKnownPersistingElements();
 
-		 long imported = StorageManagement.importPersistingElements(new FileInputStream(f));
+		 long imported = ImportExport.importPersistingElements(new FileInputStream(f));
 		 
 		 assertEquals(exported, imported);
 		 assertEquals(originalCount, searchQuery.count());
