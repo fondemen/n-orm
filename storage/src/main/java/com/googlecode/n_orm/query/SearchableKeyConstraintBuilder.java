@@ -17,10 +17,12 @@ public class SearchableKeyConstraintBuilder<T extends PersistingElement> extends
 		return (SearchableClassConstraintBuilder<T>) super.setToInt(value);
 	}
 
+	@Continuator
 	public SearchableClassConstraintBuilder<T> lessOrEqualsThan(Object value) {
 		return (SearchableClassConstraintBuilder<T>) super.lessOrEqualsThanInt(value);
 	}
 
+	@Continuator
 	public SearchableClassConstraintBuilder<T> greaterOrEqualsThan(Object value) {
 		return (SearchableClassConstraintBuilder<T>) super.greaterOrEqualsThanInt(value);
 	}
