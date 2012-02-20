@@ -1,16 +1,12 @@
 package com.googlecode.n_orm.cache;
 
-import java.util.Collections;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import javolution.util.FastMap;
 
 import com.googlecode.n_orm.PersistingElement;
 
@@ -26,59 +22,139 @@ import com.googlecode.n_orm.PersistingElement;
  *
  */
 public class Cache {
-	private static Logger logger = Logger.getLogger(Cache.class.getName());
+	
+	private static class CleanerThread extends Thread {
 
-	private static int periodBetweenCacheCleanupMS = 1000;
-	private static int timeToLiveSeconds = 10;
-	private static int maxElementsInCache = 10000;
-	
-	private static final Map<Thread, Cache> perThreadCaches;
-	private static final Map<Long, Cache> availableCaches;
-	private static final Timer cacheCleanerTimer;
-	private static final TimerTask cacheCleaner;
-	
-	static {
-		perThreadCaches = Collections.synchronizedMap(new FastMap<Thread, Cache>());
-		availableCaches = Collections.synchronizedMap(new FastMap<Long, Cache>());
-		cacheCleaner = new TimerTask() {
-			
-			@Override
-			public void run() {
-				long now = System.currentTimeMillis();
+		@Override
+		public void run() {
+			while (true) {
 				try {
-					Iterator<Entry<Thread, Cache>> ci = perThreadCaches.entrySet().iterator();
-					while (ci.hasNext()) {
-						Entry<Thread, Cache> entry = ci.next();
-						if (entry.getValue().isValid()) {
-							entry.getValue().shouldCleanup = true;
+					Thread.sleep(periodBetweenCacheCleanupMS);
+					this.step();
+				} catch (Throwable e) {
+					logger.log(Level.WARNING, "Problem while waiting next cache cleanup.", e);
+				}
+			}
+		}
+
+		public void step() {
+			
+			try {
+				long now = System.currentTimeMillis();
+				LIFO<Cache> available = new LIFO<Cache>();
+				
+				try {
+					
+					Thread[] threads;
+					synchronized(perThreadCaches) {
+						Set<Thread> threadsSet = perThreadCaches.keySet();
+						threads = threadsSet.toArray(new Thread[threadsSet.size()]);
+					}
+					for(Thread t : threads) {
+						Cache cache;
+						if (!isValid(t)) {
+							synchronized(perThreadCaches) {
+								cache = perThreadCaches.remove(t);
+							}
+							if (cache != null) {
+								available.push(cache);
+								cache.stopped = now;
+							}
 						} else {
-							availableCaches.put(now, entry.getValue());
-							ci.remove();
+							cache = perThreadCaches.get(t);
+							if (cache == null) {
+								//Nothing to do ; cache is gone
+							} else if (cache.cache != null && cache.stopped == -1) {
+								cache.shouldCleanup = true;
+							} else {
+								assert false;
+								synchronized(perThreadCaches) {
+									perThreadCaches.remove(t);
+								}
+							}
 						}
 					}
 				} catch (RuntimeException x) {
 					logger.log(Level.WARNING, "Problem while checking cache.", x);
 				}
 				
+				synchronized(availableCaches) {
+					try {
+						availableCaches.pushAll(available);
+					} catch (RuntimeException x) {
+						logger.log(Level.WARNING, "Problem while checking cache.", x);
+					}
+					available.clear();
+				}
+				
 				try {
-					Iterator<Entry<Long, Cache>> ai = availableCaches.entrySet().iterator();
-					while (ai.hasNext()) {
-						Entry<Long, Cache> entry = ai.next();
-						if ((entry.getKey()+(timeToLiveSeconds*1000)) < now) {
-							entry.getValue().close();
-							ai.remove();
-						} else {
-							entry.getValue().cleanInvalidElements();
+					Iterator<Cache> ai = availableCaches.iterator();
+availableCachesCheck:while (ai.hasNext()) {
+						Cache cache = ai.next();
+						if (cache == null) {
+							logger.warning("Invalid state: got an empty object while iterating over available caches.");
+							if (ai.hasNext()) {
+								cache = ai.next();
+								if (cache == null) {
+									String cachesStr;
+									try {
+										cachesStr = availableCaches.toString();
+										logger.severe("Invalid state: cannot continue iterating over available caches " + cachesStr);
+									} catch (Throwable t) {
+										logger.log(Level.SEVERE, "It seems that available caches are lost. No mean to recover, resetting.", t);
+										availableCaches.clear();
+									}
+									break availableCachesCheck;
+								}
+							} else
+								break availableCachesCheck;
+						}
+						synchronized(cache) {
+							if ((cache.stopped+(timeToLiveSeconds*1000)) < now) {
+								ai.remove();
+								cache.close();
+							} else if (cache.isClosed()) {
+								ai.remove();
+							} else if (isValid(cache.thread)) {
+								ai.remove();
+								assert perThreadCaches.get(cache.thread) == cache;
+							}
 						}
 					}
 				} catch (RuntimeException x) {
 					logger.log(Level.WARNING, "Problem while checking cache.", x);
 				}
+			} finally {
+			
+				synchronized(this) {
+					this.notifyAll();
+				}
 			}
-		};
-		cacheCleanerTimer = new Timer("per-thread cache cleaner", true);
-		cacheCleanerTimer.schedule(cacheCleaner, new Date(), periodBetweenCacheCleanupMS);
+		}
+	}
+
+	private static Logger logger = Logger.getLogger(Cache.class.getName());
+
+	private static int periodBetweenCacheCleanupMS = 1000;
+	private static int timeToLiveSeconds = 10;
+	private static int maxElementsInCache = 10000;
+
+	
+	private static final HashMap<Thread, Cache> perThreadCaches;
+	private static final LIFO<Cache> availableCaches;
+	private static final Thread cacheCleaner;
+	
+	static {
+		perThreadCaches = new HashMap<Thread, Cache>();
+		availableCaches = new LIFO<Cache>();
+		cacheCleaner = new CleanerThread();
+		cacheCleaner.setDaemon(true);
+		cacheCleaner.start();
 		logger.info("Per-thread caching system started.");
+	}
+	
+	private static boolean isValid(Thread thread) {
+		return thread != null && thread.isAlive() && thread.getThreadGroup() != null;
 	}
 	
 	/**
@@ -136,13 +212,6 @@ public class Cache {
 		Cache.periodBetweenCacheCleanupMS = periodBetweenCacheCleanupMS;
 	}
 
-	/**
-	 * Performs a cleanup on caches for dead threads, and marks others for being cleaned at next access.
-	 */
-	public static void runCacheCleanup() {
-		cacheCleaner.run();
-	}
-
 	static void waitNextCleanup() throws InterruptedException {
 		synchronized(cacheCleaner) {
 			cacheCleaner.wait();
@@ -153,8 +222,16 @@ public class Cache {
 		return findCache(thread)!= null;
 	}
 	
+	static void cleanRecyclableCaches() {
+		synchronized(availableCaches) {
+			availableCaches.clear();
+		}
+	}
+	
 	public static Cache findCache(Thread thread) {
-		return perThreadCaches.get(thread);
+		synchronized(perThreadCaches) {
+			return perThreadCaches.get(thread);
+		}
 	}
 	
 	/**
@@ -162,20 +239,20 @@ public class Cache {
 	 * In case this cache does not already exists, creates it.
 	 */
 	public static Cache getCache() {
-		Cache res = perThreadCaches.get(Thread.currentThread());
+		Cache res = findCache(Thread.currentThread());
 		
 		if (res == null) {
-			Iterator<Entry<Long, Cache>> available = availableCaches.entrySet().iterator();
-			do {
-				if (available.hasNext()) {
-					Entry<Long, Cache> availableEntry = available.next();
-					availableCaches.remove(availableEntry.getKey());
-					res = availableEntry.getValue();
-				}
-			} while(res != null && res.isClosed());
+			res = (Cache) availableCaches.pop(); //Most recent in the queue ; if closed, all the others in availableCaches should be closed...
 			if (res != null) {
-				res.init();
-				logger.finer("Reusing existing cache for thread " + res.thread);
+				synchronized(res) {
+					if (res.isClosed())
+						res = null;
+					else {
+						res.init();
+						res.cleanInvalidElements();
+						logger.finer("Reusing existing cache for thread " + res.thread);
+					}
+				}
 			}
 		}
 		
@@ -183,7 +260,10 @@ public class Cache {
 			res = new Cache();
 		}
 		
-		assert res.isValid();
+		assert isValid(res.thread);
+		assert !res.isClosed();
+		assert !availableCaches.contains(res);
+		assert perThreadCaches.get(Thread.currentThread()) == res;
 		
 		return res;
 	}
@@ -223,31 +303,34 @@ public class Cache {
 		}
 	}
 	
-	private FastMap<String, Element> cache;
+	private Map<String, Element> cache;
 	private Thread thread;
 	private String threadId;
 	private volatile boolean shouldCleanup;
+	private volatile long stopped = -1;
 
 	private Cache() {
 		this.init();
 	}
 	
-	private void init() {
+	private synchronized void init() {
 		this.thread = Thread.currentThread();
 		this.threadId = getThreadId(this.thread);
-		this.cache = new FastMap<String, Element>();
-		perThreadCaches.put(this.thread, this);
+		
+		this.cache = new HashMap<String, Cache.Element>();
+		this.stopped = -1;
+		
+		synchronized(perThreadCaches) {
+			perThreadCaches.put(this.thread, this);
+		}
 		logger.fine("Cache started for " + this.thread + " with id " + this.threadId);
-	}
-	
-	boolean isValid() {
-		return this.cache != null && this.thread.isAlive() && this.thread.getThreadGroup() != null;
 	}
 	
 	protected void checkState() {
 		assert !this.isClosed();
-		if (this.thread != Thread.currentThread())
-			throw new IllegalStateException(Thread.currentThread().toString() + " with id " + Thread.currentThread().getId() + " is not allowed to acccess cache for " + (this.thread.isAlive() ? "alive" : "dead") + " " + this.thread + " with id " + this.thread.getId());
+		Thread cur = Thread.currentThread();
+		if (this.thread != cur)
+			throw new IllegalStateException(cur.toString() + " with id " + cur.getId() + " is not allowed to acccess cache for " + (this.thread.isAlive() ? "alive" : "dead") + " " + this.thread + " with id " + this.thread.getId());
 		this.cleanIfNecessary();
 	}
 	
@@ -259,8 +342,8 @@ public class Cache {
 	/**
 	 * @return the element with the eldest last usage (null if cache is empty)
 	 */
-	private Element cleanInvalidElements() {
-		this.shouldCleanup = true;
+	private synchronized Element cleanInvalidElements() {
+		this.shouldCleanup = false;
 		Element eldest = null;
 		Iterator<Entry<String, Element>> it = cache.entrySet().iterator();
 		while (it.hasNext()) {
@@ -371,13 +454,13 @@ public class Cache {
 	
 	/**
 	 * Checks if this cache can be used or not.
-	 * A cache cannot be used if its thread is deas and if its time to live is over.
+	 * A cache cannot be used if its thread is dead and if its time to live is over.
 	 * A closed cache must not be used in any case (necessary resources were released)
 	 * @return whether this cache has bee closed
 	 * @see #close()
 	 */
 	public synchronized boolean isClosed() {
-		return this.cache == null;
+		return this.cache == null || this.thread == null;
 	}
 	
 	/**
@@ -387,11 +470,13 @@ public class Cache {
 	 * @see #isClosed()
 	 */
 	protected synchronized void close() {
-		if (this.cache == null)
+		if (this.isClosed())
 			return;
+		
 		this.reset();
-		FastMap.recycle(this.cache);
 		this.cache = null;
+		this.thread = null;
+		this.stopped = System.currentTimeMillis();
 		logger.fine("Cache stopped for thread " + this.thread + " with id " + this.threadId);
 	}
 

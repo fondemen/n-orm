@@ -36,14 +36,13 @@ Different data stores are possible, especially column-oriented data stores such 
 			<groupId>commons-collections</groupId>
 			<artifactId>commons-collections-testframework</artifactId>
 			<version>3.2.1</version>
-			<type>jar</type>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>javolution</groupId>
-			<artifactId>javolution</artifactId>
-			<version>5.5.1</version>
-			<scope>compile</scope>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>1.9.0</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 	<distributionManagement>

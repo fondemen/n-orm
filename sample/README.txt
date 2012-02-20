@@ -10,6 +10,8 @@ so that it points to the correct HBase configuration. You can then run "mvn test
 
 To test the project using the simple (naive) memory store:
 mvn test -f example-memory-pom.xml
+To test the project using the jedis-based redis store (redis-server should be started on localhost):
+mvn test -f example-memory-pom.xml
 
 For production, you should prefer the variant presented in src/main/resources/com/googlecode/n_orm/sample/business/store.poperties.
 

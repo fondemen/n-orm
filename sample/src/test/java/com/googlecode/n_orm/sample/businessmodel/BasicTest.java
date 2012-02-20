@@ -31,6 +31,7 @@ import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.WaitingCallBack;
+import com.googlecode.n_orm.operations.ImportExport;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 /**
@@ -433,7 +434,7 @@ public class BasicTest {
 		KeyManagement.getInstance().cleanupKnownPersistingElements();
 		
 		//Importing stored elements
-		StorageManagement.importPersistingElements(new ByteArrayInputStream(out.toByteArray()));
+		ImportExport.importPersistingElements(new ByteArrayInputStream(out.toByteArray()));
 		assertEquals(knownBooks.size(), query.count());
 		
 		//Checking database
