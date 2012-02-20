@@ -50,7 +50,8 @@ public aspect StorageManagement {
 	public boolean PersistingElement.isKnownAsNotExistingInStore() {
 		return this.exists == Boolean.FALSE;
 	}
-	
+
+	@Continuator
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
 		this.getStore().delete(this, this.getTable(), this.getIdentifier());
 		Collection<Class<? extends PersistingElement>> psc = this.getPersistingSuperClasses();
@@ -241,11 +242,13 @@ public aspect StorageManagement {
 		}
 		return this.persistingSuperClasses;
 	}
-	
+
+	@Continuator
 	public void PersistingElement.activateColumnFamily(String name) throws DatabaseNotReachedException {
 		this.getColumnFamily(name).activate();
 	}
-	
+
+	@Continuator
 	public void PersistingElement.activateColumnFamily(String name, Object fromObject, Object toObject) throws DatabaseNotReachedException {
 		this.getColumnFamily(name).activate(fromObject, toObject);
 	}
@@ -282,6 +285,7 @@ public aspect StorageManagement {
 		this.activate(timeout, families);
 	}
 	
+	@Continuator
 	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
 		this.activate(-1, families);
 	}
@@ -401,7 +405,8 @@ public aspect StorageManagement {
 		
 		return this.exists;
 	}
-	
+
+	@Continuator
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {
 		boolean ret = this.getStore().exists(this, this.getTable(), this.getIdentifier());
 		this.exists = ret ? Boolean.TRUE : Boolean.FALSE;
@@ -461,6 +466,7 @@ public aspect StorageManagement {
 				private boolean closed = false;
 
 				@Override
+				@Continuator
 				public boolean hasNext() {
 					if (closed)
 						return false;
@@ -471,6 +477,7 @@ public aspect StorageManagement {
 				}
 
 				@Override
+				@Continuator
 				public T next() {
 					if (!this.hasNext())
 						throw new NoSuchElementException();
@@ -483,11 +490,13 @@ public aspect StorageManagement {
 				}
 
 				@Override
+				@Continuator
 				public void remove() {
 					keys.remove();
 				}
 
 				@Override
+				@Continuator
 				public void close() {
 					if (closed)
 						return;
