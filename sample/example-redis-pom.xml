@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>sample</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>jedis-${jedis.version}-n_orm-${n-orm.version}</version>
 	<name>Sample n-orm project</name>
 	<description>Simple starter project.</description>
 	<properties>
