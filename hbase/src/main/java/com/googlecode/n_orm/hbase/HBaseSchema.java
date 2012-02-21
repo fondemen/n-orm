@@ -6,6 +6,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.apache.hadoop.hbase.regionserver.StoreFile;
+
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.cf.ColumnFamily;
@@ -55,4 +57,65 @@ public @interface HBaseSchema {
 	 * Changes value for {@link Store#isInMemory()} for a particular persisting class or column family.
 	 */
 	SettableBoolean inMemory() default SettableBoolean.UNSET;
+
+	/**
+	 * Changes value for {@link Store#isForceTimeToLiveSeconds()} for a particular persisting class or column family.
+	 * WARNING: to be used with great care in case of use in multiprocess context.
+	 */
+	SettableBoolean forceTimeToLive() default SettableBoolean.UNSET;
+	/**
+	 * Changes value for {@link Store#getTimeToLiveSeconds()} for a particular persisting class or column family.
+	 */
+	int timeToLiveInSeconds() default -1;
+
+	/**
+	 * Changes value for {@link Store#isForceMaxVersions()} for a particular persisting class or column family.
+	 * WARNING: to be used with great care in case of use in multiprocess context.
+	 */
+	SettableBoolean forceMaxVersions() default SettableBoolean.UNSET;
+	/**
+	 * Changes value for {@link Store#getMaxVersions()} for a particular persisting class or column family.
+	 */
+	int maxVersions() default -1;
+	
+	/**
+	 * Changes value for {@link Store#isForceBloomFilterType()} for a particular persisting class or column family.
+	 * WARNING: to be used with great care in case of use in multiprocess context.
+	 */
+	SettableBoolean forceBloomFilterType() default SettableBoolean.UNSET;
+	/**
+	 * Changes value for {@link Store#getMaxVersions()} for a particular persisting class or column family.
+	 */
+	StoreFile.BloomType bloomFilterType() default StoreFile.BloomType.NONE;//Default HBase value
+
+	/**
+	 * Changes value for {@link Store#isForceBlockCacheEnabled()} for a particular persisting class or column family.
+	 * WARNING: to be used with great care in case of use in multiprocess context.
+	 */
+	SettableBoolean forceBlockCacheEnabled() default SettableBoolean.UNSET;
+	/**
+	 * Changes value for {@link Store#getBlockCacheEnabled()} for a particular persisting class or column family.
+	 */
+	SettableBoolean blockCacheEnabled() default SettableBoolean.UNSET;
+
+	/**
+	 * Changes value for {@link Store#isForceBlockSize()} for a particular persisting class or column family.
+	 * WARNING: to be used with great care in case of use in multiprocess context.
+	 */
+	SettableBoolean forceBlockSize() default SettableBoolean.UNSET;
+	/**
+	 * Changes value for {@link Store#getBlockSize()} for a particular persisting class or column family.
+	 * Value less or equal than 0 is equivalent to an unset value.
+	 */
+	int blockSize() default -1;
+
+	/**
+	 * Changes value for {@link Store#isForceReplicationScope()} for a particular persisting class or column family.
+	 * WARNING: to be used with great care in case of use in multiprocess context.
+	 */
+	SettableBoolean forceReplicationScope() default SettableBoolean.UNSET;
+	/**
+	 * Changes value for {@link Store#getReplicationScope()} for a particular persisting class or column family.
+	 */
+	int replicationScope() default -1;
 }
