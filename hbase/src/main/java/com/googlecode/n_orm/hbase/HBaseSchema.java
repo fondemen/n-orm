@@ -6,8 +6,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import org.apache.hadoop.hbase.regionserver.StoreFile;
-
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.cf.ColumnFamily;
@@ -85,8 +83,9 @@ public @interface HBaseSchema {
 	SettableBoolean forceBloomFilterType() default SettableBoolean.UNSET;
 	/**
 	 * Changes value for {@link Store#getMaxVersions()} for a particular persisting class or column family.
+	 * Possible values are those from {@link org.apache.hadoop.hbase.regionserver.StoreFile.BloomType}, e.g. "NONE" (default), "ROW", or "ROWCOL"
 	 */
-	StoreFile.BloomType bloomFilterType() default StoreFile.BloomType.NONE;//Default HBase value
+	String bloomFilterType() default "";
 
 	/**
 	 * Changes value for {@link Store#isForceBlockCacheEnabled()} for a particular persisting class or column family.
