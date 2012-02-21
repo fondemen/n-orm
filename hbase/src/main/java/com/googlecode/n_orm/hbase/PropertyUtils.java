@@ -1,6 +1,7 @@
 package com.googlecode.n_orm.hbase;
 
 import java.lang.reflect.Field;
+import java.util.logging.Level;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
@@ -19,7 +20,8 @@ public class PropertyUtils {
 			new MaxVersionsProperty(),
 			new BloomTypeProperty(),
 			new BlockCacheProperty(),
-			new BlockSizeProperty()
+			new BlockSizeProperty(),
+			new ReplicationScopeProperty()
 		};
 	}
 
@@ -381,7 +383,16 @@ public class PropertyUtils {
 	
 		@Override
 		StoreFile.BloomType readValue(HBaseSchema ann) {
-			return ann.bloomFilterType();
+			String name = ann.bloomFilterType();
+			if (name == null) return null;
+			name = name.trim();
+			if (name.length() == 0) return null;
+			try {
+				return StoreFile.BloomType.valueOf(ann.bloomFilterType().trim());
+			} catch (Exception x) {
+				Store.errorLogger.log(Level.WARNING, "Unknown bloom type: " + name, x);
+				return null;
+			}
 		}
 	
 		@Override
