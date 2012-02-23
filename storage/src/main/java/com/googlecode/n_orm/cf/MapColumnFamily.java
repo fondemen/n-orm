@@ -14,6 +14,7 @@ import java.util.Map.Entry;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.conversion.ConversionTools;
 
 public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> {
@@ -71,6 +72,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 	}
 
 	@Override
+	@Continuator
 	public void clear() {
 		for (String key : new TreeSet<String>(this.getKeys())) {
 			this.removeKey(key);
@@ -80,11 +82,13 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 
 	@SuppressWarnings("unchecked")
 	@Override
+	@Continuator
 	public boolean containsKey(Object key) {
 		return super.containsKey(this.toKey((K) key));
 	}
 
 	@Override
+	@Continuator
 	public boolean containsValue(Object value) {
 		return this.collection.containsValue(value);
 	}
@@ -444,6 +448,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 
 	@SuppressWarnings("unchecked")
 	@Override
+	@Continuator
 	public T get(Object key) {
 		try {
 			return this.getElement(this.toKey((K) key));
@@ -453,6 +458,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 	}
 
 	@Override
+	@Continuator
 	public T put(K key, T value) {
 		String sKey = this.toKey(key);
 		T ret = this.get(key);
@@ -470,6 +476,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 
 	@SuppressWarnings("unchecked")
 	@Override
+	@Continuator
 	public T remove(Object key) {
 		T ret = this.get(key);
 		this.removeKey(this.toKey((K) key));
@@ -477,6 +484,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 	}
 
 	@Override
+	@Continuator
 	public Collection<T> values() {
 		return this.collection.values();
 	}

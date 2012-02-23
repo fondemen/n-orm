@@ -1,6 +1,7 @@
 package com.googlecode.n_orm.operations;
 
 import java.io.BufferedInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -18,6 +19,7 @@ import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.consoleannotations.Trigger;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Row;
 
@@ -163,5 +165,16 @@ public class ImportExport {
 			}
 		}
 		return ret;
+	}
+
+	/**
+	 * Import a serialized set from a file. Each element is loaded with data found from the file and stored.
+	 * Elements are removed from cache to avoid memory consumption.
+	 * @param file the file to import from
+	 * @return the number of imported elements
+	 */
+	@Trigger
+	public static long importPersistingElements(String file) throws DatabaseNotReachedException, IOException, ClassNotFoundException {
+		return importPersistingElements(new BufferedInputStream(new FileInputStream(file)));
 	}
 }
