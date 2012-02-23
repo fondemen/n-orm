@@ -223,6 +223,13 @@
 		</profile>
 
 		<profile>
+			<id>redis</id>
+			<modules>
+				<module>../n-orm.redis</module>
+			</modules>
+		</profile>
+
+		<profile>
 			<id>local-nexus</id>
 			<distributionManagement>
 				<repository>
