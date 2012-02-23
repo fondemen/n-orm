@@ -28,6 +28,8 @@ import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+import com.googlecode.n_orm.consoleannotations.Trigger;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.query.ConstraintBuilder;
 import com.googlecode.n_orm.storeapi.Constraint;
@@ -48,7 +50,8 @@ public aspect StorageManagement {
 	public boolean PersistingElement.isKnownAsNotExistingInStore() {
 		return this.exists == Boolean.FALSE;
 	}
-	
+
+	@Continuator
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
 		this.getStore().delete(this, this.getTable(), this.getIdentifier());
 		Collection<Class<? extends PersistingElement>> psc = this.getPersistingSuperClasses();
@@ -61,6 +64,7 @@ public aspect StorageManagement {
 		this.exists= Boolean.FALSE;
 	}
 	
+	@Continuator
 	public void PersistingElement.store() throws DatabaseNotReachedException {
 		this.checkIsValid();
 		
@@ -238,11 +242,13 @@ public aspect StorageManagement {
 		}
 		return this.persistingSuperClasses;
 	}
-	
+
+	@Continuator
 	public void PersistingElement.activateColumnFamily(String name) throws DatabaseNotReachedException {
 		this.getColumnFamily(name).activate();
 	}
-	
+
+	@Continuator
 	public void PersistingElement.activateColumnFamily(String name, Object fromObject, Object toObject) throws DatabaseNotReachedException {
 		this.getColumnFamily(name).activate(fromObject, toObject);
 	}
@@ -279,6 +285,7 @@ public aspect StorageManagement {
 		this.activate(timeout, families);
 	}
 	
+	@Continuator
 	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
 		this.activate(-1, families);
 	}
@@ -398,7 +405,8 @@ public aspect StorageManagement {
 		
 		return this.exists;
 	}
-	
+
+	@Continuator
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {
 		boolean ret = this.getStore().exists(this, this.getTable(), this.getIdentifier());
 		this.exists = ret ? Boolean.TRUE : Boolean.FALSE;
@@ -448,57 +456,74 @@ public aspect StorageManagement {
 		return elt;
 	}
 	
-	public static <T extends PersistingElement> CloseableIterator<T> findElement(final Class<T> clazz, Constraint c, final int limit, String... families) throws DatabaseNotReachedException {
+	public static class SearchResultIterator<T extends PersistingElement> implements CloseableIterator<T> {
+		private final Class<T> clazz;
+		private final int limit;
+		private final Map<String, Field> toBeActivated;
+		private final CloseableKeyIterator keys;
+		private int returned = 0;
+		private boolean closed = false;
+		
+		public SearchResultIterator(Class<T> clazz, int limit, Map<String, Field> toBeActivated, CloseableKeyIterator keys) {
+			this.clazz = clazz;
+			this.limit = limit;
+			this.toBeActivated = toBeActivated;
+			this.keys = keys;
+		}
+
+		@Override
+		@Continuator
+		public boolean hasNext() {
+			if (closed)
+				return false;
+			boolean ret = returned < limit && keys.hasNext();
+			if (! ret) 
+				this.close();
+			return ret;
+		}
+
+		@Override
+		@Continuator
+		public T next() {
+			if (!this.hasNext())
+				throw new NoSuchElementException();
+			Row data = keys.next();
+			try {
+				return createElementFromRow(clazz, toBeActivated, data);
+			} finally {
+				returned++;
+			}
+		}
+
+		@Override
+		@Continuator
+		public void remove() {
+			keys.remove();
+		}
+
+		@Override
+		@Continuator
+		public void close() {
+			if (closed)
+				return;
+			
+			keys.close();
+			this.closed = true;
+		}
+		
+		@Override
+		protected void finalize() throws Throwable {
+			this.close();
+			super.finalize();
+		}
+	}
+	
+	public static <T extends PersistingElement> CloseableIterator<T> findElement(Class<T> clazz, Constraint c, int limit, String... families) throws DatabaseNotReachedException {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		final Map<String, Field> toBeActivated = families == null ? null : getAutoActivatedFamilies(clazz, families);
 		final CloseableKeyIterator keys = store.get(clazz, PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
 		try {
-			CloseableIterator<T> ret = new CloseableIterator<T>() {
-				private int returned = 0;
-				private boolean closed = false;
-
-				@Override
-				public boolean hasNext() {
-					if (closed)
-						return false;
-					boolean ret = returned < limit && keys.hasNext();
-					if (! ret) 
-						this.close();
-					return ret;
-				}
-
-				@Override
-				public T next() {
-					if (!this.hasNext())
-						throw new NoSuchElementException();
-					Row data = keys.next();
-					try {
-						return createElementFromRow(clazz, toBeActivated, data);
-					} finally {
-						returned++;
-					}
-				}
-
-				@Override
-				public void remove() {
-					keys.remove();
-				}
-
-				@Override
-				public void close() {
-					if (closed)
-						return;
-					
-					keys.close();
-					this.closed = true;
-				}
-				
-				@Override
-				protected void finalize() throws Throwable {
-					this.close();
-					super.finalize();
-				}
-			};
+			CloseableIterator<T> ret = new SearchResultIterator<T>(clazz, limit, toBeActivated, keys);
 			return ret;
 		} catch (RuntimeException x) {
 			if (keys != null)
@@ -534,7 +559,8 @@ public aspect StorageManagement {
 			found.close();
 		}
 	}
-
+	
+	@Trigger
 	public static ConstraintBuilder findElements() {
 		return new ConstraintBuilder();
 	}
