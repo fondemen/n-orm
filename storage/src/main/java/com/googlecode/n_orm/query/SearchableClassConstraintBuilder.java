@@ -1,5 +1,8 @@
 package com.googlecode.n_orm.query;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -318,5 +321,20 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 		} else {
 			return ImportExport.exportPersistingElements(this.iterate(), out).getExportedElements();
 		}
+	}
+
+	/**
+	 * Runs the query to find at most N matching elements and serialize a representation into the output stream. The maximum limit N can be set before using {@link #withAtMost(int)}, but is not mandatory.
+	 * Dependencies are not serialized. Consider carefully setting families to be activated before ; it is advised to use {@link #andActivateAllFamilies()}.
+	 * Implementation tries to optimize as much as possible memory impact.
+	 * @param file the file where elements are to be stored ; overwritten if exists
+	 * @throws IOException 
+	 */
+	@Continuator
+	public long exportTo(String file) throws IOException, DatabaseNotReachedException {
+		File f = new File(file);
+		FileOutputStream fo = new FileOutputStream(f);
+		BufferedOutputStream bo = new BufferedOutputStream(fo);
+		return this.exportTo(bo);
 	}
 }

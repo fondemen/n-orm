@@ -5,6 +5,7 @@ import java.util.Date;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.console.shell.Shell;
 import com.googlecode.n_orm.console.util.PackageExplorer;
+import com.googlecode.n_orm.operations.ImportExport;
 
 public class Launcher
 {
@@ -19,6 +20,7 @@ public class Launcher
 		
 		Shell shell = new Shell();
 		shell.putEntryMapCommand(StorageManagement.class.getName(), StorageManagement.aspectOf());
+		shell.putEntryMapCommand(ImportExport.class.getName(), ImportExport.class);
 		shell.launch();
 	}
 }
