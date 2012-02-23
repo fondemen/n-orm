@@ -295,15 +295,13 @@ public class BasicTest {
 		 							.withKey("title").greaterOrEqualsThan("testtitle1")
 		 							.withAtMost(1000).elements().iterate();
 		 
-		 //Postamble before assertion so that it is always ran
-		 b2.delete();
-		 
 		 assertTrue(storeBooks.hasNext());
 		 Book found = storeBooks.next();
 		 assertFalse(storeBooks.hasNext());
 		 
 		 assertEquals(b2, found);
-		 
+
+		 b2.delete();
 		 storeBooks.close(); //Avoid forgetting closing iterators !
 	 }
 	 
