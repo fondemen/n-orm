@@ -16,6 +16,7 @@ import com.googlecode.n_orm.IncrementException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.conversion.ConversionTools;
 
 /**
@@ -105,6 +106,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	 * For this element to appear in the datastore, the owner object must be called the {@link PersistingElement#store()} method
 	 */
 	@Override
+	@Continuator
 	public boolean add(T o) {
 		if (o == null)
 			throw new NullPointerException("Set collection family " + this.getName() + " for persisting " + this.getOwner() + " does not support null values.");
@@ -134,6 +136,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
+	@Continuator
 	public boolean contains(final Object o) {
 		String id;
 		try {
@@ -153,6 +156,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	 * In the case it exists, the element is added as an activated element to the collection.
 	 */
 	@SuppressWarnings("unchecked")
+	@Continuator
 	public boolean containsInStore(final Object o) throws DatabaseNotReachedException {
 		String id;
 		try {
@@ -170,6 +174,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	 */
 	@SuppressWarnings("unchecked")
 	@Override
+	@Continuator
 	public boolean remove(Object o) {
 		String index = this.getIndex((T) o);
 		try {
@@ -250,6 +255,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	 * For those activated elements not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
 	 */
 	@Override
+	@Continuator
 	public void clear() {
 		this.removeAll(this);
 	}
@@ -266,6 +272,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	 * Supplies an array that contains activated values only.
 	 */
 	@Override
+	@Continuator
 	public Object[] toArray() {
 		return this.toArray(new Object[this.size()]);
 	}
@@ -297,6 +304,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	}
 
 	@Override
+	@Continuator
 	public int hashCode() {
 		int ret = 0;
 		Iterator<T> it = this.iterator();
@@ -308,6 +316,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
+	@Continuator
 	public void activate(Object from, Object to)
 			throws DatabaseNotReachedException {
 		if (from != null && ! this.getSetElementClazz().isInstance(from))

@@ -1,16 +1,16 @@
 package com.googlecode.n_orm.query;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-
 import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.ColumnFamiliyManagement;
@@ -26,6 +26,7 @@ import com.googlecode.n_orm.TimeoutCanceller;
 import com.googlecode.n_orm.WaitingCallBack;
 import com.googlecode.n_orm.operations.ImportExport;
 import com.googlecode.n_orm.operations.Process.ProcessReport;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.Store;
@@ -70,7 +71,8 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 			Field f) {
 		return new SearchableKeyConstraintBuilder<T>(this, f);
 	}
-
+	
+	@Continuator
 	public LimitConstraintBuilder<T> withAtMost(int limit) {
 		return new LimitConstraintBuilder<T>(this, limit);
 	}
@@ -79,6 +81,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * Requests for some more family activations while executing the query, in addition to simple properties and families marked as {@link ImplicitActivation}.
 	 * @param families the names of the families to be activated (i.e. name of the {@link Map} or {@link Set} property).
 	 */
+	@Continuator
 	public SearchableClassConstraintBuilder<T> andActivate(String... families) {
 		if (this.toBeActivated == null)
 			this.toBeActivated = families;
@@ -98,6 +101,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * This remark does not hold for properties, which are all
 	 * activated, regardless of the fact they are declared in this class or in a subclass.
 	 */
+	@Continuator
 	public SearchableClassConstraintBuilder<T> andActivateAllFamilies() {
 		Set<String> knownCfs = ColumnFamiliyManagement.getInstance().getColumnFamilies(getClazz()).keySet();
 		this.toBeActivated = knownCfs.toArray(new String[knownCfs.size()]);
@@ -112,6 +116,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @return element with given id and class ; null if not found
 	 * @throws DatabaseNotReachedException
 	 */
+	@Continuator
 	public T withId(String id) throws DatabaseNotReachedException {
 		T ret = StorageManagement.getElement(getClazz(), id);
 		if (toBeActivated != null)
@@ -125,6 +130,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
 	 * @throws DatabaseNotReachedException
 	 */
+	@Continuator
 	public NavigableSet<T> go() throws DatabaseNotReachedException {
 		if (hasNoLimit())
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
@@ -137,6 +143,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit, that has to be closed once performed.
 	 * @throws DatabaseNotReachedException
 	 */
+	@Continuator
 	public CloseableIterator<T> iterate() throws DatabaseNotReachedException {
 		if (hasNoLimit())
 			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
@@ -150,6 +157,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @return A (possibly null) element matching the query.
 	 * @throws DatabaseNotReachedException
 	 */
+	@Continuator
 	public T any()  throws DatabaseNotReachedException {
 		CloseableIterator<T> found = StorageManagement.findElement(this.getClazz(), this.getConstraint(), 1, this.toBeActivated);
 		try {
@@ -166,14 +174,17 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * Runs the query to find the number of matching elements.
 	 * Any limit set by {@link #withAtMost(int)} will be ignored.
 	 */
+	@Continuator
 	public long count() throws DatabaseNotReachedException {
 		return StorageManagement.countElements(this.getClazz(), this.getConstraint());
 	}
-
+	
+	@Continuator
 	public SearchableKeyConstraintBuilder<T> withKey(String key) {
 		return (SearchableKeyConstraintBuilder<T>) this.withKeyInt(key);
 	}
 
+	@Continuator
 	public SearchableKeyConstraintBuilder<T> andWithKey(String key) {
 		return this.withKey(key);
 	}
@@ -310,5 +321,20 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 		} else {
 			return ImportExport.exportPersistingElements(this.iterate(), out).getExportedElements();
 		}
+	}
+
+	/**
+	 * Runs the query to find at most N matching elements and serialize a representation into the output stream. The maximum limit N can be set before using {@link #withAtMost(int)}, but is not mandatory.
+	 * Dependencies are not serialized. Consider carefully setting families to be activated before ; it is advised to use {@link #andActivateAllFamilies()}.
+	 * Implementation tries to optimize as much as possible memory impact.
+	 * @param file the file where elements are to be stored ; overwritten if exists
+	 * @throws IOException 
+	 */
+	@Continuator
+	public long exportTo(String file) throws IOException, DatabaseNotReachedException {
+		File f = new File(file);
+		FileOutputStream fo = new FileOutputStream(f);
+		BufferedOutputStream bo = new BufferedOutputStream(fo);
+		return this.exportTo(bo);
 	}
 }
