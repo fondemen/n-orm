@@ -1,23 +1,25 @@
 package com.googlecode.n_orm.console.shell;
 
 import java.beans.PropertyDescriptor;
+import java.io.Closeable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.Stack;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.apache.commons.beanutils.ConvertUtils;
 import org.apache.commons.beanutils.PropertyUtils;
-import org.apache.commons.beanutils.PropertyUtilsBean;
 
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.consoleannotations.Continuator;
@@ -25,6 +27,30 @@ import com.googlecode.n_orm.consoleannotations.Trigger;
 
 public class ShellProcessor
 {
+	private static Set<Method> additionalMethods;
+	
+	static {
+		additionalMethods = new HashSet<Method>();
+		try {
+			additionalMethods.add(Object.class.getMethod("equals", Object.class));
+			additionalMethods.add(Object.class.getMethod("hashCode"));
+			additionalMethods.add(Comparable.class.getMethod("compareTo", Object.class));
+			additionalMethods.add(Collection.class.getMethod("add", Object.class));
+			additionalMethods.add(Collection.class.getMethod("remove", Object.class));
+			additionalMethods.add(Collection.class.getMethod("clear"));
+			additionalMethods.add(Collection.class.getMethod("contains", Object.class));
+			additionalMethods.add(Collection.class.getMethod("iterator"));
+			additionalMethods.add(Collection.class.getMethod("size"));
+			additionalMethods.add(Iterator.class.getMethod("hasNext"));
+			additionalMethods.add(Iterator.class.getMethod("next"));
+			additionalMethods.add(Closeable.class.getMethod("close"));
+		} catch (SecurityException e) {
+			e.printStackTrace();
+		} catch (NoSuchMethodException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	private final class ContextElement {
 		public final Object element;
 		public final String command;
@@ -78,7 +104,7 @@ public class ShellProcessor
 			// List all Trigger annotated methods
 			for (Object o : mapCommands.values())
 			{
-				for (Method m : o.getClass().getDeclaredMethods())
+				for (Method m : (o instanceof Class ? (Class<?>)o : o.getClass()).getDeclaredMethods())
 				{
 					if (m.getAnnotation(Trigger.class) != null)
 						processorCommands.put(m.getName(), m);
@@ -91,6 +117,11 @@ public class ShellProcessor
 			for (Method m : contextElement.getClass().getDeclaredMethods())
 			{
 				if (m.getAnnotation(Continuator.class) != null)
+					processorCommands.put(m.getName(), m);
+			}
+			//Adding additional methods if necessary
+			for (Method m : additionalMethods) {
+				if (m.getDeclaringClass().isInstance(contextElement))
 					processorCommands.put(m.getName(), m);
 			}
 			

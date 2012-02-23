@@ -456,61 +456,74 @@ public aspect StorageManagement {
 		return elt;
 	}
 	
-	public static <T extends PersistingElement> CloseableIterator<T> findElement(final Class<T> clazz, Constraint c, final int limit, String... families) throws DatabaseNotReachedException {
+	public static class SearchResultIterator<T extends PersistingElement> implements CloseableIterator<T> {
+		private final Class<T> clazz;
+		private final int limit;
+		private final Map<String, Field> toBeActivated;
+		private final CloseableKeyIterator keys;
+		private int returned = 0;
+		private boolean closed = false;
+		
+		public SearchResultIterator(Class<T> clazz, int limit, Map<String, Field> toBeActivated, CloseableKeyIterator keys) {
+			this.clazz = clazz;
+			this.limit = limit;
+			this.toBeActivated = toBeActivated;
+			this.keys = keys;
+		}
+
+		@Override
+		@Continuator
+		public boolean hasNext() {
+			if (closed)
+				return false;
+			boolean ret = returned < limit && keys.hasNext();
+			if (! ret) 
+				this.close();
+			return ret;
+		}
+
+		@Override
+		@Continuator
+		public T next() {
+			if (!this.hasNext())
+				throw new NoSuchElementException();
+			Row data = keys.next();
+			try {
+				return createElementFromRow(clazz, toBeActivated, data);
+			} finally {
+				returned++;
+			}
+		}
+
+		@Override
+		@Continuator
+		public void remove() {
+			keys.remove();
+		}
+
+		@Override
+		@Continuator
+		public void close() {
+			if (closed)
+				return;
+			
+			keys.close();
+			this.closed = true;
+		}
+		
+		@Override
+		protected void finalize() throws Throwable {
+			this.close();
+			super.finalize();
+		}
+	}
+	
+	public static <T extends PersistingElement> CloseableIterator<T> findElement(Class<T> clazz, Constraint c, int limit, String... families) throws DatabaseNotReachedException {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		final Map<String, Field> toBeActivated = families == null ? null : getAutoActivatedFamilies(clazz, families);
 		final CloseableKeyIterator keys = store.get(clazz, PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
 		try {
-			CloseableIterator<T> ret = new CloseableIterator<T>() {
-				private int returned = 0;
-				private boolean closed = false;
-
-				@Override
-				@Continuator
-				public boolean hasNext() {
-					if (closed)
-						return false;
-					boolean ret = returned < limit && keys.hasNext();
-					if (! ret) 
-						this.close();
-					return ret;
-				}
-
-				@Override
-				@Continuator
-				public T next() {
-					if (!this.hasNext())
-						throw new NoSuchElementException();
-					Row data = keys.next();
-					try {
-						return createElementFromRow(clazz, toBeActivated, data);
-					} finally {
-						returned++;
-					}
-				}
-
-				@Override
-				@Continuator
-				public void remove() {
-					keys.remove();
-				}
-
-				@Override
-				@Continuator
-				public void close() {
-					if (closed)
-						return;
-					
-					keys.close();
-					this.closed = true;
-				}
-				
-				@Override
-				protected void finalize() throws Throwable {
-					this.close();
-					super.finalize();
-				}
-			};
+			CloseableIterator<T> ret = new SearchResultIterator<T>(clazz, limit, toBeActivated, keys);
 			return ret;
 		} catch (RuntimeException x) {
 			if (keys != null)
