@@ -1614,10 +1614,34 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		return f;
 	}
 
-	protected Scan getScan(Constraint c, Map<String, Field> families) throws DatabaseNotReachedException {
+	protected Scan getScan(Constraint c, Class<? extends PersistingElement> clazz, Map<String, Field> families) throws DatabaseNotReachedException {
 		Scan s = new Scan();
-		if (this.scanCaching != null)
-			s.setCaching(this.getScanCaching());
+		
+		//Getting scan caching:
+		Integer caching = null;
+		//Grabbing the lowest values for all column families
+		if (families != null)
+			for (Field fam : families.values()) {
+				HBaseSchema ann = fam.getAnnotation(HBaseSchema.class);
+				if (ann != null) {
+					int famCaching = ann.scanCaching();
+					if (famCaching > 0 && (caching == null || famCaching < caching))
+						caching = famCaching;
+				}
+			}
+		//If not found, looking for the class value
+		if (caching == null && clazz != null) {
+			HBaseSchema ann = clazz.getAnnotation(HBaseSchema.class);
+			if (ann != null && ann.scanCaching() > 0)
+				caching = ann.scanCaching();
+		}
+		//If not found, looking for this store value
+		if (caching == null)
+			caching = this.getScanCaching();
+		//If there exists one, setting it
+		if (caching != null)
+			s.setCaching(caching);
+		
 		if (c != null && c.getStartKey() != null)
 			s.setStartRow(Bytes.toBytes(c.getStartKey()));
 		if (c != null && c.getEndKey() != null) {
@@ -1848,7 +1872,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (! this.hasTable(table))
 			return 0;
 		
-		return this.tryPerform(new CountAction(this, this.getScan(c, null)), type, table, null);
+		return this.tryPerform(new CountAction(this, this.getScan(c, type, null)), type, table, null);
 	}
 
 	@Override
@@ -1857,7 +1881,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (!this.hasTable(table))
 			return new EmptyCloseableIterator();
 		
-		Scan s = this.getScan(c, families);
+		Scan s = this.getScan(c, type, families);
 		s.setFilter(this.addFilter(s.getFilter(), new PageFilter(limit)));
 		
 		ResultScanner r = this.tryPerform(new ScanAction(s), type, table, families);
@@ -1870,7 +1894,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		logger.info("Truncating table " + table);
 		
-		TruncateAction action = new TruncateAction(this, this.getScan(c, null));
+		TruncateAction action = new TruncateAction(this, this.getScan(c, clazz, null));
 		this.tryPerform(action, clazz, table, null);
 		
 		logger.info("Truncated table " + table);
@@ -1890,7 +1914,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		try {
 			//Checking that cf are all there so that process will work
 			this.getTableDescriptor(elementClass, table, families);
-			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, families), action, elementClass, families.keySet().toArray(new String[families.size()]));
+			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, elementClass, families), action, elementClass, families.keySet().toArray(new String[families.size()]));
 			logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
 			if (callback != null) {
 				new Thread() {
