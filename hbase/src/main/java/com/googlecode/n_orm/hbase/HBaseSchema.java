@@ -43,6 +43,8 @@ public @interface HBaseSchema {
 	/**
 	 * Sets a default value for {@link Store#getScanCaching()} for this {@link PersistingElement} or {@link ColumnFamily}.
 	 * Value less or equal than 0 is equivalent to an unset value.
+	 * In case different column families are read at same time, the lowest value is taken.
+	 * In case a value is defined at family level for at least one of the activated families (see {@link PersistingElement#activate(String...)}), class- and store-level scan caching is ignored.
 	 */
 	int scanCaching() default -1;
 
