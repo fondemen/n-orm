@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -52,6 +53,7 @@ public aspect StoreSelector {
 	public static final String STORE_DRIVERCLASS_PROPERTY = "class";
 	public static final String STORE_DRIVERCLASS_SINGLETON_PROPERTY = "singleton";
 	public static final String STORE_DRIVERCLASS_STATIC_ACCESSOR = "static-accessor";
+	public static final String STORE_REFERENCE = "as-for-package";
 
 	private Map<String, Object> locks = new TreeMap<String, Object>();
 	private Map<String, StoreProperties> classStores = new TreeMap<String, StoreProperties>();
@@ -110,47 +112,71 @@ public aspect StoreSelector {
     
     private StoreProperties findPropertiesInt(Class<?> clazz) throws IOException {
     	synchronized (this.getLock(clazz)) {
-	    	File f = new File(clazz.getName().replace('.', '/') + ".class"), dir = f;
-	    	Properties res = new Properties();
+	    	File dir = new File(clazz.getName().replace('.', '/') /*+ ".class"*/).getParentFile();
 	    	//@ TODO: consider using thread group to find class loaders of all threads
-	    	ClassLoader [] loaders = {ClassLoader.getSystemClassLoader(), Thread.currentThread().getContextClassLoader(), clazz.getClassLoader()};
-	    	do {
-	    		StoreProperties ret;
-	    		
-	    		dir = dir.getParentFile();
-	    		if (dir == null)
-	    			throw new IOException("Cannot find storage properties for class " + clazz);
-	    		
-	    		String pack = dir.getPath().replace('/', '.').replace('\\', '.');
-	    		synchronized (getLock(pack)) {
-		    		ret = packageStores.get(pack);
-		    		if (ret != null) {
-		    			assert ret.pack.equals(pack) && ret.properties != null;
-		    			return ret;
-		    		}
-		    		
-		    		f = new File(dir, PROPERTY_FILE);
-		    		String path = f.getPath();
-		    		//Evil windows states that \ is a separator while / is expected by getResourceAsStream
-		    		if (File.separatorChar == '\\')
-		    			path = path.replace('\\', '/');
-		    		InputStream in = null;
-		    		for (ClassLoader loader : loaders) {
-						in = loader.getResourceAsStream(path);
-						if (in != null) break;
-					}
-		    			
-		    		if (in != null)
-			    		try {
-			    			res.load(in);
-			    			ret = new StoreProperties(res, pack);
-			    			packageStores.put(ret.pack, ret);
-			    			return ret;
-			    		} catch (IOException x) {
-			    		}
-	    		}
-	    	} while (true);
+	    	List<ClassLoader> classloaders = Arrays.asList(ClassLoader.getSystemClassLoader(), Thread.currentThread().getContextClassLoader(), clazz.getClassLoader());
+	    	
+	    	try {
+	    		StoreProperties ret = this.findPropertiesInt(dir, classloaders);
+	    		classStores.put(clazz.getName(), ret);
+	    		return ret;
+	    	} catch (IOException x) {
+	    		throw new IOException("Cannot find storage properties for class " + clazz, x.getCause());
+	    	}
     	}
+    }
+    
+    private StoreProperties findPropertiesInt(File dir, List<ClassLoader> classLoaders) throws IOException {
+		if (dir == null)
+			throw new IOException();
+    		
+		final String pack = dir.getPath().replace('/', '.').replace('\\', '.');
+		synchronized (getLock(pack)) {
+			StoreProperties ret = packageStores.get(pack);
+    		if (ret != null) {
+    			//assert ret.pack.equals(pack) && ret.properties != null; //Actually, not in case of a STORE_REFERENCE
+    			return ret;
+    		}
+    		
+    		File f = new File(dir, PROPERTY_FILE);
+    		String path = f.getPath();
+    		//Evil windows states that \ is a separator while / is expected by getResourceAsStream
+    		if (File.separatorChar == '\\')
+    			path = path.replace('\\', '/');
+    		InputStream in = null;
+    		for (ClassLoader loader : classLoaders) {
+				in = loader.getResourceAsStream(path);
+				if (in != null) break;
+			}
+    			
+    		if (in != null)
+	    		try {
+	    	    	Properties res = new Properties();
+	    			res.load(in);
+	    			
+	    			//Check whether this is a reference to another file
+	    			String ref = res.getProperty(STORE_REFERENCE);
+	    			if (ref != null) {
+	    				//Let's continue searching from the given path
+	    				dir = new File(ref.replace('.', '/').replace('\\', '/'), PROPERTY_FILE);
+	    			} else { //We found it and it's not an indirection
+		    			ret = new StoreProperties(res, pack);
+		    			packageStores.put(ret.pack, ret);
+		    			return ret;
+	    			}
+	    		} catch (IOException x) {
+	    		}
+		}
+		
+		//Not found ; let's try in the package above...
+		try {
+			StoreProperties ret = this.findPropertiesInt(dir.getParentFile(), classLoaders);
+			packageStores.put(pack, ret);
+			return ret;
+		} catch (IOException x) {
+			throw new IOException("Cannot find storage properties for package " + pack, x.getCause());
+		}
+    	
     }
     
     //For test purpose.
