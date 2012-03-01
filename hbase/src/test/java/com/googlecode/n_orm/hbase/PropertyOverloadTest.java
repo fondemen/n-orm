@@ -9,6 +9,7 @@ import java.util.TreeMap;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.StoreFile;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -51,15 +52,15 @@ public class PropertyOverloadTest {
 	
 	//Just a dummy class so that we've got something to give as parameter...
 	@Persisting
-	@HBaseSchema(compression="gz", forceInMemory=SettableBoolean.TRUE, inMemory=SettableBoolean.TRUE)
+	@HBaseSchema(compression="gz", forceInMemory=SettableBoolean.TRUE, inMemory=SettableBoolean.TRUE, scanCaching=1)
 	public static class Element extends DummyPersistingElement {
 		private static final long serialVersionUID = 1L;
 
 		@Key public String key = PropertyOverloadTest.key;
 		
 		public SetColumnFamily<String> defaultCf = new SetColumnFamily<String>();
-		@HBaseSchema(forceCompression=SettableBoolean.TRUE, inMemory=SettableBoolean.FALSE, bloomFilterType="ROW", blockCacheEnabled=SettableBoolean.FALSE, blockSize=1234, maxVersions=1, replicationScope=1, timeToLiveInSeconds=4321) public SetColumnFamily<String> overlodedCf = new SetColumnFamily<String>();
-		@HBaseSchema(bloomFilterType="dummy", blockSize=-34, maxVersions=-12, replicationScope=2, timeToLiveInSeconds=-13) public SetColumnFamily<String> dummyCf = new SetColumnFamily<String>();
+		@HBaseSchema(forceCompression=SettableBoolean.TRUE, inMemory=SettableBoolean.FALSE, bloomFilterType="ROW", blockCacheEnabled=SettableBoolean.FALSE, blockSize=1234, maxVersions=1, replicationScope=1, timeToLiveInSeconds=4321, scanCaching=2) public SetColumnFamily<String> overlodedCf = new SetColumnFamily<String>();
+		@HBaseSchema(bloomFilterType="dummy", blockSize=-34, maxVersions=-12, replicationScope=2, timeToLiveInSeconds=-13, scanCaching=3) public SetColumnFamily<String> dummyCf = new SetColumnFamily<String>();
 	}
 	
 	public void deleteTable() {
@@ -220,6 +221,36 @@ public class PropertyOverloadTest {
 		assertTrue(def.isInMemory()); //Was already the case ; default should not have changed at all
 		assertEquals(Algorithm.GZ, ovr.getCompression());
 		assertFalse(ovr.isInMemory());
+	}
+	
+	@Test
+	public void scanCaching() {
+		Scan s = store.getScan(null, Element.class, null);
+		assertEquals(1, s.getCaching());
+	}
+	
+	@Test
+	public void scanCachingSimpleFam() {
+		Scan s = store.getScan(null, Element.class, this.getChangedFields(true, false, false));
+		assertEquals(1, s.getCaching());
+	}
+	
+	@Test
+	public void scanCachingOverFam() {
+		Scan s = store.getScan(null, Element.class, this.getChangedFields(true, true, false));
+		assertEquals(2, s.getCaching());
+	}
+	
+	@Test
+	public void scanCachingOver2Fam() {
+		Scan s = store.getScan(null, Element.class, this.getChangedFields(true, true, true));
+		assertEquals(2, s.getCaching());
+	}
+	
+	@Test
+	public void scanCachingOverFam3Only() {
+		Scan s = store.getScan(null, Element.class, this.getChangedFields(false, false, true));
+		assertEquals(3, s.getCaching());
 	}
 
 }
