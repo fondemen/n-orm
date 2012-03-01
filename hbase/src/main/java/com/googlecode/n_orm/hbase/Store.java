@@ -1622,11 +1622,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		//Grabbing the lowest values for all column families
 		if (families != null)
 			for (Field fam : families.values()) {
-				HBaseSchema ann = fam.getAnnotation(HBaseSchema.class);
-				if (ann != null) {
-					int famCaching = ann.scanCaching();
-					if (famCaching > 0 && (caching == null || famCaching < caching))
-						caching = famCaching;
+				if (fam != null) {
+					HBaseSchema ann = fam.getAnnotation(HBaseSchema.class);
+					if (ann != null) {
+						int famCaching = ann.scanCaching();
+						if (famCaching > 0 && (caching == null || famCaching < caching))
+							caching = famCaching;
+					}
 				}
 			}
 		//If not found, looking for the class value
