@@ -16,6 +16,7 @@ import com.googlecode.n_orm.IncrementManagement;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
 
@@ -124,12 +125,14 @@ public abstract class ColumnFamily<T> {
 			throw new IllegalStateException("Column family " + this.getName() + " should be activated on " + this.getOwner() + " while " + messageToDescribeTheContextOfTheCheck);
 	}
 	
+	@Continuator
 	public void activate() throws DatabaseNotReachedException {
 		this.activate(null);
 	}
 	
 	public abstract void activate(Object from, Object to) throws DatabaseNotReachedException;
-	
+
+	@Continuator
 	public void activate(String fromIndex, String toIndex) throws DatabaseNotReachedException {
 		this.activate(new Constraint(fromIndex, toIndex));
 	}
@@ -162,6 +165,7 @@ public abstract class ColumnFamily<T> {
 	/**
 	 * Returns the number of activated elements.
 	 */
+	@Continuator
 	public int size() {
 		return this.collection.size();
 	}
@@ -189,6 +193,7 @@ public abstract class ColumnFamily<T> {
 		return !this.getOwner().getStore().exists(this.owner, this.property, this.ownerTable, this.getOwner().getIdentifier(), this.getName());
 	}
 
+	@Continuator
 	public boolean containsKey(String key) {
 		if (this.collection.containsKey(key))
 			return true;
@@ -227,6 +232,7 @@ public abstract class ColumnFamily<T> {
 	/**
 	 * The set of identifiers for activated elements.
 	 */
+	@Continuator
 	public Set<String> getKeys() {
 		return this.collection.keySet();
 	}
@@ -235,6 +241,7 @@ public abstract class ColumnFamily<T> {
 	 * Removes an element to the column family given its key.
 	 * For this element not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
 	 */
+	@Continuator
 	public void removeKey(String key) {
 		if (this.isAddOnly())
 			throw new IllegalStateException("This collection does not accepts removal.");
@@ -249,6 +256,7 @@ public abstract class ColumnFamily<T> {
 	/**
 	 * Finds an cached element according to its key.
 	 */
+	@Continuator
 	public T getElement(String key) {
 		T ret;
 		try {
@@ -272,6 +280,7 @@ public abstract class ColumnFamily<T> {
 	 * If the element is not in the cache, attempts to get it from the data store.
 	 * The found element goes into the cache.
 	 */
+	@Continuator
 	public T getFromStore(String key) throws DatabaseNotReachedException {
 		//First, tries from the cache
 		if (this.collection.containsKey(key))
@@ -292,32 +301,38 @@ public abstract class ColumnFamily<T> {
 		this.addToPOJO(this.getPOJO(true), key, element);
 		return element;
 	}
-	
+
+	@Continuator
 	public Set<String> changedKeySet() {
 		if (this.allChanged ) return this.getKeys();
 		return this.changes == null ? new TreeSet<String>() : this.changes.keySet();
 	}
-	
+
+	@Continuator
 	public Set<String> incrementedKeySet() {
 		return this.increments == null ? new TreeSet<String>() : this.increments.keySet();
 	}
-	
+
+	@Continuator
 	public boolean hasChanged() {
 		return this.allChanged
 				|| (this.changes != null && !this.changes.isEmpty())
 				|| (this.increments != null && !this.increments.isEmpty());
 	}
-	
+
+	@Continuator
 	public boolean wasChanged(String key) {
 		return this.allChanged
 				|| (this.changes != null && this.changes.containsKey(key)&& this.changes.get(key).equals(ChangeKind.SET))
 				|| (this.increments != null && this.increments.containsKey(key));
 	}
-	
+
+	@Continuator
 	public boolean wasDeleted(String key) {
 		return !this.allChanged && this.changes != null && this.changes.containsKey(key)&& this.changes.get(key).equals(ChangeKind.DELETE);
 	}
-	
+
+	@Continuator
 	public Number getIncrement(String key) {
 		return this.increments == null ? null : this.increments.containsKey(key) ? this.increments.get(key) : null;
 	}

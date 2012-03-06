@@ -57,9 +57,11 @@ import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.io.hfile.Compression;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
+import org.apache.hadoop.hbase.regionserver.StoreFile;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.recipes.lock.SharedExclusiveLock;
@@ -301,8 +303,25 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	private Algorithm compression;
 	private boolean forceCompression = false;
 	
-	private boolean inMemory = false;
+	private Boolean inMemory = null;
 	private boolean forceInMemory = false;
+	
+	private Integer timeToLiveSeconds = null;
+	private boolean forceTimeToLive = false;
+	
+	private Integer maxVersions = null;
+	private boolean forceMaxVersions = false;
+	
+	private StoreFile.BloomType bloomFilterType = null;
+	private boolean forceBloomFilterType = false;
+
+	private Boolean blockCacheEnabled = null;
+	private boolean forceBlockCacheEnabled = false;
+	private Integer blockSize = null;
+	private boolean forceBlockSize = false;
+	
+	private Integer replicationScope = null;
+	private boolean forceReplicationScope = false;
 	
 	private boolean countMapRed = false;
 	private boolean truncateMapRed = false;
@@ -534,7 +553,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 
 	/**
 	 * Whether existing columns have to be altered if they don't use the correct compressor.
-	 * see {@link #getCompression()}
+	 * @see #getCompression()
 	 */
 	public boolean isForceCompression() {
 		return forceCompression;
@@ -544,9 +563,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	/**
 	 * Whether existing columns have to be altered if they don't use the correct compressor.
 	 * Default value is false.
-	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #setForceCompression(boolean)} to true and different values for {@link Store#setCompression(String)} : column families might be altered in an endless loop !
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceCompression()} to true and different values for {@link Store#getCompression()} : column families might be altered in an endless loop !
 	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
-	 * see {@link #getCompression()}
+	 * @see #getCompression()
 	 */
 	public void setForceCompression(boolean forceCompression) {
 		this.forceCompression = forceCompression;
@@ -555,21 +574,22 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	/**
 	 * Whether created tables should have {@link HColumnDescriptor#setInMemory(boolean)} set. 
 	 */
-	public boolean isInMemory() {
+	public Boolean isInMemory() {
 		return inMemory;
 	}
 
 	/**
 	 * Whether created tables should have {@link HColumnDescriptor#setInMemory(boolean)} set.
 	 * Default value is false.
+	 * null is considered as unset (i.e. the default value)
 	 */
-	public void setInMemory(boolean inMemory) {
+	public void setInMemory(Boolean inMemory) {
 		this.inMemory = inMemory;
 	}
 
 	/**
 	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setInMemory(boolean)} setting.
-	 * see {@link #isInMemory()()}
+	 * @see #isInMemory()
 	 */
 	public boolean isForceInMemory() {
 		return forceInMemory;
@@ -577,12 +597,216 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 
 	/**
 	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setInMemory(boolean)} setting.
-	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #setForceInMemory(boolean)} to true and different values for {@link Store#setCompression(String)} : column families might be altered in an endless loop !
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceInMemory()} to true and different values for {@link Store#getCompression()} : column families might be altered in an endless loop !
 	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
-	 * see {@link #isInMemory()()}
+	 * @see #isInMemory()
 	 */
 	public void setForceInMemory(boolean forceInMemory) {
 		this.forceInMemory = forceInMemory;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setTimeToLive(int)} set. 
+	 */
+	public Integer getTimeToLiveSeconds() {
+		return timeToLiveSeconds;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setTimeToLive(int)} set.
+	 * Default value is {@link HColumnDescriptor#DEFAULT_TTL}
+	 * null or value &lt= 0 is considered as unset (i.e. the default value).
+	 */
+	public void setTimeToLiveSeconds(Integer timeToLiveSeconds) {
+		this.timeToLiveSeconds = timeToLiveSeconds;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setTimeToLive(int)} setting.
+	 * @see #getTimeToLiveSeconds()
+	 */
+	public boolean isForceTimeToLive() {
+		return forceTimeToLive;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setTimeToLive(int)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceTimeToLive()} to true and different values for {@link Store#getTimeToLiveSeconds()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getTimeToLiveSeconds()
+	 */
+	public void setForceTimeToLive(boolean forceTimeToLive) {
+		this.forceTimeToLive = forceTimeToLive;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setMaxVersions(int)} set. 
+	 */
+	public Integer getMaxVersions() {
+		return maxVersions;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setMaxVersions(int)} set.
+	 * Default value is {@link HColumnDescriptor#DEFAULT_VERSIONS}
+	 * null or value &lt= 0 is considered as unset (i.e. the default value).
+	 */
+	public void setMaxVersions(Integer maxVersions) {
+		this.maxVersions = maxVersions;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setMaxVersions(int)} setting.
+	 * @see #getMaxVersions()
+	 */
+	public boolean isForceMaxVersions() {
+		return forceMaxVersions;
+	}
+	
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setMaxVersions(int)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceMaxVersions()} to true and different values for {@link Store#getMaxVersions()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getMaxVersions()
+	 */
+	public void setForceMaxVersions(boolean forceMaxVersions) {
+		this.forceMaxVersions = forceMaxVersions;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBloomFilterType(org.apache.hadoop.hbase.regionserver.StoreFile.BloomType)} set. 
+	 */
+	public StoreFile.BloomType getBloomFilterType() {
+		return bloomFilterType;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBloomFilterType(org.apache.hadoop.hbase.regionserver.StoreFile.BloomType)} set.
+	 * Default value is equivalent to {@link HColumnDescriptor#DEFAULT_BLOOMFILTER}
+	 * null is considered as unset (i.e. the default value).
+	 */
+	public void setBloomFilterType(StoreFile.BloomType bloomFilterType) {
+		this.bloomFilterType = bloomFilterType;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBloomFilterType(org.apache.hadoop.hbase.regionserver.StoreFile.BloomType)} setting.
+	 * @see #getBloomFilterType()
+	 */
+	public boolean isForceBloomFilterType() {
+		return forceBloomFilterType;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBloomFilterType(org.apache.hadoop.hbase.regionserver.StoreFile.BloomType)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceBloomFilterType()} to true and different values for {@link Store#getBloomFilterType()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getBloomFilterType()
+	 */
+	public void setForceBloomFilterType(boolean forceBloomFilterType) {
+		this.forceBloomFilterType = forceBloomFilterType;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBlockCacheEnabled(boolean)} set. 
+	 */
+	public Boolean getBlockCacheEnabled() {
+		return blockCacheEnabled;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBlockCacheEnabled(boolean)} set.
+	 * Default value is equivalent to {@link HColumnDescriptor#DEFAULT_BLOCKCACHE}
+	 * null is considered as unset (i.e. the default value).
+	 */
+	public void setBlockCacheEnabled(Boolean blockCacheEnabled) {
+		this.blockCacheEnabled = blockCacheEnabled;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBlockCacheEnabled(boolean)} setting.
+	 * @see #getBlockCacheEnabled()
+	 */
+	public boolean isForceBlockCacheEnabled() {
+		return forceBlockCacheEnabled;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBlockCacheEnabled(boolean)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceBlockCacheEnabled()} to true and different values for {@link Store#getBlockCacheEnabled()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getBlockCacheEnabled()
+	 */
+	public void setForceBlockCacheEnabled(boolean forceBlockCacheEnabled) {
+		this.forceBlockCacheEnabled = forceBlockCacheEnabled;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBlocksize(int)} set. 
+	 */
+	public Integer getBlockSize() {
+		return blockSize;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBlocksize(int)} set.
+	 * Default value is equivalent to {@link HColumnDescriptor#DEFAULT_BLOCKSIZE}
+	 * null is considered as unset (i.e. the default value).
+	 */
+	public void setBlockSize(Integer blockSize) {
+		this.blockSize = blockSize;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBlocksize(int)} setting.
+	 * @see #getBlockCacheEnabled()
+	 */
+	public boolean isForceBlockSize() {
+		return forceBlockSize;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBlocksize(int)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceBlockSize()} to true and different values for {@link Store#getBlockSize()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getBlockSize()
+	 */
+	public void setForceBlockSize(boolean forceBlockSize) {
+		this.forceBlockSize = forceBlockSize;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setScope(int)} set. 
+	 */
+	public Integer getReplicationScope() {
+		return replicationScope;
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setScope(int)} set.
+	 * Default value is equivalent to {@link HColumnDescriptor#DEFAULT_REPLICATION_SCOPE}
+	 * null or &lt= 0 or &gt=2 is considered as unset (i.e. the default value).
+	 */
+	public void setReplicationScope(Integer replicationScope) {
+		this.replicationScope = replicationScope;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setScope(int)} setting.
+	 * @see #getReplicationScope()
+	 */
+	public boolean isForceReplicationScope() {
+		return forceReplicationScope;
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setScope(int)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceReplicationScope()} to true and different values for {@link Store#getReplicationScope()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getReplicationScope()
+	 */
+	public void setForceReplicationScope(boolean forceReplicationScope) {
+		this.forceReplicationScope = forceReplicationScope;
 	}
 
 	/**
@@ -940,14 +1164,20 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
 					String dir = "/n-orm/schemalock/" + table;
 					if (zk.exists("/n-orm", false) == null)  {
-						zk.create("/n-orm", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+						try {
+							zk.create("/n-orm", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+						} catch (NodeExistsException x){}
 					}
 					if (zk.exists("/n-orm/schemalock", false) == null)  {
-						zk.create("/n-orm/schemalock", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+						try {
+							zk.create("/n-orm/schemalock", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+						} catch (NodeExistsException x){}
 					}
 					if (zk.exists(dir, false) == null) {
-						String node = zk.create(dir, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-						logger.info("Created lock node " + node);
+						try {
+							String node = zk.create(dir, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+							logger.info("Created lock node " + node);
+						} catch (NodeExistsException x){}
 					}
 					ret = new SharedExclusiveLock(zk, dir);
 					this.locks.put(table, ret);
@@ -1391,10 +1621,36 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		return f;
 	}
 
-	protected Scan getScan(Constraint c, Map<String, Field> families) throws DatabaseNotReachedException {
+	protected Scan getScan(Constraint c, Class<? extends PersistingElement> clazz, Map<String, Field> families) throws DatabaseNotReachedException {
 		Scan s = new Scan();
-		if (this.scanCaching != null)
-			s.setCaching(this.getScanCaching());
+		
+		//Getting scan caching:
+		Integer caching = null;
+		//Grabbing the lowest values for all column families
+		if (families != null)
+			for (Field fam : families.values()) {
+				if (fam != null) {
+					HBaseSchema ann = fam.getAnnotation(HBaseSchema.class);
+					if (ann != null) {
+						int famCaching = ann.scanCaching();
+						if (famCaching > 0 && (caching == null || famCaching < caching))
+							caching = famCaching;
+					}
+				}
+			}
+		//If not found, looking for the class value
+		if (caching == null && clazz != null) {
+			HBaseSchema ann = clazz.getAnnotation(HBaseSchema.class);
+			if (ann != null && ann.scanCaching() > 0)
+				caching = ann.scanCaching();
+		}
+		//If not found, looking for this store value
+		if (caching == null)
+			caching = this.getScanCaching();
+		//If there exists one, setting it
+		if (caching != null)
+			s.setCaching(caching);
+		
 		if (c != null && c.getStartKey() != null)
 			s.setStartRow(Bytes.toBytes(c.getStartKey()));
 		if (c != null && c.getEndKey() != null) {
@@ -1625,7 +1881,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (! this.hasTable(table))
 			return 0;
 		
-		return this.tryPerform(new CountAction(this, this.getScan(c, null)), type, table, null);
+		return this.tryPerform(new CountAction(this, this.getScan(c, type, null)), type, table, null);
 	}
 
 	@Override
@@ -1634,7 +1890,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (!this.hasTable(table))
 			return new EmptyCloseableIterator();
 		
-		Scan s = this.getScan(c, families);
+		Scan s = this.getScan(c, type, families);
 		s.setFilter(this.addFilter(s.getFilter(), new PageFilter(limit)));
 		
 		ResultScanner r = this.tryPerform(new ScanAction(s), type, table, families);
@@ -1647,7 +1903,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		logger.info("Truncating table " + table);
 		
-		TruncateAction action = new TruncateAction(this, this.getScan(c, null));
+		TruncateAction action = new TruncateAction(this, this.getScan(c, clazz, null));
 		this.tryPerform(action, clazz, table, null);
 		
 		logger.info("Truncated table " + table);
@@ -1667,7 +1923,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		try {
 			//Checking that cf are all there so that process will work
 			this.getTableDescriptor(elementClass, table, families);
-			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, families), action, elementClass, families.keySet().toArray(new String[families.size()]));
+			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, elementClass, families), action, elementClass, families.keySet().toArray(new String[families.size()]));
 			logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
 			if (callback != null) {
 				new Thread() {
