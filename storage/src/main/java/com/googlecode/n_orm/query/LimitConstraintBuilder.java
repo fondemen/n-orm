@@ -1,6 +1,7 @@
 package com.googlecode.n_orm.query;
 
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 
 public class LimitConstraintBuilder<T extends PersistingElement> {
 	private final SearchableClassConstraintBuilder<T> constraintBuilder;
@@ -12,6 +13,7 @@ public class LimitConstraintBuilder<T extends PersistingElement> {
 		this.limit = limit;
 	}
 	
+	@Continuator
 	public SearchableClassConstraintBuilder<T> elements() {
 		this.constraintBuilder.setLimit(this.limit);
 		return this.constraintBuilder;

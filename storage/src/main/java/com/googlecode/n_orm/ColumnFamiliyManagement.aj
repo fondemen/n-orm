@@ -24,6 +24,7 @@ import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.cf.SetColumnFamily;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 
 
 public aspect ColumnFamiliyManagement {
@@ -72,6 +73,7 @@ public aspect ColumnFamiliyManagement {
 		return Collections.unmodifiableSet(this.getColumnFamiliesInt().keySet());
 	}
 	
+	@Continuator
 	public ColumnFamily<?> PersistingElement.getColumnFamily(String name) throws UnknownColumnFamily {
 		ColumnFamily<?> ret = this.getColumnFamiliesInt().get(name);
 		if (ret == null)

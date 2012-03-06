@@ -3,6 +3,7 @@ package com.googlecode.n_orm.query;
 import java.lang.reflect.Field;
 
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 
 public class InnerClassConstraintBuilder<T extends PersistingElement> extends ClassConstraintBuilder<T> {
 	private final ClassConstraintBuilder<T> constraintBuilder;
@@ -22,6 +23,7 @@ public class InnerClassConstraintBuilder<T extends PersistingElement> extends Cl
 	}
 
 	@SuppressWarnings("unchecked")
+	@Continuator
 	public SearchableClassConstraintBuilder<T> and() {
 		this.constraintBuilder.setSubConstraint(key, this.getConstraint());
 		if (this.constraintBuilder instanceof SearchableClassConstraintBuilder)
@@ -33,10 +35,12 @@ public class InnerClassConstraintBuilder<T extends PersistingElement> extends Cl
 		return null;
 	}
 
+	@Continuator
 	public InnerKeyConstraintBuilder<T> withKey(String key) {
 		return (InnerKeyConstraintBuilder<T>) super.withKeyInt(key);
 	}
 
+	@Continuator
 	public InnerKeyConstraintBuilder<T> andWithKey(String key) {
 		return this.withKey(key);
 	}
