@@ -21,6 +21,7 @@ import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.storeapi.SimpleStore;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.storeapi.Store;
 
 /**
@@ -154,12 +155,14 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #getIdentifier()
 	 * @see SimpleStore
 	 */
+	@Continuator
 	void store() throws DatabaseNotReachedException;
 	
 	/**
 	 * Deletes rows representing this persisting element in the store.
 	 * @see #store()
 	 */
+	@Continuator
 	void delete() throws DatabaseNotReachedException;
 	
 	/**
@@ -194,6 +197,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * Rows used to store this element in table  for its super-classes are not tested.
 	 * @see #store()
 	 */
+	@Continuator
 	boolean existsInStore() throws DatabaseNotReachedException;
 
 	/**
@@ -235,6 +239,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws DatabaseNotReachedException
 	 * @see #getColumnFamily(String)
 	 */
+	@Continuator
 	void activateColumnFamily(String name) throws UnknownColumnFamily, DatabaseNotReachedException;
 
 	/**
@@ -246,6 +251,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws DatabaseNotReachedException
 	 * @see #getColumnFamily(String)
 	 */
+	@Continuator
 	void activateColumnFamily(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
 	/**
@@ -309,6 +315,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * This method make possible to use persisting elements in {@link java.util.Hashtable}s, {@link java.util.HashMap}s or  {@link java.util.HashSet}s.
 	 * @see Object#hashCode()
 	 */
+	@Continuator
 	int hashCode();
 	
 	/**

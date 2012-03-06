@@ -3,6 +3,7 @@ package com.googlecode.n_orm.query;
 import java.lang.reflect.Field;
 
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 
 public abstract class KeyConstraintBuilder<T extends PersistingElement> {
 	private final ClassConstraintBuilder<T> constraintBuilder;
@@ -40,6 +41,7 @@ public abstract class KeyConstraintBuilder<T extends PersistingElement> {
 		return this.constraintBuilder;
 	}
 
+	@Continuator
 	public InnerClassConstraintBuilder<T> isAnElement() {
 		return new InnerClassConstraintBuilder<T>(key, this.constraintBuilder);
 	}

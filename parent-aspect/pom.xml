@@ -11,11 +11,6 @@
 	<name>n-orm aspect parent pom</name>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
-	<properties>
-		<aspectj.version>1.6.12</aspectj.version>
-		<aspectj.plugin.version>1.4</aspectj.plugin.version>
-	</properties>
-
 	<scm>
 		<connection>scm:hg:http://n-orm.googlecode.com/hg/</connection>
 		<developerConnection>scm:hg:https://n-orm.googlecode.com/hg/</developerConnection>
