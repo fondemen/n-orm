@@ -61,6 +61,7 @@ import org.apache.hadoop.hbase.regionserver.StoreFile;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.recipes.lock.SharedExclusiveLock;
@@ -1163,14 +1164,20 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
 					String dir = "/n-orm/schemalock/" + table;
 					if (zk.exists("/n-orm", false) == null)  {
-						zk.create("/n-orm", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+						try {
+							zk.create("/n-orm", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+						} catch (NodeExistsException x){}
 					}
 					if (zk.exists("/n-orm/schemalock", false) == null)  {
-						zk.create("/n-orm/schemalock", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+						try {
+							zk.create("/n-orm/schemalock", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+						} catch (NodeExistsException x){}
 					}
 					if (zk.exists(dir, false) == null) {
-						String node = zk.create(dir, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-						logger.info("Created lock node " + node);
+						try {
+							String node = zk.create(dir, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+							logger.info("Created lock node " + node);
+						} catch (NodeExistsException x){}
 					}
 					ret = new SharedExclusiveLock(zk, dir);
 					this.locks.put(table, ret);
