@@ -140,8 +140,8 @@
 		<profile>
 			<id>hbase-cdh</id>
 			<properties>
-				<hbase.version>0.90.4-cdh3u2</hbase.version>
-				<hadoop.version>0.20.2-cdh3u2</hadoop.version>
+				<hbase.version>0.90.4-cdh3u3</hbase.version>
+				<hadoop.version>0.20.2-cdh3u3</hadoop.version>
 			</properties>
 
 			<repositories>
