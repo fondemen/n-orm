@@ -40,7 +40,9 @@ public class HBase {
 		"org.apache.commons.logging.LogFactory",
 		"org.apache.commons.lang.StringUtils",
 		"org.apache.log4j.Logger",
-		"org.codehaus.jackson.map.JsonMappingException"
+		"org.codehaus.jackson.map.JsonMappingException",
+		"com.google.common.base.Predicate",
+		null //Loading Hadoop's patched guava yet not checking it's there (only required by CDH)
 	};
 	public static final String[] HBaseDependenciesJarFilters = {
 		"zookeeper*.jar,lib/zookeeper*.jar",
@@ -49,7 +51,9 @@ public class HBase {
 		"commons-logging*.jar,lib/commons-logging*.jar",
 		"commons-lang*.jar,lib/commons-lang*.jar",
 		"log4j*.jar,lib/log4j*.jar",
-		"jackson*.jar,lib/jackson*.jar"
+		"jackson*.jar,lib/jackson*.jar",
+		"guava*.jar,lib/guava*.jar",
+		"guava*jar.jar,lib/guava*jar.jar"
 	};
 
 	public static final Logger logger;
@@ -149,16 +153,25 @@ public class HBase {
 
 	private static void checkConfiguration() throws ClassNotFoundException {
 		for (String clazz : HBaseDependencies) {
-			ClassLoader.getSystemClassLoader().loadClass(clazz);
+			if (clazz != null)
+				ClassLoader.getSystemClassLoader().loadClass(clazz);
 		}
 	}
 
 	private static String createFilters() {
 		StringBuffer ret = new StringBuffer();
 		for (int i = 0; i < HBaseDependencies.length; ++i) {
-			try {
-				ClassLoader.getSystemClassLoader().loadClass(HBaseDependencies[i]);
-			} catch (ClassNotFoundException x) {
+			boolean load = false;
+			if (HBaseDependencies[i] == null)
+				load = true;
+			else
+				try {
+					ClassLoader.getSystemClassLoader().loadClass(HBaseDependencies[i]);
+				} catch (ClassNotFoundException x) {
+					load = true;
+				}
+			
+			if(load) {
 				ret.append(',');
 				ret.append(HBaseDependenciesJarFilters[i]);
 			}
