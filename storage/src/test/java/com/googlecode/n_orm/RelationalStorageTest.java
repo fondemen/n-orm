@@ -112,8 +112,8 @@ public class RelationalStorageTest {
 	}
 	
 	@Persisting(table="PC") public static class PersistingComposed {
-		@Key @ImplicitActivation public  String key;
-		public @ImplicitActivation Composed3Elements value;
+		@Key public  String key;
+		public Composed3Elements value;
 		public PersistingComposed(String key) {
 			super();
 			this.key = key;

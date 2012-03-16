@@ -10,6 +10,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.memory.ExclusiveOperations.Blocker;
 import com.googlecode.n_orm.memory.Memory.Table.Row;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
@@ -50,9 +51,11 @@ public class Memory implements SimpleStore {
 		}
 	}
 
-	@SuppressWarnings("serial")
 	private abstract class LazyHash<T> {
-		protected ReentrantReadWriteLock generalLock = new ReentrantReadWriteLock();
+		protected static final byte OP_READ = (byte)1;
+		protected static final byte OP_UPDATE = (byte)2;
+		
+		protected ExclusiveOperations generalLock = new ExclusiveOperations();
 		protected Map<String, T> map = new TreeMap<String, T>();
 		private Map<String, ReentrantReadWriteLock> locks = new TreeMap<String, ReentrantReadWriteLock>();
 		
@@ -88,7 +91,12 @@ public class Memory implements SimpleStore {
 				ret = map.get(key);
 				if (ret == null) {
 					ret = this.newElement((String) key);
-					map.put((String) key, ret);
+					Blocker gl = generalLock.softenedStart(OP_UPDATE);
+					try {
+						map.put((String) key, ret);
+					} finally {
+						gl.leave();
+					}
 				}
 				return ret;
 			} finally {
@@ -107,13 +115,13 @@ public class Memory implements SimpleStore {
 		}
 		
 		public final T put(String key, T value) {
-			generalLock.readLock().lock();
 			ReentrantReadWriteLock lock = this.getLock(key);
 			lock.writeLock().lock();
+			Blocker gl = generalLock.softenedStart(OP_UPDATE);
 			try {
 				return map.put(key, value);
 			} finally {
-				generalLock.readLock().unlock();
+				gl.leave();
 				lock.writeLock().unlock();
 			}
 		}
@@ -126,11 +134,11 @@ public class Memory implements SimpleStore {
 			}
 			ReentrantReadWriteLock lock = this.getLock(key);
 			lock.writeLock().lock();
-			generalLock.readLock().lock();
+			Blocker gl = generalLock.softenedStart(OP_UPDATE);
 			try {
 				return map.remove(key);
 			} finally {
-				generalLock.readLock().unlock();
+				gl.leave();
 				lock.writeLock().unlock();
 				synchronized(locks) {
 					locks.remove(key);
@@ -139,11 +147,15 @@ public class Memory implements SimpleStore {
 		}
 		
 		public final Set<String> getKeys() {
-			generalLock.writeLock().lock();
+			Blocker gl = generalLock.softenedStart(OP_READ);
 			try {
-				return new TreeSet<String>(map.keySet());
+				TreeSet<String> ret = new TreeSet<String>();
+				for (String key : map.keySet()) {
+					ret.add(key);
+				}
+				return ret;
 			} finally {
-				generalLock.writeLock().unlock();
+				gl.leave();
 			}
 		}
 		
@@ -172,7 +184,6 @@ public class Memory implements SimpleStore {
 		}
 	}
 
-	@SuppressWarnings("serial")
 	public class Table extends LazyHash<Table.Row> {
 		public class Row extends LazyHash<Row.ColumnFamily> implements com.googlecode.n_orm.storeapi.Row {
 			public final String key;
@@ -193,11 +204,11 @@ public class Memory implements SimpleStore {
 					return new byte[0];
 				}
 
-				public synchronized void incr(String key, Number increment) {
+				public void incr(String key, Number increment) {
 					assert increment.longValue() != 0 : "Received a 0 increment for table" + Table.this.name + ", row " + Row.this.key + ", family " + this.name + ", qualifier " + key; 
-					generalLock.readLock().lock();
 					ReentrantReadWriteLock lock = this.getLock(key);
 					lock.writeLock().lock();
+					Blocker gl = generalLock.softenedStart(OP_UPDATE);
 					try {
 						byte [] val = this.map.get(key);
 						if (val == null) {
@@ -225,7 +236,7 @@ public class Memory implements SimpleStore {
 						}
 						this.map.put(key, val);
 					} finally {
-						generalLock.readLock().unlock();
+						gl.leave();
 						lock.writeLock().unlock();
 					}
 				}
