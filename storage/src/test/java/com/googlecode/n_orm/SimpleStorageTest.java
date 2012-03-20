@@ -179,24 +179,24 @@ public class SimpleStorageTest {
 
 	@Test
 	public void soreNoTransientProperties() {
-		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("tProp1"));
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable(), false).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("tProp1"));
 	}
 
 	@Test
 	public void soreNoAnnotatedTransientProperties() {
-		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("tProp2"));
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable(), false).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("tProp2"));
 	}
 
 	@Test
 	public void soreNoPojoProperty() {
-		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("ajc$interField$com_googlecode_n_orm_ColumnFamiliyManagement$com_googlecode_n_orm_PersistingElement$inPOJOMode"));
-		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("inPOJOMode"));
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable(), false).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("ajc$interField$com_googlecode_n_orm_ColumnFamiliyManagement$com_googlecode_n_orm_PersistingElement$inPOJOMode"));
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable(), false).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("inPOJOMode"));
 	}
 
 	@Test
 	public void soreNoKeyInProperties() {
-		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("key1"));
-		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("key2"));
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable(), false).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("key1"));
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable(), false).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("key2"));
 	}
 
 	@Test
@@ -209,8 +209,8 @@ public class SimpleStorageTest {
 		assertArrayEquals(new String [] {"ik21", "ik22"}, ConversionTools.convert(String[].class, Memory.INSTANCE.get(
 				this.sutH.getTable(), this.sutH.getIdentifier(),
 				PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "key2")));
-		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("key1"));
-		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("key2"));
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable(), false).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("key1"));
+		assertFalse(Memory.INSTANCE.getTable(sut1.getTable(), false).get(sut1.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("key2"));
 	}
 
 	@Test
@@ -459,17 +459,17 @@ public class SimpleStorageTest {
 		s.prop2 = false;
 		s.store();
 		Memory.INSTANCE.resetQueries();
-		assertTrue(Memory.INSTANCE.getTable(s.getTable()).contains(s.getIdentifier()));
-		assertTrue(Memory.INSTANCE.getTable(sut1.getTable()).contains(s.getFullIdentifier()));
+		assertTrue(Memory.INSTANCE.getTable(s.getTable(), false).contains(s.getIdentifier()));
+		assertTrue(Memory.INSTANCE.getTable(sut1.getTable(), false).contains(s.getFullIdentifier()));
 //		assertTrue(Memory.INSTANCE.getTable(sut1.getTable()).get(s.getFullIdentifier()).containsKey(StorageManagement.CLASS_COLUMN_FAMILY));
 //		assertTrue(Memory.INSTANCE.getTable(sut1.getTable()).get(s.getFullIdentifier()).get(StorageManagement.CLASS_COLUMN_FAMILY).containsKey(StorageManagement.CLASS_COLUMN));
 //		assertFalse(Memory.INSTANCE.getTable(sut1.getTable()).get(s.getFullIdentifier()).get(StorageManagement.CLASS_COLUMN_FAMILY).containsKey(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 //		assertEquals(s.getClass().getName(), ConversionTools.convert(String.class, Memory.INSTANCE.getTable(sut1.getTable()).get(s.getFullIdentifier()).get(StorageManagement.CLASS_COLUMN_FAMILY).get(StorageManagement.CLASS_COLUMN)));
 //		assertFalse(Memory.INSTANCE.getTable(s.getTable()).get(s.getIdentifier()).containsKey(StorageManagement.CLASS_COLUMN_FAMILY));
-		assertTrue(Memory.INSTANCE.getTable(s.getTable()).get(s.getIdentifier()).contains(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		assertTrue(Memory.INSTANCE.getTable(s.getTable(), false).get(s.getIdentifier()).contains(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		//Keys are not supposed to be stored as a property in this case
-		assertFalse(Memory.INSTANCE.getTable(s.getTable()).get(s.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("key1"));
-		assertEquals(s.prop1, ConversionTools.convert(String.class, Memory.INSTANCE.getTable(s.getTable()).get(s.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).get("prop1")));
+		assertFalse(Memory.INSTANCE.getTable(s.getTable(), false).get(s.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).contains("key1"));
+		assertEquals(s.prop1, ConversionTools.convert(String.class, Memory.INSTANCE.getTable(s.getTable(), false).get(s.getIdentifier()).get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME).get("prop1").getBytes()));
 	}
 	
 	@Test
