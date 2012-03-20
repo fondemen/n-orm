@@ -175,7 +175,7 @@ public class RelationalStorageTest {
 		out.val = in;
 		out.store(); //Should not store anything
 		assertEquals("inside" + ke, ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
-		assertFalse(Memory.INSTANCE.getTable("Inside").contains("inside" + ke)); //memory was reseted ; in was not stored for it thought it was not changed and in store
+		assertFalse(Memory.INSTANCE.getTable("Inside", true).contains("inside" + ke)); //memory was reseted ; in was not stored for it thought it was not changed and in store
 	}
 	
 	@Persisting(table="Outside") public static class PersistingOutsideExplicit {
@@ -193,9 +193,9 @@ public class RelationalStorageTest {
 		PersistingOutsideExplicit out = new PersistingOutsideExplicit("outside");
 		out.val = in;
 		out.store();
-		assertFalse(Memory.INSTANCE.getTable("Inside").contains("inside" + ke));
+		assertFalse(Memory.INSTANCE.getTable("Inside", true).contains("inside" + ke));
 		in.store();
-		assertTrue(Memory.INSTANCE.getTable("Inside").contains("inside" + ke));
+		assertTrue(Memory.INSTANCE.getTable("Inside", false).contains("inside" + ke));
 		
 		KeyManagement.getInstance().cleanupKnownPersistingElements();
 		
