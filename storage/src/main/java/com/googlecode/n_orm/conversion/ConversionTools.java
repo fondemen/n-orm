@@ -177,7 +177,7 @@ public class ConversionTools {
 			return null;
 		
 		return (byte[]) convertInternal(o, expected, ConversionKind.ToBytes,
-				"Cannot create a binary representation for " + o);
+				"Cannot create a binary representation for " + o + " of class " + o.getClass() + " while expecting " + expected.getName());
 	}
 	
 	public static String convertToString(Object o) {
