@@ -15,6 +15,7 @@ import com.googlecode.n_orm.EmptyCloseableIterator;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory.Table.Row;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily;
+import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily.ByteValue;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily.Value;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
@@ -25,6 +26,7 @@ import com.googlecode.n_orm.storeapi.SimpleStore;
  * This store entirely resides into memory, and is only available for the current JVM.
  * It is well suited for testing.
  * This store is thread-safe.
+ * This store does not supports mixing incrementing and absolute values.
  */
 public class Memory implements SimpleStore {
 	public static final Memory INSTANCE = new Memory();
@@ -149,33 +151,12 @@ public class Memory implements SimpleStore {
 				throw new NullPointerException();
 			map.keySet().removeAll(keys);
 		}
-		
-		/**
-		 * Transforms this map into a {@link NavigableMap} sorted against key values.
-		 * A sub-map can be returned in case some parameter is not null
-		 * @param fromIncl the inclusive start key of the map (null to start from the lowest key of this map)
-		 * @param toIncl the inclusive end key of the map (null to start from the lowest key of this map)
-		 * @return a new map containing expected values ; changes to thismap are not reflected in the original one
-		 * @see Memory#subMap(NavigableMap, String, String)
-		 */
-		public Map<String, T> toMap(String fromIncl, String toIncl) {
-			Map<String, T> ret = new TreeMap<String, T>(subMap(this.map, fromIncl, toIncl));
-			return ret;
-		}
 
 		/**
 		 * Vacuums this map.
 		 */
 		public void clear() {
 			this.map.clear();
-		}
-
-		public int size() {
-			return this.map.size();
-		}
-		
-		public boolean isEmpty() {
-			return this.size() == 0;
 		}
 	}
 
@@ -463,12 +444,19 @@ public class Memory implements SimpleStore {
 			Map<String, Map<String, byte[]>> changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> incremented) {
+		IllegalArgumentException x = null;
+		
 		Row r = this.getRow(table, id, true);
 		
 		for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
 			ColumnFamily f = r.get(change.getKey());
 			for (Entry<String, byte[]> value : change.getValue().entrySet()) {
-				f.put(value.getKey(), f.new ByteValue(value.getKey(), value.getValue()));
+				Value<?> val = f.get(value.getKey());
+				if (val instanceof ByteValue) {
+					((ByteValue)val).setValue(value.getValue());
+				} else {
+					x = new IllegalArgumentException("Cannot set an incrementing value " + value.getKey() + " in family " + change.getKey() + " for row " + id + " in table " + table);
+				}
 			}
 		}
 		
@@ -484,14 +472,11 @@ public class Memory implements SimpleStore {
 		}
 	}
 
-	public int count(String table) {
+	@Override
+	public long count(String table, Constraint c)
+			throws DatabaseNotReachedException {
 		Table t = this.getTable(table, false);
-		return t == null ? 0 : t.size();
-	}
-
-	public int count(String table, String row, String family) {
-		ColumnFamily fam = this.getFamily(table, row, family, false);
-		return fam == null ? 0 : fam.size();
+		return t == null ? 0 : subMap(t.map, c == null ? null : c.getStartKey(), c == null ? null : c.getEndKey()).size();
 	}
 	
 	public void reset() {
@@ -505,18 +490,13 @@ public class Memory implements SimpleStore {
 			t.remove(id);
 	}
 
-	public boolean exists(String table, String row, String family, String key)
-			throws DatabaseNotReachedException {
-		ColumnFamily fam = this.getFamily(table, row, family, false);
-		return fam == null ? false : fam.contains(key);
-	}
-
 	@Override
 	public boolean exists(String table, String row, String family)
 			throws DatabaseNotReachedException {
 		return this.getFamily(table, row, family, false) != null;
 	}
 
+	@Override
 	public boolean exists(String table, String row)
 			throws DatabaseNotReachedException {
 		if (!this.tables.contains(table))
@@ -600,13 +580,6 @@ public class Memory implements SimpleStore {
 			public void close() {
 			}
 		}; 
-	}
-
-	@Override
-	public long count(String table, Constraint c)
-			throws DatabaseNotReachedException {
-		Table t = this.getTable(table, false);
-		return t == null ? 0 : subMap(t.map, c == null ? null : c.getStartKey(), c == null ? null : c.getEndKey()).size();
 	}
 
 }
