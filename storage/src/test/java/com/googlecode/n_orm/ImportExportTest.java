@@ -11,10 +11,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.junit.After;
 import org.junit.Test;
@@ -55,7 +57,7 @@ public class ImportExportTest {
 
 		//Exporting collection directly from store
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		query.exportTo(out);
+		query.exportTo(new ObjectOutputStream(out));
 		
 		//Deleting collection from base
 		for (Book book : knownBooks) {
@@ -98,7 +100,7 @@ public class ImportExportTest {
 		 
 		 // Serialize in a file
 		 FileOutputStream fos = new FileOutputStream(f);
-		 searchQuery.exportTo(fos);
+		 searchQuery.exportTo(new ObjectOutputStream(fos));
 		 fos.close();
 		 
 		 // Test if the file has been created
@@ -135,7 +137,7 @@ public class ImportExportTest {
 		 
 		 // Serialize in a file
 		 FileOutputStream fos = new FileOutputStream(f);
-		 long exported = searchQuery.exportTo(fos);
+		 long exported = searchQuery.exportTo(new ObjectOutputStream(fos));
 		 fos.close();
 		 assertEquals(searchQuery.count(), exported);
 		 
@@ -158,6 +160,52 @@ public class ImportExportTest {
 		 
 		 assertEquals(exported, imported);
 		 assertEquals(originalCount, searchQuery.count());
+	 }
+	 
+	 @Test public void checkUnserializeBookAndBookStore() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
+		 PersistingElement current;
+		 Iterator<PersistingElement> it;
+
+		 Book b2 = new Book(bssut, new Date(12121212), new Date());
+		 b2.store();
+		 BookStore bs2 = new BookStore("rfgbuhfgj");
+		 bs2.store();
+		Book b3 = new Book(bs2, new Date(123456789), new Date());
+		 b3.store();
+
+		 SearchableClassConstraintBuilder<BookStore> searchQuery1 = StorageManagement.findElements().ofClass(BookStore.class).withAtMost(1000).elements();
+		 SearchableClassConstraintBuilder<Book> searchQuery2 = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
+		 
+		 File f = new File(BOOKS_SER_FILE);
+		 
+		 // Serialize in a file
+		 ObjectOutputStream fos = new ObjectOutputStream( new FileOutputStream(f) );
+		 long exported = searchQuery1.exportTo(fos) + searchQuery2.exportTo(fos);
+		 fos.close();
+		 assertEquals(searchQuery1.count()+searchQuery2.count(), exported);
+		 
+		 // Test if the file has been created
+		 assertTrue(f.exists());
+		 
+		 TreeSet<PersistingElement> original = new TreeSet<PersistingElement>();
+		 original.addAll(searchQuery1.go());
+		 original.addAll(searchQuery2.go());
+		 long originalCount = searchQuery1.count()+searchQuery2.count();
+
+		 it = original.iterator();
+		 while(it.hasNext())
+		 {
+			 current = it.next();
+			 current.delete();
+		 }
+		 assertEquals(0, searchQuery1.count()+searchQuery2.count());
+		 
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		 long imported = ImportExport.importPersistingElements(new FileInputStream(f));
+		 
+		 assertEquals(exported, imported);
+		 assertEquals(originalCount, searchQuery1.count()+searchQuery2.count());
 	 }
 
 }
