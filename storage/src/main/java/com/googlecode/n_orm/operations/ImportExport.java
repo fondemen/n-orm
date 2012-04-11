@@ -105,8 +105,7 @@ public class ImportExport {
 	 * @param elementsIterator an iterator over the elements to be serialized ; closed by the method
 	 * @return lastElement the last element serialized from the collection
 	 */
-	public static ExportReport exportPersistingElements(CloseableIterator<? extends PersistingElement> elementsIterator, OutputStream out) throws IOException {
-		ObjectOutputStream oos= new ObjectOutputStream(out);
+	public static ExportReport exportPersistingElements(CloseableIterator<? extends PersistingElement> elementsIterator, ObjectOutputStream out) throws IOException {
 		PersistingElement lastElement = null;
 		KeyManagement km = KeyManagement.getInstance();
 		long exported = 0;
@@ -115,13 +114,13 @@ public class ImportExport {
 				PersistingElement elt = elementsIterator.next();
 				elt.checkIsValid();
 				elt.updateFromPOJO();
-				oos.writeObject(SERIALIZATION_SEPARATOR);
-				oos.writeObject(new Element(elt));
+				out.writeObject(SERIALIZATION_SEPARATOR);
+				out.writeObject(new Element(elt));
 				lastElement = elt;
 				km.unregister(elt);
 				exported++;
 			}
-			oos.flush();
+			out.flush();
 		} finally {
 			elementsIterator.close();
 		}
@@ -148,7 +147,7 @@ public class ImportExport {
 			try {
 				String sep = (String) ois.readObject();
 				ok = SERIALIZATION_SEPARATOR.equals(sep);
-			} catch (Exception x) {
+			} catch (Exception x) {x.printStackTrace();
 				fis.reset();
 				ok = false;
 			}
