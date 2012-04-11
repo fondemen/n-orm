@@ -420,8 +420,9 @@ public class BasicTest {
 		assertEquals(knownBooks.size(), query.count());
 
 		//Exporting collection directly from store
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		query.exportTo(out);
+		ByteArrayOutputStream bout = new ByteArrayOutputStream();
+		ObjectOutputStream oout = new ObjectOutputStream(bout);
+		query.exportTo(oout);
 		
 		//Deleting collection from base
 		for (Book book : knownBooks) {
@@ -432,7 +433,7 @@ public class BasicTest {
 		KeyManagement.getInstance().cleanupKnownPersistingElements();
 		
 		//Importing stored elements
-		ImportExport.importPersistingElements(new ByteArrayInputStream(out.toByteArray()));
+		ImportExport.importPersistingElements(new ByteArrayInputStream(bout.toByteArray()));
 		assertEquals(knownBooks.size(), query.count());
 		
 		//Checking database
