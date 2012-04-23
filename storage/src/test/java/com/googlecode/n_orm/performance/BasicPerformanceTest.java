@@ -290,7 +290,7 @@ public class BasicPerformanceTest {
 		 }
 		
 		exec.shutdown();
-		boolean running = exec.awaitTermination(1, TimeUnit.MINUTES);
+		boolean running = exec.awaitTermination(5, TimeUnit.MINUTES);
 		
 		for (Future<?> future : futures) {
 			if (future.isDone()) {
