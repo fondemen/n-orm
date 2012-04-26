@@ -149,7 +149,7 @@
 		<site>
 			<id>wiki</id>
 			<name>n-orm Wiki pages</name>
-			<url>file://${basedir}/../../n-orm-wiki/hbase</url>
+			<url>file://${basedir}/../../n-orm.wiki/hbase</url>
 		</site>
 	</distributionManagement>
 
