@@ -21,7 +21,7 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
 
 
-public abstract class ColumnFamily<T> {
+public abstract class ColumnFamily<T> implements Comparable<ColumnFamily<T>> {
 	public static enum ChangeKind {SET, DELETE};
 	
 	protected final Class<T> clazz;
@@ -72,6 +72,11 @@ public abstract class ColumnFamily<T> {
 	protected abstract void updateFromPOJO(Object pojoVersion);
 	protected abstract void storeToPOJO(Object pojoVersion);
 	protected abstract void addToPOJO(Object pojoVersion, String key, T element);
+
+	@Override
+	public int compareTo(ColumnFamily<T> rhs) {
+		return this == rhs ? 0 : this.owner.compareTo(rhs.owner) + this.name.compareTo(rhs.name);
+	}
 	
 	public String getName() {
 		return name;
