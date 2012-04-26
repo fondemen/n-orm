@@ -358,8 +358,7 @@ public class BasicTest {
 	 @Test public void activationOKListener() {
 		 PersistingElementListener listener = EasyMock.createStrictMock(PersistingElementListener.class);
 		 listener.activateInvoked(bsut, new TreeSet<ColumnFamily<?>>());
-		 TreeSet<ColumnFamily<?>> activated = new TreeSet<ColumnFamily<?>>();
-		 activated.add(bsut.getPropertiesColumnFamily());
+		 ColumnFamily[] activated = new ColumnFamily[] {bsut.getPropertiesColumnFamily()};
 		 Capture<Set<ColumnFamily<?>>> famCap = new Capture<Set<ColumnFamily<?>>>();
 		 Capture<Book> bookCap = new Capture<Book>();
 		 listener.activated(EasyMock.capture(bookCap), EasyMock.capture(famCap));
@@ -368,7 +367,7 @@ public class BasicTest {
 		 bsut.activate();
 		 EasyMock.verify(listener);
 		 assertEquals(bsut, bookCap.getValue());
-		 assertArrayEquals(activated.toArray(), famCap.getValue().toArray());
+		 assertArrayEquals(activated, famCap.getValue().toArray());
 	 }
 
 	 @Test public void storeFailedListener() {
