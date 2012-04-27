@@ -128,22 +128,25 @@ public aspect ColumnFamiliyManagement {
 	 * Finds in a class the fields that are column families
 	 */
 	public Map<String, Field> getColumnFamilies(Class<? extends PersistingElement> clazz) {
-		synchronized (typeColumnFamilies) {
-			Map<String, Field> ret = this.typeColumnFamilies.get(clazz);
-			if (ret == null) {
-				ret = new TreeMap<String, Field>();
-				Class<?> c = clazz;
-				do {
-					for (Field field : c.getDeclaredFields()) {
-						if (isCollectionFamily(field))
-							ret.put(field.getName(), field);
-					}
-					c = c.getSuperclass();
-				} while (c != null);
-				typeColumnFamilies.put(clazz, ret);
+		Map<String, Field> ret = this.typeColumnFamilies.get(clazz);
+		if (ret == null) {
+			synchronized(typeColumnFamilies) {
+				ret = this.typeColumnFamilies.get(clazz);
+				if (ret == null) {
+					ret = new TreeMap<String, Field>();
+					Class<?> c = clazz;
+					do {
+						for (Field field : c.getDeclaredFields()) {
+							if (isCollectionFamily(field))
+								ret.put(field.getName(), field);
+						}
+						c = c.getSuperclass();
+					} while (c != null);
+					typeColumnFamilies.put(clazz, Collections.unmodifiableMap(ret));
+				}
 			}
-			return ret;
 		}
+		return ret;
 	}
 	
 

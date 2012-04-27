@@ -6,6 +6,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -344,7 +345,7 @@ public aspect PropertyManagement {
 							|| ColumnFamily.class.isAssignableFrom(ft))
 						ret.remove(f);
 				}
-				this.typeProperties.put(type, ret);
+				this.typeProperties.put(type, Collections.unmodifiableSet(ret));
 			}
 			return this.typeProperties.get(type);
 		}

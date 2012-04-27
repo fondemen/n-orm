@@ -110,6 +110,22 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see Object#getClass()
 	 */
 	String getFullIdentifier();
+	
+	/**
+	 * Gets the collection of the all the indexes defined for this element
+	 */
+	Set<IndexDeclaration> getIndexes();
+	
+	/**
+	 * The identifier for this persisting element according to an index.
+	 * The identifier is computed from a string representation of all indexes of this persisting element
+	 * separated with {@link KeyManagement#KEY_SEPARATOR} and followed by {@link KeyManagement#KEY_END_SEPARATOR}.
+	 * In case the index is not declared on the actual class of this persisting element, the name of the actual class is appended.
+	 * @throws IllegalArgumentException in case the given index is not defined for this element
+	 * @throws IllegalStateException in case all indexes have not been set
+	 * @see com.googlecode.n_orm.conversion.ConversionTools#convertToString(Object)
+	 */
+	String getIdentifierForIndex(IndexDeclaration index);
 
 	/**
 	 * Checks whether this persisting has changed since its last activation.

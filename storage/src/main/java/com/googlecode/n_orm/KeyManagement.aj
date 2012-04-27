@@ -6,6 +6,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -43,7 +44,7 @@ import com.googlecode.n_orm.conversion.UnreversibleTypeException;
  * @author fondemen
  *
  */
-public aspect KeyManagement {
+public aspect KeyManagement implements FieldsetHandler {
 	public static final String KEY_SEPARATOR = "\u0017";  //Shouldn't be a printable char
 	public static final String KEY_END_SEPARATOR = "\u0001"; //As small as possible so that {v="AA"}.identifier (= "AA"+KEY_END_SEPARATOR) < {v="AAA"}.identifier (= "AAA"+KEY_END_SEPARATOR)
 	public static final String ARRAY_SEPARATOR = "\uFFFF"; //As large as possible so that [0, 1] (identified by 0 + StringSeparator + 1) < [0, 1] (identified by 0 + StringSeparator + 1 + StringSeparator + 2)
@@ -55,11 +56,14 @@ public aspect KeyManagement {
 		return INSTANCE;
 	}
 
+	//Similar declarations in IndexManagement
 	declare error: set(@Key double PersistingElement+.*) : "Floating values not supported in keys...";
 	declare error: set(@Key java.lang.Double PersistingElement+.*) : "Floating values not supported in keys...";
 	declare error: set(@Key float PersistingElement+.*) : "Floating values not supported in keys...";
 	declare error: set(@Key java.lang.Float PersistingElement+.*) : "Floating values not supported in keys...";
+
 	//declare error: PersistingElement+ && hasField(@Key double *) : "Floating values not supported in keys..."; //AJ 1.6.9 style
+
 	declare error: set(@Key final * *.*) : "A key should not be final";
 	
 	declare error: set(@Key(reverted=true) (!java.util.Date && !boolean && !Boolean && !byte && !Byte && !short && !Short &&!int && !Integer && !long && !Long) *.*) : "Can only revert boolean, natural or java.util.Date keys";
@@ -321,7 +325,7 @@ public aspect KeyManagement {
 	}
 	
 	public List<Field> PersistingElement.getKeys() {
-		return new ArrayList<Field>(KeyManagement.getInstance().typeKeys.get(this.getClass()));
+		return KeyManagement.getInstance().typeKeys.get(this.getClass());
 	}
 
 	public List<Field> detectKeys(Class<?> clazz) {
@@ -361,7 +365,7 @@ public aspect KeyManagement {
 			
 			foundKeys.trimToSize();
 			
-			typeKeys.put(clazz, foundKeys);
+			typeKeys.put(clazz, Collections.unmodifiableList(foundKeys));
 		}
 		return typeKeys.get(clazz);
 	}
@@ -385,28 +389,52 @@ public aspect KeyManagement {
 		}
 	}
 	
+	@Override
+	public List<Field> getFields(Class<?> clazz) {
+		return this.detectKeys(clazz);
+	}
+	
+	@Override
+	public boolean isReverted(Field key) {
+		return key.getAnnotation(Key.class).reverted();
+	}
+	
+	@Override
+	public String handledFieldKind() {
+		return "key";
+	}
+	
+	@Override
+	public String getIdentifier(PersistingElement elt) {
+		return elt.identifier;
+	}
+	
 	public String createIdentifier(Object element, Class<?> expected) {
+		return this.createIdentifier(element, expected, this);
+	}
+	
+	public String createIdentifier(Object element, Class<?> expected, FieldsetHandler fsh) {
 		if (expected != null && ! expected.isInstance(element))
 			throw new ClassCastException("Element " + element + " of class " + element.getClass() + " is not compatible with " + expected);
 		try {
 			StringBuffer ret = new StringBuffer();
 			
-			if ((element instanceof PersistingElement) && ((PersistingElement)element).identifier != null) {
-				ret.append(((PersistingElement)element).identifier);
+			if ((element instanceof PersistingElement) && fsh.getIdentifier((PersistingElement)element) != null) {
+				ret.append(fsh.getIdentifier((PersistingElement)element));
 			} else {
 				boolean fst = true;
 				PropertyManagement pm = PropertyManagement.getInstance();
-				for (Field key : this.detectKeys(element.getClass())) {
+				for (Field f : fsh.getFields(element.getClass())) {
 					if (fst) fst = false; else ret.append(KEY_SEPARATOR);
-					Object o = pm.readValue(element, key);
+					Object o = pm.readValue(element, f);
 					if (o == null)
-						throw new IllegalStateException("A key cannot be null as it is the case for key " + key + " of " + element);
+						throw new IllegalStateException("A " + fsh.handledFieldKind() + " cannot be null as it is the case for " + fsh.handledFieldKind() + " " + f + " of " + element);
 //					if (key.getType().isArray() && Array.getLength(o) == 0)
 //						throw new IllegalStateException("An array key cannot be empty as it is the case for key " + key + " of " + element);
-					if (key.getAnnotation(Key.class).reverted())
-						ret.append(ConversionTools.convertToStringReverted(o, key.getType()));
+					if (fsh.isReverted(f))
+						ret.append(ConversionTools.convertToStringReverted(o, f.getType()));
 					else
-						ret.append(ConversionTools.convertToString(o, key.getType()));
+						ret.append(ConversionTools.convertToString(o, f.getType()));
 				}
 				ret.append(KEY_END_SEPARATOR);
 			}
