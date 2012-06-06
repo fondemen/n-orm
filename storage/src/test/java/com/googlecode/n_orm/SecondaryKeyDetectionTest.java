@@ -10,19 +10,19 @@ import java.util.Set;
 
 import org.junit.Test;
 
-import com.googlecode.n_orm.IndexDeclaration.IndexField;
+import com.googlecode.n_orm.SecondaryKeyDeclaration.SecondaryKeyField;
 
-public class IndexDetectionTest {
-	@Persisting @Indexable({"firstindex", "secondindex"})
+public class SecondaryKeyDetectionTest {
+	@Persisting @SecondaryKeys({"firstindex", "secondindex"})
 	public static class Element {
-		@Key @Index("secondindex#reverted") public String key;
-		@Index({"firstindex", "secondindex#2#reverted"}) public String att1;
-		@Index("firstindex#2") public String att2;
+		@Key @SecondaryKey("secondindex#reverted") public String key;
+		@SecondaryKey({"firstindex", "secondindex#2#reverted"}) public String att1;
+		@SecondaryKey("firstindex#2") public String att2;
 	}
 
 	@Test
-	public void indexDetection() throws SecurityException, NoSuchFieldException {
-		Set<IndexDeclaration> ids = IndexManagement.getInstance().getIndexDeclarations(Element.class);
+	public void skDetection() throws SecurityException, NoSuchFieldException {
+		Set<SecondaryKeyDeclaration> ids = SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(Element.class);
 		Field key = Element.class.getDeclaredField("key");
 		Field att1 = Element.class.getDeclaredField("att1");
 		Field att2 = Element.class.getDeclaredField("att2");
@@ -30,7 +30,7 @@ public class IndexDetectionTest {
 		assertEquals(2, ids.size());
 		
 		boolean foundFirst = false, foundSecond = false;
-		for (IndexDeclaration id : ids) {
+		for (SecondaryKeyDeclaration id : ids) {
 
 			assertEquals(Element.class, id.getDeclaringClass());
 			
@@ -39,7 +39,7 @@ public class IndexDetectionTest {
 					fail("firstindex detected twice");
 				foundFirst = true;
 				
-				List<IndexField> fis = id.getIndexes();
+				List<SecondaryKeyField> fis = id.getIndexes();
 				
 				assertEquals(2, fis.size());
 				
@@ -57,7 +57,7 @@ public class IndexDetectionTest {
 					fail("firstindex detected twice");
 				foundSecond = true;
 				
-				List<IndexField> fis = id.getIndexes();
+				List<SecondaryKeyField> fis = id.getIndexes();
 				
 				assertEquals(2, fis.size());
 				
@@ -78,71 +78,71 @@ public class IndexDetectionTest {
 		assertTrue(foundSecond);
 	}
 	
-	@Persisting @Indexable("")
+	@Persisting @SecondaryKeys("")
 	public static class ElementUnnamedIndex {
-		@Key @Index("") public String key;
+		@Key @SecondaryKey("") public String key;
 	}
 	@Test(expected=IllegalArgumentException.class)
 	public void indexDetectionUnnamedIndex() {
-		IndexManagement.getInstance().getIndexDeclarations(ElementUnnamedIndex.class);
+		SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(ElementUnnamedIndex.class);
 	}
 	
-	@Persisting @Indexable("index")
+	@Persisting @SecondaryKeys("index")
 	public static class ElementMissingIndex {
-		@Key @Index("secondindex#reverted") public String key;
-		@Index({"firstindex", "secondindex#2#reverted"}) public String att1;
-		@Index("firstindex#2") public String att2;
+		@Key @SecondaryKey("secondindex#reverted") public String key;
+		@SecondaryKey({"firstindex", "secondindex#2#reverted"}) public String att1;
+		@SecondaryKey("firstindex#2") public String att2;
 	}
 	@Test(expected=IllegalArgumentException.class)
 	public void indexDetectionMissingIndex() {
-		IndexManagement.getInstance().getIndexDeclarations(ElementMissingIndex.class);
+		SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(ElementMissingIndex.class);
 	}
 	
-	@Persisting @Indexable("index")
+	@Persisting @SecondaryKeys("index")
 	public static class ElementMissingOrder {
-		@Key @Index("index#2") public String key;
+		@Key @SecondaryKey("index#2") public String key;
 	}
 	@Test(expected=IllegalArgumentException.class)
 	public void indexDetectionMissingOrder() {
-		IndexManagement.getInstance().getIndexDeclarations(ElementMissingOrder.class);
+		SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(ElementMissingOrder.class);
 	}
 	
-	@Persisting @Indexable("index")
+	@Persisting @SecondaryKeys("index")
 	public static class ElementDuplicateOrder {
-		@Key @Index("index") public String key;
-		@Index("index") public String att;
+		@Key @SecondaryKey("index") public String key;
+		@SecondaryKey("index") public String att;
 	}
 	@Test(expected=IllegalArgumentException.class)
 	public void indexDetectionDuplicateOrder() {
-		IndexManagement.getInstance().getIndexDeclarations(ElementDuplicateOrder.class);
+		SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(ElementDuplicateOrder.class);
 	}
 	
-	@Persisting @Indexable("index")
+	@Persisting @SecondaryKeys("index")
 	public static class ElementBadOrder {
-		@Key @Index("index#X") public String key;
+		@Key @SecondaryKey("index#X") public String key;
 	}
 	@Test(expected=IllegalArgumentException.class)
 	public void indexDetectionBadOrder() {
-		IndexManagement.getInstance().getIndexDeclarations(ElementBadOrder.class);
+		SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(ElementBadOrder.class);
 	}
 	
-	@Persisting @Indexable("index")
+	@Persisting @SecondaryKeys("index")
 	public static class ElementBadDeclaration {
-		@Key @Index("indexdfcqjekfhzj") public String key;
+		@Key @SecondaryKey("indexdfcqjekfhzj") public String key;
 	}
 	@Test(expected=IllegalArgumentException.class)
 	public void indexDetectionBadDeclaration() {
-		IndexManagement.getInstance().getIndexDeclarations(ElementBadDeclaration.class);
+		SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(ElementBadDeclaration.class);
 	}
 
-	@Indexable("firstindex")
+	@SecondaryKeys("firstindex")
 	public static class InheritingElement extends Element {
-		@Index("firstindex#3") public String att3;
+		@SecondaryKey("firstindex#3") public String att3;
 	}
 
 	@Test
 	public void indexDetectionInherited() throws SecurityException, NoSuchFieldException {
-		Set<IndexDeclaration> ids = IndexManagement.getInstance().getIndexDeclarations(InheritingElement.class);
+		Set<SecondaryKeyDeclaration> ids = SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(InheritingElement.class);
 		Field key = Element.class.getDeclaredField("key");
 		Field att1 = Element.class.getDeclaredField("att1");
 		Field att2 = Element.class.getDeclaredField("att2");
@@ -150,10 +150,10 @@ public class IndexDetectionTest {
 		
 		assertEquals(1, ids.size());
 		
-		IndexDeclaration id  = ids.iterator().next();
+		SecondaryKeyDeclaration id  = ids.iterator().next();
 		assertEquals("firstindex", id.getName());
 				
-		List<IndexField> fis = id.getIndexes();
+		List<SecondaryKeyField> fis = id.getIndexes();
 		
 		assertEquals(3, fis.size());
 		
@@ -172,18 +172,18 @@ public class IndexDetectionTest {
 	}
 	
 	public static class NonPersistingElement {
-		@Key @Index("secondindex#reverted") public String key;
-		@Index({"firstindex", "secondindex#2#reverted"}) public String att1;
-		@Index("firstindex#2") public String att2;
+		@Key @SecondaryKey("secondindex#reverted") public String key;
+		@SecondaryKey({"firstindex", "secondindex#2#reverted"}) public String att1;
+		@SecondaryKey("firstindex#2") public String att2;
 	}
 
-	@Persisting @Indexable("firstindex")
+	@Persisting @SecondaryKeys("firstindex")
 	public static class InheritingNonPersistingElement extends NonPersistingElement {
-		@Index("firstindex#3") public String att3;
+		@SecondaryKey("firstindex#3") public String att3;
 	}
 	@Test
 	public void indexDetectionInheritedNonPersisting() throws SecurityException, NoSuchFieldException {
-		Set<IndexDeclaration> ids = IndexManagement.getInstance().getIndexDeclarations(InheritingNonPersistingElement.class);
+		Set<SecondaryKeyDeclaration> ids = SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(InheritingNonPersistingElement.class);
 		Field key = NonPersistingElement.class.getDeclaredField("key");
 		Field att1 = NonPersistingElement.class.getDeclaredField("att1");
 		Field att2 = NonPersistingElement.class.getDeclaredField("att2");
@@ -191,10 +191,10 @@ public class IndexDetectionTest {
 		
 		assertEquals(1, ids.size());
 		
-		IndexDeclaration id  = ids.iterator().next();
+		SecondaryKeyDeclaration id  = ids.iterator().next();
 		assertEquals("firstindex", id.getName());
 				
-		List<IndexField> fis = id.getIndexes();
+		List<SecondaryKeyField> fis = id.getIndexes();
 		
 		assertEquals(3, fis.size());
 		
@@ -212,23 +212,23 @@ public class IndexDetectionTest {
 				
 	}
 	
-	@Indexable("firstindex")
+	@SecondaryKeys("firstindex")
 	public static class InheritingElementDuplicateOrder extends Element {
-		@Index("firstindex") public String att3;
+		@SecondaryKey("firstindex") public String att3;
 	}
 	@Test(expected=IllegalArgumentException.class)
 	public void indexDetectionInheritingDuplicateOrder() {
-		IndexManagement.getInstance().getIndexDeclarations(InheritingElementDuplicateOrder.class);
+		SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(InheritingElementDuplicateOrder.class);
 	}
 
 
-	@Indexable("firstindex")
+	@SecondaryKeys("firstindex")
 	public static class InheritingPersistingElement extends Element {
-		@Index("firstindex#3") public String att3;
+		@SecondaryKey("firstindex#3") public String att3;
 	}
 	@Test
 	public void indexDetectionInheritedPersisting() throws SecurityException, NoSuchFieldException {
-		Set<IndexDeclaration> ids = IndexManagement.getInstance().getIndexDeclarations(InheritingPersistingElement.class);
+		Set<SecondaryKeyDeclaration> ids = SecondaryKeyManagement.getInstance().getSecondaryKeyDeclarations(InheritingPersistingElement.class);
 		Field key = Element.class.getDeclaredField("key");
 		Field att1 = Element.class.getDeclaredField("att1");
 		Field att2 = Element.class.getDeclaredField("att2");
@@ -236,11 +236,11 @@ public class IndexDetectionTest {
 		
 		assertEquals(1, ids.size());
 		
-		IndexDeclaration id  = ids.iterator().next();
+		SecondaryKeyDeclaration id  = ids.iterator().next();
 		assertEquals("firstindex", id.getName());
 		assertEquals(InheritingPersistingElement.class, id.getDeclaringClass());
 				
-		List<IndexField> fis = id.getIndexes();
+		List<SecondaryKeyField> fis = id.getIndexes();
 		
 		assertEquals(3, fis.size());
 		

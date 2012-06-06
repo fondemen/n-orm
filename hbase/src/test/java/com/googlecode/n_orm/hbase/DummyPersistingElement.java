@@ -9,6 +9,7 @@ import java.util.Set;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingElementListener;
+import com.googlecode.n_orm.SecondaryKeyDeclaration;
 import com.googlecode.n_orm.UnknownColumnFamily;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.ColumnFamily;
@@ -255,6 +256,18 @@ public class DummyPersistingElement implements PersistingElement {
 	public void updateFromPOJO() {
 		// TODO Auto-generated method stub
 
+	}
+
+	@Override
+	public Set<SecondaryKeyDeclaration> getSecondaryKeys() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public String getIdentifierForSecondaryKey(SecondaryKeyDeclaration index) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }
