@@ -270,4 +270,10 @@ public class DummyPersistingElement implements PersistingElement {
 		return null;
 	}
 
+	@Override
+	public String getIdentifierForSecondaryKey(Class<? extends PersistingElement> clazz, String secondaryKeyName) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 }
