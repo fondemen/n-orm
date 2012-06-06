@@ -3,6 +3,7 @@ package com.googlecode.n_orm;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -64,15 +65,16 @@ public aspect SecondaryKeyManagement {
 						return;
 					this.creatingSKIdentifiers = true;
 					try {
+						this.getIdentifier();
 						KeyManagement km = KeyManagement.getInstance();
 						SecondaryKeyManagement skm = SecondaryKeyManagement.getInstance();
 						
-						Map<SecondaryKeyDeclaration, String> ii = new TreeMap<SecondaryKeyDeclaration, String>();
+						Map<SecondaryKeyDeclaration, String> ski = new TreeMap<SecondaryKeyDeclaration, String>();
 						
 						Class<? extends PersistingElement> clazz = this.getClass().asSubclass(PersistingElement.class);
 						do {
 							for(SecondaryKeyDeclaration sk : skm.getSecondaryKeyDeclarations(clazz)) {
-								this.skIdentifiers.put(sk, km.createIdentifier(this, sk.getClass(), sk));
+								ski.put(sk, km.createIdentifier(this, sk.getDeclaringClass(), sk));
 							}
 							
 							try {
@@ -82,7 +84,7 @@ public aspect SecondaryKeyManagement {
 							}
 						} while (clazz != null);
 						
-						this.skIdentifiers = Collections.unmodifiableMap(ii);
+						this.skIdentifiers = Collections.unmodifiableMap(ski);
 					} finally {
 						this.creatingSKIdentifiers = false;
 					}
@@ -101,8 +103,18 @@ public aspect SecondaryKeyManagement {
 		return this.skIdentifiers.keySet();
 	}
 	
-	public String PersistingElement.getIdentifierForSecondaryKey(SecondaryKeyDeclaration index) {
+	public String PersistingElement.getIdentifierForSecondaryKey(SecondaryKeyDeclaration secondaryKey) {
 		this.createIdentifiers();
-		return this.skIdentifiers.get(index);
+		return this.skIdentifiers == null ? null : this.skIdentifiers.get(secondaryKey);
+	}
+	
+	public String PersistingElement.getIdentifierForSecondaryKey(String secondaryKeyName) {
+		this.createIdentifiers();
+		secondaryKeyName = secondaryKeyName.trim();
+		for (Entry<SecondaryKeyDeclaration, String> skid : this.skIdentifiers.entrySet()) {
+			if (skid.getKey().getName().equalsIgnoreCase(secondaryKeyName))
+				return skid.getValue();
+		}
+		throw new IllegalArgumentException("Unknown secondary key " + secondaryKeyName + " for " + this);
 	}
 }

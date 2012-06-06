@@ -125,7 +125,18 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws IllegalStateException in case all secondary keys have not been set
 	 * @see com.googlecode.n_orm.conversion.ConversionTools#convertToString(Object)
 	 */
-	String getIdentifierForSecondaryKey(SecondaryKeyDeclaration index);
+	String getIdentifierForSecondaryKey(SecondaryKeyDeclaration secondaryKey);
+
+	/**
+	 * The identifier for this persisting element according to a secondary key.
+	 * The identifier is computed from a string representation of all indexes of this persisting element
+	 * separated with {@link KeyManagement#KEY_SEPARATOR} and followed by {@link KeyManagement#KEY_END_SEPARATOR}.
+	 * In case the secondary key is not declared on the actual class of this persisting element, the name of the actual class is appended.
+	 * @throws IllegalArgumentException in case the given secondary key is not defined for this element
+	 * @throws IllegalStateException in case all secondary keys have not been set
+	 * @see com.googlecode.n_orm.conversion.ConversionTools#convertToString(Object)
+	 */
+	String getIdentifierForSecondaryKey(String secondaryKeyName);
 
 	/**
 	 * Checks whether this persisting has changed since its last activation.
