@@ -58,35 +58,29 @@ public aspect SecondaryKeyManagement {
 	private transient volatile boolean PersistingElement.creatingSKIdentifiers = false;
 	
 	private void PersistingElement.createIdentifiers() {
-		if (this.skIdentifiers == null) {
-			synchronized(this) {
-				if (this.skIdentifiers == null) {
-					if (this.creatingSKIdentifiers)
-						return;
-					this.creatingSKIdentifiers = true;
-					try {
-						KeyManagement km = KeyManagement.getInstance();
-						SecondaryKeyManagement skm = SecondaryKeyManagement.getInstance();
-						
-						Map<SecondaryKeyDeclaration, String> ski = new TreeMap<SecondaryKeyDeclaration, String>();
-						Class<? extends PersistingElement> cls = this.getClass().asSubclass(PersistingElement.class);
-						do {
-							for(SecondaryKeyDeclaration sk : skm.getSecondaryKeyDeclarations(cls)) {
-								ski.put(sk, km.createIdentifier(this, sk.getDeclaringClass(), sk, false));
-							}
-							
-							try {
-								cls = cls.getSuperclass().asSubclass(PersistingElement.class);
-							} catch (ClassCastException x) {
-								cls = null;
-							}
-						} while (cls != null);
-						
-						this.skIdentifiers = Collections.unmodifiableMap(ski);
-					} finally {
-						this.creatingSKIdentifiers = false;
+		if (this.skIdentifiers == null && !this.creatingSKIdentifiers) {
+			this.creatingSKIdentifiers = true;
+			try {
+				KeyManagement km = KeyManagement.getInstance();
+				SecondaryKeyManagement skm = SecondaryKeyManagement.getInstance();
+				
+				Map<SecondaryKeyDeclaration, String> ski = new TreeMap<SecondaryKeyDeclaration, String>();
+				Class<? extends PersistingElement> cls = this.getClass().asSubclass(PersistingElement.class);
+				do {
+					for(SecondaryKeyDeclaration sk : skm.getSecondaryKeyDeclarations(cls)) {
+						ski.put(sk, km.createIdentifier(this, sk.getDeclaringClass(), sk, false));
 					}
-				}
+					
+					try {
+						cls = cls.getSuperclass().asSubclass(PersistingElement.class);
+					} catch (ClassCastException x) {
+						cls = null;
+					}
+				} while (cls != null);
+				
+				this.skIdentifiers = Collections.unmodifiableMap(ski);
+			} finally {
+				this.creatingSKIdentifiers = false;
 			}
 		}
 	}
