@@ -47,8 +47,8 @@ public aspect SecondaryKeyManagement {
 				for (String indexName : ann.value()) {
 					ret.add(new SecondaryKeyDeclaration(clazz, indexName));
 				}
-				typeSecondaryKeys.put(clazz, ret);
 			}
+			typeSecondaryKeys.put(clazz, ret);
 		}
 		
 		return ret;
@@ -65,24 +65,22 @@ public aspect SecondaryKeyManagement {
 						return;
 					this.creatingSKIdentifiers = true;
 					try {
-						this.getIdentifier();
 						KeyManagement km = KeyManagement.getInstance();
 						SecondaryKeyManagement skm = SecondaryKeyManagement.getInstance();
 						
 						Map<SecondaryKeyDeclaration, String> ski = new TreeMap<SecondaryKeyDeclaration, String>();
-						
-						Class<? extends PersistingElement> clazz = this.getClass().asSubclass(PersistingElement.class);
+						Class<? extends PersistingElement> cls = this.getClass().asSubclass(PersistingElement.class);
 						do {
-							for(SecondaryKeyDeclaration sk : skm.getSecondaryKeyDeclarations(clazz)) {
-								ski.put(sk, km.createIdentifier(this, sk.getDeclaringClass(), sk));
+							for(SecondaryKeyDeclaration sk : skm.getSecondaryKeyDeclarations(cls)) {
+								ski.put(sk, km.createIdentifier(this, sk.getDeclaringClass(), sk, false));
 							}
 							
 							try {
-								clazz = clazz.getSuperclass().asSubclass(PersistingElement.class);
+								cls = cls.getSuperclass().asSubclass(PersistingElement.class);
 							} catch (ClassCastException x) {
-								break;
+								cls = null;
 							}
-						} while (clazz != null);
+						} while (cls != null);
 						
 						this.skIdentifiers = Collections.unmodifiableMap(ski);
 					} finally {
@@ -90,6 +88,17 @@ public aspect SecondaryKeyManagement {
 					}
 				}
 			}
+		}
+	}
+	
+	before(PersistingElement self) throws IllegalStateException : execution(void PersistingElement.checkIsValid() throws IllegalStateException) && target(self) {
+		self.createIdentifiers();
+		KeyManagement km = KeyManagement.getInstance();
+		for (Entry<SecondaryKeyDeclaration, String> id : self.skIdentifiers.entrySet()) {
+			SecondaryKeyDeclaration sk = id.getKey();
+			String newId = km.createIdentifier(self, sk.getDeclaringClass(), sk, true);
+			if (! id.getValue().equals(newId))
+				throw new IllegalStateException(sk + " has changed value for " + self + ": was " + PersistingMixin.toReadableString(id.getValue()) + " it became " + PersistingMixin.toReadableString(newId));
 		}
 	}
 	
@@ -108,11 +117,11 @@ public aspect SecondaryKeyManagement {
 		return this.skIdentifiers == null ? null : this.skIdentifiers.get(secondaryKey);
 	}
 	
-	public String PersistingElement.getIdentifierForSecondaryKey(String secondaryKeyName) {
+	public String PersistingElement.getIdentifierForSecondaryKey(Class<? extends PersistingElement> className, String secondaryKeyName) {
 		this.createIdentifiers();
 		secondaryKeyName = secondaryKeyName.trim();
 		for (Entry<SecondaryKeyDeclaration, String> skid : this.skIdentifiers.entrySet()) {
-			if (skid.getKey().getName().equalsIgnoreCase(secondaryKeyName))
+			if (skid.getKey().getName().equalsIgnoreCase(secondaryKeyName) && skid.getKey().getDeclaringClass().equals(className))
 				return skid.getValue();
 		}
 		throw new IllegalArgumentException("Unknown secondary key " + secondaryKeyName + " for " + this);

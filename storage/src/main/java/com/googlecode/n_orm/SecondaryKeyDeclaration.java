@@ -125,7 +125,7 @@ public class SecondaryKeyDeclaration implements FieldsetHandler, Comparable<Seco
 		} while(clazz != null);
 		
 		if (detected.isEmpty())
-			throw new IllegalArgumentException("No field for index " + this.name + " on class " + this.declaringClass.getName() + " ; use annotation @" + SecondaryKey.class.getName() + "({\"" + this.name + "\"}) on a field of the class or of one of its superclasss");
+			throw new IllegalArgumentException("No field for secondary key " + this.name + " on class " + this.declaringClass.getName() + " ; use annotation @" + SecondaryKey.class.getName() + "({\"" + this.name + "\"}) on a field of the class or of one of its superclasss");
 		
 		SecondaryKeyField[] ret = detected.toArray(new SecondaryKeyField[detected.size()]);
 		
@@ -135,7 +135,7 @@ public class SecondaryKeyDeclaration implements FieldsetHandler, Comparable<Seco
 			int order = i+1;
 			
 			if (dif == null)
-				throw new IllegalArgumentException("Missing field of order " + order + " for index " + this.name);
+				throw new IllegalArgumentException("Missing field of order " + order + " for secondary key " + this.name);
 
 			assert dif.getSecondaryKeyDeclaration().getName().equals(this.getName());
 			assert dif.getSecondaryKeyDeclaration() == this;
@@ -184,7 +184,12 @@ public class SecondaryKeyDeclaration implements FieldsetHandler, Comparable<Seco
 
 	@Override
 	public String handledFieldKind() {
-		return this.name + " index";
+		return this.name + " secondary key";
+	}
+
+	@Override
+	public String toString() {
+		return "secondary key " + this.getDeclaringClass().getName() + '.' + this.getName();
 	}
 	
 }

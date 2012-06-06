@@ -82,15 +82,20 @@ public privileged aspect PersistingMixin {
 			sb.append(" with no key yet (missing some key values)");
 			ret = sb.toString();
 		} else {
-			ident = ident.replace(KeyManagement.KEY_SEPARATOR, ":");
-			ident = ident.replace(KeyManagement.KEY_END_SEPARATOR, "}");
-			ident = ident.replace(KeyManagement.ARRAY_SEPARATOR, ";");
+			ident = toReadableString(ident);
 			sb.append(" with key " + ident);
 			ret = sb.toString();
 			this.stringRep = ret;
 		}
 		
 		return ret;
+	}
+	
+	public static String toReadableString(String ident) {
+		ident = ident.replace(KeyManagement.KEY_SEPARATOR, ":");
+		ident = ident.replace(KeyManagement.KEY_END_SEPARATOR, "}");
+		ident = ident.replace(KeyManagement.ARRAY_SEPARATOR, ";");
+		return ident;
 	}
 	
 }

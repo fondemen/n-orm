@@ -410,16 +410,16 @@ public aspect KeyManagement implements FieldsetHandler {
 	}
 	
 	public String createIdentifier(Object element, Class<?> expected) {
-		return this.createIdentifier(element, expected, this);
+		return this.createIdentifier(element, expected, this, false);
 	}
 	
-	public String createIdentifier(Object element, Class<?> expected, FieldsetHandler fsh) {
+	public String createIdentifier(Object element, Class<?> expected, FieldsetHandler fsh, boolean forceCreation) {
 		if (expected != null && ! expected.isInstance(element))
 			throw new ClassCastException("Element " + element + " of class " + element.getClass() + " is not compatible with " + expected);
 		try {
 			StringBuffer ret = new StringBuffer();
 			
-			if ((element instanceof PersistingElement) && fsh.getIdentifier((PersistingElement)element) != null) {
+			if (!forceCreation && (element instanceof PersistingElement) && fsh.getIdentifier((PersistingElement)element) != null) {
 				ret.append(fsh.getIdentifier((PersistingElement)element));
 			} else {
 				boolean fst = true;
@@ -461,13 +461,13 @@ public aspect KeyManagement implements FieldsetHandler {
 		if (this.getIdentifier() == null)
 			throw new IllegalStateException("Persisting element ot type " + this.getClass() + " is missing some of its key values.");
 		KeyManagement km = KeyManagement.getInstance();
-		String newKey = km.createIdentifier(this, getClass());
+		String newKey = km.createIdentifier(this, getClass(), km, true);
 		if (!this.getIdentifier().equals(newKey)) {
 			km.unregister(this);
 			if (newKey == null)
-				throw new IllegalArgumentException("One of the key value for " + this + " is no longer valid.");
+				throw new IllegalStateException("One of the key value for " + this + " is no longer valid.");
 			else
-				throw new IllegalArgumentException("At leat a key for object " + this + " has changed (identifier would be now " + newKey + ")");
+				throw new IllegalStateException("At leat a key for object " + this + " has changed (identifier would be now " + newKey + ")");
 		}
 		km.register(this);
 	}
