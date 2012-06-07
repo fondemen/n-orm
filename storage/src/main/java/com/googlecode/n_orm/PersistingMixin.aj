@@ -14,7 +14,7 @@ public privileged aspect PersistingMixin {
 			INSTANCE = aspectOf();
 		return INSTANCE;
 	}
-	
+
 	declare parents: (@Persisting *) implements PersistingElement;
 
 	////If set within the constructor, we can't know whether the correct value is within the database, or that one that was set within the constructor.
