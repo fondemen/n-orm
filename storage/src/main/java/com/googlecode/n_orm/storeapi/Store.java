@@ -6,6 +6,7 @@ import java.util.Set;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.SecondaryKeyDeclaration;
 
 /**
  * The interface that defines what a data store should implement.
@@ -87,7 +88,8 @@ public interface Store {
 			Map<String, Field> changedFields, String table, String id,
 			Map<String, Map<String, byte[]>> changed,
 			Map<String, Set<String>> removed,
-			Map<String, Map<String, Number>> increments)
+			Map<String, Map<String, Number>> increments,
+			Map<SecondaryKeyDeclaration, String> indexes)
 			throws DatabaseNotReachedException;
 
 	/**

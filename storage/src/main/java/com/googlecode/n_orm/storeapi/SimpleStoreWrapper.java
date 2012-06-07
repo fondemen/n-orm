@@ -3,10 +3,13 @@ package com.googlecode.n_orm.storeapi;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.SecondaryKeyDeclaration;
 
 public class SimpleStoreWrapper implements Store {
 	private static Map<SimpleStore, Store> INSTANCES = new HashMap<SimpleStore, Store>();
@@ -183,9 +186,17 @@ public class SimpleStoreWrapper implements Store {
 	public void storeChanges(PersistingElement elt, Map<String, Field> changedFields,
 			String table, String id, Map<String, Map<String, byte[]>> changed,
 			Map<String, Set<String>> removed,
-			Map<String, Map<String, Number>> increments)
+			Map<String, Map<String, Number>> increments,
+			Map<SecondaryKeyDeclaration, String> indexes)
 			throws DatabaseNotReachedException {
-		store.storeChanges(table, id, changed, removed, increments);
+		Map<String, String> sis = null;
+		if (indexes != null) {
+			sis = new TreeMap<String, String>();
+			for (Entry<SecondaryKeyDeclaration, String> sk : indexes.entrySet()) {
+				sis.put(sk.getKey().getTable(), sk.getValue());
+			}
+		}
+		store.storeChanges(table, id, changed, removed, increments, sis);
 	}
 
 	/*

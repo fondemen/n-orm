@@ -114,7 +114,8 @@ public class DummyStore implements Store {
 			Map<String, Field> changedFields, String table, String id,
 			Map<String, Map<String, byte[]>> changed,
 			Map<String, Set<String>> removed,
-			Map<String, Map<String, Number>> increments)
+			Map<String, Map<String, Number>> increments,
+			Map<SecondaryKeyDeclaration, String> indexes)
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
 		

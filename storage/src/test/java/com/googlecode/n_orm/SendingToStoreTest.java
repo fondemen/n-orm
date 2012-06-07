@@ -203,6 +203,10 @@ public class SendingToStoreTest {
 		}
 	}
 	
+	public Map<SecondaryKeyDeclaration, String> getExpectedSK() {
+		return argThat(SendingToStoreTest.<SecondaryKeyDeclaration, String>getEmptyOrNullMapArgumentMatcher());
+	}
+	
 	@After
 	public void checkNoMoreInteractions() {
 		//verify(this.store, atMost(1)).start();
@@ -274,25 +278,25 @@ public class SendingToStoreTest {
 	@Test
 	public void storeSimple() {
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, false, false)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, false, false)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false), getExpectedIncr(null), getExpectedSK());
 	}
 	
 	@Test
 	public void storeWithPropAndDelete() {
 		this.element.prop = "1234856453";
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, false, false)), eq(table), eq(id), this.getExpectedChange(this.element.prop), this.getExpectedDelete(false), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, false, false)), eq(table), eq(id), this.getExpectedChange(this.element.prop), this.getExpectedDelete(false), getExpectedIncr(null), getExpectedSK());
 		
 		this.element.prop = null;
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, false, false)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(true), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, false, false)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(true), getExpectedIncr(null), getExpectedSK());
 	}
 	
 	@Test
 	public void storeWithIncr() {
 		this.element.incr += 12;
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, true, false)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false), getExpectedIncr(12));
+		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, true, false)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false), getExpectedIncr(12), getExpectedSK());
 	}
 	
 	@Test
@@ -300,11 +304,11 @@ public class SendingToStoreTest {
 		this.element.cf.add("DummyKey1");
 		this.element.cf.add("DummyKey2");
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, false, true)), eq(table), eq(id), this.getExpectedChange(null, "DummyKey2", "DummyKey1"), this.getExpectedDelete(false), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, false, true)), eq(table), eq(id), this.getExpectedChange(null, "DummyKey2", "DummyKey1"), this.getExpectedDelete(false), getExpectedIncr(null), getExpectedSK());
 		
 		this.element.cf.remove("DummyKey2");
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, false, true)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false, "DummyKey2"), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, false, true)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false, "DummyKey2"), getExpectedIncr(null), getExpectedSK());
 	}
 	
 	@Test
@@ -314,12 +318,12 @@ public class SendingToStoreTest {
 		this.element.cf.add("DummyKey1");
 		this.element.cf.add("DummyKey2");
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, true, true)), eq(table), eq(id), this.getExpectedChange(this.element.prop, "DummyKey2", "DummyKey1"), this.getExpectedDelete(false), getExpectedIncr(12));
+		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, true, true)), eq(table), eq(id), this.getExpectedChange(this.element.prop, "DummyKey2", "DummyKey1"), this.getExpectedDelete(false), getExpectedIncr(12), getExpectedSK());
 
 		this.element.prop = null;
 		this.element.cf.remove("DummyKey2");
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, false, true)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(true, "DummyKey2"), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, false, true)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(true, "DummyKey2"), getExpectedIncr(null), getExpectedSK());
 	}
 	
 }

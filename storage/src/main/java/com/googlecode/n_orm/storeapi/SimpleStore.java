@@ -72,7 +72,7 @@ public interface SimpleStore {
 	 * Stores given piece of information.
 	 * In case an element is missing in the data store (table, row, family, ...), it is created.
 	 */
-	void storeChanges(String table, String id, Map<String, Map<String, byte[]>> changed, Map<String, Set<String>> removed, Map<String, Map<String, Number>> increments) throws DatabaseNotReachedException;
+	void storeChanges(String table, String id, Map<String, Map<String, byte[]>> changed, Map<String, Set<String>> removed, Map<String, Map<String, Number>> increments, Map<String, String> indexes) throws DatabaseNotReachedException;
 	
 	/**
 	 * Deletes the given row

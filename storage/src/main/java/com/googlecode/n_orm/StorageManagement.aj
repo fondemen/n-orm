@@ -181,7 +181,8 @@ public aspect StorageManagement {
 			
 			if (!(this.exists == Boolean.TRUE && changed.isEmpty() && deleted.isEmpty() && increments.isEmpty())) {
 				
-				this.getStore().storeChanges(this, changedFields, this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
+				this.getStore().storeChanges(this, changedFields, this.getTable(), this.getIdentifier(), localChanges, deleted, increments,
+						this.exists == Boolean.TRUE ? null : this.getSecondaryKeyIdentifiers());
 	
 				propsIncrs.clear();
 				for(ColumnFamily<?> family : families) {
@@ -203,7 +204,7 @@ public aspect StorageManagement {
 //					changed.put(CLASS_COLUMN_FAMILY, classColumn);
 					String ident = this.getFullIdentifier();
 					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
-						this.getStore().storeChanges(this, changedFields, px.getTable(sc), ident, changed, deleted, increments);
+						this.getStore().storeChanges(this, changedFields, px.getTable(sc), ident, changed, deleted, increments, null);
 					}
 				}
 			}

@@ -443,7 +443,8 @@ public class Memory implements SimpleStore {
 	public void storeChanges(String table, String id,
 			Map<String, Map<String, byte[]>> changed,
 			Map<String, Set<String>> removed,
-			Map<String, Map<String, Number>> incremented) {
+			Map<String, Map<String, Number>> incremented,
+			Map<String, String> indexes) {
 		IllegalArgumentException x = null;
 		
 		Row r = this.getRow(table, id, true);
@@ -470,6 +471,13 @@ public class Memory implements SimpleStore {
 				f.incr(entry.getKey(), entry.getValue());
 			}
 		}
+		
+		if (indexes != null)
+			for (Entry<String, String> idx : indexes.entrySet()) {
+				Row index = this.getRow(idx.getKey(), idx.getValue(), true);
+				ColumnFamily idxCf = index.get("");
+				idxCf.put(id, null);
+			}
 	}
 
 	@Override

@@ -39,13 +39,14 @@ public class SecondaryKeyDeclaration implements FieldsetHandler, Comparable<Seco
 		
 	}
 
-	private final Class<?> declaringClass;
+	private final Class<? extends PersistingElement> declaringClass;
 	private final String name;
 	private final List<SecondaryKeyField> indexes;
 	private final Map<Field, SecondaryKeyField> indexesMap;
 	private final List<Field> orderedFields;
+	private String table = null;
 	
-	protected SecondaryKeyDeclaration(Class<?> declaringClass,
+	protected SecondaryKeyDeclaration(Class<? extends PersistingElement> declaringClass,
 			String name) {
 		assert declaringClass != null;
 		assert name != null;
@@ -146,7 +147,7 @@ public class SecondaryKeyDeclaration implements FieldsetHandler, Comparable<Seco
 		return ret;
 	}
 
-	public Class<?> getDeclaringClass() {
+	public Class<? extends PersistingElement> getDeclaringClass() {
 		return declaringClass;
 	}
 
@@ -185,6 +186,13 @@ public class SecondaryKeyDeclaration implements FieldsetHandler, Comparable<Seco
 	@Override
 	public String handledFieldKind() {
 		return this.name + " secondary key";
+	}
+	
+	public String getTable() {
+		if (this.table == null) {
+			this.table = PersistingMixin.getInstance().getTable(this.getDeclaringClass()) + '.' + this.getName();
+		}
+		return this.table;
 	}
 
 	@Override
