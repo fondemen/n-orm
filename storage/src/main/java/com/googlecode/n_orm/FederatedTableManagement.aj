@@ -67,11 +67,8 @@ public aspect FederatedTableManagement {
 			
 			//ExecutorService pe = Executors.newCachedThreadPool();
 			for (String t : self.getPossibleTables()) {
-				System.out.println("truy from " + t);
 				Map<String, Map<String, byte[]>> ret = store.get(self, t, self.getIdentifier(), families);
-				System.out.println("found " + ret);
 				if (ret != null && !ret.isEmpty()) {
-					System.out.println("found in " + t);
 					self.table = t;
 					return ret;
 				}
