@@ -63,4 +63,12 @@ public @interface Persisting {
 	 * The normal case is not as information is stored in the table for the instance's class already.
 	 */
 	boolean storeAlsoInSuperClasses() default false;
+	
+	/**
+	 * States whether this class should target more than one table.<br>
+	 * When true, class automatically implements {@link PersistingElementOverFederatedTable}.<br>
+	 * If true, table name is determined on a per-object basis, and the table is the table for the class (see {@link PersistingMixin#getTable(Class)}
+	 * post-fixed with the result of the invocation of {@link PersistingElementOverFederatedTable#getTablePostfix()}.<br>
+	 */
+	boolean federated() default false;
 }
