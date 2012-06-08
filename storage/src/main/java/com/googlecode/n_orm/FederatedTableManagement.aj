@@ -115,6 +115,30 @@ public aspect FederatedTableManagement {
 	public String PersistingElementOverFederatedTable.getMainTable() {
 		return super.getTable();
 	}
+	
+	private void PersistingElementOverFederatedTable.setTablePostfix(String postfix, Store store) {
+		String oldPostfix = this.tablePostfix;
+		this.tablePostfix = postfix;
+		switch (this.getClass().getAnnotation(Persisting.class).federated()) {
+		case FAST_CHECKED:
+			String computedPostfix = this.getTablePostfix();
+			if (!this.tablePostfix.equals(computedPostfix))
+				throw new IllegalStateException("Found " + this
+						+ " from table " + this.getMainTable() + " with postfix "
+						+ this.tablePostfix
+						+ " while computed version states postfix "
+						+ computedPostfix);
+			//No break to check the following
+		case CONSISTENT:
+			if (oldPostfix != null && !oldPostfix.equals(this.tablePostfix)) {
+				throw new IllegalStateException("Found " + this
+						+ " from table " + this.getMainTable() + " with postfix "
+						+ this.tablePostfix + " while another postfix "
+						+ oldPostfix + " was registered");
+			}
+		}
+		registerTable(this.getMainTable(), this.getMainTable()+this.tablePostfix, store);
+	}
 
 	/**
 	 * The list of tables where to find this object from what we can guess in
@@ -175,24 +199,24 @@ public aspect FederatedTableManagement {
 		if (self.tablePostfix == null
 				&& Persisting.FederatedMode.CONSISTENT.equals(self.getClass()
 						.getAnnotation(Persisting.class).federated())) {
-			new RowExistsAction(store, id).run(self, store); //Should setup self.tablePostfix if it exists
+			new RowExistsAction(store, id).run(self, store); // Should setup
+																// self.tablePostfix
+																// if it exists
 		}
 
 		// We now have to definitely choose the proper table
 		if (self.tablePostfix == null) {
-			self.tablePostfix = self.getTablePostfix();
-		} else {
-			switch (self.getClass().getAnnotation(Persisting.class).federated()) {
-			case FAST_CHECKED:
-				String computedPostfix = self.getTablePostfix();
-				if (!self.tablePostfix.equals(computedPostfix)) {
-					throw new IllegalStateException(self
-							+ " already registered in table "
-							+ self.getMainTable() + " with postfix "
-							+ self.tablePostfix
-							+ " while computed postfix states now "
-							+ computedPostfix);
-				}
+			self.setTablePostfix(self.getTablePostfix(), store);
+		} else if (self.getClass().getAnnotation(Persisting.class).federated()
+						.equals(Persisting.FederatedMode.FAST_CHECKED)) {
+			String computedPostfix = self.getTablePostfix();
+			if (!self.tablePostfix.equals(computedPostfix)) {
+				throw new IllegalStateException(self
+						+ " already registered in table "
+						+ self.getMainTable() + " with postfix "
+						+ self.tablePostfix
+						+ " while computed postfix states now "
+						+ computedPostfix);
 			}
 		}
 
@@ -213,31 +237,6 @@ public aspect FederatedTableManagement {
 
 		abstract boolean isAnswerValid(T ans);
 
-		private void setPostfix(PersistingElementOverFederatedTable self,
-				String mainTable, String actualTable, Store store) {
-			String computedPostfix = self.getTablePostfix();
-			String oldPostfix = self.tablePostfix;
-			self.tablePostfix = actualTable.substring(mainTable.length());
-			switch (self.getClass().getAnnotation(Persisting.class).federated()) {
-			case FAST_CHECKED:
-				if (!self.tablePostfix.equals(computedPostfix))
-					throw new IllegalStateException("Found " + self
-							+ " from table " + mainTable + " with postfix "
-							+ self.tablePostfix
-							+ " while computed version states postfix "
-							+ computedPostfix);
-			case CONSISTENT:
-				if (oldPostfix != null && !oldPostfix.equals(self.tablePostfix)) {
-					throw new IllegalStateException("Found " + self
-							+ " from table " + mainTable + " with postfix "
-							+ self.tablePostfix
-							+ " while another postfix "
-							+ computedPostfix + " was registered");
-				}
-			}
-			registerTable(mainTable, actualTable, store);
-		}
-
 		public T run(PersistingElementOverFederatedTable self, Store store) {
 			String mainTable = self.getMainTable();
 			// ExecutorService pe = Executors.newCachedThreadPool();
@@ -248,7 +247,7 @@ public aspect FederatedTableManagement {
 				assert t.startsWith(mainTable);
 				ret = this.performAction(self, t);
 				if (this.isAnswerValid(ret)) {
-					setPostfix(self, mainTable, t, store);
+					self.setTablePostfix(t.substring(mainTable.length()), store);
 					return ret;
 				}
 			}
@@ -258,7 +257,7 @@ public aspect FederatedTableManagement {
 				assert t.startsWith(mainTable);
 				ret = this.performAction(self, t);
 				if (this.isAnswerValid(ret)) {
-					setPostfix(self, mainTable, t, store);
+					self.setTablePostfix(t.substring(mainTable.length()), store);
 					return ret;
 				}
 			}
