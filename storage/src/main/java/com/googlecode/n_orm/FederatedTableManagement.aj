@@ -23,7 +23,7 @@ public aspect FederatedTableManagement {
 	public static long TableAlternativeCacheTTLInS = 600;
 
 	// REM: a federated element can only inherit federated elements
-	declare parents: (@Persisting(federated=true) *) implements PersistingElement, PersistingElementOverFederatedTable;
+	declare parents: (@Persisting(federated!=Persisting.FederatedMode.NONE) *) implements PersistingElement, PersistingElementOverFederatedTable;
 
 	private final static class TableAlternatives {
 		private final String mainTable;
@@ -45,7 +45,7 @@ public aspect FederatedTableManagement {
 		 */
 		protected Set<String> updateAlternatives(Store store) {
 
-			if ((this.lastUpdate + TableAlternativeCacheTTLInS) > System
+			if ((this.lastUpdate + TableAlternativeCacheTTLInS) < System
 					.currentTimeMillis()) {
 				Map<String, byte[]> res = store.get(null, null,
 						FEDERATED_META_TABLE, this.mainTable,
@@ -165,14 +165,36 @@ public aspect FederatedTableManagement {
 
 	// Store
 	void around(PersistingElementOverFederatedTable self, String table,
-			Store store):
+			String id, Store store):
 		call(void Store+.storeChanges(..))
 		&& within(StorageManagement)
 		&& target(store)
-		&& args(self, Map<String, Field>, table, ..) {
+		&& args(self, Map<String, Field>, table, id, ..) {
+
+		// consistent mode ; let's see where this object can be found already
+		if (self.tablePostfix == null
+				&& Persisting.FederatedMode.CONSISTENT.equals(self.getClass()
+						.getAnnotation(Persisting.class).federated())) {
+			new RowExistsAction(store, id).run(self, store); //Should setup self.tablePostfix if it exists
+		}
+
 		// We now have to definitely choose the proper table
-		if (self.tablePostfix == null)
+		if (self.tablePostfix == null) {
 			self.tablePostfix = self.getTablePostfix();
+		} else {
+			switch (self.getClass().getAnnotation(Persisting.class).federated()) {
+			case FAST_CHECKED:
+				String computedPostfix = self.getTablePostfix();
+				if (!self.tablePostfix.equals(computedPostfix)) {
+					throw new IllegalStateException(self
+							+ " already registered in table "
+							+ self.getMainTable() + " with postfix "
+							+ self.tablePostfix
+							+ " while computed postfix states now "
+							+ computedPostfix);
+				}
+			}
+		}
 
 		// Postfixing table name if necessary + registering alternative in the
 		// cache
@@ -182,24 +204,51 @@ public aspect FederatedTableManagement {
 			table = actualTable;
 		}
 
-		proceed(self, table, store);
+		proceed(self, table, id, store);
 	}
-	
+
 	private static abstract class Action<T> {
-		abstract T performAction(PersistingElementOverFederatedTable self, String table);
-		
+		abstract T performAction(PersistingElementOverFederatedTable self,
+				String table);
+
 		abstract boolean isAnswerValid(T ans);
-		
+
+		private void setPostfix(PersistingElementOverFederatedTable self,
+				String mainTable, String actualTable, Store store) {
+			String computedPostfix = self.getTablePostfix();
+			String oldPostfix = self.tablePostfix;
+			self.tablePostfix = actualTable.substring(mainTable.length());
+			switch (self.getClass().getAnnotation(Persisting.class).federated()) {
+			case FAST_CHECKED:
+				if (!self.tablePostfix.equals(computedPostfix))
+					throw new IllegalStateException("Found " + self
+							+ " from table " + mainTable + " with postfix "
+							+ self.tablePostfix
+							+ " while computed version states postfix "
+							+ computedPostfix);
+			case CONSISTENT:
+				if (oldPostfix != null && !oldPostfix.equals(self.tablePostfix)) {
+					throw new IllegalStateException("Found " + self
+							+ " from table " + mainTable + " with postfix "
+							+ self.tablePostfix
+							+ " while another postfix "
+							+ computedPostfix + " was registered");
+				}
+			}
+			registerTable(mainTable, actualTable, store);
+		}
+
 		public T run(PersistingElementOverFederatedTable self, Store store) {
 			String mainTable = self.getMainTable();
 			// ExecutorService pe = Executors.newCachedThreadPool();
 			// First trying with known possible tables
 			List<String> knownPossibleTables = self.getKnownPossibleTables();
+			T ret = null;
 			for (String t : knownPossibleTables) {
 				assert t.startsWith(mainTable);
-				T ret = this.performAction(self, t);
+				ret = this.performAction(self, t);
 				if (this.isAnswerValid(ret)) {
-					self.tablePostfix = t.substring(mainTable.length());
+					setPostfix(self, mainTable, t, store);
 					return ret;
 				}
 			}
@@ -207,32 +256,64 @@ public aspect FederatedTableManagement {
 			for (String t : self.getPossibleTablesWithAnUpdate(
 					knownPossibleTables, store)) {
 				assert t.startsWith(mainTable);
-				T ret = this.performAction(self, t);
+				ret = this.performAction(self, t);
 				if (this.isAnswerValid(ret)) {
-					self.tablePostfix = t.substring(mainTable.length());
+					setPostfix(self, mainTable, t, store);
 					return ret;
 				}
 			}
-			return null;
+			return ret;
 		}
 	}
 
 	// Activate
 	Map<String, Map<String, byte[]>> around(
-			PersistingElementOverFederatedTable self, final String table, final String id,
-			final Map<String, Field> families, final Store store):
+			PersistingElementOverFederatedTable self, final String table,
+			final String id, final Map<String, Field> families,
+			final Store store):
 		call(Map<String, Map<String, byte[]>> Store.get(PersistingElement,String,String,Map<String, Field>))
 		&& within(StorageManagement)
-		&& this(self)
 		&& target(store)
-		&& args(PersistingElement, table, id, families) {
+		&& args(self, table, id, families) {
 		return new Action<Map<String, Map<String, byte[]>>>() {
-			Map<String, Map<String, byte[]>> performAction(PersistingElementOverFederatedTable self, String table) {
+			Map<String, Map<String, byte[]>> performAction(
+					PersistingElementOverFederatedTable self, String table) {
 				return store.get(self, table, id, families);
 			}
+
 			boolean isAnswerValid(Map<String, Map<String, byte[]>> ans) {
 				return ans != null && !ans.isEmpty();
 			}
 		}.run(self, store);
+	}
+
+	private static class RowExistsAction extends Action<Boolean> {
+		private Store store;
+		private String id;
+
+		public RowExistsAction(Store store, String id) {
+			this.store = store;
+			this.id = id;
+		}
+
+		Boolean performAction(PersistingElementOverFederatedTable self,
+				String table) {
+			return store.exists(self, table, id);
+		}
+
+		boolean isAnswerValid(Boolean ans) {
+			return ans.booleanValue();
+		}
+	}
+
+	// Exists
+	boolean around(PersistingElementOverFederatedTable self,
+			final String table, final String id, final Store store):
+		call(boolean Store.exists(PersistingElement, String, String))
+		&& within(StorageManagement)
+		&& target(store)
+		&& args(self, table, id) {
+		Boolean ret = new RowExistsAction(store, id).run(self, store);
+		return ret != null && ret.booleanValue();
 	}
 }

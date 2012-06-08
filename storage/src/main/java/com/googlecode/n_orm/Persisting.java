@@ -46,6 +46,13 @@ import com.googlecode.n_orm.storeapi.SimpleStore;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface Persisting {
+	public static enum FederatedMode {
+		NONE,
+		FAST_UNCHECKED,
+		FAST_CHECKED,
+		CONSISTENT
+	}
+	
 	/**
 	 * The name of the table where should be stored instances.
 	 * If let empty (default value), the name of the class is used.
@@ -70,5 +77,5 @@ public @interface Persisting {
 	 * If true, table name is determined on a per-object basis, and the table is the table for the class (see {@link PersistingMixin#getTable(Class)}
 	 * post-fixed with the result of the invocation of {@link PersistingElementOverFederatedTable#getTablePostfix()}.<br>
 	 */
-	boolean federated() default false;
+	FederatedMode federated() default FederatedMode.NONE;
 }
