@@ -13,7 +13,7 @@
 	<packaging>pom</packaging>
 
 	<properties>
-		<hbase.version>0.90.4</hbase.version>
+		<hbase.version>0.90.5</hbase.version>
 		<hadoop.version>0.20-append-r1056497</hadoop.version>
 	</properties>
 

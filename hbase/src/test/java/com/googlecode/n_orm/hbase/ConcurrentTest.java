@@ -452,7 +452,7 @@ public class ConcurrentTest {
 	@Test
 	public void requestTimeout() throws Throwable {
 //		ExecutorService es = Executors.newCachedThreadPool();
-//		try {
+		try {
 			store1.setClientTimeout(1);
 			store1.restart();
 
@@ -487,9 +487,9 @@ public class ConcurrentTest {
 //				throw error[0];
 //		} catch (Exception x) {
 //			x.printStackTrace();
-//		} finally {
-//			store1.setClientTimeout(null);
-//			store1.restart();
-//		}
+		} finally {
+			store1.setClientTimeout(1000);
+			store1.restart();
+		}
 	}
 }
