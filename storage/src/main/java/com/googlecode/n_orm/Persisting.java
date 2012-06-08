@@ -47,9 +47,31 @@ import com.googlecode.n_orm.storeapi.SimpleStore;
 @Target(ElementType.TYPE)
 public @interface Persisting {
 	public static enum FederatedMode {
+		/**
+		 * A single table will be used to store elements.
+		 */
 		NONE,
+		/**
+		 * Many tables can be used for storing elements.
+		 * This version is dangerous and use it with care as data might become inconsistent between tables.
+		 * Indeed, table extension is computed from {@link PersistingElementOverFederatedTable#getTablePostfix()}
+		 * when stored for first time. In case the stored element already exists in another table (either because of
+		 * legacy data in table with no postfix, or because the result of
+		 * {@link PersistingElementOverFederatedTable#getTablePostfix()} changes over time - e.g. when it depends
+		 * on an activated datum), (possibly partial) element will be duplicated in more than one table, and it won't be possible
+		 * to find the overridden version.
+		 */
 		FAST_UNCHECKED,
+		/**
+		 * Same as {@link #FAST_UNCHECKED}, but checking that {@link PersistingElementOverFederatedTable#getTablePostfix()}
+		 * does not change over time. In the latter case, an {@link IllegalStateException} is thrown.
+		 */
 		FAST_CHECKED,
+		/**
+		 * Checks from the data store first to know what is the postfix for a given element.
+		 * Triggers much more queries on the data store than other option, but this is the only one
+		 * that guarantees consistency regardless implementation for {@link PersistingElementOverFederatedTable#getTablePostfix()}.
+		 */
 		CONSISTENT
 	}
 	
