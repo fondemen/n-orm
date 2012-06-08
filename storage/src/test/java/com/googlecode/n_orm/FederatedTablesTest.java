@@ -30,7 +30,8 @@ public class FederatedTablesTest {
 	
 	@Test
 	public void sendingToTable() {
-		Store store = Mockito.mock(Store.class);
+		Memory.INSTANCE.reset();
+		
 		Element elt = new Element();
 		elt.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
 		elt.key = "akey";
@@ -47,17 +48,46 @@ public class FederatedTablesTest {
 	}
 	
 	@Test
-	public void gettingFromTable() {
+	public void gettingFromGuessedTable() {
+		FederatedTableManagement.clearAlternativesCache();
+		Memory.INSTANCE.resetQueries();
+		
 		Element elt = new Element();
+		elt.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
 		elt.key = "akey";
 		elt.post = "post";
 		elt.arg = "a value";
 		elt.store();
+		//One query to register the alternative table
+		//Another to actually store the element
+		assertEquals(2, Memory.INSTANCE.getQueriesAndReset());
 		
 		Element elt2 = new Element();
+		elt2.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
 		elt2.key = "akey";
 		elt2.post = "post";
 		elt2.activate();
+		
+		assertEquals(elt.arg, elt2.arg);
+		assertEquals(1, Memory.INSTANCE.getQueriesAndReset());
+	}
+	
+	@Test
+	public void gettingFromKnownTable() {
+		FederatedTableManagement.clearAlternativesCache();
+		
+		Element elt = new Element();
+		elt.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
+		elt.key = "akey";
+		elt.post = "post";
+		elt.arg = "a value";
+		elt.store(); //Caches the tpost table as an alternative to t
+
+		Memory.INSTANCE.resetQueries(); //So that tpost table is forgotten in the store
+		Element elt2 = new Element();
+		elt2.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
+		elt2.key = "akey";
+		elt2.activate(); //tpost table can only be found from cache
 		
 		assertEquals(elt.arg, elt2.arg);
 	}
