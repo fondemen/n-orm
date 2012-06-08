@@ -103,7 +103,7 @@ public aspect FederatedTableManagement {
 	}
 
 	// The postfix for tables ; null if table is not known
-	private transient String PersistingElementOverFederatedTable.tablePostfix = null;
+	private transient String PersistingElementOverFederatedTable.tablePostfix;
 
 	public String PersistingElementOverFederatedTable.getTable() {
 		if (this.tablePostfix != null) {
@@ -139,6 +139,9 @@ public aspect FederatedTableManagement {
 		}
 		registerTable(this.getMainTable(), this.getMainTable()+this.tablePostfix, store);
 	}
+	
+	//jut to be sure
+	declare error: set(* PersistingElementOverFederatedTable.tablePostfix) && !withincode(private void PersistingElementOverFederatedTable.setTablePostfix(String, Store)) : "Avoid setting this attribute directly ; use setTablePostfix(String postfix, Store store) instead";
 
 	/**
 	 * The list of tables where to find this object from what we can guess in
