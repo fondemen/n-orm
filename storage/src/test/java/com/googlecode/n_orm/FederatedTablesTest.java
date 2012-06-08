@@ -2,6 +2,7 @@ package com.googlecode.n_orm;
 
 import static org.junit.Assert.*;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import com.googlecode.n_orm.Persisting.FederatedMode;
@@ -19,6 +20,12 @@ public class FederatedTablesTest {
 		public String getTablePostfix() {
 			return this.post;
 		}
+	}
+	
+	@Before
+	public void cleanupCache() {
+		//Mandatory as we are using diffrent data stores for the same class in this test case
+		FederatedTableManagement.clearAlternativesCache();
 	}
 	
 	@Test
