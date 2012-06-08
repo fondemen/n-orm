@@ -2,15 +2,12 @@ package com.googlecode.n_orm;
 
 import java.lang.reflect.Field;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import com.googlecode.n_orm.storeapi.Store;
 
@@ -79,7 +76,7 @@ public aspect FederatedTableManagement {
 		}
 
 		public Set<String> getAlternatives() {
-			return /* Collections.unmodifiableSet( */this.alternatives/* ) */;
+			return this.alternatives;
 		}
 	}
 
@@ -106,7 +103,7 @@ public aspect FederatedTableManagement {
 	}
 
 	// The postfix for tables ; null if table is not known
-	private String PersistingElementOverFederatedTable.tablePostfix = null;
+	private transient String PersistingElementOverFederatedTable.tablePostfix = null;
 
 	public String PersistingElementOverFederatedTable.getTable() {
 		if (this.tablePostfix != null) {
@@ -222,17 +219,16 @@ public aspect FederatedTableManagement {
 
 	// Activate
 	Map<String, Map<String, byte[]>> around(
-			final PersistingElementOverFederatedTable self, final String table,
+			PersistingElementOverFederatedTable self, final String table, final String id,
 			final Map<String, Field> families, final Store store):
 		call(Map<String, Map<String, byte[]>> Store.get(PersistingElement,String,String,Map<String, Field>))
 		&& within(StorageManagement)
 		&& this(self)
 		&& target(store)
-		&& args(PersistingElement, String, table, families) {
-		
+		&& args(PersistingElement, table, id, families) {
 		return new Action<Map<String, Map<String, byte[]>>>() {
 			Map<String, Map<String, byte[]>> performAction(PersistingElementOverFederatedTable self, String table) {
-				return store.get(self, table, self.getIdentifier(), families);
+				return store.get(self, table, id, families);
 			}
 			boolean isAnswerValid(Map<String, Map<String, byte[]>> ans) {
 				return ans != null && !ans.isEmpty();

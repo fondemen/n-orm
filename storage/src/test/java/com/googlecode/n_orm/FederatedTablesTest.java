@@ -70,6 +70,7 @@ public class FederatedTablesTest {
 		
 		assertEquals(elt.arg, elt2.arg);
 		assertEquals(1, Memory.INSTANCE.getQueriesAndReset());
+		assertEquals("tpost", elt2.getTable());
 	}
 	
 	@Test
@@ -90,6 +91,41 @@ public class FederatedTablesTest {
 		elt2.activate(); //tpost table can only be found from cache
 		
 		assertEquals(elt.arg, elt2.arg);
+		assertEquals("tpost", elt2.getTable());
+	}
+	
+	@Test
+	public void storeAndActivate() {
+		Element elt = new Element();
+		elt.key = "akey";
+		elt.post = "post";
+		elt.arg = "a value";
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = "akey";
+		elt2.activate();
+
+		assertEquals(elt.post, elt2.post);
+		assertEquals(elt.arg, elt2.arg);
+		assertEquals("tpost", elt2.getTable());
+	}
+	
+	@Test
+	public void storeAndActivateIfNotAlready() {
+		Element elt = new Element();
+		elt.key = "akey";
+		elt.post = "post";
+		elt.arg = "a value";
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = "akey";
+		elt2.activateIfNotAlready();
+
+		assertEquals(elt.post, elt2.post);
+		assertEquals(elt.arg, elt2.arg);
+		assertEquals("tpost", elt2.getTable());
 	}
 
 }
