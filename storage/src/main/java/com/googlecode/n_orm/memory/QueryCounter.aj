@@ -1,26 +1,27 @@
 package com.googlecode.n_orm.memory;
 
 import java.lang.reflect.Method;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.aspectj.lang.reflect.MethodSignature;
 
 public aspect QueryCounter {
-	private int Memory.queries = 0;
+	private AtomicInteger Memory.queries = new AtomicInteger();
 	
 	public void Memory.resetQueries() {
-		this.queries = 0;
+		this.queries.set(0);
+	}
+	
+	public int Memory.getQueriesAndReset() {
+		return this.queries.getAndSet(0);
 	}
 	
 	public boolean Memory.hadAQuery() {
-		boolean ret = this.queries == 1;
-		this.resetQueries();
-		return ret;
+		return this.getQueriesAndReset() == 1;
 	}
 	
 	public boolean Memory.hadNoQuery() {
-		boolean ret = this.queries == 0;
-		this.resetQueries();
-		return ret;
+		return this.getQueriesAndReset() == 0;
 	}
 	
 	private transient volatile Method Memory.running = null;
@@ -29,7 +30,7 @@ public aspect QueryCounter {
 	
 	before(Memory self): runningQuery(self) && if(self.running == null) {
 		self.running = ((MethodSignature)thisJoinPointStaticPart.getSignature()).getMethod();
-		self.queries++;
+		self.queries.incrementAndGet();
 	}
 	
 	after(Memory self): runningQuery(self) {
