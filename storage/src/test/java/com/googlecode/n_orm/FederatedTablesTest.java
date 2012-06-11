@@ -268,13 +268,9 @@ public class FederatedTablesTest {
 	
 	@Test
 	public void exists() {
-		Memory.INSTANCE.reset();
-		
 		Element elt = new Element();
 		elt.key = "akey";
 		elt.post = "post";
-		
-		assertFalse(elt.existsInStore());
 		
 		elt.store();
 		
@@ -283,6 +279,57 @@ public class FederatedTablesTest {
 
 		assertTrue(elt2.existsInStore());
 		assertTrue(elt.existsInStore());
+	}
+	
+	@Test
+	public void delete() {
+		Memory.INSTANCE.reset();
+		
+		Element elt = new Element();
+		elt.key = "akey";
+		elt.post = "post";
+		
+		elt.store();
+
+		assertTrue(elt.existsInStore());
+		
+		elt.delete();
+		
+		assertFalse(elt.existsInStore());
+	}
+	
+	@Test
+	public void deleteFromOutside() {
+		Element elt = new Element();
+		elt.key = "akey";
+		elt.post = "post";
+		
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = "akey";
+		
+		elt2.delete();
+
+		assertFalse(elt.existsInStore());
+	}
+	
+	@Test
+	public void deleteCompletelyUnknown() {
+		Element elt = new Element();
+		elt.key = "akey";
+		elt.post = "post";
+		
+		elt.store();
+		
+		FederatedTableManagement.clearAlternativesCache();
+		
+		Element elt2 = new Element();
+		elt2.key = "akey";
+		
+		elt2.delete();
+
+		assertFalse(elt.existsInStore());
 	}
 
 }

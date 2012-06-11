@@ -204,9 +204,9 @@ public aspect FederatedTableManagement {
 		if (self.tablePostfix == null
 				&& Persisting.FederatedMode.CONSISTENT.equals(self.getClass()
 						.getAnnotation(Persisting.class).federated())) {
-			new RowExistsAction(store, id).run(self, store); // Should setup
-																// self.tablePostfix
-																// if it exists
+			//Should setup self.tablePostfix if it exists
+			boolean exists = new RowExistsAction(store, id).run(self, store);
+			assert !exists || self.tablePostfix != null;
 		}
 
 		// We now have to definitely choose the proper table
@@ -243,6 +243,11 @@ public aspect FederatedTableManagement {
 		abstract boolean isAnswerValid(T ans);
 
 		public T run(PersistingElementOverFederatedTable self, Store store) {
+			//Do we already know the actuals table ?
+			if (self.tablePostfix != null) {
+				return this.performAction(self, self.getTable());
+			}
+			
 			String mainTable = self.getMainTable();
 			// ExecutorService pe = Executors.newCachedThreadPool();
 			// First trying with known possible tables
@@ -256,7 +261,7 @@ public aspect FederatedTableManagement {
 					return ret;
 				}
 			}
-			// Then retrying with tables from store
+			// Then retrying with tables from store (
 			for (String t : self.getPossibleTablesWithAnUpdate(
 					knownPossibleTables, store)) {
 				assert t.startsWith(mainTable);
@@ -319,5 +324,26 @@ public aspect FederatedTableManagement {
 		&& args(self, table, id) {
 		Boolean ret = new RowExistsAction(store, id).run(self, store);
 		return ret != null && ret.booleanValue();
+	}
+	
+	// Delete
+	void around(PersistingElementOverFederatedTable self, final String table,
+			final String id, final Store store):
+		call(void Store+.delete(..))
+		&& within(StorageManagement)
+		&& target(store)
+		&& args(self, table, id) {
+		new RowExistsAction(store, id) {
+			@Override
+			Boolean performAction(PersistingElementOverFederatedTable self,
+					String table) {
+				//Avoid deleting an inexisting element
+				Boolean ret = super.performAction(self, table);
+				if (ret)
+					store.delete(self, table, id);
+				return ret;
+			}
+			
+		}.run(self, store);
 	}
 }
