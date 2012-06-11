@@ -28,7 +28,7 @@
 		<site>
 			<id>wiki</id>
 			<name>n-orm Wiki pages</name>
-			<url>file://${basedir}/../../n-orm-wiki/parent</url>
+			<url>file://${basedir}/../../n-orm.wiki/parent</url>
 		</site>
 	</distributionManagement>
 

@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -303,10 +304,10 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * Runs the query to find at most N matching elements and serialize a representation into the output stream. The maximum limit N can be set before using {@link #withAtMost(int)}, but is not mandatory.
 	 * Dependencies are not serialized. Consider carefully setting families to be activated before ; it is advised to use {@link #andActivateAllFamilies()}.
 	 * Implementation tries to optimize as much as possible memory impact.
-	 * @param out an output stream that must support {@link InputStream#markSupported()}
+	 * @param out an output stream that must support {@link InputStream#markSupported()} ; note that only one {@link ObjectOutputStream} must be created for a given {@link OutputStream}
 	 * @throws IOException 
 	 */
-	public long exportTo(OutputStream out) throws IOException, DatabaseNotReachedException {
+	public long exportTo(ObjectOutputStream out) throws IOException, DatabaseNotReachedException {
 		if (this.hasNoLimit()) {
 			long exported = 0;
 			Constraint c = this.getConstraint();
@@ -335,6 +336,6 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 		File f = new File(file);
 		FileOutputStream fo = new FileOutputStream(f);
 		BufferedOutputStream bo = new BufferedOutputStream(fo);
-		return this.exportTo(bo);
+		return this.exportTo(new ObjectOutputStream(bo));
 	}
 }

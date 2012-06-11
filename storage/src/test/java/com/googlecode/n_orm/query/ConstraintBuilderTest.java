@@ -63,6 +63,12 @@ public class ConstraintBuilderTest {
 	}
 	
 	@Test
+	public void stringParameter() throws DatabaseNotReachedException {
+		 Constraint c = StorageManagement.findElements().ofClass(SUTClass.class).withKey("key1").setTo("765").getConstraint();
+		 assertEquals(ConversionTools.convertToString(765) + KeyManagement.KEY_SEPARATOR, c.getStartKey());
+	}
+	
+	@Test
 	public void lacksSearchKey() throws DatabaseNotReachedException {
 		ClassConstraintBuilder<SUTClass> c = StorageManagement.findElements().ofClass(SUTClass.class).withKey("key1").setTo(1).withAtMost(4).elements();
 		assertEquals(c.getClazz(), SUTClass.class);

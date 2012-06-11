@@ -10,6 +10,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.NavigableSet;
@@ -17,6 +19,11 @@ import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
@@ -34,6 +41,8 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.Novel;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.Process;
+import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.RealBook;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
@@ -54,19 +63,36 @@ public class BasicPerformanceTest {
 	private BookStore bssut = null;
 	private Book bsut = null;
 	
+	public ExecutorService exec = null;
+	
 	@BeforeClass
 	@AfterClass
 	public static void vacuumDB() throws DatabaseNotReachedException {
+		ExecutorService exec = Executors.newFixedThreadPool(100);
 		for (Class<?> clazz : new Class<?> [] {BookStore.class, Book.class, Novel.class}) {
 			@SuppressWarnings("unchecked")
 			CloseableIterator<? extends PersistingElement> found = StorageManagement.findElements().ofClass((Class<? extends PersistingElement>)clazz).withAtMost(10000).elements().iterate();
 			try {
 				while (found.hasNext()) {
-					found.next().delete();
+					final PersistingElement elt = found.next();
+					exec.submit(new Runnable () {
+
+						@Override
+						public void run() {
+							elt.delete();
+						}
+						
+					});
 				}
 			} finally {
 				found.close();
 			}
+		}
+		exec.shutdown();
+		try {
+			exec.awaitTermination(10, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			fail(e.getMessage());
 		}
 		KeyManagement.getInstance().cleanupKnownPersistingElements();
 	}
@@ -88,6 +114,17 @@ public class BasicPerformanceTest {
 		//}
 	}
 	
+	@Before
+	public void createExecutor() {
+		this.exec = Executors.newFixedThreadPool(100);
+	}
+	
+	@After
+	public void stopExecutor() throws InterruptedException {
+		this.exec.shutdown();
+		this.exec.awaitTermination(5, TimeUnit.SECONDS);
+	}
+	
 	public void deleteBookstore() throws DatabaseNotReachedException {
 		if (bssut != null) {
 			bssut.delete();
@@ -97,57 +134,89 @@ public class BasicPerformanceTest {
 	 
 	 @Test public void insert1kEmptyBS() throws DatabaseNotReachedException {
 		 
-		 BookStore p;
-		 
 		 for(int i = 0; i < 1000; i++) {
-			 p = new BookStore("testbookstore");
-			 p.activate();
+			 exec.submit(new Runnable() {
+
+				@Override
+				public void run() {
+					BookStore p = new BookStore("testbookstore");
+					p.activate();
+				}
+				 
+			 });
 		 }
 
 	 }
 	 
 	 @Test public void insert1kNonEmptyBS() throws DatabaseNotReachedException {
-		 BookStore p;
-		 
 		 for(int i = 0; i < 1000; i++) {
-			 p = new BookStore("testbookstore");
-			 p.setName("Hello, I'm BS #"+i);
-			 p.activate();
+			 final int index = i;
+			 exec.submit(new Runnable() {
+
+				@Override
+				public void run() {
+					BookStore p = new BookStore("testbookstore");
+					p.setName("Hello, I'm BS #"+index);
+					p.activate();
+				}
+				 
+			 });
 		 }
 	 }
 	 
 	 @Test public void insertAndStore1kNonEmptyBS() throws DatabaseNotReachedException {
-		 BookStore p;
-		 
 		 for(int i = 0; i < 1000; i++) {
-			 p = new BookStore("testbookstore");
-			 p.setName("Hello, I'm BS #"+i);
-			 p.store();
+			 final int index = i;
+			 exec.submit(new Runnable() {
+
+				@Override
+				public void run() {
+					BookStore p = new BookStore("testbookstore");
+					p.setName("Hello, I'm BS #"+index);
+					p.store();
+				}
+				 
+			 });
 		 }
 	 }
 	
 	 @Test public void insertAnddelete1kBS() throws DatabaseNotReachedException {
-		 BookStore p;
-		 
 		 for(int i = 0; i < 1000; i++) {
-			 p = new BookStore("testbookstore");
-			 p.setName("Hello, I'm BS #"+i);
-			 p.store();
-			 p.delete();
+			 final int index = i;
+			 exec.submit(new Runnable() {
+
+				@Override
+				public void run() {
+					BookStore p = new BookStore("testbookstore");
+					p.setName("Hello, I'm BS #"+index);
+					p.store();
+					 p.delete();
+				}
+				 
+			 });
 		 }
 	 }
 	
 	 @Test public void insertAnddelete1kBWithBS() throws DatabaseNotReachedException {
-		 RealBook b;
 		 for(int i = 0; i < 10000; i++) {
-			 b = new RealBook(bssut, new Date(2012, 1, i % 30), new Date(2042, i % 12, 12), "Hello"+i, i);
-			 b.store();
-			 b.activate();
-			 bssut.store();
+			 final int index = i;
+			 exec.submit(new Runnable() {
+
+				@Override
+				public void run() {
+					RealBook b = new RealBook(bssut, new Date(2012, 1, index % 30), new Date(2042, index % 12, 12), "Hello"+index, index);
+					b.store();
+					b.activate();
+					bssut.store();
+				}
+				 
+			 });
+			 
 		 }
 	 }
 	 
 	 @Test public void searchAmong1kBooks() throws DatabaseNotReachedException {
+		 this.insertAnddelete1kBWithBS();
 		 CloseableIterator<RealBook> storeBooks = StorageManagement.findElements().ofClass(RealBook.class)
 					.withKey("bookStore").setTo(bssut)
 					.withKey("sellerDate").lessOrEqualsThan(new Date(2014, 1, 1))
@@ -158,9 +227,82 @@ public class BasicPerformanceTest {
 			 while(storeBooks.next() != null) {
 				 count++;
 			 }
-		 } catch (NoSuchElementException x) {}
+		 } catch (NoSuchElementException x) {
+		 } finally {
+			 storeBooks.close();
+		 }
+		 
 		 assertEquals(1000, count);
 		 
+	 }
+	 
+	 @Test public void simultaneousActivateAndInsert() throws Throwable {
+		int turns = 1000;
+		ExecutorService exec = Executors.newFixedThreadPool(100);
+		Collection<Future<?>> futures = new ArrayList<Future<?>>(turns*3);
+		for(int i = 0; i < turns; i++) {
+			 final int index = i;
+			 futures.add(exec.submit(new Runnable() {
+
+				@Override
+				public void run() {
+					RealBook b = new RealBook(bssut, new Date(2012, 1, index % 30), new Date(2042, index % 12, 12), "Hello"+index, index);
+					b.store();
+					bssut.store();
+				}
+				 
+			 }));
+			 futures.add(exec.submit(new Runnable() {
+
+				@Override
+				public void run() {
+					RealBook b = new RealBook(bssut, new Date(2012, 1, index % 30), new Date(2042, index % 12, 12), "Hello"+index, index);
+					b.activate();
+				}
+				 
+			 }));
+			 if (i%2 == 0)
+				 futures.add(exec.submit(new Runnable() {
+	
+					@Override
+					public void run() {
+						 final int [] count = {0};
+						 int treated;
+						try {
+							treated = StorageManagement.findElements().ofClass(RealBook.class)
+										.withKey("bookStore").setTo(bssut)
+										.withKey("sellerDate").lessOrEqualsThan(new Date(2014, 1, 1))
+										.withAtMost(1000).elements().forEach(new Process<RealBook>() {
+											
+											@Override
+											public void process(RealBook element) throws Throwable {
+												count[0]++;
+											}
+										}).getElementsTreated();
+							assertTrue(treated == count[0]);
+						} catch (Exception e) {
+							e.printStackTrace();
+							throw new RuntimeException(e);
+						}
+					}
+					 
+				 }));
+		 }
+		
+		exec.shutdown();
+		boolean running = exec.awaitTermination(5, TimeUnit.MINUTES);
+		
+		for (Future<?> future : futures) {
+			if (future.isDone()) {
+				try {
+					future.get();
+				} catch (ExecutionException x) {
+					throw x.getCause();
+				}
+			}
+		}
+		
+		assertTrue(running);
 	 }
 	 
 

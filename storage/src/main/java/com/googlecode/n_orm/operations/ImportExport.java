@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Collection;
@@ -21,6 +20,7 @@ import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.consoleannotations.Trigger;
 import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row;
 
 public class ImportExport {
@@ -29,7 +29,7 @@ public class ImportExport {
 		
 		private String key;
 		private Class<? extends PersistingElement> clazz;
-		private Map<String, Map<String, byte[]>> values;
+		private ColumnFamilyData values;
 		
 		public Element(PersistingElement pe) {
 			pe.checkIsValid();
@@ -37,7 +37,7 @@ public class ImportExport {
 			this.clazz = pe.getClass();
 			this.key = pe.getIdentifier();
 			Collection<ColumnFamily<?>> fams = pe.getColumnFamilies();
-			values = new TreeMap<String, Map<String,byte[]>>();
+			values = new DefaultColumnFamilyData();
 			for (ColumnFamily<?> family : fams) {
 				Map<String, byte[]> familyMap = new TreeMap<String, byte[]>();
 				values.put(family.getName(), familyMap);
@@ -66,7 +66,7 @@ public class ImportExport {
 		}
 	
 		@Override
-		public Map<String, Map<String, byte[]>> getValues() {
+		public ColumnFamilyData getValues() {
 			return values;
 		}
 		
@@ -105,8 +105,7 @@ public class ImportExport {
 	 * @param elementsIterator an iterator over the elements to be serialized ; closed by the method
 	 * @return lastElement the last element serialized from the collection
 	 */
-	public static ExportReport exportPersistingElements(CloseableIterator<? extends PersistingElement> elementsIterator, OutputStream out) throws IOException {
-		ObjectOutputStream oos= new ObjectOutputStream(out);
+	public static ExportReport exportPersistingElements(CloseableIterator<? extends PersistingElement> elementsIterator, ObjectOutputStream out) throws IOException {
 		PersistingElement lastElement = null;
 		KeyManagement km = KeyManagement.getInstance();
 		long exported = 0;
@@ -115,13 +114,13 @@ public class ImportExport {
 				PersistingElement elt = elementsIterator.next();
 				elt.checkIsValid();
 				elt.updateFromPOJO();
-				oos.writeObject(SERIALIZATION_SEPARATOR);
-				oos.writeObject(new Element(elt));
+				out.writeObject(SERIALIZATION_SEPARATOR);
+				out.writeObject(new Element(elt));
 				lastElement = elt;
 				km.unregister(elt);
 				exported++;
 			}
-			oos.flush();
+			out.flush();
 		} finally {
 			elementsIterator.close();
 		}
@@ -148,7 +147,7 @@ public class ImportExport {
 			try {
 				String sep = (String) ois.readObject();
 				ok = SERIALIZATION_SEPARATOR.equals(sep);
-			} catch (Exception x) {
+			} catch (Exception x) {x.printStackTrace();
 				fis.reset();
 				ok = false;
 			}

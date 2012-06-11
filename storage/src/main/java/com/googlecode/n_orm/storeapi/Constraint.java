@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.apache.commons.beanutils.ConvertUtils;
+
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
@@ -129,9 +131,14 @@ public class Constraint {
 				if (checkKeys)
 					throw new IllegalArgumentException("In order to select an element of class " + clazz + ", you must supply a value for " + f);
 			} else {
+				Object actualVal = values.get(keys.get(i));
+				Class<?> type = f.getType();
+				if ((actualVal instanceof String) && (! type.isInstance(actualVal))) {
+					actualVal = ConvertUtils.convert((String)actualVal, type);
+				}
 				String rep = f.getAnnotation(Key.class).reverted() ?
-							ConversionTools.convertToStringReverted(values.get(keys.get(i)), f.getType())
-						:	ConversionTools.convertToString(values.get(keys.get(i)), f.getType());
+							ConversionTools.convertToStringReverted(actualVal, type)
+						:	ConversionTools.convertToString(actualVal, type);
 				fixedPartb.append(rep);
 				if (allKeysThere && i == length-1)
 					fixedPartb.append(KeyManagement.KEY_END_SEPARATOR);

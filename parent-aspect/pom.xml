@@ -20,7 +20,7 @@
 		<site>
 			<id>wiki</id>
 			<name>n-orm Wiki pages</name>
-			<url>file://${basedir}/../../n-orm-wiki/parent-aspect</url>
+			<url>file://${basedir}/../../n-orm.wiki/parent-aspect</url>
 		</site>
 	</distributionManagement>
 

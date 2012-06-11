@@ -34,6 +34,8 @@ import com.googlecode.n_orm.hbase.HBaseLauncher;
 import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 
 public class ConcurrentTest {
@@ -60,7 +62,7 @@ public class ConcurrentTest {
 				} catch (InterruptedException e1) {
 				}
 			try {
-				Map<String, Map<String, byte[]>> ch = new TreeMap<String, Map<String,byte[]>>();
+				ColumnFamilyData ch = new DefaultColumnFamilyData();
 				Map<String, byte[]> cf = new TreeMap<String, byte[]>();
 				cf.put("qual", new byte [] {1, 2, 3, 4});
 				ch.put("cf", cf );
@@ -214,7 +216,7 @@ public class ConcurrentTest {
 	public void acceptingOutsideTableRemoval() throws IOException {
 		this.deleteTable("t1");
 		
-		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change1 = new DefaultColumnFamilyData();
 		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
 		change1.put("cf1", ch1);
 		ch1.put("k1", new byte[]{1, 2});
@@ -233,7 +235,7 @@ public class ConcurrentTest {
 	public void acceptingOutsideTableDisable() throws IOException {
 		this.deleteTable("t1");
 		
-		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change1 = new DefaultColumnFamilyData();
 		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
 		change1.put("cf1", ch1);
 		ch1.put("k1", new byte[]{1, 2});
@@ -252,7 +254,7 @@ public class ConcurrentTest {
 	public void acceptingConnectionTimeout() throws IOException, SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
 		store1.delete(null, "t1", "idt1");
 		
-		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change1 = new DefaultColumnFamilyData();
 		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
 		change1.put("cf1", ch1);
 		ch1.put("k1", new byte[]{1, 2});
@@ -281,7 +283,7 @@ public class ConcurrentTest {
 		this.truncateTable("t1");
 		store1.setScanCaching(1);
 		
-		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change1 = new DefaultColumnFamilyData();
 		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
 		change1.put("cf1", ch1);
 		ch1.put("k1", new byte[]{1, 2});
@@ -322,14 +324,14 @@ public class ConcurrentTest {
 
 		this.deleteTable("t1");
 		
-		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change1 = new DefaultColumnFamilyData();
 		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
 		change1.put("cf1", ch1);
 		ch1.put("k1", new byte[]{1, 2});
 		store1.storeChanges(null, null, "t1", "idt1", change1 , null, null);
 		store2.storeChanges(null, null, "t1", "idt1", change1 , null, null);
 		
-		Map<String, Map<String, byte[]>> change2 = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change2 = new DefaultColumnFamilyData();
 		TreeMap<String, byte[]> ch2 = new TreeMap<String, byte[]>();
 		change2.put("cf2", ch2);
 		ch2.put("k1", new byte[]{1, 2});
@@ -342,7 +344,7 @@ public class ConcurrentTest {
 	@Test(timeout=60000)
 	public void acceptingOutsideColumnFamilyRemoval() throws IOException, InterruptedException {
 		
-		Map<String, Map<String, byte[]>> change1 = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change1 = new DefaultColumnFamilyData();
 		TreeMap<String, byte[]> ch1 = new TreeMap<String, byte[]>();
 		change1.put("cf1", ch1);
 		ch1.put("k1", new byte[]{1, 2});
@@ -360,7 +362,7 @@ public class ConcurrentTest {
 			} while (store1.getAdmin().getTableDescriptor(tblNameBytes).hasFamily(Bytes.toBytes("cf1")));
 		}
 		
-		Map<String, Map<String, byte[]>> change2 = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change2 = new DefaultColumnFamilyData();
 		TreeMap<String, byte[]> ch2 = new TreeMap<String, byte[]>();
 		change2.put("cf1", ch2);
 		ch2.put("k1", new byte[]{1, 2, 3});
