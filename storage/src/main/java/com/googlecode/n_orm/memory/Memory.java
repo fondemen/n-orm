@@ -462,16 +462,18 @@ public class Memory implements SimpleStore {
 			}
 		}
 		
-		for (Entry<String, Set<String>> remove : removed.entrySet()) {
-			r.get(remove.getKey()).removeAll(remove.getValue());
-		}
-		
-		for (Entry<String, Map<String, Number>> incr : incremented.entrySet()) {
-			ColumnFamily f = r.get(incr.getKey());
-			for (Entry<String, Number> entry : incr.getValue().entrySet()) {
-				f.incr(entry.getKey(), entry.getValue());
+		if (removed != null)
+			for (Entry<String, Set<String>> remove : removed.entrySet()) {
+				r.get(remove.getKey()).removeAll(remove.getValue());
 			}
-		}
+		
+		if (incremented != null)
+			for (Entry<String, Map<String, Number>> incr : incremented.entrySet()) {
+				ColumnFamily f = r.get(incr.getKey());
+				for (Entry<String, Number> entry : incr.getValue().entrySet()) {
+					f.incr(entry.getKey(), entry.getValue());
+				}
+			}
 	}
 
 	@Override
