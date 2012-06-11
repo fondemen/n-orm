@@ -19,6 +19,8 @@ import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily.ByteValue;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily.Value;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.SimpleStore;
 
 /**
@@ -223,8 +225,8 @@ public class Memory implements SimpleStore {
 			}
 
 			@Override
-			public Map<String, Map<String, byte[]>> getValues() {
-				Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String,byte[]>>();
+			public ColumnFamilyData getValues() {
+				ColumnFamilyData ret = new DefaultColumnFamilyData();
 				for (Entry<String, ColumnFamily> element : map.entrySet()) {
 					ret.put(element.getKey(), element.getValue().getValues(null, null));
 				}
@@ -441,7 +443,7 @@ public class Memory implements SimpleStore {
 
 	@Override
 	public void storeChanges(String table, String id,
-			Map<String, Map<String, byte[]>> changed,
+			ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> incremented) {
 		IllegalArgumentException x = null;
@@ -505,12 +507,12 @@ public class Memory implements SimpleStore {
 	}
 
 	@Override
-	public Map<String, Map<String, byte[]>> get(String table, String id, Set<String> families) throws DatabaseNotReachedException {
+	public ColumnFamilyData get(String table, String id, Set<String> families) throws DatabaseNotReachedException {
 		Row row = this.getRow(table, id, false);
 		if (row == null)
 			return null;
 		
-		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData ret = new DefaultColumnFamilyData();
 		
 		for (String family : families) {
 			ColumnFamily fam = row.getNoCreate(family);
