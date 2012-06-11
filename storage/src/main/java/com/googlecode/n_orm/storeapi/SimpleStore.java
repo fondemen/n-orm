@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 /**
  * An interface that defines what a data store should implement and which is simpler than {@link Store}.
@@ -66,13 +67,13 @@ public interface SimpleStore {
 	 * Returns all elements in families ; no side-effect.
 	 * In case one element is missing, null is returned.
 	 */
-	Map<String, Map<String, byte[]>> get(String table, String id, Set<String> families) throws DatabaseNotReachedException;
+	ColumnFamilyData get(String table, String id, Set<String> families) throws DatabaseNotReachedException;
 	
 	/**
 	 * Stores given piece of information.
 	 * In case an element is missing in the data store (table, row, family, ...), it is created.
 	 */
-	void storeChanges(String table, String id, Map<String, Map<String, byte[]>> changed, Map<String, Set<String>> removed, Map<String, Map<String, Number>> increments) throws DatabaseNotReachedException;
+	void storeChanges(String table, String id, ColumnFamilyData changed, Map<String, Set<String>> removed, Map<String, Map<String, Number>> increments) throws DatabaseNotReachedException;
 	
 	/**
 	 * Deletes the given row

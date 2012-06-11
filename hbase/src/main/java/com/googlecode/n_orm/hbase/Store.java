@@ -92,7 +92,9 @@ import com.googlecode.n_orm.hbase.mapreduce.ActionJob;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.GenericStore;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 /**
  * The HBase store found according to its configuration folder.
@@ -1672,7 +1674,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	@Override
-	public Map<String, Map<String, byte[]>> get(PersistingElement elt, String table, String id,
+	public ColumnFamilyData get(PersistingElement elt, String table, String id,
 			Map<String, Field> families) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return null;
@@ -1686,7 +1688,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (r.isEmpty())
 			return null;
 		
-		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String, byte[]>>();
+		ColumnFamilyData ret = new DefaultColumnFamilyData();
 		if (!r.isEmpty()) {
 			for (KeyValue kv : r.list()) {
 				String familyName = Bytes.toString(kv.getFamily());
@@ -1704,7 +1706,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 
 	@Override
 	public void storeChanges(PersistingElement elt, Map<String, Field> changedFields, String table, String id,
-			Map<String, Map<String, byte[]>> changed,
+			ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {
