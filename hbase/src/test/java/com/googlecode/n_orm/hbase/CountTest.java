@@ -14,6 +14,8 @@ import org.junit.Test;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 
 public class CountTest {
 	private static Store store;
@@ -52,7 +54,7 @@ public class CountTest {
 
 	@Test
 	public void none() {
-		Map<String, Map<String, byte[]>> change = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change = new DefaultColumnFamilyData();
 		Map<String, byte[]> famChange = new TreeMap<String, byte[]>();
 		famChange.put("col", new byte[]{1, 2, 3});
 		change.put("fam", famChange );
@@ -71,7 +73,7 @@ public class CountTest {
 
 	@Test
 	public void one() {
-		Map<String, Map<String, byte[]>> change = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change = new DefaultColumnFamilyData();
 		Map<String, byte[]> famChange = new TreeMap<String, byte[]>();
 		famChange.put("col1", new byte[]{1, 2, 3});
 		famChange.put("col2", new byte[]{1, 2, 3});
@@ -84,7 +86,7 @@ public class CountTest {
 	
 	@Test
 	public void two() {
-		Map<String, Map<String, byte[]>> change = new TreeMap<String, Map<String,byte[]>>();
+		ColumnFamilyData change = new DefaultColumnFamilyData();
 		Map<String, byte[]> famChange = new TreeMap<String, byte[]>();
 		famChange.put("col", new byte[]{1, 2, 3});
 		change.put("fam", famChange );
