@@ -9,12 +9,13 @@ import java.util.Map.Entry;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row;
 
 public class RowWrapper implements Row, Serializable {
 	private static final long serialVersionUID = -3943538431236454382L;
 	private final String key;
-	private final Map<String, Map<String, byte[]>> values;
+	private final ColumnFamilyData values;
 
 	public RowWrapper(Result r) {
 		this(r, true);
@@ -24,7 +25,7 @@ public class RowWrapper implements Row, Serializable {
 	public RowWrapper(Result r, boolean sendValues) {
 		this.key = Bytes.toString(r.getRow());
 		if (sendValues) {
-			this.values = new TreeMap<String, Map<String,byte[]>>();
+			this.values = new DefaultColumnFamilyData();
 			for (Entry<byte[], NavigableMap<byte[], byte[]>> famData : r.getNoVersionMap().entrySet()) {
 				Map<String, byte[]> fam = new TreeMap<String, byte[]>();
 				this.values.put(Bytes.toString(famData.getKey()), fam);
@@ -42,7 +43,7 @@ public class RowWrapper implements Row, Serializable {
 	}
 
 	@Override
-	public Map<String, Map<String, byte[]>> getValues() {
+	public ColumnFamilyData getValues() {
 		return this.values;
 	}
 

@@ -7,6 +7,7 @@ import java.util.Set;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 public class SimpleStoreWrapper implements Store {
 	private static Map<SimpleStore, Store> INSTANCES = new HashMap<SimpleStore, Store>();
@@ -165,7 +166,7 @@ public class SimpleStoreWrapper implements Store {
 	 * .PersistingElement, java.lang.String, java.lang.String, java.util.Set)
 	 */
 	@Override
-	public Map<String, Map<String, byte[]>> get(PersistingElement elt,
+	public ColumnFamilyData get(PersistingElement elt,
 			String table, String id,
 			Map<String, Field> families) throws DatabaseNotReachedException {
 		return store.get(table, id, families == null ? null : families.keySet());
@@ -181,7 +182,7 @@ public class SimpleStoreWrapper implements Store {
 	 */
 	@Override
 	public void storeChanges(PersistingElement elt, Map<String, Field> changedFields,
-			String table, String id, Map<String, Map<String, byte[]>> changed,
+			String table, String id, ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {

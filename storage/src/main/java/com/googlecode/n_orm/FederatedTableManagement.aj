@@ -9,6 +9,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 
 public aspect FederatedTableManagement {
@@ -66,7 +68,7 @@ public aspect FederatedTableManagement {
 			if (table.equals(this.mainTable))
 				return;
 			if (this.alternatives.add(table)) {
-				Map<String, Map<String, byte[]>> changes = new TreeMap<String, Map<String, byte[]>>();
+				ColumnFamilyData changes = new DefaultColumnFamilyData();
 				Map<String, byte[]> change = new TreeMap<String, byte[]>();
 				changes.put(FEDERATED_META_COLUMN_FAMILY, change);
 				change.put(table, null);
@@ -269,21 +271,21 @@ public aspect FederatedTableManagement {
 	}
 
 	// Activate
-	Map<String, Map<String, byte[]>> around(
+	ColumnFamilyData around(
 			PersistingElementOverFederatedTable self, final String table,
 			final String id, final Map<String, Field> families,
 			final Store store):
-		call(Map<String, Map<String, byte[]>> Store.get(PersistingElement,String,String,Map<String, Field>))
+		call(ColumnFamilyData Store.get(PersistingElement,String,String,Map<String, Field>))
 		&& within(StorageManagement)
 		&& target(store)
 		&& args(self, table, id, families) {
-		return new Action<Map<String, Map<String, byte[]>>>() {
-			Map<String, Map<String, byte[]>> performAction(
+		return new Action<ColumnFamilyData>() {
+			ColumnFamilyData performAction(
 					PersistingElementOverFederatedTable self, String table) {
 				return store.get(self, table, id, families);
 			}
 
-			boolean isAnswerValid(Map<String, Map<String, byte[]>> ans) {
+			boolean isAnswerValid(ColumnFamilyData ans) {
 				return ans != null && !ans.isEmpty();
 			}
 		}.run(self, store);

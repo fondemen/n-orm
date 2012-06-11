@@ -24,6 +24,7 @@ import com.googlecode.n_orm.Incrementing.Mode;
 import com.googlecode.n_orm.cf.SetColumnFamily;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 
 public class SendingToStoreTest {
@@ -85,8 +86,8 @@ public class SendingToStoreTest {
 		return ret;
 	}
 	
-	public static <K,V> ArgumentMatcher<Map<K,V>> getEmptyOrNullMapArgumentMatcher() {
-		return new ArgumentMatcher<Map<K,V>>() {
+	public static <T extends Map<?,?>> ArgumentMatcher<T> getEmptyOrNullMapArgumentMatcher() {
+		return new ArgumentMatcher<T>() {
 
 			@Override
 			public boolean matches(Object argument) {
@@ -99,9 +100,9 @@ public class SendingToStoreTest {
 		};
 	}
 	
-	public Map<String, Map<String, byte[]>> getExpectedChange(final String expectedProChangeOrNull, final String... expectedCfValues) {
+	public ColumnFamilyData getExpectedChange(final String expectedProChangeOrNull, final String... expectedCfValues) {
 		if (expectedProChangeOrNull != null || (expectedCfValues != null && expectedCfValues.length > 0)) {
-			return argThat(new ArgumentMatcher<Map<String, Map<String, byte[]>>>() {
+			return argThat(new ArgumentMatcher<ColumnFamilyData>() {
 
 				@Override
 				public boolean matches(Object argument) {
@@ -109,7 +110,7 @@ public class SendingToStoreTest {
 						return false;
 					
 					@SuppressWarnings("unchecked")
-					Map<String, Map<String, byte[]>> map = (Map<String, Map<String, byte[]>>)argument;
+					ColumnFamilyData map = (ColumnFamilyData)argument;
 					
 					int expectedSize = 0;
 					
@@ -153,7 +154,7 @@ public class SendingToStoreTest {
 				}
 			});
 		} else {
-			return argThat(SendingToStoreTest.<String, Map<String, byte[]>>getEmptyOrNullMapArgumentMatcher());
+			return argThat(SendingToStoreTest.<ColumnFamilyData>getEmptyOrNullMapArgumentMatcher());
 		}
 	}
 	
@@ -173,7 +174,7 @@ public class SendingToStoreTest {
 			}
 			return eq(ret);
 		} else
-			return argThat(SendingToStoreTest.<String, Set<String>>getEmptyOrNullMapArgumentMatcher());
+			return argThat(SendingToStoreTest.<Map<String, Set<String>>>getEmptyOrNullMapArgumentMatcher());
 	}
 	
 	public Map<String, Map<String, Number>> getExpectedIncr(final Integer expectedIncrement) {
@@ -199,7 +200,7 @@ public class SendingToStoreTest {
 				
 			});
 		} else {
-			return argThat(SendingToStoreTest.<String, Map<String, Number>>getEmptyOrNullMapArgumentMatcher());
+			return argThat(SendingToStoreTest.<Map<String, Map<String, Number>>>getEmptyOrNullMapArgumentMatcher());
 		}
 	}
 	

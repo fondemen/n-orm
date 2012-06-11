@@ -25,6 +25,8 @@ import org.junit.Test;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 public class MapRedTest {
 	
@@ -89,7 +91,7 @@ public class MapRedTest {
 	
 	protected void createElements(int number) {
 		for (int i = number; i > 0; --i) {
-			Map<String, Map<String, byte[]>> changed = new TreeMap<String, Map<String,byte[]>>();
+			ColumnFamilyData changed = new DefaultColumnFamilyData();
 			Map<String, byte[]> changes = new TreeMap<String, byte[]>();
 			changes.put("aval", new byte[] {1, 2, 3, 4});
 			changed.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changes );

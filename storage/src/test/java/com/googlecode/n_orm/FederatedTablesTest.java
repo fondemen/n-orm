@@ -268,6 +268,8 @@ public class FederatedTablesTest {
 	
 	@Test
 	public void exists() {
+		Memory.INSTANCE.reset();
+		
 		Element elt = new Element();
 		elt.key = "akey";
 		elt.post = "post";

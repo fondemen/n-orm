@@ -23,6 +23,8 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cf.SetColumnFamily;
 import com.googlecode.n_orm.hbase.HBaseSchema.SettableBoolean;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 public class PropertyOverloadTest {
 	private static Store store;
@@ -125,8 +127,8 @@ public class PropertyOverloadTest {
 		return ret;
 	}
 	
-	public Map<String, Map<String, byte[]>> getChangedValues(boolean defaultCf, boolean overlodedCf, boolean dummyCf) {
-		Map<String, Map<String, byte[]>> ret = new TreeMap<String, Map<String, byte[]>>();
+	public ColumnFamilyData getChangedValues(boolean defaultCf, boolean overlodedCf, boolean dummyCf) {
+		ColumnFamilyData ret = new DefaultColumnFamilyData();
 		if (defaultCf) {
 			Map<String, byte[]> change = new TreeMap<String, byte[]>();
 			ret.put(defaultCfField.getName(), change);
