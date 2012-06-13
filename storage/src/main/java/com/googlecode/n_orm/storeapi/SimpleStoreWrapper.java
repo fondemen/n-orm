@@ -55,6 +55,11 @@ public class SimpleStoreWrapper implements Store {
 	public void start() throws DatabaseNotReachedException {
 		store.start();
 	}
+	
+	@Override
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException {
+		return this.store.hasTable(tableName);
+	}
 
 	/*
 	 * (non-Javadoc)
