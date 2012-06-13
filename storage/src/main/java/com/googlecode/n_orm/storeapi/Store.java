@@ -24,6 +24,11 @@ public interface Store {
 	public void start() throws DatabaseNotReachedException;
 	
 	/**
+	 * Checks whether the given table exists in this store.
+	 */
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException;
+	
+	/**
 	 * Tests whether a column family is empty.
 	 */
 	public void delete(PersistingElement elt, String table, String id)

@@ -58,9 +58,11 @@ public class FederatedTablesTest {
 		elt.post = "post";
 		elt.arg = "a value";
 		elt.store();
-		//One query to register the alternative table
-		//Another to actually store the element
+		//One query to register the table
+		//And another one to store@
 		assertEquals(2, Memory.INSTANCE.getQueriesAndReset());
+		
+		FederatedTableManagement.clearAlternativesCache();
 		
 		Element elt2 = new Element();
 		elt2.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
@@ -69,7 +71,7 @@ public class FederatedTablesTest {
 		elt2.activate();
 		
 		assertEquals(elt.arg, elt2.arg);
-		assertEquals(1, Memory.INSTANCE.getQueriesAndReset());
+		assertEquals(2, Memory.INSTANCE.getQueriesAndReset());
 		assertEquals("tpost", elt2.getTable());
 	}
 	

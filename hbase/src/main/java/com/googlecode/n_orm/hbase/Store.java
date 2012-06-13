@@ -972,10 +972,15 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 	
 	private void cache(String tableName, HTableDescriptor descr) {
-		synchronized(this.tablesD) {
-			this.uncache(tableName);
-			this.tablesD.put(tableName, descr);
-		}
+		HTableDescriptor knownDescr = this.tablesD.get(tableName);
+		if (knownDescr == null || !knownDescr.equals(descr))
+			synchronized(this.tablesD) {
+				knownDescr = this.tablesD.get(tableName);
+				if (knownDescr == null || !knownDescr.equals(descr)) {
+					this.uncache(tableName);
+					this.tablesD.put(tableName, descr);
+				}
+			}
 	}
 
 	private void uncache(String tableName) {
@@ -1267,7 +1272,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 	}
 
-	protected boolean hasTable(String name) throws DatabaseNotReachedException {
+	@Override
+	public boolean hasTable(String name) throws DatabaseNotReachedException {
 		name = this.mangleTableName(name);
 		if (this.tablesD.containsKey(name))
 			return true;
@@ -1279,13 +1285,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		name = this.mangleTableName(name);
 		try {
 			boolean ret;
-			synchronized(this.sharedLockTable(name)) {
-				try {
+			//synchronized(this.sharedLockTable(name)) {
+			//	try {
 					ret = this.admin.tableExists(name);
-				} finally {
-					this.sharedUnlockTable(name);
-				}
-			}
+			//	} finally {
+			//		this.sharedUnlockTable(name);
+			//	}
+			//}
 			if (!ret &&this.tablesD.containsKey(name)) {
 				this.uncache(name);
 			}
