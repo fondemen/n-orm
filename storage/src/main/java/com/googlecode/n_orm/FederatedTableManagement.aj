@@ -10,6 +10,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 
 public aspect FederatedTableManagement {
@@ -85,7 +87,7 @@ public aspect FederatedTableManagement {
 			if (table.equals(this.mainTable))
 				return;
 			if (this.alternatives.add(table)) {
-				Map<String, Map<String, byte[]>> changes = new TreeMap<String, Map<String, byte[]>>();
+				ColumnFamilyData changes = new DefaultColumnFamilyData();
 				Map<String, byte[]> change = new TreeMap<String, byte[]>();
 				changes.put(FEDERATED_META_COLUMN_FAMILY, change);
 				change.put(table, null);
@@ -134,8 +136,9 @@ public aspect FederatedTableManagement {
 	public String PersistingElementOverFederatedTable.getMainTable() {
 		return super.getTable();
 	}
-	
-	private void PersistingElementOverFederatedTable.setTablePostfix(String postfix, Store store) {
+
+	private void PersistingElementOverFederatedTable.setTablePostfix(
+			String postfix, Store store) {
 		String oldPostfix = this.tablePostfix;
 		this.tablePostfix = postfix;
 		this.checkTablePostfixHasNotChanged();
@@ -144,15 +147,17 @@ public aspect FederatedTableManagement {
 		case CONSISTENT:
 			if (oldPostfix != null && !oldPostfix.equals(this.tablePostfix)) {
 				throw new IllegalStateException("Found " + this
-						+ " from table " + this.getMainTable() + " with postfix "
-						+ this.tablePostfix + " while another postfix "
-						+ oldPostfix + " was registered");
+						+ " from table " + this.getMainTable()
+						+ " with postfix " + this.tablePostfix
+						+ " while another postfix " + oldPostfix
+						+ " was registered");
 			}
 		}
-		registerTable(this.getMainTable(), this.getMainTable()+this.tablePostfix, store);
+		registerTable(this.getMainTable(), this.getMainTable()
+				+ this.tablePostfix, store);
 	}
-	
-	//jut to be sure
+
+	// jut to be sure
 	declare error: set(* PersistingElementOverFederatedTable.tablePostfix) && !withincode(private void PersistingElementOverFederatedTable.setTablePostfix(String, Store)) : "Avoid setting this attribute directly ; use setTablePostfix(String postfix, Store store) instead";
 
 	/**
@@ -190,14 +195,13 @@ public aspect FederatedTableManagement {
 	 * {@link PersistingElementOverFederatedTable#getKnownPossibleTables()}
 	 */
 	private List<String> PersistingElementOverFederatedTable.getPossibleTablesWithAnUpdate(
-			Collection<String> alreadyTestedTables, Store store) {
+			Store store) {
 		assert this.tablePostfix == null;
 
 		List<String> ret = new LinkedList<String>();
 		String mainTable = super.getTable();
 		TableAlternatives alternatives = getAlternatives(mainTable);
 		ret.addAll(alternatives.updateAlternatives(store));
-		ret.removeAll(alreadyTestedTables);
 
 		return ret;
 	}
@@ -232,7 +236,7 @@ public aspect FederatedTableManagement {
 						.getAnnotation(Persisting.class).federated())) {
 			// Should setup self.tablePostfix if it exists
 			boolean exists = new RowExistsAction(store, id).run(self, store);
-			assert exists == (self.tablePostfix != null);
+			assert !exists || self.tablePostfix != null;
 		}
 
 		// We now have to definitely choose the proper table
@@ -260,6 +264,11 @@ public aspect FederatedTableManagement {
 		abstract boolean isAnswerValid(T ans);
 
 		public T run(PersistingElementOverFederatedTable self, Store store) {
+			// Do we already know the actuals table ?
+			if (self.tablePostfix != null) {
+				return this.performAction(self, self.getTable());
+			}
+
 			String mainTable = self.getMainTable();
 			// ExecutorService pe = Executors.newCachedThreadPool();
 			// First trying with known possible tables
@@ -274,8 +283,9 @@ public aspect FederatedTableManagement {
 				}
 			}
 			// Then retrying with tables from store
-			for (String t : self.getPossibleTablesWithAnUpdate(
-					knownPossibleTables, store)) {
+			List<String> updatedTables = self.getPossibleTablesWithAnUpdate(store);
+			updatedTables.removeAll(knownPossibleTables);
+			for (String t : updatedTables) {
 				assert t.startsWith(mainTable);
 				ret = this.performAction(self, t);
 				if (this.isAnswerValid(ret)) {
@@ -288,21 +298,20 @@ public aspect FederatedTableManagement {
 	}
 
 	// Activate
-	Map<String, Map<String, byte[]>> around(
-			PersistingElementOverFederatedTable self, final String table,
-			final String id, final Map<String, Field> families,
-			final Store store):
-		call(Map<String, Map<String, byte[]>> Store.get(PersistingElement,String,String,Map<String, Field>))
+	ColumnFamilyData around(PersistingElementOverFederatedTable self,
+			final String table, final String id,
+			final Map<String, Field> families, final Store store):
+		call(ColumnFamilyData Store.get(PersistingElement,String,String,Map<String, Field>))
 		&& within(StorageManagement)
 		&& target(store)
 		&& args(self, table, id, families) {
-		return new Action<Map<String, Map<String, byte[]>>>() {
-			Map<String, Map<String, byte[]>> performAction(
+		return new Action<ColumnFamilyData>() {
+			ColumnFamilyData performAction(
 					PersistingElementOverFederatedTable self, String table) {
 				return store.get(self, table, id, families);
 			}
 
-			boolean isAnswerValid(Map<String, Map<String, byte[]>> ans) {
+			boolean isAnswerValid(ColumnFamilyData ans) {
 				return ans != null && !ans.isEmpty();
 			}
 		}.run(self, store);
@@ -336,5 +345,26 @@ public aspect FederatedTableManagement {
 		&& args(self, table, id) {
 		Boolean ret = new RowExistsAction(store, id).run(self, store);
 		return ret != null && ret.booleanValue();
+	}
+
+	// Delete
+	void around(PersistingElementOverFederatedTable self, final String table,
+			final String id, final Store store):
+		call(void Store+.delete(..))
+		&& within(StorageManagement)
+		&& target(store)
+		&& args(self, table, id) {
+		new RowExistsAction(store, id) {
+			@Override
+			Boolean performAction(PersistingElementOverFederatedTable self,
+					String table) {
+				// Avoid deleting an inexisting element
+				Boolean ret = super.performAction(self, table);
+				if (ret)
+					store.delete(self, table, id);
+				return ret;
+			}
+
+		}.run(self, store);
 	}
 }

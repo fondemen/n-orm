@@ -6,6 +6,7 @@ import java.util.Set;
 
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 
 public class DummyStore implements Store {
@@ -102,7 +103,7 @@ public class DummyStore implements Store {
 	}
 
 	@Override
-	public Map<String, Map<String, byte[]>> get(PersistingElement elt,
+	public ColumnFamilyData get(PersistingElement elt,
 			String table, String id, Map<String, Field> families)
 			throws DatabaseNotReachedException {
 		// TODO Auto-generated method stub
@@ -112,7 +113,7 @@ public class DummyStore implements Store {
 	@Override
 	public void storeChanges(PersistingElement elt,
 			Map<String, Field> changedFields, String table, String id,
-			Map<String, Map<String, byte[]>> changed,
+			ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {

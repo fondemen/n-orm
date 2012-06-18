@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Collection;
@@ -21,6 +20,7 @@ import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.consoleannotations.Trigger;
 import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row;
 
 public class ImportExport {
@@ -29,7 +29,7 @@ public class ImportExport {
 		
 		private String key;
 		private Class<? extends PersistingElement> clazz;
-		private Map<String, Map<String, byte[]>> values;
+		private ColumnFamilyData values;
 		
 		public Element(PersistingElement pe) {
 			pe.checkIsValid();
@@ -37,7 +37,7 @@ public class ImportExport {
 			this.clazz = pe.getClass();
 			this.key = pe.getIdentifier();
 			Collection<ColumnFamily<?>> fams = pe.getColumnFamilies();
-			values = new TreeMap<String, Map<String,byte[]>>();
+			values = new DefaultColumnFamilyData();
 			for (ColumnFamily<?> family : fams) {
 				Map<String, byte[]> familyMap = new TreeMap<String, byte[]>();
 				values.put(family.getName(), familyMap);
@@ -66,7 +66,7 @@ public class ImportExport {
 		}
 	
 		@Override
-		public Map<String, Map<String, byte[]>> getValues() {
+		public ColumnFamilyData getValues() {
 			return values;
 		}
 		

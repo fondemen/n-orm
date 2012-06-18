@@ -24,7 +24,9 @@ import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.cf.ColumnFamily;
@@ -80,7 +82,7 @@ public aspect StorageManagement {
 			
 			PropertyManagement pm = PropertyManagement.getInstance();
 			Map<String, Field> changedFields = new TreeMap<String, Field>();
-			Map<String, Map<String, byte[]>> changed = new TreeMap<String, Map<String,byte[]>>(), localChanges;
+			ColumnFamilyData changed = new DefaultColumnFamilyData(), localChanges;
 			Map<String, Set<String>> deleted = new TreeMap<String, Set<String>>();
 			Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String,Number>>();
 			Map<String,Number> propsIncrs = this.getIncrements();
@@ -158,7 +160,7 @@ public aspect StorageManagement {
 			
 			//Storing keys into properties. As keys are final, there is no need to store them again if we know that the object already exists within the base
 			if (annotation.storeKeys() && (this.exists == null || this.exists.equals(Boolean.FALSE))) {
-				localChanges = new TreeMap<String, Map<String,byte[]>>(changed);
+				localChanges = new DefaultColumnFamilyData(changed);
 				Map<String, byte[]> changedProperties = changed.get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 				if (changedProperties == null) {
 					changedProperties = new TreeMap<String, byte[]>();
@@ -307,13 +309,13 @@ public aspect StorageManagement {
 		Map<String, Field> toBeActivated = getActualFamiliesToBeActivated(timeout, families);
 		
 		if (! toBeActivated.isEmpty()) {
-			Map<String, Map<String, byte[]>> rawData = this.getStore().get(this, this.getTable(), this.getIdentifier(), toBeActivated);
+			ColumnFamilyData rawData = this.getStore().get(this, this.getTable(), this.getIdentifier(), toBeActivated);
 			activateFromRawData(toBeActivated.keySet(), rawData);
 		}
 	}
 
 	public void PersistingElement.activateFromRawData(Set<String> toBeActivated,
-			Map<String, Map<String, byte[]>> rawData) {
+			ColumnFamilyData rawData) {
 		assert ! toBeActivated.isEmpty();
 		if (rawData == null)
 			this.exists = Boolean.FALSE;
@@ -446,7 +448,7 @@ public aspect StorageManagement {
 			}
 			
 			if (!tba.isEmpty()) {
-				elt.activateFromRawData(tba.keySet(), data.getValues());
+				elt.activateFromRawData(tba.keySet(), new DefaultColumnFamilyData(data.getValues()));
 			}
 			
 			if (missingCf != null && !missingCf.isEmpty()) {
