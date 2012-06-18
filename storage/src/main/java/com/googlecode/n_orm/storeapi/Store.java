@@ -6,6 +6,7 @@ import java.util.Set;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 /**
  * The interface that defines what a data store should implement.
@@ -81,7 +82,7 @@ public interface Store {
 	 * Returns all elements in families ; no side-effect.
 	 * In case one element is missing, null is returned.
 	 */
-	public Map<String, Map<String, byte[]>> get(PersistingElement elt,
+	public ColumnFamilyData get(PersistingElement elt,
 			String table, String id,
 			Map<String, Field> families) throws DatabaseNotReachedException;
 	/**
@@ -90,7 +91,7 @@ public interface Store {
 	 */
 	public void storeChanges(PersistingElement elt,
 			Map<String, Field> changedFields, String table, String id,
-			Map<String, Map<String, byte[]>> changed,
+			ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException;

@@ -12,6 +12,7 @@ import com.googlecode.n_orm.PersistingElementListener;
 import com.googlecode.n_orm.UnknownColumnFamily;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 
 public class DummyPersistingElement implements PersistingElement {
@@ -99,7 +100,7 @@ public class DummyPersistingElement implements PersistingElement {
 
 	@Override
 	public void activateFromRawData(Set<String> arg0,
-			Map<String, Map<String, byte[]>> arg1) {
+			ColumnFamilyData arg1) {
 		// TODO Auto-generated method stub
 
 	}
