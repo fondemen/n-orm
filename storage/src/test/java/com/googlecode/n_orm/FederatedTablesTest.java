@@ -67,6 +67,8 @@ public class FederatedTablesTest {
 		//Another to actually store the element
 		assertEquals(2, Memory.INSTANCE.getQueriesAndReset());
 		
+		FederatedTableManagement.clearAlternativesCache();
+		
 		Element elt2 = new Element();
 		elt2.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
 		elt2.key = key;
@@ -74,7 +76,7 @@ public class FederatedTablesTest {
 		elt2.activate();
 		
 		assertEquals(elt.arg, elt2.arg);
-		assertEquals(1, Memory.INSTANCE.getQueriesAndReset());
+		assertEquals(2, Memory.INSTANCE.getQueriesAndReset());
 		assertEquals("tpost", elt2.getTable());
 	}
 	

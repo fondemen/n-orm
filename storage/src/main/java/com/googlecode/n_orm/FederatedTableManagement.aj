@@ -2,6 +2,7 @@ package com.googlecode.n_orm;
 
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -46,17 +47,35 @@ public aspect FederatedTableManagement {
 		 * @return tables that appeared with the update
 		 */
 		protected Set<String> updateAlternatives(Store store) {
-
-			if ((this.lastUpdate + TableAlternativeCacheTTLInS) < System
-					.currentTimeMillis()) {
+			long now = System.currentTimeMillis();
+			if ((this.lastUpdate + TableAlternativeCacheTTLInS) < now) {
+				this.lastUpdate = now;
 				Map<String, byte[]> res = store.get(null, null,
 						FEDERATED_META_TABLE, this.mainTable,
 						FEDERATED_META_COLUMN_FAMILY);
 				Set<String> newAlternatives = res == null ? new TreeSet<String>()
 						: new TreeSet<String>(res.keySet());
+				
+				//Checking for deleted tables
+				Iterator<String> newAlternativesIt = newAlternatives.iterator();
+				Set<String> deletedTables = new TreeSet<String>();
+				while (newAlternativesIt.hasNext()) {
+					String altTable = newAlternativesIt.next();
+					if (!store.hasTable(altTable)) {
+						newAlternativesIt.remove();
+						deletedTables.add(altTable);
+					}
+				}
+				if (!deletedTables.isEmpty()) {
+					Map<String, Set<String>> removed = new TreeMap<String, Set<String>>();
+					removed.put(FEDERATED_META_COLUMN_FAMILY, deletedTables);
+					store.storeChanges(null, null, FEDERATED_META_TABLE, this.mainTable, null, removed , null);
+				}
+				
 				Set<String> diff = new TreeSet<String>(newAlternatives);
 				diff.removeAll(this.alternatives);
-				assert newAlternatives.containsAll(this.alternatives);
+				//Actually the following assertion is wrong, as a table might have been deleted...
+				//assert newAlternatives.containsAll(this.alternatives);
 				this.alternatives = newAlternatives;
 				return diff;
 			} else
@@ -122,16 +141,9 @@ public aspect FederatedTableManagement {
 			String postfix, Store store) {
 		String oldPostfix = this.tablePostfix;
 		this.tablePostfix = postfix;
+		this.checkTablePostfixHasNotChanged();
 		switch (this.getClass().getAnnotation(Persisting.class).federated()) {
 		case FAST_CHECKED:
-			String computedPostfix = this.getTablePostfix();
-			if (!this.tablePostfix.equals(computedPostfix))
-				throw new IllegalStateException("Found " + this
-						+ " from table " + this.getMainTable()
-						+ " with postfix " + this.tablePostfix
-						+ " while computed version states postfix "
-						+ computedPostfix);
-			// No break to check the following
 		case CONSISTENT:
 			if (oldPostfix != null && !oldPostfix.equals(this.tablePostfix)) {
 				throw new IllegalStateException("Found " + this
@@ -193,6 +205,22 @@ public aspect FederatedTableManagement {
 
 		return ret;
 	}
+	
+	private void PersistingElementOverFederatedTable.checkTablePostfixHasNotChanged() {
+		if (this.getClass().getAnnotation(Persisting.class).federated()
+				.equals(Persisting.FederatedMode.FAST_CHECKED)) {
+			//Let's check whether a new computation for table postfix changes its value...
+			String computedPostfix = this.getTablePostfix();
+			if (!this.tablePostfix.equals(computedPostfix)) {
+				throw new IllegalStateException(this
+						+ " already registered in table "
+						+ this.getMainTable() + " with postfix "
+						+ this.tablePostfix
+						+ " while computed postfix states now "
+						+ computedPostfix);
+			}
+		}
+	}
 
 	// Store
 	void around(PersistingElementOverFederatedTable self, String table,
@@ -214,16 +242,8 @@ public aspect FederatedTableManagement {
 		// We now have to definitely choose the proper table
 		if (self.tablePostfix == null) {
 			self.setTablePostfix(self.getTablePostfix(), store);
-		} else if (self.getClass().getAnnotation(Persisting.class).federated()
-				.equals(Persisting.FederatedMode.FAST_CHECKED)) {
-			String computedPostfix = self.getTablePostfix();
-			if (!self.tablePostfix.equals(computedPostfix)) {
-				throw new IllegalStateException(self
-						+ " already registered in table " + self.getMainTable()
-						+ " with postfix " + self.tablePostfix
-						+ " while computed postfix states now "
-						+ computedPostfix);
-			}
+		} else {
+			self.checkTablePostfixHasNotChanged();
 		}
 
 		// Postfixing table name if necessary + registering alternative in the

@@ -22,8 +22,10 @@ public interface SimpleStore {
 	 */
 	void start() throws DatabaseNotReachedException;
 	
-	//void add(String table, String id, String family, String key, byte[] value);
-	//void remove(String table, String id, String family, String key);
+	/**
+	 * Checks whether the given table exists in this store.
+	 */
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException;
 	
 	/**
 	 * Tests for a row.

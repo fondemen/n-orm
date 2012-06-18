@@ -6,12 +6,14 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.EmptyCloseableIterator;
+import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory.Table.Row;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily;
@@ -419,6 +421,11 @@ public class Memory implements SimpleStore {
 	public ColumnFamily getFamily(String table, String id, String family, boolean createIfNecessary) {
 		Row r = this.getRow(table, id, createIfNecessary);
 		return createIfNecessary ? r.get(family) : r == null ? null : r.getNoCreate(family);
+	}
+
+	@Override
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException {
+		return this.tables.contains(tableName);
 	}
 
 	@Override
