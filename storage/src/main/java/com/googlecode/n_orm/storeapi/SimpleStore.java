@@ -67,7 +67,11 @@ public interface SimpleStore {
 	
 	/**
 	 * Returns all elements in families ; no side-effect.
-	 * In case one element is missing, null is returned.
+	 * In case element with the given key is missing, null is returned.
+	 * @param table the table from which to find the element
+	 * @param id the unique identifier (i.e. the key) with which the element was stored
+	 * @param families the set of column families to be activated ; should never be null or empty
+	 * @return the data stored for each family ; null if and only if the id does not exist in the table
 	 */
 	ColumnFamilyData get(String table, String id, Set<String> families) throws DatabaseNotReachedException;
 	
