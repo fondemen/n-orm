@@ -1695,17 +1695,15 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			return null;
 		
 		ColumnFamilyData ret = new DefaultColumnFamilyData();
-		if (!r.isEmpty()) {
-			for (KeyValue kv : r.list()) {
-				String familyName = Bytes.toString(kv.getFamily());
-				Map<String, byte[]> fam = ret.get(familyName);
-				if (fam == null) {
-					fam = new TreeMap<String, byte[]>();
-					ret.put(familyName, fam);
-				}
-				fam.put(Bytes.toString(kv.getQualifier()),
-						kv.getValue());
+		for (KeyValue kv : r.list()) {
+			String familyName = Bytes.toString(kv.getFamily());
+			Map<String, byte[]> fam = ret.get(familyName);
+			if (fam == null) {
+				fam = new TreeMap<String, byte[]>();
+				ret.put(familyName, fam);
 			}
+			fam.put(Bytes.toString(kv.getQualifier()),
+					kv.getValue());
 		}
 		return ret;
 	}
@@ -1716,11 +1714,15 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {
+		//Grabbing all involved families
 		Set<String> families = new HashSet<String>();
 		if (changed !=null) families.addAll(changed.keySet());
 		if (removed != null) families.addAll(removed.keySet());
 		if (increments != null) families.addAll(increments.keySet());
 		
+		//In HBase, an element only exists when there is a value for its column family
+		//Storing (see later) an empty value with an empty qualifier within the properties family
+		//Thus the properties family is always involved
 		families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 		Map<String, Field> fams = this.toMap(families, changedFields);
 		
@@ -1729,9 +1731,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		try {
 			byte[] row = Bytes.toBytes(id);
 			
+			List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2); //At most one put and one delete
 	
-			List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2);
-	
+			//Transforming changes into a big Put (if necessary)
+			//and registering it as an action to be performed
 			Put rowPut = null;
 			if (changed != null && !changed.isEmpty()) {
 				rowPut = new Put(row);
@@ -1746,7 +1749,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				else
 					actions.add(rowPut);
 			}
-	
+
+			//Transforming deletes into a big Delete (if necessary)
+			//and registering it as an action to be performed
 			Delete rowDel = null;
 			if (removed != null && !removed.isEmpty()) {
 				rowDel = new Delete(row);
@@ -1762,7 +1767,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				else
 					actions.add(rowDel);
 			}
-			
+
+			//Transforming changes into a big Put (if necessary)
+			//but can't register it as an action to be performed (according to HBase API)
 			Increment rowInc = null;
 			if (increments != null && !increments.isEmpty()) {
 				rowInc = new Increment(row);
@@ -1778,6 +1785,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			}
 	
 			//An empty object is to be stored...
+			//Adding a dummy value into properties family
 			if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
 				rowPut = new Put(row);
 				rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
@@ -1786,13 +1794,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			
 			
 			Action<?> act;
-			
+			//Running puts and deletes
 			if (! actions.isEmpty()) {
 				act = new BatchAction(actions);
 				this.tryPerform(act, t, elt == null ? null : elt.getClass(), fams);
 				t = act.getTable();
 			}
-			
+			//Running increments
 			if (rowInc != null) {
 				act = new IncrementAction(rowInc);
 				this.tryPerform(act, t, elt == null ? null : elt.getClass(), fams);

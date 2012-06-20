@@ -2,6 +2,7 @@ package com.googlecode.n_orm;
 
 import static org.junit.Assert.*;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -29,8 +30,13 @@ public class FederatedTablesTest {
 		elt.key = key;
 		elt.delete();
 		
-		//Mandatory as we are using diffrent data stores for the same class in this test case
+		//Mandatory as we are using different data stores for the same class in this test case
 		FederatedTableManagement.clearAlternativesCache();
+	}
+	
+	@After
+	public void cleanupMem() {
+		Memory.INSTANCE.reset();
 	}
 	
 	@Test
@@ -76,7 +82,10 @@ public class FederatedTablesTest {
 		elt2.activate();
 		
 		assertEquals(elt.arg, elt2.arg);
-		assertEquals(2, Memory.INSTANCE.getQueriesAndReset());
+		//One query to register the alternative table
+		//Another to find where the element is
+		//And a last one to actually store the element
+		assertEquals(3, Memory.INSTANCE.getQueriesAndReset());
 		assertEquals("tpost", elt2.getTable());
 	}
 	
@@ -239,6 +248,8 @@ public class FederatedTablesTest {
 		elt.post = "post1";
 		elt.store(); //Stores key element in "tpost1"
 		
+		FederatedTableManagement.clearAlternativesCache();
+		
 		ConsistentElement elt2 = new ConsistentElement();
 		elt2.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
 		elt2.key = key;
@@ -260,6 +271,8 @@ public class FederatedTablesTest {
 		elt.post = "post1";
 		elt.store(); //Stores key element in "tpost1"
 		
+		FederatedTableManagement.clearAlternativesCache();
+		
 		ConsistentElement elt2 = new ConsistentElement();
 		elt2.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
 		elt2.key = key;
@@ -271,6 +284,58 @@ public class FederatedTablesTest {
 		assertEquals("arg2", elt.arg);
 		assertEquals("post2", elt.post);
 		assertEquals("tpost1", elt2.getTable());
+	}
+	
+	@Persisting(table="t",federated=FederatedMode.CHECKED_CONSISTENT_WITH_UNPOSTFIXED)
+	public static class LegacyableElement {
+		@Key public String key;
+		public String post;
+		public String arg;
+		
+		public String getTablePostfix() {
+			return this.post;
+		}
+	}
+	
+	@Test
+	public void notFromLegacy() {
+		Element elt = new Element();
+		elt.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
+		elt.key = key;
+		elt.post = "post1";
+		elt.store(); //Stores key element in "tpost1" (legacy)
+		
+		FederatedTableManagement.clearAlternativesCache();
+		
+		LegacyableElement elt2 = new LegacyableElement();
+		elt2.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
+		elt2.key = key;
+		elt2.post = "post2";
+		elt2.store(); //Misses "tpost1" !!!
+
+		assertEquals("tpost2", elt2.getTable());
+
+		//We are in an INCONSISTENT state !
+		ConsistentElement celt = new ConsistentElement();
+		celt.key = elt.key;
+		assertTrue(celt.existsInStore());
+		
+		try {
+			elt.delete();
+		} catch (AssertionError x) {}
+		assertTrue(elt.existsInStore()); //Found back from tpost2
+		assertTrue(celt.existsInStore());
+		assertTrue(elt2.existsInStore());
+		
+		elt2.delete();
+		assertFalse(elt.existsInStore());
+		assertFalse(celt.existsInStore());
+		assertFalse(elt2.existsInStore());
+		
+		elt2.delete();
+		assertFalse(elt.existsInStore());
+		assertFalse(celt.existsInStore());
+		assertFalse(elt2.existsInStore());
 	}
 	
 	@Test
@@ -374,7 +439,6 @@ public class FederatedTablesTest {
 		Element elt2 = new Element();
 		elt2.key = key;
 		elt2.post = "post";
-		elt2.activate();
 		
 		assertTrue(elt2.existsInStore());
 	}
