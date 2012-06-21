@@ -273,7 +273,7 @@ public aspect FederatedTableManagement {
 			this.tablePostfix = null;
 			return;
 		}
-		
+
 		String oldPostfix = this.tablePostfix;
 		this.tablePostfix = postfix;
 		this.checkTablePostfixHasNotChanged();
@@ -373,44 +373,64 @@ public aspect FederatedTableManagement {
 	 * already known postfixes for the original table, will all possible
 	 * postfixes (not already tested) taken from the store (see
 	 * {@link TableAlternatives#updateAlternatives(Store)}).
+	 * 
+	 * @return whether this table was newly found
 	 */
-	private void PersistingElementOverFederatedTable.findTableLocation(ReadWrite mode) {
-		if (this.tablePostfix == null) {
-			Consistency consistencyLevel = this.getClass().getAnnotation(Persisting.class).federated().getConsistency(mode);
-			//No consistency check
-			if (consistencyLevel.compareTo(Consistency.NONE) <= 0)
-				return;
-			
-			String mainTable = this.getMainTable();
-			String id = this.getIdentifier();
-			Store store = this.getStore();
-			Set<String> testedTables = new HashSet<String>();
-			
-			// First trying with expected table
-			if (this.testTableLocation(mainTable + this.getTablePostfix(), id, mainTable, testedTables, store))
-				return;
-			
-			//Then trying with legacy table
-			if (this.testTableLocation(mainTable, id, mainTable, testedTables, store))
-				return;
-			
-			//In case of heavy consistency mode, test all possible tables
-			if (consistencyLevel.compareTo(Consistency.CONSISTENT) >= 0) {
-				for (String t : this.getKnownPossibleTables()) {
-					if (this.testTableLocation(t, id, mainTable, testedTables, store))
-						return;
-				}
-				// No found yet ; querying possible alternatives from store
-				for (String t : this.getPossibleTablesWithAnUpdate(store)) {
-					if (this.testTableLocation(t, id, mainTable, testedTables, store))
-						return;
-				}
+	private boolean PersistingElementOverFederatedTable.findTableLocation(
+			ReadWrite mode) {
+		if (this.tablePostfix != null) {
+			this.checkTablePostfixHasNotChanged();
+			return false;
+		}
+
+		Consistency consistencyLevel = this.getClass()
+				.getAnnotation(Persisting.class).federated()
+				.getConsistency(mode);
+		Store store = this.getStore();
+
+		// No consistency check
+		if (consistencyLevel.compareTo(Consistency.NONE) <= 0) {
+			this.setTablePostfix(this.getTablePostfix(), store);
+			return false;
+		}
+
+		String mainTable = this.getMainTable();
+		String id = this.getIdentifier();
+		Set<String> testedTables = new HashSet<String>();
+
+		// First trying with expected table
+		if (this.testTableLocation(mainTable + this.getTablePostfix(), id,
+				mainTable, testedTables, store))
+			return true;
+
+		// Then trying with legacy table
+		if (this.testTableLocation(mainTable, id, mainTable, testedTables,
+				store))
+			return true;
+
+		// In case of heavy consistency mode, test all possible tables
+		if (consistencyLevel.compareTo(Consistency.CONSISTENT) >= 0) {
+			for (String t : this.getKnownPossibleTables()) {
+				if (this.testTableLocation(t, id, mainTable, testedTables,
+						store))
+					return true;
+			}
+			// No found yet ; querying possible alternatives from store
+			for (String t : this.getPossibleTablesWithAnUpdate(store)) {
+				if (this.testTableLocation(t, id, mainTable, testedTables,
+						store))
+					return true;
 			}
 		}
 
+		// Still not found ; setting postfix to computed value
+		this.setTablePostfix(this.getTablePostfix(), store);
+		return false;
 	}
-	
-	private boolean PersistingElementOverFederatedTable.testTableLocation(String t, String id, String mainTable, Set<String> alreadyTested, Store store) {
+
+	private boolean PersistingElementOverFederatedTable.testTableLocation(
+			String t, String id, String mainTable, Set<String> alreadyTested,
+			Store store) {
 		assert t.startsWith(mainTable);
 		if (alreadyTested.add(t)) {
 			if (store.exists(this, t, id)) {
@@ -420,81 +440,81 @@ public aspect FederatedTableManagement {
 		}
 		return false;
 	}
-	
-	//getTablePostfix might return null ; we'll consider it is equivalent to empty postfix
+
+	// getTablePostfix might return null ; we'll consider it is equivalent to
+	// empty postfix
 	String around():
 		call(String PersistingElementOverFederatedTable+.getTablePostfix())
 		&& within(FederatedTableManagement) {
-			String ret = proceed();
-			return ret == null ? "" : ret;
-		}
+		String ret = proceed();
+		return ret == null ? "" : ret;
+	}
+
+	// ===================================
+	// element-level operations
+	// ===================================
 
 	// Store
 	void around(PersistingElementOverFederatedTable self, String table,
-			String id, Store store):
+			Store store):
 		call(void Store+.storeChanges(..))
-		&& within(StorageManagement)
+		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
 		&& target(store)
-		&& args(self, Map<String, Field>, table, id, ..) {
+		&& args(self, Map<String, Field>, table, ..) {
 
 		self.findTableLocation(ReadWrite.WRITE);
-		
-		// We now have to definitely choose the proper table
-		if (self.tablePostfix == null) {
-			self.setTablePostfix(self.getTablePostfix(), store);
-		} else {
-			self.checkTablePostfixHasNotChanged();
-		}
 
-		// Postfixing table name if necessary + registering alternative in the
-		// cache
+		// Postfixing table name if necessary
 		if (!table.endsWith(self.tablePostfix)) {
 			String actualTable = table + self.tablePostfix;
 			// Should register table (even if looks like done when invoking
-			// setTablePostfix) as we may be adding a postfix for a super table
-			// (remember federated mode is inherited and immutable)
+			// findTableLocation) as we may be adding a postfix for a super
+			// table (remember federated mode is inherited and immutable)
 			registerTable(table, actualTable, store);
 			table = actualTable;
 		}
 
-		proceed(self, table, id, store);
+		proceed(self, table, store);
 	}
 
 	// Activate
 	ColumnFamilyData around(PersistingElementOverFederatedTable self,
 			String table):
 		call(ColumnFamilyData Store.get(PersistingElement,String,String,Map<String, Field>))
-		&& within(StorageManagement)
+		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
 		&& args(self, table, ..)
+		// No need to around when postfix is already known as getTable returns the actual table
 		&& if(self.tablePostfix == null) {
-		self.findTableLocation(ReadWrite.READ);
-		if (self.tablePostfix == null) //Element does not exists
-			return null;
-		else
+		if (self.findTableLocation(ReadWrite.READ)) // Element exists
 			return proceed(self, table + self.tablePostfix);
+		else
+			// Element does not exists
+			return null;
 	}
 
 	// Exists
 	boolean around(PersistingElementOverFederatedTable self):
 		call(boolean Store.exists(PersistingElement, String, String))
-		&& within(StorageManagement)
+		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
 		&& args(self,..)
+		// No need to around when postfix is already known as getTable returns the actual table
 		&& if(self.tablePostfix == null) {
-		self.findTableLocation(ReadWrite.READ);
-		return self.tablePostfix != null;
+		return self.findTableLocation(ReadWrite.READ);
 	}
 
 	// Delete
 	void around(PersistingElementOverFederatedTable self, String table):
 		call(void Store+.delete(..))
-		&& within(StorageManagement)
+		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
 		&& args(self, table, ..) {
 		self.findTableLocation(ReadWrite.READ_OR_WRITE);
-		if (self.tablePostfix != null) {
-			if (!table.endsWith(self.tablePostfix))
-				table = table + self.tablePostfix;
-			proceed(self, table);
-			self.setTablePostfix(null, self.getStore());
-		}
+		if (!table.endsWith(self.tablePostfix))
+			table = table + self.tablePostfix;
+		proceed(self, table);
+		self.setTablePostfix(null, self.getStore());
 	}
+
+	// ===================================
+	// family-level operations
+	// ===================================
 }
