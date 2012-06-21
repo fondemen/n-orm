@@ -652,6 +652,10 @@ public aspect FederatedTableManagement {
 		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
 		&& target(store)
 		&& args(clazz, table, c) {
+		if (!clazz.getAnnotation(Persisting.class).federated().isFederated()) {
+			return proceed(clazz, table, c, store);
+		}
+		
 		return new GlobalAction<Long>() {
 
 			@Override
@@ -777,6 +781,10 @@ public aspect FederatedTableManagement {
 		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
 		&& target(store)
 		&& args(clazz, table, c, limit, families) {
+		if (!clazz.getAnnotation(Persisting.class).federated().isFederated()) {
+			return proceed(clazz, table, c, limit, families, store);
+		}
+		
 		return new GlobalAction<CloseableKeyIterator>() {
 
 			@Override
