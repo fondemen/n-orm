@@ -65,7 +65,9 @@ import com.googlecode.n_orm.storeapi.Store;
  * read operation (like {@link PersistingElement#store()})
  * </ol>
  * When read and write operation should the the same level of consistency
- * checks, only consistency level is indicated.
+ * checks, only consistency level is indicated. Note that
+ * {@link PersistingElement#delete()} uses the most consistent mode between read
+ * and write consistency.
  * </p>
  * 
  * @see FederatedTableManagement FederatedTableManagement for more
