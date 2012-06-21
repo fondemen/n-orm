@@ -11,9 +11,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import com.googlecode.n_orm.FederatedMode.Consistency;
 import com.googlecode.n_orm.FederatedMode.ReadWrite;
+import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
@@ -51,6 +58,14 @@ public aspect FederatedTableManagement {
 	 * the base ; default is 10min
 	 */
 	public static long TableAlternativeCacheTTLInS = 600;
+
+	/**
+	 * The maximum number of threads to be used while performing global actions
+	 * like a {@link SearchableClassConstraintBuilder#count() counting} or
+	 * {@link SearchableClassConstraintBuilder#go() grabbing} elements from a
+	 * class.
+	 */
+	public static final int PARALLEL_GLOBAL_SEARCH = 5;
 
 	// REM: a federated element can only inherit federated elements
 	declare parents: (@Persisting(federated!=FederatedMode.NONE) *) implements PersistingElement, PersistingElementOverFederatedTable;
@@ -565,5 +580,63 @@ public aspect FederatedTableManagement {
 			return null;
 
 		return proceed(self, self.getTable());
+	}
+
+	// ===================================
+	// global-level operations
+	// ===================================
+
+	// Count
+	long around(final Class<? extends PersistingElement> clazz, final String table, final Constraint c, final Store store):
+		call(long Store.count(Class<? extends PersistingElement>, String, Constraint))
+		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
+		&& target(store)
+		&& args(clazz, table, c) {
+			
+		ExecutorService exec = Executors.newFixedThreadPool(PARALLEL_GLOBAL_SEARCH);
+		Collection<Future<Long>> results = new LinkedList<Future<Long>>();
+		
+		//looking count in the main table
+		results.add(exec.submit(new Callable<Long>() {
+
+			@Override
+			public Long call() throws Exception {
+				// TODO Auto-generated method stub
+				return store.count(clazz, table, c);
+			}
+		}));
+			
+		TableAlternatives alts = getAlternatives(table);
+		alts.updateAlternatives(store);
+		
+		for (final String t : alts.getAlternatives()) {
+			results.add(exec.submit(new Callable<Long>() {
+
+				@Override
+				public Long call() throws Exception {
+					return store.count(clazz, t, c);
+				}
+			}));
+		}
+		
+		exec.shutdown();
+		try {
+			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+		} catch (InterruptedException e) {
+			throw new DatabaseNotReachedException(e);
+		}
+		
+		long ret = 0;
+		for (Future<Long> res : results) {
+			try {
+				ret += res.get().longValue();
+			} catch (InterruptedException e) {
+				throw new DatabaseNotReachedException(e);
+			} catch (ExecutionException e) {
+				throw new DatabaseNotReachedException(e);
+			}
+		}
+		
+		return ret;
 	}
 }
