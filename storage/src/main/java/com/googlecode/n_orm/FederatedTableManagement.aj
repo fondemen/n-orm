@@ -14,6 +14,7 @@ import java.util.TreeSet;
 
 import com.googlecode.n_orm.FederatedMode.Consistency;
 import com.googlecode.n_orm.FederatedMode.ReadWrite;
+import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
@@ -525,26 +526,44 @@ public aspect FederatedTableManagement {
 		&& args(self,Field, table, ..)
 		// No need to around when postfix is already known as getTable returns the actual table
 		&& if(self.tablePostfix == null) {
-			
-		//Element does not exists
+
+		// Element does not exists
 		if (!self.findTableLocation(ReadWrite.READ))
 			return false;
-		
+
 		return proceed(self, self.getTable());
 	}
 
-	// Get
+	// Get column
 	byte[] around(PersistingElementOverFederatedTable self, String table):
 		call(byte[] Store.get(PersistingElement, Field, String, String, String, String))
 		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
 		&& args(self,Field, table, ..)
 		// No need to around when postfix is already known as getTable returns the actual table
 		&& if(self.tablePostfix == null) {
-			
-		//Element does not exists
+
+		// Element does not exists
 		if (!self.findTableLocation(ReadWrite.READ))
 			return null;
-		
+
+		return proceed(self, self.getTable());
+	}
+
+	// Get all columns
+	Map<String, byte[]> around(PersistingElementOverFederatedTable self,
+			String table):
+		(		call(Map<String, byte[]> Store.get(PersistingElement, Field, String, String, String))
+			||	call(Map<String, byte[]> Store.get(PersistingElement, Field, String, String, String, Constraint))
+		)
+		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
+		&& args(self,Field, table, ..)
+		// No need to around when postfix is already known as getTable returns the actual table
+		&& if(self.tablePostfix == null) {
+
+		// Element does not exists
+		if (!self.findTableLocation(ReadWrite.READ))
+			return null;
+
 		return proceed(self, self.getTable());
 	}
 }
