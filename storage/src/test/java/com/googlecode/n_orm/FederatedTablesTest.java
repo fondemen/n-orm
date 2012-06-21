@@ -691,4 +691,37 @@ public class FederatedTablesTest {
 		assertEquals("AZERTY2", elt2.cf.get("QUAL"));
 		assertNull(elt2.cf.get("qual"));
 	}
+	
+	@Test
+	public void countNone() {
+		assertEquals(0, StorageManagement.findElements().ofClass(Element.class).count());
+	}
+	
+	@Test
+	public void countAll() {
+		for(int i = 0; i < 100; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + i;
+			int post  = i%4;
+			if (post != 0)
+				elt.post = "post" + post;
+			elt.store();
+		}
+		
+		assertEquals(100, StorageManagement.findElements().ofClass(Element.class).count());
+	}
+	
+	@Test
+	public void countConstrained() {
+		for(int i = 'a'; i < 'z'; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + (char)i;
+			int post  = i%4;
+			if (post != 0)
+				elt.post = "post" + post;
+			elt.store();
+		}
+		
+		assertEquals(10, StorageManagement.findElements().ofClass(Element.class).withKey("key").between("keyd").and("keym").count());
+	}
 }
