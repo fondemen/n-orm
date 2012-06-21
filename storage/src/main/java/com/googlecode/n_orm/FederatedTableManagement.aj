@@ -517,4 +517,19 @@ public aspect FederatedTableManagement {
 	// ===================================
 	// family-level operations
 	// ===================================
+
+	// Exists
+	boolean around(PersistingElementOverFederatedTable self, String table):
+		call(boolean Store.exists(PersistingElement, Field, String, String, String))
+		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
+		&& args(self,Field, table, ..)
+		// No need to around when postfix is already known as getTable returns the actual table
+		&& if(self.tablePostfix == null) {
+			
+		//Element does not exists
+		if (!self.findTableLocation(ReadWrite.READ))
+			return false;
+		
+		return proceed(self, self.getTable());
+	}
 }

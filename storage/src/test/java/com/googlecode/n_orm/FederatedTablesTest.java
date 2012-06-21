@@ -6,6 +6,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.googlecode.n_orm.cf.SetColumnFamily;
 import com.googlecode.n_orm.memory.Memory;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
 
@@ -17,6 +18,7 @@ public class FederatedTablesTest {
 		@Key public String key;
 		public String post;
 		public String arg;
+		public SetColumnFamily<String> cf = new SetColumnFamily<String>();
 		
 		public String getTablePostfix() {
 			return this.post;
@@ -25,17 +27,21 @@ public class FederatedTablesTest {
 	
 	@Before
 	public void cleanupCache() {
-		Element elt = new Element();
+		ConsistentElement elt = new ConsistentElement();
 		elt.key = key;
-		elt.delete();
+		
+		boolean ok;
+		do {
+			try {
+				elt.delete();
+				ok = !elt.existsInStore();
+			} catch (AssertionError x) { // Is element still exists
+				ok = false;
+			}
+		} while (!ok);
 		
 		//Mandatory as we are using different data stores for the same class in this test case
 		FederatedTableManagement.clearAlternativesCache();
-	}
-	
-	@After
-	public void cleanupMem() {
-		Memory.INSTANCE.reset();
 	}
 	
 	@Test
@@ -472,5 +478,39 @@ public class FederatedTablesTest {
 		elt2.delete();
 		
 		assertFalse(elt.existsInStore());
+	}
+	
+	@Test
+	public void existsCfWhenElementDoesNotExists() {
+		Element elt = new Element();
+		elt.key = key;
+		//deleted by @Before method cleanupCache()
+		
+		assertTrue(elt.cf.isEmptyInStore());
+	}
+	
+	@Test
+	public void existsCfWhenCFDoesNotExists() {
+		Element elt = new Element();
+		elt.key = key;
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = key;
+		
+		assertTrue(elt2.cf.isEmptyInStore());
+	}
+	
+	@Test
+	public void existsCfWhenCFExists() {
+		Element elt = new Element();
+		elt.key = key;
+		elt.cf.add("AZERTY");
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = key;
+		
+		assertFalse(elt2.cf.isEmptyInStore());
 	}
 }
