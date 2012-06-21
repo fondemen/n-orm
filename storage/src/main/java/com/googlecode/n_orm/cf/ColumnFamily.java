@@ -152,9 +152,10 @@ public abstract class ColumnFamily<T> implements Comparable<ColumnFamily<T>> {
 		this.clearChanges();
 		String id = this.owner.getIdentifier();
 		assert id != null;
-		for (Entry<String, byte[]> entry : rawData.entrySet()) {
-			this.collection.put(entry.getKey(), this.preparePut(entry.getKey(), entry.getValue()));
-		}
+		if (rawData != null)
+			for (Entry<String, byte[]> entry : rawData.entrySet()) {
+				this.collection.put(entry.getKey(), this.preparePut(entry.getKey(), entry.getValue()));
+			}
 		setActivated();
 		this.storeToPOJO();
 		assert ! this.hasChanged();

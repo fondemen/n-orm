@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.memory.Memory;
+import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
 
 public class FederatedTablesTest {
@@ -484,27 +485,32 @@ public class FederatedTablesTest {
 	public void existsCfWhenElementDoesNotExists() {
 		Element elt = new Element();
 		elt.key = key;
+		elt.post = "post1";
 		//deleted by @Before method cleanupCache()
 		
 		assertTrue(elt.cf.isEmptyInStore());
+		assertEquals("tpost1", elt.getTable());
 	}
 	
 	@Test
 	public void existsCfWhenCFDoesNotExists() {
 		Element elt = new Element();
 		elt.key = key;
+		elt.post = "post1";
 		elt.store();
 		
 		Element elt2 = new Element();
 		elt2.key = key;
 		
 		assertTrue(elt2.cf.isEmptyInStore());
+		assertEquals("tpost1", elt2.getTable());
 	}
 	
 	@Test
 	public void existsCfWhenCFExists() {
 		Element elt = new Element();
 		elt.key = key;
+		elt.post = "post1";
 		elt.cf.put("qual", "AZERTY");
 		elt.store();
 		
@@ -512,39 +518,177 @@ public class FederatedTablesTest {
 		elt2.key = key;
 		
 		assertFalse(elt2.cf.isEmptyInStore());
+		assertEquals("tpost1", elt2.getTable());
 	}
 	
 	@Test
 	public void getCfWhenElementDoesNotExists() {
 		Element elt = new Element();
 		elt.key = key;
+		elt.post = "post1";
 		//deleted by @Before method cleanupCache()
 		
 		assertNull(elt.cf.getFromStore("qual"));
+		assertEquals("tpost1", elt.getTable());
 	}
 	
 	@Test
 	public void getCfWhenCFDoesNotExists() {
 		Element elt = new Element();
 		elt.key = key;
+		elt.post = "post1";
 		elt.store();
 		
 		Element elt2 = new Element();
 		elt2.key = key;
 
 		assertNull(elt2.cf.getFromStore("qual"));
+		assertEquals("tpost1", elt2.getTable());
 	}
 	
 	@Test
 	public void getCfWhenCFExists() {
 		Element elt = new Element();
 		elt.key = key;
+		elt.post = "post1";
 		elt.cf.put("qual", "AZERTY");
 		elt.store();
 		
 		Element elt2 = new Element();
 		elt2.key = key;
 
-		assertEquals("AZERTY", elt.cf.getFromStore("qual"));
+		assertEquals("AZERTY", elt2.cf.getFromStore("qual"));
+		
+		assertEquals("tpost1", elt2.getTable());
+	}
+	
+	@Test
+	public void getAllCfWhenElementDoesNotExists() {
+		Element elt = new Element();
+		elt.key = key;
+		elt.post = "post1";
+		elt.cf.put("qual", "AZZERTYTEST");
+		elt.cf.activate();
+		//deleted by @Before method cleanupCache()
+		
+		assertEquals("tpost1", elt.getTable());
+
+		assertTrue(elt.cf.isEmpty());
+
+		//Testing again as table should already be known now and not go through aspect
+		elt.cf.activate();
+		assertTrue(elt.cf.isEmpty());
+	}
+	
+	@Test
+	public void getAllCfWhenCFDoesNotExists() {
+		Element elt = new Element();
+		elt.key = key;
+		elt.post = "post1";
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = key;
+		elt2.cf.put("qual", "AZZERTYTEST");
+		elt2.cf.activate();
+		
+		assertEquals("tpost1", elt2.getTable());
+
+		assertTrue(elt2.cf.isEmpty());
+		
+		//Testing again as table should already be known now and not go through aspect
+		elt2.cf.activate();
+		assertTrue(elt2.cf.isEmpty());
+	}
+	
+	@Test
+	public void getAllCfWhenCFExists() {
+		Element elt = new Element();
+		elt.key = key;
+		elt.post = "post1";
+		elt.cf.put("qual", "AZERTY");
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = key;
+		elt2.cf.put("qual", "AZZERTYTEST");
+		elt2.cf.activate();
+		
+		assertEquals("tpost1", elt2.getTable());
+
+		assertEquals("AZERTY", elt2.cf.get("qual"));
+
+		//Testing again as table should already be known now and not go through aspect
+		elt.cf.activate();
+		assertEquals("AZERTY", elt.cf.get("qual"));
+		elt2.cf.activate();
+		assertEquals("AZERTY", elt2.cf.get("qual"));
+	}
+	
+	@Test
+	public void getAllConstrainedCfWhenElementDoesNotExists() {
+		Element elt = new Element();
+		elt.key = key;
+		elt.post = "post1";
+		elt.cf.put("qual", "AZZERTYTEST");
+		elt.cf.activate(new Constraint("A", "Z"));
+		//deleted by @Before method cleanupCache()
+		
+		assertEquals("tpost1", elt.getTable());
+
+		assertTrue(elt.cf.isEmpty());
+
+		//Testing again as table should already be known now and not go through aspect
+		elt.cf.activate(new Constraint("A", "Z"));
+		assertTrue(elt.cf.isEmpty());
+	}
+	
+	@Test
+	public void getAllConstrainedCfWhenCFDoesNotExists() {
+		Element elt = new Element();
+		elt.key = key;
+		elt.post = "post1";
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = key;
+		elt2.cf.put("qual", "AZZERTYTEST");
+		elt2.cf.activate(new Constraint("A", "Z"));
+		
+		assertEquals("tpost1", elt2.getTable());
+
+		assertTrue(elt2.cf.isEmpty());
+		
+		//Testing again as table should already be known now and not go through aspect
+		elt2.cf.activate(new Constraint("A", "Z"));
+		assertTrue(elt2.cf.isEmpty());
+	}
+	
+	@Test
+	public void getAllConstrainedCfWhenCFExists() {
+		Element elt = new Element();
+		elt.key = key;
+		elt.post = "post1";
+		elt.cf.put("qual", "AZERTY1");
+		elt.cf.put("QUAL", "AZERTY2");
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = key;
+		elt2.cf.put("qual", "AZZERTYTEST");
+		elt2.cf.activate(new Constraint("A", "Z"));
+		
+		assertEquals("tpost1", elt2.getTable());
+
+		assertEquals("AZERTY2", elt2.cf.get("QUAL"));
+		assertNull(elt2.cf.get("qual"));
+
+		//Testing again as table should already be known now and not go through aspect
+		elt.cf.activate(new Constraint("A", "Z"));
+		assertEquals("AZERTY2", elt.cf.get("QUAL"));
+		assertNull(elt.cf.get("qual"));
+		elt2.cf.activate(new Constraint("A", "Z"));
+		assertEquals("AZERTY2", elt2.cf.get("QUAL"));
+		assertNull(elt2.cf.get("qual"));
 	}
 }
