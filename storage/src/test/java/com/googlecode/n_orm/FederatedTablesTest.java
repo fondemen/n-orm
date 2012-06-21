@@ -6,7 +6,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.googlecode.n_orm.cf.SetColumnFamily;
+import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.memory.Memory;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
 
@@ -18,7 +18,7 @@ public class FederatedTablesTest {
 		@Key public String key;
 		public String post;
 		public String arg;
-		public SetColumnFamily<String> cf = new SetColumnFamily<String>();
+		public MapColumnFamily<String, String> cf = new MapColumnFamily<String, String>();
 		
 		public String getTablePostfix() {
 			return this.post;
@@ -505,12 +505,46 @@ public class FederatedTablesTest {
 	public void existsCfWhenCFExists() {
 		Element elt = new Element();
 		elt.key = key;
-		elt.cf.add("AZERTY");
+		elt.cf.put("qual", "AZERTY");
 		elt.store();
 		
 		Element elt2 = new Element();
 		elt2.key = key;
 		
 		assertFalse(elt2.cf.isEmptyInStore());
+	}
+	
+	@Test
+	public void getCfWhenElementDoesNotExists() {
+		Element elt = new Element();
+		elt.key = key;
+		//deleted by @Before method cleanupCache()
+		
+		assertNull(elt.cf.getFromStore("qual"));
+	}
+	
+	@Test
+	public void getCfWhenCFDoesNotExists() {
+		Element elt = new Element();
+		elt.key = key;
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = key;
+
+		assertNull(elt2.cf.getFromStore("qual"));
+	}
+	
+	@Test
+	public void getCfWhenCFExists() {
+		Element elt = new Element();
+		elt.key = key;
+		elt.cf.put("qual", "AZERTY");
+		elt.store();
+		
+		Element elt2 = new Element();
+		elt2.key = key;
+
+		assertEquals("AZERTY", elt.cf.getFromStore("qual"));
 	}
 }
