@@ -2,6 +2,8 @@ package com.googlecode.n_orm;
 
 import static org.junit.Assert.*;
 
+import java.util.NavigableSet;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -40,6 +42,40 @@ public class FederatedTablesTest {
 				ok = false;
 			}
 		} while (!ok);
+		
+		//Mandatory as we are using different data stores for the same class in this test case
+		FederatedTableManagement.clearAlternativesCache();
+	}
+	
+	@Before
+	public void cleanupLists() {
+		ConsistentElement elt = new ConsistentElement();
+		elt.key = "key1";
+		if (!elt.existsInStore())
+			return;
+
+		for(int i = 0; i < 100; ++i) {
+			elt = new ConsistentElement();
+			elt.key = "key" + i;
+			elt.delete();
+		}
+		
+		//Mandatory as we are using different data stores for the same class in this test case
+		FederatedTableManagement.clearAlternativesCache();
+	}
+	
+	@Before
+	public void cleanupAlpha() {
+		ConsistentElement elt = new ConsistentElement();
+		elt.key = "keya";
+		if (!elt.existsInStore())
+			return;
+
+		for(int i = 'a'; i < 'z'; ++i) {
+			elt = new ConsistentElement();
+			elt.key = "key" + (char)i;
+			elt.delete();
+		}
 		
 		//Mandatory as we are using different data stores for the same class in this test case
 		FederatedTableManagement.clearAlternativesCache();
@@ -723,5 +759,78 @@ public class FederatedTablesTest {
 		}
 		
 		assertEquals(10, StorageManagement.findElements().ofClass(Element.class).withKey("key").between("keyd").and("keym").count());
+	}
+	
+	@Test
+	public void findNone() {
+		CloseableIterator<Element> res = StorageManagement.findElements().ofClass(Element.class).withAtMost(1000).elements().andActivateAllFamilies().iterate();
+		assertFalse(res.hasNext());
+		res.close();
+	}
+	
+	@Test
+	public void findAll() {
+		for(int i = 0; i < 100; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + i;
+			int post  = i%4;
+			if (post != 0)
+				elt.post = "post" + post;
+			elt.store();
+		}
+
+		CloseableIterator<Element> res = StorageManagement.findElements().ofClass(Element.class).withAtMost(1000).elements().andActivateAllFamilies().iterate();
+		Element oldE = null;
+		for(int i = 0; i < 100; ++i) {
+			assertTrue(res.hasNext());
+			Element newE = res.next();
+			if (oldE != null)
+				assertTrue(oldE.compareTo(newE) < 0);
+			oldE = newE;
+		}
+		assertFalse(res.hasNext());
+		res.close();
+	}
+	
+	@Test
+	public void findAllConstrained() {
+		for(int i = 'a'; i < 'z'; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + (char)i;
+			int post  = i%4;
+			if (post != 0)
+				elt.post = "post" + post;
+			elt.store();
+		}
+
+		NavigableSet<Element> res = StorageManagement.findElements().ofClass(Element.class).withAtMost(1000).elements().withKey("key").between("keyd").and("keym").go();
+		assertEquals(10, res.size());
+		Element elt = new Element();
+		elt.key = "keyg";
+		assertTrue(res.contains(elt));
+		elt = new Element();
+		elt.key = "keyc";
+		assertFalse(res.contains(elt));
+	}
+	
+	@Test
+	public void findAllLimited() {
+		for(int i = 'a'; i < 'z'; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + (char)i;
+			int post  = i%4;
+			if (post != 0)
+				elt.post = "post" + post;
+			elt.store();
+		}
+
+		NavigableSet<Element> res = StorageManagement.findElements().ofClass(Element.class).withAtMost(10).elements().go();
+		assertEquals(10, res.size());
+		Element elt = new Element();
+		elt.key = "keyj";
+		assertTrue(res.contains(elt));
+		elt = new Element();
+		elt.key = "keyk";
+		assertFalse(res.contains(elt));
 	}
 }
