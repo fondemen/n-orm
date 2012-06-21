@@ -6,14 +6,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.googlecode.n_orm.Persisting.FederatedMode;
 import com.googlecode.n_orm.memory.Memory;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
 
 public class FederatedTablesTest {
 	public static final String key = "akey";
 	
-	@Persisting(table="t",federated=FederatedMode.FAST_UNCHECKED)
+	@Persisting(table="t",federated=FederatedMode.RCONS)
 	public static class Element {
 		@Key public String key;
 		public String post;
@@ -69,8 +68,8 @@ public class FederatedTablesTest {
 		elt.post = "post";
 		elt.arg = "a value";
 		elt.store();
-		//One query to register the alternative table
-		//Another to actually store the element
+		//A query to register the alternative table
+		//Another one to actually store the element
 		assertEquals(2, Memory.INSTANCE.getQueriesAndReset());
 		
 		FederatedTableManagement.clearAlternativesCache();
@@ -186,7 +185,7 @@ public class FederatedTablesTest {
 		assertEquals("tpost1", elt.getTable());
 	}
 	
-	@Persisting(table="t",federated=FederatedMode.FAST_CHECKED)
+	@Persisting(table="t",federated=FederatedMode.PC_INCONS)
 	public static class CheckedElement {
 		@Key public String key;
 		public String post;
@@ -227,7 +226,7 @@ public class FederatedTablesTest {
 		elt2.activate(); //Finds key from "tpost1" while it should be found only from "tpost2" !
 	}
 	
-	@Persisting(table="t",federated=FederatedMode.CONSISTENT)
+	@Persisting(table="t",federated=FederatedMode.CONS)
 	public static class ConsistentElement {
 		@Key public String key;
 		public String post;
@@ -286,7 +285,7 @@ public class FederatedTablesTest {
 		assertEquals("tpost1", elt2.getTable());
 	}
 	
-	@Persisting(table="t",federated=FederatedMode.CHECKED_CONSISTENT_WITH_UNPOSTFIXED)
+	@Persisting(table="t",federated=FederatedMode.PC_LEG)
 	public static class LegacyableElement {
 		@Key public String key;
 		public String post;
