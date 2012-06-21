@@ -3,7 +3,7 @@ package com.googlecode.n_orm;
 /**
  * Such kind of persisting elements are those that were annotated with
  * {@link Persisting#federated()} with a mode different from
- * {@link Persisting.FederatedMode#NONE}. Unlike other persisting elements,
+ * {@link FederatedMode#NONE}. Unlike other persisting elements,
  * those elements can be located in more than one table. Actual table can be the
  * table for other elements, or any other table with the same name postfixed
  * with a qualifier. In case this qualifier is not known,

@@ -12,7 +12,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import com.googlecode.n_orm.Persisting.FederatedMode;
+import com.googlecode.n_orm.FederatedMode.Consistency;
+import com.googlecode.n_orm.FederatedMode.ReadWrite;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
@@ -51,7 +52,7 @@ public aspect FederatedTableManagement {
 	public static long TableAlternativeCacheTTLInS = 600;
 
 	// REM: a federated element can only inherit federated elements
-	declare parents: (@Persisting(federated!=Persisting.FederatedMode.NONE) *) implements PersistingElement, PersistingElementOverFederatedTable;
+	declare parents: (@Persisting(federated!=FederatedMode.NONE) *) implements PersistingElement, PersistingElementOverFederatedTable;
 
 	/**
 	 * A place where to register alternatives for an original tables.
@@ -343,7 +344,7 @@ public aspect FederatedTableManagement {
 	 *             in case {@link Persisting#federated()} states table postfix
 	 *             computation should be checked and is different from known
 	 *             postfix
-	 * @see Persisting.FederatedMode#isCheckForChangingPostfix()
+	 * @see FederatedMode#isCheckForChangingPostfix()
 	 */
 	private void PersistingElementOverFederatedTable.checkTablePostfixHasNotChanged() {
 		FederatedMode fm = this.getClass().getAnnotation(Persisting.class)
@@ -354,8 +355,7 @@ public aspect FederatedTableManagement {
 			String computedPostfix = this.getTablePostfix();
 			if (!this.tablePostfix.equals(computedPostfix)) {
 				// Could still be forgiven in legacy mode
-				if (!(this.tablePostfix.length() == 0 && fm
-						.isConsistentWithUnpostfixedTable()))
+				if (this.tablePostfix.length() != 0)
 					throw new IllegalStateException(this
 							+ " already registered in table "
 							+ this.getMainTable() + " with postfix "
@@ -374,26 +374,28 @@ public aspect FederatedTableManagement {
 	 * postfixes (not already tested) taken from the store (see
 	 * {@link TableAlternatives#updateAlternatives(Store)}).
 	 */
-	private void PersistingElementOverFederatedTable.findTableLocation() {
+	private void PersistingElementOverFederatedTable.findTableLocation(ReadWrite mode) {
 		if (this.tablePostfix == null) {
+			Consistency consistencyLevel = this.getClass().getAnnotation(Persisting.class).federated().getConsistency(mode);
+			//No consistency check
+			if (consistencyLevel.compareTo(Consistency.NONE) <= 0)
+				return;
+			
 			String mainTable = this.getMainTable();
 			String id = this.getIdentifier();
 			Store store = this.getStore();
-			FederatedMode fm = this.getClass().getAnnotation(Persisting.class).federated();
 			Set<String> testedTables = new HashSet<String>();
 			
 			// First trying with expected table
 			if (this.testTableLocation(mainTable + this.getTablePostfix(), id, mainTable, testedTables, store))
 				return;
 			
-			// In case of light consistency mode, use also standard table
-			//if (fm.isConsistentWithUnpostfixedTable()) {
-				if (this.testTableLocation(mainTable, id, mainTable, testedTables, store))
-					return;
-			//}
+			//Then trying with legacy table
+			if (this.testTableLocation(mainTable, id, mainTable, testedTables, store))
+				return;
 			
 			//In case of heavy consistency mode, test all possible tables
-			//if (fm.isConsistentWithOtherPostfixedTables()) {
+			if (consistencyLevel.compareTo(Consistency.CONSISTENT) >= 0) {
 				for (String t : this.getKnownPossibleTables()) {
 					if (this.testTableLocation(t, id, mainTable, testedTables, store))
 						return;
@@ -403,7 +405,7 @@ public aspect FederatedTableManagement {
 					if (this.testTableLocation(t, id, mainTable, testedTables, store))
 						return;
 				}
-			//}
+			}
 		}
 
 	}
@@ -435,25 +437,8 @@ public aspect FederatedTableManagement {
 		&& target(store)
 		&& args(self, Map<String, Field>, table, id, ..) {
 
-		// We don't know yet where self is supposed to pre-exist
-		if (self.tablePostfix == null) {
-			// Checking for consistency requirements
-			Persisting.FederatedMode fm = self.getClass()
-					.getAnnotation(Persisting.class).federated();
-			if (self.tablePostfix == null
-					&& fm.isConsistentWithOtherPostfixedTables()) {
-				// Checking all possible alternatives
-				// Should setup self.tablePostfix if it exists
-				self.findTableLocation();
-			} else if (fm.isConsistentWithUnpostfixedTable()) {
-				// Checking from original table first
-				if (store.exists(self, table, id)) {
-					self.setTablePostfix("", store);
-				}
-
-			}
-		}
-
+		self.findTableLocation(ReadWrite.WRITE);
+		
 		// We now have to definitely choose the proper table
 		if (self.tablePostfix == null) {
 			self.setTablePostfix(self.getTablePostfix(), store);
@@ -467,7 +452,7 @@ public aspect FederatedTableManagement {
 			String actualTable = table + self.tablePostfix;
 			// Should register table (even if looks like done when invoking
 			// setTablePostfix) as we may be adding a postfix for a super table
-			// (remember federated mode is inherited and immuable)
+			// (remember federated mode is inherited and immutable)
 			registerTable(table, actualTable, store);
 			table = actualTable;
 		}
@@ -482,7 +467,7 @@ public aspect FederatedTableManagement {
 		&& within(StorageManagement)
 		&& args(self, table, ..)
 		&& if(self.tablePostfix == null) {
-		self.findTableLocation();
+		self.findTableLocation(ReadWrite.READ);
 		if (self.tablePostfix == null) //Element does not exists
 			return null;
 		else
@@ -495,7 +480,7 @@ public aspect FederatedTableManagement {
 		&& within(StorageManagement)
 		&& args(self,..)
 		&& if(self.tablePostfix == null) {
-		self.findTableLocation();
+		self.findTableLocation(ReadWrite.READ);
 		return self.tablePostfix != null;
 	}
 
@@ -504,7 +489,7 @@ public aspect FederatedTableManagement {
 		call(void Store+.delete(..))
 		&& within(StorageManagement)
 		&& args(self, table, ..) {
-		self.findTableLocation();
+		self.findTableLocation(ReadWrite.READ_OR_WRITE);
 		if (self.tablePostfix != null) {
 			if (!table.endsWith(self.tablePostfix))
 				table = table + self.tablePostfix;
