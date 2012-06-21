@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -21,8 +22,10 @@ import java.util.concurrent.TimeUnit;
 import com.googlecode.n_orm.FederatedMode.Consistency;
 import com.googlecode.n_orm.FederatedMode.ReadWrite;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 
@@ -586,57 +589,213 @@ public aspect FederatedTableManagement {
 	// global-level operations
 	// ===================================
 
+	private static abstract class GlobalAction<T> {
+
+		protected abstract T localRun(String table);
+
+		protected abstract T add(T lhs, T rhs);
+
+		private Callable<T> createLocalAction(final String table) {
+			return new Callable<T>() {
+
+				@Override
+				public T call() throws Exception {
+					return localRun(table);
+				}
+
+			};
+		}
+
+		public T globalRun(String table, Store store) {
+
+			ExecutorService exec = Executors
+					.newFixedThreadPool(PARALLEL_GLOBAL_SEARCH);
+			Collection<Future<T>> results = new LinkedList<Future<T>>();
+
+			// looking count in the main table
+			results.add(exec.submit(this.createLocalAction(table)));
+
+			TableAlternatives alts = getAlternatives(table);
+			alts.updateAlternatives(store);
+
+			for (final String t : alts.getAlternatives()) {
+				assert !t.equals(table);
+				results.add(exec.submit(this.createLocalAction(t)));
+			}
+
+			exec.shutdown();
+			try {
+				exec.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+			} catch (InterruptedException e) {
+				throw new DatabaseNotReachedException(e);
+			}
+
+			T ret = null;
+			for (Future<T> res : results) {
+				try {
+					ret = ret == null ? res.get() : this.add(ret, res.get());
+				} catch (InterruptedException e) {
+					throw new DatabaseNotReachedException(e);
+				} catch (ExecutionException e) {
+					throw new DatabaseNotReachedException(e);
+				}
+			}
+
+			return ret;
+		}
+	}
+
 	// Count
-	long around(final Class<? extends PersistingElement> clazz, final String table, final Constraint c, final Store store):
+	long around(final Class<? extends PersistingElement> clazz,
+			final String table, final Constraint c, final Store store):
 		call(long Store.count(Class<? extends PersistingElement>, String, Constraint))
 		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
 		&& target(store)
 		&& args(clazz, table, c) {
-			
-		ExecutorService exec = Executors.newFixedThreadPool(PARALLEL_GLOBAL_SEARCH);
-		Collection<Future<Long>> results = new LinkedList<Future<Long>>();
-		
-		//looking count in the main table
-		results.add(exec.submit(new Callable<Long>() {
+		return new GlobalAction<Long>() {
 
 			@Override
-			public Long call() throws Exception {
-				// TODO Auto-generated method stub
-				return store.count(clazz, table, c);
+			protected Long localRun(final String t) {
+				return store.count(clazz, t, c);
 			}
-		}));
-			
-		TableAlternatives alts = getAlternatives(table);
-		alts.updateAlternatives(store);
-		
-		for (final String t : alts.getAlternatives()) {
-			results.add(exec.submit(new Callable<Long>() {
 
-				@Override
-				public Long call() throws Exception {
-					return store.count(clazz, t, c);
+			@Override
+			protected Long add(Long lhs, Long rhs) {
+				return lhs+rhs;
+			}
+		}.globalRun(table, store);
+	}
+	
+	private static class AggregatingIterator implements CloseableKeyIterator {
+		private static class IteratorStatus {
+			private class ResultReadyToGo {
+				public Row getResult() {
+					Row ret = IteratorStatus.this.next;
+					IteratorStatus.this.next = null;
+					return ret;
 				}
-			}));
-		}
-		
-		exec.shutdown();
-		try {
-			exec.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException e) {
-			throw new DatabaseNotReachedException(e);
-		}
-		
-		long ret = 0;
-		for (Future<Long> res : results) {
-			try {
-				ret += res.get().longValue();
-			} catch (InterruptedException e) {
-				throw new DatabaseNotReachedException(e);
-			} catch (ExecutionException e) {
-				throw new DatabaseNotReachedException(e);
+				
+				private String getKey() {
+					return IteratorStatus.this.next.getKey();
+				}
+			}
+			
+			private final CloseableKeyIterator it;
+			private Row next = null;
+			private boolean done = false;
+			
+			public IteratorStatus(CloseableKeyIterator it) {
+				this.it = it;
+			}
+			
+			private void prepareNext() {
+				try {
+					if (this.done)
+						return;
+					if (this.next == null) {
+						if (this.it.hasNext()) {
+							this.next = this.it.next();
+						} else {
+							this.close();
+						}
+					}
+				} finally {
+					assert this.done == (this.next == null);
+				}
+			}
+			
+			public boolean hasNext() {
+				this.prepareNext();
+				return this.next != null;
+			}
+			
+			public ResultReadyToGo getNextIfLower(ResultReadyToGo r) {
+				this.prepareNext();
+				
+				if (this.done)
+					return r;
+				
+				assert this.next != null;
+				
+				if (r == null || this.next.getKey().compareTo(r.getKey()) < 0) {
+					return new ResultReadyToGo();
+				} else {
+					return r;
+				}
+			}
+			
+			public void close() {
+				if (!this.done) {
+					this.it.close();
+					this.done = true;
+				}
 			}
 		}
 		
-		return ret;
+		private Set<IteratorStatus> status = new LinkedHashSet<IteratorStatus>();
+		
+		public void addIterator(CloseableKeyIterator it) {
+			this.status.add(new IteratorStatus(it));
+		}
+
+		@Override
+		public void close() {
+			for (IteratorStatus is : this.status) {
+				is.close();
+			}
+		}
+
+		@Override
+		public boolean hasNext() {
+			for (IteratorStatus is : this.status) {
+				if (is.hasNext())
+					return true;
+			}
+			return false;
+		}
+
+		@Override
+		public Row next() {
+			com.googlecode.n_orm.FederatedTableManagement.AggregatingIterator.IteratorStatus.ResultReadyToGo ret = null;
+			for (IteratorStatus is : this.status) {
+				ret = is.getNextIfLower(ret);
+			}
+			return ret.getResult();
+		}
+
+		@Override
+		public void remove() {
+			throw new UnsupportedOperationException();
+		}
+		
+	}
+
+	// Search
+	CloseableKeyIterator around(final Class<? extends PersistingElement> clazz,
+			final String table, final Constraint c, final int limit, final Map<String, Field> families, final Store store):
+		call(CloseableKeyIterator Store.get(Class<? extends PersistingElement>, String, Constraint,int, Map<String, Field>))
+		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
+		&& target(store)
+		&& args(clazz, table, c, limit, families) {
+		return new GlobalAction<CloseableKeyIterator>() {
+
+			@Override
+			protected CloseableKeyIterator localRun(final String t) {
+				return store.get(clazz, t, c, limit, families);
+			}
+
+			@Override
+			protected CloseableKeyIterator add(CloseableKeyIterator lhs, CloseableKeyIterator rhs) {
+				if (lhs == null)
+					return rhs;
+				if (!(lhs instanceof AggregatingIterator)) {
+					AggregatingIterator ret = new AggregatingIterator();
+					ret.addIterator(lhs);
+					lhs = ret;
+				}
+				((AggregatingIterator)lhs).addIterator(rhs);
+				return lhs;
+			}
+		}.globalRun(table, store);
 	}
 }
