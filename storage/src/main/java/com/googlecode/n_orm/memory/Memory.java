@@ -457,17 +457,18 @@ public class Memory implements SimpleStore {
 		
 		Row r = this.getRow(table, id, true);
 		
-		for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
-			ColumnFamily f = r.get(change.getKey());
-			for (Entry<String, byte[]> value : change.getValue().entrySet()) {
-				Value<?> val = f.get(value.getKey());
-				if (val instanceof ByteValue) {
-					((ByteValue)val).setValue(value.getValue());
-				} else {
-					x = new IllegalArgumentException("Cannot set an incrementing value " + value.getKey() + " in family " + change.getKey() + " for row " + id + " in table " + table);
+		if (changed != null)
+			for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
+				ColumnFamily f = r.get(change.getKey());
+				for (Entry<String, byte[]> value : change.getValue().entrySet()) {
+					Value<?> val = f.get(value.getKey());
+					if (val instanceof ByteValue) {
+						((ByteValue)val).setValue(value.getValue());
+					} else {
+						x = new IllegalArgumentException("Cannot set an incrementing value " + value.getKey() + " in family " + change.getKey() + " for row " + id + " in table " + table);
+					}
 				}
 			}
-		}
 		
 		if (removed != null)
 			for (Entry<String, Set<String>> remove : removed.entrySet()) {
