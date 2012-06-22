@@ -57,10 +57,29 @@ public aspect FederatedTableManagement {
 	public static final String FEDERATED_META_COLUMN_FAMILY = "t";
 
 	/**
-	 * The time (in s) during which table alternatives are not loaded again from
-	 * the base ; default is 10min
+	 * The time (in ms) during which table alternatives are not loaded again
+	 * from the base ; default is 1s
 	 */
-	public static long TableAlternativeCacheTTLInS = 600;
+	public static long TableAlternativeCacheTTLInS = 10000;
+
+	/**
+	 * The time (in ms) during which table alternatives are not loaded again
+	 * from the base ; default is 1s
+	 */
+	public static long getTableAlternativeCacheTTLInS() {
+		return TableAlternativeCacheTTLInS;
+	}
+
+	/**
+	 * The time (in s) during which table alternatives are not loaded again from
+	 * the base ; default is 1s
+	 */
+	public static void setTableAlternativeCacheTTLInS(
+			long tableAlternativeCacheTTLInS) {
+		TableAlternativeCacheTTLInS = tableAlternativeCacheTTLInS;
+	}
+
+	public static int ParallelGlobalSearch = 5;
 
 	/**
 	 * The maximum number of threads to be used while performing global actions
@@ -68,19 +87,35 @@ public aspect FederatedTableManagement {
 	 * {@link SearchableClassConstraintBuilder#go() grabbing} elements from a
 	 * class.
 	 */
-	public static final int PARALLEL_GLOBAL_SEARCH = 5;
+	public static int getParallelglobalsearch() {
+		return ParallelGlobalSearch;
+	}
 
-	// REM: a federated element can only inherit federated elements
+	/**
+	 * The maximum number of threads to be used while performing global actions
+	 * like a {@link SearchableClassConstraintBuilder#count() counting} or
+	 * {@link SearchableClassConstraintBuilder#go() grabbing} elements from a
+	 * class.
+	 */
+	public static int getParallelGlobalSearch() {
+		return ParallelGlobalSearch;
+	}
+
+	public static void setParallelGlobalSearch(int parallelGlobalSearch) {
+		ParallelGlobalSearch = parallelGlobalSearch;
+	}
+
+	// REM: a federated element can only inherit federated elements with similar
+	// configuration
 	declare parents: (@Persisting(federated!=FederatedMode.NONE) *) implements PersistingElement, PersistingElementOverFederatedTable;
 
 	/**
-	 * A place where to register alternatives for an original tables.
-	 * Alternative tables can be registered or updated from the store using
-	 * table {@link FederatedTableManagement#FEDERATED_META_TABLE} and family
+	 * A place where to register alternatives for an original table. Alternative
+	 * tables can be registered or updated from the store using table
+	 * {@link FederatedTableManagement#FEDERATED_META_TABLE} and family
 	 * {@link FederatedTableManagement#FEDERATED_META_COLUMN_FAMILY}. Updates
 	 * occurs at most each
-	 * {@link FederatedTableManagement#TableAlternativeCacheTTLInS}
-	 * milliseconds.
+	 * {@link FederatedTableManagement#TableAlternativeCacheTTLInS} seconds.
 	 */
 	private final static class TableAlternatives {
 		/**
@@ -89,7 +124,8 @@ public aspect FederatedTableManagement {
 		private final String mainTable;
 
 		/**
-		 * When alternatives for {@link #mainTable} was last updated
+		 * When alternatives for {@link #mainTable} was last updated (epoch in
+		 * seconds)
 		 */
 		private long lastUpdate = -TableAlternativeCacheTTLInS;
 
@@ -177,14 +213,14 @@ public aspect FederatedTableManagement {
 		 * @param store
 		 *            the store to which register this new alternative ; should
 		 *            be the store for a class having {@link #mainTable} as
-		 *            original table
+		 *            original table. null in case no write have ever been done
 		 */
 		public synchronized void addAlternative(String table, Store store) {
 			assert table.startsWith(this.mainTable);
 			// Avoid registering original table as an alternative to itself
 			if (table.equals(this.mainTable))
 				return;
-			if (this.alternatives.add(table)) {
+			if (this.alternatives.add(table) && store != null) {
 				// We were not aware of that alternative ;
 				// let's register in the store
 				// Table is FEDERATED_META_TABLE
@@ -277,7 +313,7 @@ public aspect FederatedTableManagement {
 	 * Sets table postfix as it is discovered.
 	 * 
 	 * @param postfix
-	 * @param store
+	 * @param store null value means that table won't be registered (even not cached)
 	 * @throws IllegalStateException
 	 *             if a different postfix is already known
 	 * @throws IllegalStateException
@@ -303,12 +339,13 @@ public aspect FederatedTableManagement {
 					+ " while another postfix " + oldPostfix
 					+ " was registered");
 		}
-		registerTable(this.getMainTable(), this.getMainTable()
-				+ this.tablePostfix, store);
+		if (store != null)
+			registerTable(this.getMainTable(), this.getMainTable()
+					+ this.tablePostfix, store);
 	}
 
 	// jut to be sure
-	declare error: set(* PersistingElementOverFederatedTable.tablePostfix) && !withincode(private void PersistingElementOverFederatedTable.setTablePostfix(String, Store)) : "Avoid setting this attribute directly ; use setTablePostfix(String postfix, Store store) instead";
+	declare error: set(* PersistingElementOverFederatedTable.tablePostfix) && !withincode(private void PersistingElementOverFederatedTable.setTablePostfix(..)) : "Avoid setting this attribute directly ; use setTablePostfix(String postfix, Store store) instead";
 
 	/**
 	 * The list of tables where to find this object from what we can guess in
@@ -405,45 +442,43 @@ public aspect FederatedTableManagement {
 		Consistency consistencyLevel = this.getClass()
 				.getAnnotation(Persisting.class).federated()
 				.getConsistency(mode);
+
 		Store store = this.getStore();
 
-		// No consistency check
-		if (consistencyLevel.compareTo(Consistency.NONE) <= 0) {
-			this.setTablePostfix(this.getTablePostfix(), store);
-			return false;
-		}
+		if (consistencyLevel.compareTo(Consistency.CONSISTENT_WITH_LEGACY) >= 0) {
+			String mainTable = this.getMainTable();
+			String id = this.getIdentifier();
+			Set<String> testedTables = new HashSet<String>();
 
-		String mainTable = this.getMainTable();
-		String id = this.getIdentifier();
-		Set<String> testedTables = new HashSet<String>();
+			// First trying with expected table
+			if (this.testTableLocation(mainTable + this.getTablePostfix(), id,
+					mainTable, testedTables, store))
+				return true;
 
-		// First trying with expected table
-		if (this.testTableLocation(mainTable + this.getTablePostfix(), id,
-				mainTable, testedTables, store))
-			return true;
+			// Then trying with legacy table
+			if (this.testTableLocation(mainTable, id, mainTable, testedTables,
+					store))
+				return true;
 
-		// Then trying with legacy table
-		if (this.testTableLocation(mainTable, id, mainTable, testedTables,
-				store))
-			return true;
-
-		// In case of heavy consistency mode, test all possible tables
-		if (consistencyLevel.compareTo(Consistency.CONSISTENT) >= 0) {
-			for (String t : this.getKnownPossibleTables()) {
-				if (this.testTableLocation(t, id, mainTable, testedTables,
-						store))
-					return true;
-			}
-			// No found yet ; querying possible alternatives from store
-			for (String t : this.getPossibleTablesWithAnUpdate(store)) {
-				if (this.testTableLocation(t, id, mainTable, testedTables,
-						store))
-					return true;
+			// In case of heavy consistency mode, test all possible tables
+			if (consistencyLevel.compareTo(Consistency.CONSISTENT) >= 0) {
+				for (String t : this.getKnownPossibleTables()) {
+					if (this.testTableLocation(t, id, mainTable, testedTables,
+							store))
+						return true;
+				}
+				// No found yet ; querying possible alternatives from store
+				for (String t : this.getPossibleTablesWithAnUpdate(store)) {
+					if (this.testTableLocation(t, id, mainTable, testedTables,
+							store))
+						return true;
+				}
 			}
 		}
 
 		// Still not found ; setting postfix to computed value
-		this.setTablePostfix(this.getTablePostfix(), store);
+		// Only registering in case we are sure table exists (or about to)
+		this.setTablePostfix(this.getTablePostfix(), mode.isRead() ? null : store);
 		return false;
 	}
 
@@ -530,7 +565,7 @@ public aspect FederatedTableManagement {
 		if (!table.endsWith(self.tablePostfix))
 			table = table + self.tablePostfix;
 		proceed(self, table);
-		self.setTablePostfix(null, self.getStore());
+		self.setTablePostfix(null, null);
 	}
 
 	// ===================================
@@ -591,8 +626,19 @@ public aspect FederatedTableManagement {
 
 	private static abstract class GlobalAction<T> {
 
+		/**
+		 * Runs the query on one possible alternative table
+		 */
 		protected abstract T localRun(String table);
 
+		/**
+		 * Merging two results for different alternative table into a single
+		 * one. Order in which results are merged is unknown.
+		 * 
+		 * @param lhs
+		 *            either result for the first table or the previously
+		 *            aggregated result.
+		 */
 		protected abstract T add(T lhs, T rhs);
 
 		private Callable<T> createLocalAction(final String table) {
@@ -606,16 +652,22 @@ public aspect FederatedTableManagement {
 			};
 		}
 
+		/**
+		 * Runs {@link #localRun(String) the action} on all referenced
+		 * alternative tables (including main table) and
+		 * {@link #add(Object, Object) aggregates} results.
+		 */
 		public T globalRun(String table, Store store) {
 
 			ExecutorService exec = Executors
-					.newFixedThreadPool(PARALLEL_GLOBAL_SEARCH);
+					.newFixedThreadPool(ParallelGlobalSearch);
 			Collection<Future<T>> results = new LinkedList<Future<T>>();
 
 			// looking count in the main table
 			results.add(exec.submit(this.createLocalAction(table)));
 
 			TableAlternatives alts = getAlternatives(table);
+			// Making sure we are aware of all possible alternative tables
 			alts.updateAlternatives(store);
 
 			for (final String t : alts.getAlternatives()) {
@@ -623,6 +675,7 @@ public aspect FederatedTableManagement {
 				results.add(exec.submit(this.createLocalAction(t)));
 			}
 
+			// Waiting for results to show up
 			exec.shutdown();
 			try {
 				exec.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
@@ -630,6 +683,7 @@ public aspect FederatedTableManagement {
 				throw new DatabaseNotReachedException(e);
 			}
 
+			// Aggregating results into one single result
 			T ret = null;
 			for (Future<T> res : results) {
 				try {
@@ -655,7 +709,7 @@ public aspect FederatedTableManagement {
 		if (!clazz.getAnnotation(Persisting.class).federated().isFederated()) {
 			return proceed(clazz, table, c, store);
 		}
-		
+
 		return new GlobalAction<Long>() {
 
 			@Override
@@ -665,21 +719,24 @@ public aspect FederatedTableManagement {
 
 			@Override
 			protected Long add(Long lhs, Long rhs) {
-				return lhs+rhs;
+				return lhs + rhs;
 			}
 		}.globalRun(table, store);
 	}
-	
+
+	/**
+	 * A {@link Row} decorated with the table from which data was retrieved.
+	 */
 	private static class RowWithTable implements Row {
 		private final String table;
 		private final Row row;
-		
+
 		public RowWithTable(String table, Row row) {
 			super();
 			this.table = table;
 			this.row = row;
 		}
-		
+
 		public String getTable() {
 			return table;
 		}
@@ -694,17 +751,23 @@ public aspect FederatedTableManagement {
 			return row.getValues();
 		}
 	}
-	
-	private static class CloseableKeyIteratorWithTable implements CloseableKeyIterator {
+
+	/**
+	 * A {@link CloseableIterator} decorated with the table from which keys are
+	 * found. {@link #next() Returns} instances of {@link RowWithTable}.
+	 */
+	private static class CloseableKeyIteratorWithTable implements
+			CloseableKeyIterator {
 		private final String table;
 		private final CloseableKeyIterator iterator;
+
 		public CloseableKeyIteratorWithTable(String table,
 				CloseableKeyIterator iterator) {
 			super();
 			this.table = table;
 			this.iterator = iterator;
 		}
-		
+
 		public String getTable() {
 			return table;
 		}
@@ -719,6 +782,9 @@ public aspect FederatedTableManagement {
 			return iterator.hasNext();
 		}
 
+		/**
+		 * @return an instance of {@link RowWithTable}
+		 */
 		@Override
 		public Row next() {
 			Row r = iterator.next();
@@ -729,39 +795,85 @@ public aspect FederatedTableManagement {
 		public void remove() {
 			iterator.remove();
 		}
-		
+
 	}
-	
+
+	/**
+	 * An {@link CloseableIterator} composite able to iterate over a set of
+	 * {@link CloseableIterator}s. Elements are selected from composed iterators
+	 * so that they are iterated
+	 * {@link PersistingElement#compareTo(PersistingElement) in an ordered way}.
+	 */
 	private static class AggregatingIterator implements CloseableKeyIterator {
+
+		/**
+		 * A pointer on a composed iterator..
+		 */
 		private static class IteratorStatus {
+			/**
+			 * The result of an iterated element. The iterated element is
+			 * considered as iterated over only when
+			 * {@link ResultReadyToGo#getResult()} is called.
+			 */
 			private class ResultReadyToGo {
+
+				/**
+				 * Get the iterated row and marks it as iterated over, that is
+				 * iterator pointed by {@link IteratorStatus} will be called
+				 * {@link Iterator#next()} in order to know what is the next
+				 * element to be iterated, instead of returning this element
+				 * again.
+				 * 
+				 * @return the iterated row
+				 */
 				public Row getResult() {
 					Row ret = IteratorStatus.this.next;
 					IteratorStatus.this.next = null;
 					return ret;
 				}
-				
+
+				/**
+				 * The key of the result. This methods leave the element as the
+				 * next element to be iterated.
+				 * 
+				 * @return
+				 */
 				private String getKey() {
 					return IteratorStatus.this.next.getKey();
 				}
 			}
-			
+
+			/**
+			 * The pointed iterator
+			 */
 			private final CloseableKeyIterator it;
+			/**
+			 * The next row to be iterated
+			 */
 			private Row next = null;
+			/**
+			 * Whether pointed iterator is empty and closed
+			 */
 			private boolean done = false;
-			
+
 			public IteratorStatus(CloseableKeyIterator it) {
 				this.it = it;
 			}
-			
+
+			/**
+			 * Grabs the next element to be iterated if no known yet.
+			 */
 			private void prepareNext() {
 				try {
 					if (this.done)
 						return;
 					if (this.next == null) {
+						// First call or last result was iterated using
+						// ResultReadyToGo.getResult()
 						if (this.it.hasNext()) {
 							this.next = this.it.next();
 						} else {
+							// No more elements in this iterator ; closing
 							this.close();
 						}
 					}
@@ -769,27 +881,45 @@ public aspect FederatedTableManagement {
 					assert this.done == (this.next == null);
 				}
 			}
-			
+
+			/**
+			 * @see CloseableKeyIterator#hasNext()
+			 */
 			public boolean hasNext() {
 				this.prepareNext();
 				return this.next != null;
 			}
-			
+
+			/**
+			 * Returns the next element to be iterated if this element is lower
+			 * than parameter. Lower means with a lower key as can be found by
+			 * {@link ResultReadyToGo#getKey()}.
+			 * 
+			 * @param r
+			 *            null or a previously iterated key
+			 * @return r if it is null or lower than the next element of this
+			 *         iterator or the row to be removed from this iterator in
+			 *         case {@link ResultReadyToGo#getResult()} is called
+			 * @see CloseableKeyIterator#next()
+			 */
 			public ResultReadyToGo getNextIfLower(ResultReadyToGo r) {
 				this.prepareNext();
-				
+
 				if (this.done)
 					return r;
-				
+
 				assert this.next != null;
-				
+
 				if (r == null || this.next.getKey().compareTo(r.getKey()) < 0) {
 					return new ResultReadyToGo();
 				} else {
 					return r;
 				}
 			}
-			
+
+			/**
+			 * @see CloseableIterator#close()
+			 */
 			public void close() {
 				if (!this.done) {
 					this.it.close();
@@ -797,10 +927,27 @@ public aspect FederatedTableManagement {
 				}
 			}
 		}
-		
+
+		/**
+		 * The composed iterators.
+		 */
 		private Set<IteratorStatus> status = new LinkedHashSet<IteratorStatus>();
-		
+		/**
+		 * Whether iteration has started.
+		 */
+		private boolean started = false;
+
+		/**
+		 * Adds an iterator to the list of iterators to be explored.
+		 * 
+		 * @throws IllegalStateException
+		 *             in case the iteration has started using
+		 *             {@link #hasNext()} or {@link #next()}.
+		 */
 		public void addIterator(CloseableKeyIterator it) {
+			if (this.started)
+				throw new IllegalStateException(
+						"Cannot add a new iterator when iteration has started");
 			this.status.add(new IteratorStatus(it));
 		}
 
@@ -813,6 +960,7 @@ public aspect FederatedTableManagement {
 
 		@Override
 		public boolean hasNext() {
+			this.started = true;
 			for (IteratorStatus is : this.status) {
 				if (is.hasNext())
 					return true;
@@ -822,6 +970,7 @@ public aspect FederatedTableManagement {
 
 		@Override
 		public Row next() {
+			this.started = true;
 			com.googlecode.n_orm.FederatedTableManagement.AggregatingIterator.IteratorStatus.ResultReadyToGo ret = null;
 			for (IteratorStatus is : this.status) {
 				ret = is.getNextIfLower(ret);
@@ -829,16 +978,21 @@ public aspect FederatedTableManagement {
 			return ret.getResult();
 		}
 
+		/**
+		 * @throws UnsupportedOperationException
+		 *             in any case
+		 */
 		@Override
 		public void remove() {
 			throw new UnsupportedOperationException();
 		}
-		
+
 	}
 
 	// Search
 	CloseableKeyIterator around(final Class<? extends PersistingElement> clazz,
-			final String table, final Constraint c, final int limit, final Map<String, Field> families, final Store store):
+			final String table, final Constraint c, final int limit,
+			final Map<String, Field> families, final Store store):
 		call(CloseableKeyIterator Store.get(Class<? extends PersistingElement>, String, Constraint,int, Map<String, Field>))
 		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
 		&& target(store)
@@ -846,16 +1000,18 @@ public aspect FederatedTableManagement {
 		if (!clazz.getAnnotation(Persisting.class).federated().isFederated()) {
 			return proceed(clazz, table, c, limit, families, store);
 		}
-		
+
 		return new GlobalAction<CloseableKeyIterator>() {
 
 			@Override
 			protected CloseableKeyIterator localRun(final String t) {
-				return new CloseableKeyIteratorWithTable(t,  store.get(clazz, t, c, limit, families));
+				return new CloseableKeyIteratorWithTable(t, store.get(clazz, t,
+						c, limit, families));
 			}
 
 			@Override
-			protected CloseableKeyIterator add(CloseableKeyIterator lhs, CloseableKeyIterator rhs) {
+			protected CloseableKeyIterator add(CloseableKeyIterator lhs,
+					CloseableKeyIterator rhs) {
 				if (lhs == null)
 					return rhs;
 				if (!(lhs instanceof AggregatingIterator)) {
@@ -863,13 +1019,14 @@ public aspect FederatedTableManagement {
 					ret.addIterator(lhs);
 					lhs = ret;
 				}
-				((AggregatingIterator)lhs).addIterator(rhs);
+				((AggregatingIterator) lhs).addIterator(rhs);
 				return lhs;
 			}
 		}.globalRun(table, store);
 	}
-	
-	// When creating an element from a row using a search, let's immediately set its table
+
+	// When creating an element from a row using a search, let's immediately set
+	// its table
 	after(RowWithTable row) returning (PersistingElementOverFederatedTable self) : 
 		execution(PersistingElement createElementFromRow(Class, Map<String, Field>, Row)) 
 		&& args(.., row){
@@ -877,7 +1034,8 @@ public aspect FederatedTableManagement {
 			String mainTable = self.getMainTable();
 			String actualTable = row.getTable();
 			assert actualTable.startsWith(mainTable);
-			self.setTablePostfix(actualTable.substring(mainTable.length()), self.getStore());
+			self.setTablePostfix(actualTable.substring(mainTable.length()),
+					self.getStore());
 		}
 	}
 }
