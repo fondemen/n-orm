@@ -670,6 +670,68 @@ public aspect FederatedTableManagement {
 		}.globalRun(table, store);
 	}
 	
+	private static class RowWithTable implements Row {
+		private final String table;
+		private final Row row;
+		
+		public RowWithTable(String table, Row row) {
+			super();
+			this.table = table;
+			this.row = row;
+		}
+		
+		public String getTable() {
+			return table;
+		}
+
+		@Override
+		public String getKey() {
+			return row.getKey();
+		}
+
+		@Override
+		public ColumnFamilyData getValues() {
+			return row.getValues();
+		}
+	}
+	
+	private static class CloseableKeyIteratorWithTable implements CloseableKeyIterator {
+		private final String table;
+		private final CloseableKeyIterator iterator;
+		public CloseableKeyIteratorWithTable(String table,
+				CloseableKeyIterator iterator) {
+			super();
+			this.table = table;
+			this.iterator = iterator;
+		}
+		
+		public String getTable() {
+			return table;
+		}
+
+		@Override
+		public void close() {
+			iterator.close();
+		}
+
+		@Override
+		public boolean hasNext() {
+			return iterator.hasNext();
+		}
+
+		@Override
+		public Row next() {
+			Row r = iterator.next();
+			return r == null ? null : new RowWithTable(this.getTable(), r);
+		}
+
+		@Override
+		public void remove() {
+			iterator.remove();
+		}
+		
+	}
+	
 	private static class AggregatingIterator implements CloseableKeyIterator {
 		private static class IteratorStatus {
 			private class ResultReadyToGo {
@@ -789,7 +851,7 @@ public aspect FederatedTableManagement {
 
 			@Override
 			protected CloseableKeyIterator localRun(final String t) {
-				return store.get(clazz, t, c, limit, families);
+				return new CloseableKeyIteratorWithTable(t,  store.get(clazz, t, c, limit, families));
 			}
 
 			@Override
@@ -805,5 +867,17 @@ public aspect FederatedTableManagement {
 				return lhs;
 			}
 		}.globalRun(table, store);
+	}
+	
+	// When creating an element from a row using a search, let's immediately set its table
+	after(RowWithTable row) returning (PersistingElementOverFederatedTable self) : 
+		execution(PersistingElement createElementFromRow(Class, Map<String, Field>, Row)) 
+		&& args(.., row){
+		if (self != null) {
+			String mainTable = self.getMainTable();
+			String actualTable = row.getTable();
+			assert actualTable.startsWith(mainTable);
+			self.setTablePostfix(actualTable.substring(mainTable.length()), self.getStore());
+		}
 	}
 }
