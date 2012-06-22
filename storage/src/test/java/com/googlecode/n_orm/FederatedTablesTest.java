@@ -833,4 +833,29 @@ public class FederatedTablesTest {
 		elt.key = "keyk";
 		assertFalse(res.contains(elt));
 	}
+	
+	@Test
+	public void tableSetAfterSearch() {
+		for(int i = 0; i < 10; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + i;
+			int post  = i%4;
+			if (post != 0)
+				elt.post = "post" + post;
+			elt.store();
+		}
+
+		CloseableIterator<Element> res = StorageManagement.findElements().ofClass(Element.class).withAtMost(10).elements().iterate();
+		try {
+			assertTrue(res.hasNext());
+			do {
+				Element elt = res.next();
+				int expectedIndex = Integer.parseInt(elt.key.substring("key".length()))%4;
+				String expectedPostfix = expectedIndex == 0 ? "" : "post" + expectedIndex;
+				assertEquals("t"+expectedPostfix, elt.getTable());
+			} while(res.hasNext());
+		} finally {
+			res.close();
+		}
+	}
 }
