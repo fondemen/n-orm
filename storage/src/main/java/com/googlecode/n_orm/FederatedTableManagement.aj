@@ -28,6 +28,7 @@ import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.query.ClassConstraintBuilder;
 
 /**
  * Makes it possible to look for elements of a given class from/to different
@@ -313,7 +314,9 @@ public aspect FederatedTableManagement {
 	 * Sets table postfix as it is discovered.
 	 * 
 	 * @param postfix
-	 * @param store null value means that table won't be registered (even not cached)
+	 * @param store
+	 *            null value means that table won't be registered (even not
+	 *            cached)
 	 * @throws IllegalStateException
 	 *             if a different postfix is already known
 	 * @throws IllegalStateException
@@ -478,7 +481,8 @@ public aspect FederatedTableManagement {
 
 		// Still not found ; setting postfix to computed value
 		// Only registering in case we are sure table exists (or about to)
-		this.setTablePostfix(this.getTablePostfix(), mode.isRead() ? null : store);
+		this.setTablePostfix(this.getTablePostfix(), mode.isRead() ? null
+				: store);
 		return false;
 	}
 
@@ -708,6 +712,12 @@ public aspect FederatedTableManagement {
 		&& args(clazz, table, c) {
 		if (!clazz.getAnnotation(Persisting.class).federated().isFederated()) {
 			return proceed(clazz, table, c, store);
+		}
+
+		// Table was set in the query
+		if (c instanceof ConstraintWithTable) {
+			return proceed(clazz, ((ConstraintWithTable) c).getTable(),
+					((ConstraintWithTable) c).getConstraint(), store);
 		}
 
 		return new GlobalAction<Long>() {
@@ -1001,6 +1011,13 @@ public aspect FederatedTableManagement {
 			return proceed(clazz, table, c, limit, families, store);
 		}
 
+		// Table was set in the query
+		if (c instanceof ConstraintWithTable) {
+			return proceed(clazz, ((ConstraintWithTable) c).getTable(),
+					((ConstraintWithTable) c).getConstraint(), limit, families,
+					store);
+		}
+
 		return new GlobalAction<CloseableKeyIterator>() {
 
 			@Override
@@ -1037,5 +1054,67 @@ public aspect FederatedTableManagement {
 			self.setTablePostfix(actualTable.substring(mainTable.length()),
 					self.getStore());
 		}
+	}
+
+	// Search with query
+	// Add a new method to search elements of a given table
+	private String SearchableClassConstraintBuilder.table = null;
+
+	public String SearchableClassConstraintBuilder<T extends PersistingElementOverFederatedTable>.getTable() {
+		return this.table;
+	}
+
+	public SearchableClassConstraintBuilder<T> SearchableClassConstraintBuilder<T extends PersistingElementOverFederatedTable>.inTable(
+			String table) {
+		if (this.table != null && !this.table.equals(table))
+			throw new IllegalArgumentException(
+					"This query is already limited to table " + this.table
+							+ " ; cannot set it to " + table);
+
+		if (!PersistingElementOverFederatedTable.class.isAssignableFrom(this
+				.getClazz()))
+			throw new IllegalArgumentException("Class "
+					+ this.getClazz().getName()
+					+ " is not federated ; cannot assign table in query");
+
+		String mainTable = PersistingMixin.getInstance().getTable(
+				this.getClazz());
+		if (!table.startsWith(mainTable))
+			throw new IllegalArgumentException("Table " + table
+					+ " is not an alternative table for class "
+					+ this.getClazz().getName() + " as it should start with "
+					+ mainTable);
+
+		this.table = table;
+		return this;
+	}
+
+	// We're using Constraint to transmit searched table
+	public static class ConstraintWithTable extends Constraint {
+		private final String table;
+		private final Constraint constraint;
+
+		public ConstraintWithTable(Constraint c, String table) {
+			super(c == null ? null : c.getStartKey(), c == null ? null : c
+					.getEndKey());
+			this.constraint = c;
+			this.table = table;
+		}
+
+		public String getTable() {
+			return this.table;
+		}
+
+		public Constraint getConstraint() {
+			return this.constraint;
+		}
+	}
+
+	// Created a tabled constraint in case query was set a table
+	Constraint around(SearchableClassConstraintBuilder self): 
+		execution(Constraint ClassConstraintBuilder.getConstraint())
+		&& target(self) 
+		&& if(self.getTable() != null) {
+		return new ConstraintWithTable(proceed(self), self.getTable());
 	}
 }

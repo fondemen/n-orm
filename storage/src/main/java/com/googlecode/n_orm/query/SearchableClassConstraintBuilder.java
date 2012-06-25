@@ -63,7 +63,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	
 	@Override
 	@SuppressWarnings("unchecked")
-	Class<T> getClazz() {
+	public Class<T> getClazz() {
 		return (Class<T>) super.getClazz();
 	}
 

@@ -949,6 +949,21 @@ public class FederatedTablesTest {
 	}
 
 	@Test
+	public void countAllInTable() {
+		for (int i = 0; i < 100; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + i;
+			int post = i % 4;
+			if (post != 0)
+				elt.post = "post" + post;
+			elt.store();
+		}
+
+		assertEquals(25,
+				StorageManagement.findElements().ofClass(Element.class).inTable("tpost1").count());
+	}
+
+	@Test
 	public void countConstrained() {
 		for (int i = 'a'; i < 'z'; ++i) {
 			Element elt = new Element();
@@ -962,6 +977,22 @@ public class FederatedTablesTest {
 		assertEquals(10,
 				StorageManagement.findElements().ofClass(Element.class)
 						.withKey("key").between("keyd").and("keym").count());
+	}
+
+	@Test
+	public void countConstrainedInTable() {
+		for (int i = 'a'; i < 'z'; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + (char) i;
+			int post = i % 4;
+			if (post != 0)
+				elt.post = "post" + post;
+			elt.store();
+		}
+		// 'd' is 100, so we should count 'd', 'h', 'l'
+		assertEquals(3,
+				StorageManagement.findElements().ofClass(Element.class)
+						.withKey("key").between("keyd").and("keym").inTable("t").count());
 	}
 
 	@Test
@@ -1070,5 +1101,81 @@ public class FederatedTablesTest {
 		} finally {
 			res.close();
 		}
+	}
+
+	@Test
+	public void findAllInTable() {
+		for (int i = 0; i < 100; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + i;
+			int post = i % 4;
+			if (post != 0)
+				elt.post = "post" + post;
+			elt.store();
+		}
+
+		CloseableIterator<Element> res = StorageManagement.findElements()
+				.ofClass(Element.class).withAtMost(1000).elements()
+				.inTable("tpost1").iterate();
+		Element oldE = null;
+		for (int i = 0; i < 25; ++i) {
+			assertTrue(res.hasNext());
+			Element newE = res.next();
+			if (oldE != null)
+				assertTrue(oldE.compareTo(newE) < 0);
+			assertEquals("tpost1", newE.getTable());
+			oldE = newE;
+		}
+		assertFalse(res.hasNext());
+		res.close();
+	}
+
+	@Test
+	public void findAllConstrainedInTable() {
+		for (int i = 'a'; i < 'z'; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + (char) i;
+			int post = i % 4;
+			if (post != 0)
+				elt.post = "post" + post;
+			elt.store();
+		}
+
+		NavigableSet<Element> res = StorageManagement.findElements()
+				.ofClass(Element.class).withAtMost(1000).elements()
+				.withKey("key").between("keyd").and("keym").inTable("tpost1").go();
+		// 'd' is 100, so should be in table t
+		// thus we have only 'e' and 'i' and 'm' in tpost1
+		Element elt = new Element();
+		elt.key = "keye";
+		assertTrue(res.contains(elt));
+		elt = new Element();
+		elt.key = "keyi";
+		assertTrue(res.contains(elt));
+		elt = new Element();
+		elt.key = "keym";
+		assertTrue(res.contains(elt));
+		assertEquals(3, res.size());
+	}
+
+	@Test(expected=IllegalArgumentException.class)
+	public void settingTableInNonFederatedQuery() {
+		StorageManagement.findElements()
+				.ofClass(Book.class).withAtMost(1000).elements()
+				.inTable("com.googlecode.n_orm.Book");
+	}
+
+	@Test(expected=IllegalArgumentException.class)
+	public void settingDummyTableInQuery() {
+		StorageManagement.findElements()
+				.ofClass(Element.class).withAtMost(1000).elements()
+				.inTable("XXX");
+	}
+
+	@Test
+	public void settingSameTwiceTableInQuery() {
+		StorageManagement.findElements()
+				.ofClass(Element.class).withAtMost(1000).elements()
+				.inTable("tpost").inTable("tpost");
 	}
 }
