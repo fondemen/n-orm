@@ -660,8 +660,14 @@ public aspect FederatedTableManagement {
 		 * Runs {@link #localRun(String) the action} on all referenced
 		 * alternative tables (including main table) and
 		 * {@link #add(Object, Object) aggregates} results.
+		 * @param c 
 		 */
-		public T globalRun(String table, Store store) {
+		public T globalRun(String table, Store store, Constraint c) {
+
+			// Table was set in the query
+			if (c != null && (c instanceof ConstraintWithTable)) {
+				return this.localRun(((ConstraintWithTable)c).getTable());
+			}
 
 			ExecutorService exec = Executors
 					.newFixedThreadPool(ParallelGlobalSearch);
@@ -714,12 +720,6 @@ public aspect FederatedTableManagement {
 			return proceed(clazz, table, c, store);
 		}
 
-		// Table was set in the query
-		if (c instanceof ConstraintWithTable) {
-			return proceed(clazz, ((ConstraintWithTable) c).getTable(),
-					((ConstraintWithTable) c).getConstraint(), store);
-		}
-
 		return new GlobalAction<Long>() {
 
 			@Override
@@ -731,7 +731,7 @@ public aspect FederatedTableManagement {
 			protected Long add(Long lhs, Long rhs) {
 				return lhs + rhs;
 			}
-		}.globalRun(table, store);
+		}.globalRun(table, store, c);
 	}
 
 	/**
@@ -1011,13 +1011,6 @@ public aspect FederatedTableManagement {
 			return proceed(clazz, table, c, limit, families, store);
 		}
 
-		// Table was set in the query
-		if (c instanceof ConstraintWithTable) {
-			return proceed(clazz, ((ConstraintWithTable) c).getTable(),
-					((ConstraintWithTable) c).getConstraint(), limit, families,
-					store);
-		}
-
 		return new GlobalAction<CloseableKeyIterator>() {
 
 			@Override
@@ -1039,7 +1032,7 @@ public aspect FederatedTableManagement {
 				((AggregatingIterator) lhs).addIterator(rhs);
 				return lhs;
 			}
-		}.globalRun(table, store);
+		}.globalRun(table, store, c);
 	}
 
 	// When creating an element from a row using a search, let's immediately set
