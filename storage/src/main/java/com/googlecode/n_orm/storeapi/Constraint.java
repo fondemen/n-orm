@@ -43,7 +43,9 @@ public class Constraint {
 	private final String startKey, endKey;
 	
 	public Constraint(String startKey, String endKey) {
-		if (startKey == null && endKey == null)
+		// In case we are restricting to one sigle table, this is a constraint that might be violated
+		// See FederatedTableManagement.ConstraintWithTable
+		if (this.getClass() == Constraint.class && startKey == null && endKey == null)
 			throw new IllegalArgumentException("A search requires at least a start or an end value.");
 		this.startKey = startKey;
 		this.endKey = endKey;
