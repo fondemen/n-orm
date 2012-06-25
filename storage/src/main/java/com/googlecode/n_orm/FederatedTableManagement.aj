@@ -660,13 +660,14 @@ public aspect FederatedTableManagement {
 		 * Runs {@link #localRun(String) the action} on all referenced
 		 * alternative tables (including main table) and
 		 * {@link #add(Object, Object) aggregates} results.
-		 * @param c 
+		 * 
+		 * @param c
 		 */
 		public T globalRun(String table, Store store, Constraint c) {
 
 			// Table was set in the query
 			if (c != null && (c instanceof ConstraintWithTable)) {
-				return this.localRun(((ConstraintWithTable)c).getTable());
+				return this.localRun(((ConstraintWithTable) c).getTable());
 			}
 
 			ExecutorService exec = Executors
@@ -1057,6 +1058,23 @@ public aspect FederatedTableManagement {
 		return this.table;
 	}
 
+	/**
+	 * Sets the table to look for. This is only possible in case searched
+	 * element is over a {@link PersistingElementOverFederatedTable federated
+	 * table}.
+	 * 
+	 * @param table
+	 *            the table to look for
+	 * @throws IllegalArgumentException
+	 *             in case this class is not over a
+	 *             {@link PersistingElementOverFederatedTable federated table}
+	 * @throws IllegalArgumentException
+	 *             in case this table cannot be part of the federation for
+	 *             {@link ConstraintBuilder#ofClass(Class) searched class} (i.e.
+	 *             it does not starts with original table name)
+	 * @throws IllegalArgumentException
+	 *             in case a different table was already set in the query
+	 */
 	public SearchableClassConstraintBuilder<T> SearchableClassConstraintBuilder<T extends PersistingElementOverFederatedTable>.inTable(
 			String table) {
 		if (this.table != null && !this.table.equals(table))
