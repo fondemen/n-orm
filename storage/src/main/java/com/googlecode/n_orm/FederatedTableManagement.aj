@@ -1075,13 +1075,8 @@ public aspect FederatedTableManagement {
 	 * @throws IllegalArgumentException
 	 *             in case a different table was already set in the query
 	 */
-	public SearchableClassConstraintBuilder<T> SearchableClassConstraintBuilder<T extends PersistingElementOverFederatedTable>.inTable(
-			String table) {
-		if (this.table != null && !this.table.equals(table))
-			throw new IllegalArgumentException(
-					"This query is already limited to table " + this.table
-							+ " ; cannot set it to " + table);
-
+	public SearchableClassConstraintBuilder<T> SearchableClassConstraintBuilder<T extends PersistingElementOverFederatedTable>.inTableWithPostfix(
+			String tablePostfix) {
 		if (!PersistingElementOverFederatedTable.class.isAssignableFrom(this
 				.getClazz()))
 			throw new IllegalArgumentException("Class "
@@ -1090,11 +1085,12 @@ public aspect FederatedTableManagement {
 
 		String mainTable = PersistingMixin.getInstance().getTable(
 				this.getClazz());
-		if (!table.startsWith(mainTable))
-			throw new IllegalArgumentException("Table " + table
-					+ " is not an alternative table for class "
-					+ this.getClazz().getName() + " as it should start with "
-					+ mainTable);
+		String table = mainTable + tablePostfix;
+		
+		if (this.table != null && !this.table.equals(table))
+			throw new IllegalArgumentException(
+					"This query is already limited to table " + this.table
+							+ " ; cannot set it to " + table);
 
 		this.table = table;
 		return this;

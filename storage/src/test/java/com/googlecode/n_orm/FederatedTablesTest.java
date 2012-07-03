@@ -960,7 +960,7 @@ public class FederatedTablesTest {
 		}
 
 		assertEquals(25,
-				StorageManagement.findElements().ofClass(Element.class).inTable("tpost1").count());
+				StorageManagement.findElements().ofClass(Element.class).inTableWithPostfix("post1").count());
 	}
 
 	@Test
@@ -992,7 +992,7 @@ public class FederatedTablesTest {
 		// 'd' is 100, so we should count 'd', 'h', 'l'
 		assertEquals(3,
 				StorageManagement.findElements().ofClass(Element.class)
-						.withKey("key").between("keyd").and("keym").inTable("t").count());
+						.withKey("key").between("keyd").and("keym").inTableWithPostfix("").count());
 	}
 
 	@Test
@@ -1116,7 +1116,7 @@ public class FederatedTablesTest {
 
 		CloseableIterator<Element> res = StorageManagement.findElements()
 				.ofClass(Element.class).withAtMost(1000).elements()
-				.inTable("tpost1").iterate();
+				.inTableWithPostfix("post1").iterate();
 		Element oldE = null;
 		for (int i = 0; i < 25; ++i) {
 			assertTrue(res.hasNext());
@@ -1143,7 +1143,7 @@ public class FederatedTablesTest {
 
 		NavigableSet<Element> res = StorageManagement.findElements()
 				.ofClass(Element.class).withAtMost(1000).elements()
-				.withKey("key").between("keyd").and("keym").inTable("tpost1").go();
+				.withKey("key").between("keyd").and("keym").inTableWithPostfix("post1").go();
 		// 'd' is 100, so should be in table t
 		// thus we have only 'e' and 'i' and 'm' in tpost1
 		Element elt = new Element();
@@ -1162,20 +1162,20 @@ public class FederatedTablesTest {
 	public void settingTableInNonFederatedQuery() {
 		StorageManagement.findElements()
 				.ofClass(Book.class).withAtMost(1000).elements()
-				.inTable("com.googlecode.n_orm.Book");
-	}
-
-	@Test(expected=IllegalArgumentException.class)
-	public void settingDummyTableInQuery() {
-		StorageManagement.findElements()
-				.ofClass(Element.class).withAtMost(1000).elements()
-				.inTable("XXX");
+				.inTableWithPostfix("XXX");
 	}
 
 	@Test
 	public void settingSameTwiceTableInQuery() {
 		StorageManagement.findElements()
 				.ofClass(Element.class).withAtMost(1000).elements()
-				.inTable("tpost").inTable("tpost");
+				.inTableWithPostfix("post").inTableWithPostfix("post");
+	}
+
+	@Test(expected=IllegalArgumentException.class)
+	public void settingDifferentTwiceTableInQuery() {
+		StorageManagement.findElements()
+				.ofClass(Element.class).withAtMost(1000).elements()
+				.inTableWithPostfix("post1").inTableWithPostfix("post2");
 	}
 }
