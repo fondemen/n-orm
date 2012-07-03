@@ -1061,10 +1061,12 @@ public aspect FederatedTableManagement {
 	/**
 	 * Sets the table to look for. This is only possible in case searched
 	 * element is over a {@link PersistingElementOverFederatedTable federated
-	 * table}.
+	 * table}. Element is thus searched from only one sigle table, whose name is
+	 * the original table, postfixed by the given parameter.
 	 * 
-	 * @param table
-	 *            the table to look for
+	 * @param tablePostfix
+	 *            the table to look for has to have the given postfix (can be ""
+	 *            for original table)
 	 * @throws IllegalArgumentException
 	 *             in case this class is not over a
 	 *             {@link PersistingElementOverFederatedTable federated table}
@@ -1086,7 +1088,7 @@ public aspect FederatedTableManagement {
 		String mainTable = PersistingMixin.getInstance().getTable(
 				this.getClazz());
 		String table = mainTable + tablePostfix;
-		
+
 		if (this.table != null && !this.table.equals(table))
 			throw new IllegalArgumentException(
 					"This query is already limited to table " + this.table
