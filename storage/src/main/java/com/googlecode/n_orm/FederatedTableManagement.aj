@@ -1054,7 +1054,7 @@ public aspect FederatedTableManagement {
 	// Add a new method to search elements of a given table
 	private String SearchableClassConstraintBuilder.table = null;
 
-	public String SearchableClassConstraintBuilder<T extends PersistingElementOverFederatedTable>.getTable() {
+	public String SearchableClassConstraintBuilder/*<T extends PersistingElementOverFederatedTable>*/.getTable() {
 		return this.table;
 	}
 
@@ -1077,7 +1077,7 @@ public aspect FederatedTableManagement {
 	 * @throws IllegalArgumentException
 	 *             in case a different table was already set in the query
 	 */
-	public SearchableClassConstraintBuilder<T> SearchableClassConstraintBuilder<T extends PersistingElementOverFederatedTable>.inTableWithPostfix(
+	public SearchableClassConstraintBuilder/*<U>*/ SearchableClassConstraintBuilder/*<U extends PersistingElementOverFederatedTable>*/.inTableWithPostfix(
 			String tablePostfix) {
 		if (!PersistingElementOverFederatedTable.class.isAssignableFrom(this
 				.getClazz()))
