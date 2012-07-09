@@ -19,8 +19,8 @@
 	</scm>
 	
 	<properties>
-		<hbase.version>0.90.4-cdh3u3</hbase.version>
-		<hadoop.version>0.20.2-cdh3u3</hadoop.version>
+		<hbase.version>0.90.6-cdh3u4</hbase.version>
+		<hadoop.version>0.20.2-cdh3u4</hadoop.version>
 	</properties>
 
 	<dependencies>

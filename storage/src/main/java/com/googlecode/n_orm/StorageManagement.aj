@@ -64,6 +64,7 @@ public aspect StorageManagement {
 			}
 		}
 		this.exists= Boolean.FALSE;
+		assert !this.existsInStore();
 	}
 	
 	@Continuator

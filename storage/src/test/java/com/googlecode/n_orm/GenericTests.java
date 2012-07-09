@@ -14,7 +14,8 @@ import com.googlecode.n_orm.cf.CollectionStorageTest;
 		PersistableSearchTest.class,
 		InheritanceTest.class,
 		ReveresedOrderSearchTest.class,
-		EvolutionTest.class
+		EvolutionTest.class,
+		FederatedTablesTest.class
 		//ImportExportTest.class
 })
 
