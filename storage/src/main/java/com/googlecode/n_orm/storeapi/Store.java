@@ -25,6 +25,11 @@ public interface Store {
 	public void start() throws DatabaseNotReachedException;
 	
 	/**
+	 * Checks whether the given table exists in this store.
+	 */
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException;
+	
+	/**
 	 * Tests whether a column family is empty.
 	 */
 	public void delete(PersistingElement elt, String table, String id)
@@ -75,7 +80,12 @@ public interface Store {
 
 	/**
 	 * Returns all elements in families ; no side-effect.
-	 * In case one element is missing, null is returned.
+	 * In case element with the given key is missing, null is returned.
+	 * @param elt the element to be activated (may be null)
+	 * @param table the table from which to find the element
+	 * @param id the unique identifier (i.e. the key) with which the element was stored
+	 * @param families the set of column families to be activated ; should never be null or empty
+	 * @return the data stored for each family ; null if and only if the id does not exist within the given table
 	 */
 	public ColumnFamilyData get(PersistingElement elt,
 			String table, String id,

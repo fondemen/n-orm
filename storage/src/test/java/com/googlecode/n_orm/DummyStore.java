@@ -121,4 +121,10 @@ public class DummyStore implements Store {
 		
 	}
 
+	@Override
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
 }

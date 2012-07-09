@@ -6,12 +6,14 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.EmptyCloseableIterator;
+import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory.Table.Row;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily;
@@ -422,6 +424,11 @@ public class Memory implements SimpleStore {
 	}
 
 	@Override
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException {
+		return this.tables.contains(tableName);
+	}
+
+	@Override
 	public byte[] get(String table, String id, String family, String qualifer) {
 		ColumnFamily fam = this.getFamily(table, id, family, false);
 		Value<?> val = fam == null ? null : fam.getNoCreate(qualifer);
@@ -450,28 +457,31 @@ public class Memory implements SimpleStore {
 		
 		Row r = this.getRow(table, id, true);
 		
-		for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
-			ColumnFamily f = r.get(change.getKey());
-			for (Entry<String, byte[]> value : change.getValue().entrySet()) {
-				Value<?> val = f.get(value.getKey());
-				if (val instanceof ByteValue) {
-					((ByteValue)val).setValue(value.getValue());
-				} else {
-					x = new IllegalArgumentException("Cannot set an incrementing value " + value.getKey() + " in family " + change.getKey() + " for row " + id + " in table " + table);
+		if (changed != null)
+			for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
+				ColumnFamily f = r.get(change.getKey());
+				for (Entry<String, byte[]> value : change.getValue().entrySet()) {
+					Value<?> val = f.get(value.getKey());
+					if (val instanceof ByteValue) {
+						((ByteValue)val).setValue(value.getValue());
+					} else {
+						x = new IllegalArgumentException("Cannot set an incrementing value " + value.getKey() + " in family " + change.getKey() + " for row " + id + " in table " + table);
+					}
 				}
 			}
-		}
 		
-		for (Entry<String, Set<String>> remove : removed.entrySet()) {
-			r.get(remove.getKey()).removeAll(remove.getValue());
-		}
-		
-		for (Entry<String, Map<String, Number>> incr : incremented.entrySet()) {
-			ColumnFamily f = r.get(incr.getKey());
-			for (Entry<String, Number> entry : incr.getValue().entrySet()) {
-				f.incr(entry.getKey(), entry.getValue());
+		if (removed != null)
+			for (Entry<String, Set<String>> remove : removed.entrySet()) {
+				r.get(remove.getKey()).removeAll(remove.getValue());
 			}
-		}
+		
+		if (incremented != null)
+			for (Entry<String, Map<String, Number>> incr : incremented.entrySet()) {
+				ColumnFamily f = r.get(incr.getKey());
+				for (Entry<String, Number> entry : incr.getValue().entrySet()) {
+					f.incr(entry.getKey(), entry.getValue());
+				}
+			}
 	}
 
 	@Override

@@ -19,6 +19,7 @@ import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.mockito.verification.VerificationMode;
 
 import com.googlecode.n_orm.Incrementing.Mode;
 import com.googlecode.n_orm.cf.SetColumnFamily;
@@ -234,6 +235,8 @@ public class SendingToStoreTest {
 	public void delete() {
 		this.element.delete();
 		verify(this.store).delete(this.element, table, id);
+		//Assertion checks whether element still exists after deletion
+		verify(this.store, atMost(1)).exists(this.element, table, id);
 	}
 	
 	@Test
