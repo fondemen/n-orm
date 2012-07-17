@@ -177,25 +177,14 @@
 					</reportSet>
 				</reportSets>
 			</plugin>
-			<!-- The following does not work on the Mac... Use pre-site goals instead. -->
-			<!-- plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-javadoc-plugin</artifactId>
-				<version>2.7</version>
-			</plugin>
+
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-report-plugin</artifactId>
-				<version>2.7.2</version>
-			</plugin -->
-			<!-- plugin> <groupId>org.apache.maven.plugins</groupId> <artifactId>maven-jxr-plugin</artifactId> 
-				</plugin -->
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>emma-maven-plugin</artifactId>
+				<version>1.0-alpha-3</version>
+			</plugin>
 		</plugins>
 	</reporting>
-	<!-- repositories> <repository> <id>org.apache</id> <name>Apache repository</name> 
-		<url>https://repository.apache.org/content/groups/public/</url> </repository> 
-		<repository> <id>org.codehaus</id> <name>Codehaus repository</name> <url>https://nexus.codehaus.org/content/groups/public/</url> 
-		</repository> </repositories -->
 
 	<profiles>
 
