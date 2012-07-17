@@ -13,8 +13,8 @@
 	<packaging>pom</packaging>
 
 	<properties>
-		<hbase.version>0.90.6-cdh3u4</hbase.version>
-		<hadoop.version>0.20.2-cdh3u4</hadoop.version>
+		<hbase.version>0.90.4-cdh3u3</hbase.version>
+		<hadoop.version>0.20.2-cdh3u3</hadoop.version>
 	</properties>
 
 	<dependencies>
@@ -63,7 +63,7 @@
 		<site>
 			<id>wiki</id>
 			<name>n-orm Wiki pages</name>
-			<url>file://${basedir}/../../n-orm-wiki/hbase-test-deps</url>
+			<url>file://${basedir}/../../n-orm.wiki/hbase-test-deps</url>
 		</site>
 	</distributionManagement>
 
