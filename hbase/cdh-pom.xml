@@ -19,8 +19,8 @@
 	</scm>
 	
 	<properties>
-		<hbase.version>0.90.6-cdh3u4</hbase.version>
-		<hadoop.version>0.20.2-cdh3u4</hadoop.version>
+		<hbase.version>0.90.4-cdh3u3</hbase.version>
+		<hadoop.version>0.20.2-cdh3u3</hadoop.version>
 	</properties>
 
 	<dependencies>
@@ -150,7 +150,7 @@
 		<site>
 			<id>wiki</id>
 			<name>n-orm Wiki pages</name>
-			<url>file://${basedir}/../../n-orm-wiki/hbase</url>
+			<url>file://${basedir}/../../n-orm.wiki/hbase</url>
 		</site>
 	</distributionManagement>
 
@@ -173,58 +173,4 @@
 			</snapshots>
 		</repository>
 	</repositories>
-
-	<profiles>
-		<profile>
-			<id>coverage</id>
-
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.codehaus.mojo</groupId>
-						<artifactId>cobertura-maven-plugin</artifactId>
-						<version>2.4</version>
-						<configuration>
-							<check>
-								<lineRate>80</lineRate>
-							</check>
-							<formats>
-								<format>xml</format>
-								<format>html</format>
-							</formats>
-						</configuration>
-						<executions>
-							<execution>
-								<goals>
-									<goal>clean</goal>
-								</goals>
-							</execution>
-							<execution>
-								<id>report</id>
-								<phase>pre-site</phase>
-								<goals>
-									<goal>cobertura</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-			<reporting>
-				<plugins>
-					<plugin>
-						<groupId>org.codehaus.mojo</groupId>
-						<artifactId>cobertura-maven-plugin</artifactId>
-						<version>2.4</version>
-						<configuration>
-							<formats>
-								<format>html</format>
-								<format>xml</format>
-							</formats>
-						</configuration>
-					</plugin>
-				</plugins>
-			</reporting>
-		</profile>
-	</profiles>
 </project>
