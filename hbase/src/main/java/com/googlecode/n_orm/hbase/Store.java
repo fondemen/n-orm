@@ -1321,7 +1321,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 										byte [] famB = Bytes.toBytes(fam.getKey());
 										if (!td.hasFamily(famB)) {
 											HColumnDescriptor famD = new HColumnDescriptor(famB);
-											this.setValues(famD, clazz, fam.getValue());
+											this.setValues(famD, name, clazz, fam.getValue());
 											td.addFamily(famD);
 										}
 									}
@@ -1414,12 +1414,12 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		return td.hasFamily(Bytes.toBytes(family));
 	}
 	
-	private boolean asExpected(HColumnDescriptor columnDescriptor, Class<? extends PersistingElement> clazz, Field cfField) {
+	private boolean asExpected(HColumnDescriptor columnDescriptor, String table, Class<? extends PersistingElement> clazz, Field cfField) {
 		if (columnDescriptor == null) {
 			return false;
 		} else {
 			for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
-				if(hprop.alter(columnDescriptor, this, clazz, cfField)) {
+				if(hprop.alter(columnDescriptor, this, table, clazz, cfField)) {
 					return false;
 				}
 			}
@@ -1427,9 +1427,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 	}
 	
-	private void setValues(HColumnDescriptor columnDescriptor, Class<? extends PersistingElement> clazz, Field cfField) {
+	private void setValues(HColumnDescriptor columnDescriptor, String table, Class<? extends PersistingElement> clazz, Field cfField) {
 		for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
-			hprop.setValue(columnDescriptor, this, clazz, cfField);
+			hprop.setValue(columnDescriptor, this, table, clazz, cfField);
 		}
 	}
 	
@@ -1444,7 +1444,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			for (Entry<String, Field> cf : columnFamilies.entrySet()) {
 				byte[] cfname = Bytes.toBytes(cf.getKey());
 				HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
-				boolean asExpected = this.asExpected(family, clazz, cf.getValue());
+				boolean asExpected = this.asExpected(family, tableName, clazz, cf.getValue());
 				if (!recreated && !asExpected) {
 					logger.fine("Table " + tableName + " is not known to have family " + cf.getKey() + " properly configured: checking from HBase");
 					synchronized (this.sharedLockTable(tableName)) {
@@ -1464,16 +1464,16 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 						}
 					}
 					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
-					asExpected = this.asExpected(family, clazz, cf.getValue());
+					asExpected = this.asExpected(family, tableName, clazz, cf.getValue());
 					this.cache(tableName, tableD);
 					recreated = true;
 				}
 				if (family == null) {
 					HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
-					this.setValues(newFamily, clazz, cf.getValue());
+					this.setValues(newFamily, tableName, clazz, cf.getValue());
 					toBeAdded.add(newFamily);
 				} else if (!asExpected) {
-					this.setValues(family, clazz, cf.getValue());
+					this.setValues(family, tableName, clazz, cf.getValue());
 					toBeAltered.add(family);
 				}
 			}
@@ -1523,7 +1523,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 									done = done && actualFamily != null;
 									if (done) {
 										for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
-											done = done && hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()));
+											done = done && hprop.hasValue(actualFamily, this, tableName, clazz, columnFamilies.get(expectedFamily.getNameAsString()));
 										}
 									}
 								}
@@ -1551,8 +1551,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 								if (actualFamily == null)
 									throw new IOException("Table " + tableName + " is now lacking familiy " + expectedFamily.getNameAsString());
 								for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
-									if (!hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()))) {
-										throw new IOException("Table " + tableName + " still has family " + expectedFamily.getNameAsString() + " with property " + hprop + " not set to " + hprop.getValue(this, clazz, columnFamilies.get(expectedFamily.getNameAsString())));
+									if (!hprop.hasValue(actualFamily, this, tableName, clazz, columnFamilies.get(expectedFamily.getNameAsString()))) {
+										throw new IOException("Table " + tableName + " still has family " + expectedFamily.getNameAsString() + " with property " + hprop + " not set to " + hprop.getValue(this, tableName, clazz, columnFamilies.get(expectedFamily.getNameAsString())));
 									}
 								}
 							}
