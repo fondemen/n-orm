@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.hbase;
+	package com.googlecode.n_orm.hbase;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -12,6 +12,7 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.StoreFile;
 
+import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.hbase.HBaseSchema.SettableBoolean;
@@ -377,16 +378,30 @@ public class PropertyUtils {
 			List<HBaseSchema> possibleSchemas = new LinkedList<HBaseSchema>();
 			HBaseSchema tmp;
 
-			String originalTable = PersistingMixin.getInstance()
-					.getTable(clazz);
-			String postfix = table.substring(originalTable.length());
-			assert table.startsWith(originalTable);
+			String postfix = null;
+			if (clazz != null) {
+				Class<? extends PersistingElement> actualTable = clazz;
+				String originalTable = store.mangleTableName(PersistingMixin.getInstance().getTable(actualTable));
+				while (!table.startsWith(originalTable)) {
+					try {
+						actualTable = clazz.getSuperclass().asSubclass(PersistingElement.class);
+						originalTable = store.mangleTableName(PersistingMixin.getInstance().getTable(actualTable));
+					} catch (ClassCastException x) {
+						throw new IllegalStateException("Cannot determine postfix for class " + clazz.getName() + " with table " + table, x);
+					} catch (NullPointerException x) {
+						throw new IllegalStateException("Cannot determine postfix for class " + clazz.getName() + " with table " + table, x);
+					}
+				}
+				postfix = table.substring(originalTable.length());
+			}
 			
 			if (field != null) {
-				tmp = specificities.get(new ColumnFamilyWithPostfix(field,
-						postfix));
-				if (tmp != null)
-					possibleSchemas.add(tmp);
+				if (postfix != null) {
+					tmp = specificities.get(new ColumnFamilyWithPostfix(field,
+							postfix));
+					if (tmp != null)
+						possibleSchemas.add(tmp);
+				}
 				
 				tmp = field.getAnnotation(HBaseSchema.class);
 				if (tmp != null)
@@ -394,9 +409,11 @@ public class PropertyUtils {
 			}
 
 			if (clazz != null) {
-				tmp = specificities.get(new ClassWithPostfix(clazz, postfix));
-				if (tmp != null)
-					possibleSchemas.add(tmp);
+				if (postfix != null) {
+					tmp = specificities.get(new ClassWithPostfix(clazz, postfix));
+					if (tmp != null)
+						possibleSchemas.add(tmp);
+				}
 				
 				tmp = clazz.getAnnotation(HBaseSchema.class);
 				if (tmp != null)
