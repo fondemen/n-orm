@@ -467,7 +467,7 @@ public class BasicTest {
 		assertFalse(sut2.exists());
 	}
 	 
-	 @Test(timeout=20000) public void processAsync() throws DatabaseNotReachedException, InterruptedException, InstantiationException, IllegalAccessException {
+	 @Test/*(timeout=20000)*/ public void processAsync() throws DatabaseNotReachedException, InterruptedException, InstantiationException, IllegalAccessException {
 		 Novel n1 = new Novel(bssut, new Date(123456799), new Date(0));
 		 n1.attribute = 1;
 		 n1.store();

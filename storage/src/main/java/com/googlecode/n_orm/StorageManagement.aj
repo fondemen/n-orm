@@ -3,6 +3,7 @@ package com.googlecode.n_orm;
 import java.io.FileInputStream;
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -25,6 +26,7 @@ import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
@@ -55,12 +57,12 @@ public aspect StorageManagement {
 
 	@Continuator
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
-		this.getStore().delete(this, this.getTable(), this.getIdentifier());
+		this.getStore().delete(new MetaInformation().forElement(this), this.getTable(), this.getIdentifier());
 		Collection<Class<? extends PersistingElement>> psc = this.getPersistingSuperClasses();
 		if (!psc.isEmpty()) {
 			PersistingMixin px = PersistingMixin.getInstance();
 			for (Class<? extends PersistingElement> cls : psc) {
-				this.getStore().delete(this, px.getTable(cls), this.getFullIdentifier());
+				this.getStore().delete(new MetaInformation().forElement(this).forClass(cls), px.getTable(cls), this.getFullIdentifier());
 			}
 		}
 		this.exists= Boolean.FALSE;
@@ -184,7 +186,7 @@ public aspect StorageManagement {
 			
 			if (!(this.exists == Boolean.TRUE && changed.isEmpty() && deleted.isEmpty() && increments.isEmpty())) {
 				
-				this.getStore().storeChanges(this, changedFields, this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
+				this.getStore().storeChanges(new MetaInformation().forElement(this).withColumnFamilies(changedFields), this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
 	
 				propsIncrs.clear();
 				for(ColumnFamily<?> family : families) {
@@ -206,7 +208,7 @@ public aspect StorageManagement {
 //					changed.put(CLASS_COLUMN_FAMILY, classColumn);
 					String ident = this.getFullIdentifier();
 					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
-						this.getStore().storeChanges(this, changedFields, px.getTable(sc), ident, changed, deleted, increments);
+						this.getStore().storeChanges(new MetaInformation().forElement(this).withColumnFamilies(changedFields), px.getTable(sc), ident, changed, deleted, increments);
 					}
 				}
 			}
@@ -310,7 +312,7 @@ public aspect StorageManagement {
 		Map<String, Field> toBeActivated = getActualFamiliesToBeActivated(timeout, families);
 		
 		if (! toBeActivated.isEmpty()) {
-			ColumnFamilyData rawData = this.getStore().get(this, this.getTable(), this.getIdentifier(), toBeActivated);
+			ColumnFamilyData rawData = this.getStore().get(new MetaInformation().forElement(this).withColumnFamilies(toBeActivated), this.getTable(), this.getIdentifier(), toBeActivated == null ? null : toBeActivated.keySet());
 			activateFromRawData(toBeActivated.keySet(), rawData);
 		}
 	}
@@ -411,7 +413,7 @@ public aspect StorageManagement {
 
 	@Continuator
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {
-		boolean ret = this.getStore().exists(this, this.getTable(), this.getIdentifier());
+		boolean ret = this.getStore().exists(new MetaInformation().forElement(this), this.getTable(), this.getIdentifier());
 		this.exists = ret ? Boolean.TRUE : Boolean.FALSE;
 		return ret;
 	}
@@ -524,7 +526,7 @@ public aspect StorageManagement {
 	public static <T extends PersistingElement> CloseableIterator<T> findElement(Class<T> clazz, Constraint c, int limit, String... families) throws DatabaseNotReachedException {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		final Map<String, Field> toBeActivated = families == null ? null : getAutoActivatedFamilies(clazz, families);
-		final CloseableKeyIterator keys = store.get(clazz, PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
+		final CloseableKeyIterator keys = store.get(new MetaInformation().forClass(clazz).withColumnFamilies(toBeActivated), PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated == null ? null : toBeActivated.keySet());
 		try {
 			CloseableIterator<T> ret = new SearchResultIterator<T>(clazz, limit, toBeActivated, keys);
 			return ret;
@@ -537,7 +539,7 @@ public aspect StorageManagement {
 	
 	public static <T extends PersistingElement> long countElements(Class<T> clazz, Constraint c) {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
-		return store.count(clazz, PersistingMixin.getInstance().getTable(clazz), c);
+		return store.count(new MetaInformation().forClass(clazz), PersistingMixin.getInstance().getTable(clazz), c);
 	}
 	
 //	/**

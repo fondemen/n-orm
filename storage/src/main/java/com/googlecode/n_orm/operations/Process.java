@@ -30,6 +30,7 @@ import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Store;
 
@@ -146,7 +147,7 @@ public class Process {
 		final Map<String, Field> toBeActivated = families == null ? null : StorageManagement.getAutoActivatedFamilies(clazz, families);
 		ret.toBeActivated = toBeActivated;
 		ret.clazz = clazz;
-		final CloseableKeyIterator keys = store.get(clazz, PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
+		final CloseableKeyIterator keys = store.get(new MetaInformation().forClass(clazz).withColumnFamilies(toBeActivated), PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated == null ? null : toBeActivated.keySet());
 		boolean ownsExecutor = executor == null;
 		if (ownsExecutor) {
 			executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
@@ -200,7 +201,7 @@ public class Process {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		if (store instanceof ActionnableStore) {
 			Map<String, Field> autoActivatedFamilies = StorageManagement.getAutoActivatedFamilies(clazz, families);
-			((ActionnableStore)store).process(PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies, clazz, process, callback);
+			((ActionnableStore)store).process(new MetaInformation().forClass(clazz).withColumnFamilies(autoActivatedFamilies), PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies == null ? null : autoActivatedFamilies.keySet(), clazz, process, callback);
 		} else {
 			new Thread() {
 				public void run() {

@@ -1,17 +1,34 @@
 package com.googlecode.n_orm;
 
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
+import java.lang.reflect.Field;
+import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import com.googlecode.n_orm.cf.MapColumnFamily;
+import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory;
+import com.googlecode.n_orm.mocked.ElementInFederatedMockedStore;
+import com.googlecode.n_orm.mocked.MockedStoreTest;
+import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.MetaInformation;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
+import com.googlecode.n_orm.storeapi.Store;
 
 public class FederatedTablesTest {
 	public static final String key = "akey";
@@ -102,7 +119,7 @@ public class FederatedTablesTest {
 		assertNotNull(Memory.INSTANCE.getRow("tpost", elt.getIdentifier(),
 				false));
 		assertNull(Memory.INSTANCE.getRow("t", elt.getIdentifier(), false));
-		assertEquals("tpost", elt.getTable());
+		assertEquals("tpost", elt.getActualTable());
 	}
 
 	@Test
@@ -133,7 +150,7 @@ public class FederatedTablesTest {
 		// Another to find where the element is
 		// And a last one to actually store the element
 		assertEquals(3, Memory.INSTANCE.getQueriesAndReset());
-		assertEquals("tpost", elt2.getTable());
+		assertEquals("tpost", elt2.getActualTable());
 	}
 
 	@Test
@@ -150,8 +167,9 @@ public class FederatedTablesTest {
 		// 1: testing table tpost
 		// 2: testing table t
 		// 3: updating alternative tables from base
+		// 4: checking for legacy table
 		// No more table to test, does not exists, no activation
-		assertEquals(3, Memory.INSTANCE.getQueriesAndReset());
+		assertEquals(4, Memory.INSTANCE.getQueriesAndReset());
 
 		Element elt2 = new Element();
 		elt2.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
@@ -181,8 +199,9 @@ public class FederatedTablesTest {
 		// 1: testing table tpost
 		// 2: testing table t
 		// 3: updating alternative tables from base
+		// 4: checking for legacy table
 		// No more table to test, does not exists, no activation
-		assertEquals(3, Memory.INSTANCE.getQueriesAndReset());
+		assertEquals(4, Memory.INSTANCE.getQueriesAndReset());
 
 		long initialTTL = FederatedTableManagement
 				.getTableAlternativeCacheTTLInS();
@@ -201,8 +220,9 @@ public class FederatedTablesTest {
 			// 1: testing table tljs,dcfzklfzk
 			// 2: testing table t
 			// 3: updating alternative tables from store
+			// 4: checking for legacy table
 			// Not found, giving up
-			assertEquals(3, Memory.INSTANCE.getQueriesAndReset());
+			assertEquals(4, Memory.INSTANCE.getQueriesAndReset());
 		} finally {
 			FederatedTableManagement.setTableAlternativeCacheTTLInS(initialTTL);
 		}
@@ -224,7 +244,7 @@ public class FederatedTablesTest {
 				.getRow(FederatedTableManagement.FEDERATED_META_TABLE, "t",
 						false)
 				.get(FederatedTableManagement.FEDERATED_META_COLUMN_FAMILY)
-				.contains("tpost"));
+				.contains("post"));
 	}
 
 	@Test
@@ -299,7 +319,7 @@ public class FederatedTablesTest {
 		// 3: activation
 		assertEquals(3, Memory.INSTANCE.getQueriesAndReset());
 		assertEquals(elt.arg, elt2.arg);
-		assertEquals("tpost", elt2.getTable());
+		assertEquals("tpost", elt2.getActualTable());
 	}
 
 	@Test
@@ -325,12 +345,13 @@ public class FederatedTablesTest {
 
 		// 1: testing t
 		// 2: updating alternatives from cache
-		// 3: testing whether tpost is a table (found from cache)
-		// 4: testing tpost
-		// 5: activation
-		assertEquals(5, Memory.INSTANCE.getQueriesAndReset());
+		// 3: checking for legacy table
+		// 4: testing whether tpost is a table (found from cache)
+		// 5: testing tpost
+		// 6: activation
+		assertEquals(6, Memory.INSTANCE.getQueriesAndReset());
 		assertEquals(elt.arg, elt2.arg);
-		assertEquals("tpost", elt2.getTable());
+		assertEquals("tpost", elt2.getActualTable());
 	}
 
 	@Test
@@ -350,7 +371,7 @@ public class FederatedTablesTest {
 		elt2.activate(); // tpost table can only be found from meta data
 
 		assertEquals(elt.arg, elt2.arg);
-		assertEquals("tpost", elt2.getTable());
+		assertEquals("tpost", elt2.getActualTable());
 	}
 
 	@Test
@@ -367,7 +388,7 @@ public class FederatedTablesTest {
 
 		assertEquals(elt.post, elt2.post);
 		assertEquals(elt.arg, elt2.arg);
-		assertEquals("tpost", elt2.getTable());
+		assertEquals("tpost", elt2.getActualTable());
 	}
 
 	@Test
@@ -384,7 +405,7 @@ public class FederatedTablesTest {
 
 		assertEquals(elt.post, elt2.post);
 		assertEquals(elt.arg, elt2.arg);
-		assertEquals("tpost", elt2.getTable());
+		assertEquals("tpost", elt2.getActualTable());
 	}
 
 	@Test
@@ -401,7 +422,7 @@ public class FederatedTablesTest {
 				false));
 		assertNull(Memory.INSTANCE.getRow("t", elt.getIdentifier(), false));
 		assertNull(Memory.INSTANCE.getRow("tpost2", elt.getIdentifier(), false));
-		assertEquals("tpost1", elt.getTable());
+		assertEquals("tpost1", elt.getActualTable());
 
 		elt.post = "post2";
 		elt.store();
@@ -410,7 +431,7 @@ public class FederatedTablesTest {
 				false));
 		assertNull(Memory.INSTANCE.getRow("t", elt.getIdentifier(), false));
 		assertNull(Memory.INSTANCE.getRow("tpost2", elt.getIdentifier(), false));
-		assertEquals("tpost1", elt.getTable());
+		assertEquals("tpost1", elt.getActualTable());
 	}
 
 	@Persisting(table = "t", federated = FederatedMode.PC_INCONS)
@@ -488,7 +509,7 @@ public class FederatedTablesTest {
 
 		assertEquals(elt.arg, elt2.arg);
 		assertEquals(elt.post, elt2.post);
-		assertEquals(elt.getTable(), elt2.getTable());
+		assertEquals(elt.getActualTable(), elt2.getActualTable());
 	}
 
 	@Test
@@ -515,7 +536,7 @@ public class FederatedTablesTest {
 		elt.activate();
 		assertEquals("arg2", elt.arg);
 		assertEquals("post2", elt.post);
-		assertEquals("tpost1", elt2.getTable());
+		assertEquals("tpost1", elt2.getActualTable());
 	}
 
 	@Persisting(table = "t", federated = FederatedMode.PC_LEG)
@@ -546,7 +567,7 @@ public class FederatedTablesTest {
 		elt2.post = "post2";
 		elt2.store(); // Misses "tpost1" !!!
 
-		assertEquals("tpost2", elt2.getTable());
+		assertEquals("tpost2", elt2.getActualTable());
 
 		// We are in an INCONSISTENT state !
 		ConsistentElement celt = new ConsistentElement();
@@ -718,7 +739,7 @@ public class FederatedTablesTest {
 		// deleted by @Before method cleanupCache()
 
 		assertTrue(elt.cf.isEmptyInStore());
-		assertEquals("tpost1", elt.getTable());
+		assertEquals("tpost1", elt.getActualTable());
 	}
 
 	@Test
@@ -732,7 +753,7 @@ public class FederatedTablesTest {
 		elt2.key = key;
 
 		assertTrue(elt2.cf.isEmptyInStore());
-		assertEquals("tpost1", elt2.getTable());
+		assertEquals("tpost1", elt2.getActualTable());
 	}
 
 	@Test
@@ -747,7 +768,7 @@ public class FederatedTablesTest {
 		elt2.key = key;
 
 		assertFalse(elt2.cf.isEmptyInStore());
-		assertEquals("tpost1", elt2.getTable());
+		assertEquals("tpost1", elt2.getActualTable());
 	}
 
 	@Test
@@ -758,7 +779,7 @@ public class FederatedTablesTest {
 		// deleted by @Before method cleanupCache()
 
 		assertNull(elt.cf.getFromStore("qual"));
-		assertEquals("tpost1", elt.getTable());
+		assertEquals("tpost1", elt.getActualTable());
 	}
 
 	@Test
@@ -772,7 +793,7 @@ public class FederatedTablesTest {
 		elt2.key = key;
 
 		assertNull(elt2.cf.getFromStore("qual"));
-		assertEquals("tpost1", elt2.getTable());
+		assertEquals("tpost1", elt2.getActualTable());
 	}
 
 	@Test
@@ -788,7 +809,7 @@ public class FederatedTablesTest {
 
 		assertEquals("AZERTY", elt2.cf.getFromStore("qual"));
 
-		assertEquals("tpost1", elt2.getTable());
+		assertEquals("tpost1", elt2.getActualTable());
 	}
 
 	@Test
@@ -800,7 +821,7 @@ public class FederatedTablesTest {
 		elt.cf.activate();
 		// deleted by @Before method cleanupCache()
 
-		assertEquals("tpost1", elt.getTable());
+		assertEquals("tpost1", elt.getActualTable());
 
 		assertTrue(elt.cf.isEmpty());
 
@@ -822,7 +843,7 @@ public class FederatedTablesTest {
 		elt2.cf.put("qual", "AZZERTYTEST");
 		elt2.cf.activate();
 
-		assertEquals("tpost1", elt2.getTable());
+		assertEquals("tpost1", elt2.getActualTable());
 
 		assertTrue(elt2.cf.isEmpty());
 
@@ -845,7 +866,7 @@ public class FederatedTablesTest {
 		elt2.cf.put("qual", "AZZERTYTEST");
 		elt2.cf.activate();
 
-		assertEquals("tpost1", elt2.getTable());
+		assertEquals("tpost1", elt2.getActualTable());
 
 		assertEquals("AZERTY", elt2.cf.get("qual"));
 
@@ -866,7 +887,7 @@ public class FederatedTablesTest {
 		elt.cf.activate(new Constraint("A", "Z"));
 		// deleted by @Before method cleanupCache()
 
-		assertEquals("tpost1", elt.getTable());
+		assertEquals("tpost1", elt.getActualTable());
 
 		assertTrue(elt.cf.isEmpty());
 
@@ -888,7 +909,7 @@ public class FederatedTablesTest {
 		elt2.cf.put("qual", "AZZERTYTEST");
 		elt2.cf.activate(new Constraint("A", "Z"));
 
-		assertEquals("tpost1", elt2.getTable());
+		assertEquals("tpost1", elt2.getActualTable());
 
 		assertTrue(elt2.cf.isEmpty());
 
@@ -912,7 +933,7 @@ public class FederatedTablesTest {
 		elt2.cf.put("qual", "AZZERTYTEST");
 		elt2.cf.activate(new Constraint("A", "Z"));
 
-		assertEquals("tpost1", elt2.getTable());
+		assertEquals("tpost1", elt2.getActualTable());
 
 		assertEquals("AZERTY2", elt2.cf.get("QUAL"));
 		assertNull(elt2.cf.get("qual"));
@@ -945,6 +966,48 @@ public class FederatedTablesTest {
 		}
 
 		assertEquals(100,
+				StorageManagement.findElements().ofClass(Element.class).count());
+	}
+
+	@Test
+	public void countAllFromLegacy() {
+		Store store = null;
+		for (int i = 0; i < 100; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + i;
+			elt.store();
+			if (store == null)
+				store = elt.getStore();
+		}
+		store.delete(null, FederatedTableManagement.FEDERATED_META_TABLE, PersistingMixin.getInstance().getTable(Element.class));
+		
+		FederatedTableManagement.clearAlternativesCache();
+
+		assertEquals(100,
+				StorageManagement.findElements().ofClass(Element.class).count());
+	}
+
+	@Test
+	public void countAllFromLegacyWithPostAlreadyRegistered() {
+		Store store = null;
+		for (int i = 0; i < 100; ++i) {
+			Element elt = new Element();
+			elt.key = "key" + i;
+			elt.store();
+			if (store == null)
+				store = elt.getStore();
+		}
+		store.delete(null, FederatedTableManagement.FEDERATED_META_TABLE, PersistingMixin.getInstance().getTable(Element.class));
+		
+		FederatedTableManagement.clearAlternativesCache();
+		
+		// Registers a brand new postfix (not the "" postfix)
+		Element elt = new Element();
+		elt.key = key;
+		elt.post = "post1";
+		elt.store();
+
+		assertEquals(101,
 				StorageManagement.findElements().ofClass(Element.class).count());
 	}
 
@@ -1096,7 +1159,7 @@ public class FederatedTablesTest {
 						.length())) % 4;
 				String expectedPostfix = expectedIndex == 0 ? "" : "post"
 						+ expectedIndex;
-				assertEquals("t" + expectedPostfix, elt.getTable());
+				assertEquals("t" + expectedPostfix, elt.getActualTable());
 			} while (res.hasNext());
 		} finally {
 			res.close();
@@ -1123,7 +1186,7 @@ public class FederatedTablesTest {
 			Element newE = res.next();
 			if (oldE != null)
 				assertTrue(oldE.compareTo(newE) < 0);
-			assertEquals("tpost1", newE.getTable());
+			assertEquals("tpost1", newE.getActualTable());
 			oldE = newE;
 		}
 		assertFalse(res.hasNext());

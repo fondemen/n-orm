@@ -1,4 +1,4 @@
-	package com.googlecode.n_orm.hbase;
+package com.googlecode.n_orm.hbase;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -311,7 +311,7 @@ public class PropertyUtils {
 	}
 
 	private static Map<TypeWithPostfix, HBaseSchema> specificities = new TreeMap<TypeWithPostfix, HBaseSchema>();
-	
+
 	static void clearAllSchemaSpecificities() {
 		specificities.clear();
 	}
@@ -373,48 +373,32 @@ public class PropertyUtils {
 		/**
 		 * @return null if unset
 		 */
-		T getValue(Store store, String table,
-				Class<? extends PersistingElement> clazz, Field field) {
+		T getValue(Store store, Class<? extends PersistingElement> clazz,
+				Field field, String tablePostfix) {
 			List<HBaseSchema> possibleSchemas = new LinkedList<HBaseSchema>();
 			HBaseSchema tmp;
 
-			String postfix = null;
-			if (clazz != null) {
-				Class<? extends PersistingElement> actualTable = clazz;
-				String originalTable = store.mangleTableName(PersistingMixin.getInstance().getTable(actualTable));
-				while (!table.startsWith(originalTable)) {
-					try {
-						actualTable = clazz.getSuperclass().asSubclass(PersistingElement.class);
-						originalTable = store.mangleTableName(PersistingMixin.getInstance().getTable(actualTable));
-					} catch (ClassCastException x) {
-						throw new IllegalStateException("Cannot determine postfix for class " + clazz.getName() + " with table " + table, x);
-					} catch (NullPointerException x) {
-						throw new IllegalStateException("Cannot determine postfix for class " + clazz.getName() + " with table " + table, x);
-					}
-				}
-				postfix = table.substring(originalTable.length());
-			}
-			
 			if (field != null) {
-				if (postfix != null) {
+				if (tablePostfix != null) {
 					tmp = specificities.get(new ColumnFamilyWithPostfix(field,
-							postfix));
+							tablePostfix));
 					if (tmp != null)
 						possibleSchemas.add(tmp);
 				}
-				
+
 				tmp = field.getAnnotation(HBaseSchema.class);
 				if (tmp != null)
 					possibleSchemas.add(tmp);
 			}
 
 			if (clazz != null) {
-				if (postfix != null) {
-					tmp = specificities.get(new ClassWithPostfix(clazz, postfix));
+				if (tablePostfix != null) {
+					tmp = specificities.get(new ClassWithPostfix(clazz,
+							tablePostfix));
 					if (tmp != null)
 						possibleSchemas.add(tmp);
 				}
-				
+
 				tmp = clazz.getAnnotation(HBaseSchema.class);
 				if (tmp != null)
 					possibleSchemas.add(tmp);
@@ -442,25 +426,27 @@ public class PropertyUtils {
 		abstract boolean hasValue(T value, HColumnDescriptor cf);
 
 		public boolean hasValue(HColumnDescriptor cf, Store store,
-				String table, Class<? extends PersistingElement> clazz,
-				Field field) {
-			T value = this.getValue(store, table, clazz, field);
+				Class<? extends PersistingElement> clazz, Field field,
+				String tablePostfix) {
+			T value = this.getValue(store, clazz, field, tablePostfix);
 			return this.isSet(value) ? this.hasValue(value, cf) : true;
 		}
 
 		public abstract void setValue(T value, HColumnDescriptor cf);
 
-		public void setValue(HColumnDescriptor cf, Store store, String table,
-				Class<? extends PersistingElement> clazz, Field field) {
-			T value = this.getValue(store, table, clazz, field);
+		public void setValue(HColumnDescriptor cf, Store store,
+				Class<? extends PersistingElement> clazz, Field field,
+				String tablePostfix) {
+			T value = this.getValue(store, clazz, field, tablePostfix);
 			if (this.isSet(value)) {
 				this.setValue(value, cf);
 			}
 		}
 
-		public boolean alter(HColumnDescriptor cf, Store store, String table,
-				Class<? extends PersistingElement> clazz, Field field) {
-			T value = this.getValue(store, table, clazz, field);
+		public boolean alter(HColumnDescriptor cf, Store store,
+				Class<? extends PersistingElement> clazz, Field field,
+				String tablePostfix) {
+			T value = this.getValue(store, clazz, field, tablePostfix);
 			if (this.isSet(value) && !this.hasValue(value, cf)) {
 				this.setValue(value, cf);
 				return true;
@@ -508,13 +494,14 @@ public class PropertyUtils {
 		}
 
 		@Override
-		public boolean alter(HColumnDescriptor cf, Store store, String table,
-				Class<? extends PersistingElement> clazz, Field field) {
-			Boolean shouldForce = this.forcedProperty.getValue(store, table,
-					clazz, field);
+		public boolean alter(HColumnDescriptor cf, Store store,
+				Class<? extends PersistingElement> clazz, Field field,
+				String tablePostfix) {
+			Boolean shouldForce = this.forcedProperty.getValue(store, clazz,
+					field, tablePostfix);
 			if (this.forcedProperty.isSet(shouldForce)
 					&& Boolean.TRUE.equals(shouldForce)) {
-				return super.alter(cf, store, table, clazz, field);
+				return super.alter(cf, store, clazz, field, tablePostfix);
 			} else {
 				return false;
 			}
