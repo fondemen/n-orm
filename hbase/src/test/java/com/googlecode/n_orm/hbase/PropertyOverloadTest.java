@@ -29,6 +29,7 @@ import com.googlecode.n_orm.cf.SetColumnFamily;
 import com.googlecode.n_orm.hbase.HBaseSchema.SettableBoolean;
 import com.googlecode.n_orm.hbase.PropertyUtils.DefaultHBaseSchema;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 public class PropertyOverloadTest {
@@ -176,7 +177,7 @@ public class PropertyOverloadTest {
 	@Test
 	public void firstCreation() {
 		this.deleteTable();
-		store.storeChanges(elt, this.getChangedFields(true, true, true), table, id, this.getChangedValues(true, true, true), null, null);
+		store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, true)).withPostfixedTable(table, ""), table, id, this.getChangedValues(true, true, true), null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
 		HColumnDescriptor def = this.getColumnFamilyDescriptor(defaultCfField, td);
@@ -219,7 +220,7 @@ public class PropertyOverloadTest {
 	@Test
 	public void alreadyCompressionNoneAllChanges() {
 		this.createTable(true, false, Algorithm.NONE, true, false, Algorithm.NONE);
-		store.storeChanges(elt, this.getChangedFields(true, true, false), table, id, this.getChangedValues(true, true, false), null, null);
+		store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, false)).withPostfixedTable(table, ""), table, id, this.getChangedValues(true, true, false), null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
 		HColumnDescriptor def = this.getColumnFamilyDescriptor(defaultCfField, td);
@@ -234,7 +235,7 @@ public class PropertyOverloadTest {
 	@Test
 	public void alreadyCompressionOvrOnlyChanges() {
 		this.createTable(true, true, Algorithm.NONE, true, false, Algorithm.NONE);
-		store.storeChanges(elt, this.getChangedFields(true, true, false), table, id, this.getChangedValues(true, true, false), null, null);
+		store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, false)).withPostfixedTable(table, ""), table, id, this.getChangedValues(true, true, false), null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
 		HColumnDescriptor def = this.getColumnFamilyDescriptor(defaultCfField, td);
@@ -285,7 +286,7 @@ public class PropertyOverloadTest {
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(defaultCfField, postfix, schema);
 			elt.postfix = postfix;
-			store.storeChanges(elt, this.getChangedFields(true, true, true), table+postfix, id, this.getChangedValues(true, true, true), null, null);
+			store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, true)).withPostfixedTable(table, postfix), table+postfix, id, this.getChangedValues(true, true, true), null, null);
 			
 			HTableDescriptor td = this.getTableDescriptor(postfix);
 			HColumnDescriptor def = this.getColumnFamilyDescriptor(defaultCfField, td);
@@ -304,7 +305,7 @@ public class PropertyOverloadTest {
 			DefaultHBaseSchema schema = new PropertyUtils.DefaultHBaseSchema();
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(defaultCfField, "", schema);
-			store.storeChanges(elt, this.getChangedFields(true, true, true), table, id, this.getChangedValues(true, true, true), null, null);
+			store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, true)).withPostfixedTable(table, ""), table, id, this.getChangedValues(true, true, true), null, null);
 			
 			HTableDescriptor td = this.getTableDescriptor();
 			HColumnDescriptor def = this.getColumnFamilyDescriptor(defaultCfField, td);
@@ -325,7 +326,7 @@ public class PropertyOverloadTest {
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(defaultCfField, "toto", schema);
 			elt.postfix = postfix;
-			store.storeChanges(elt, this.getChangedFields(true, true, true), table+postfix, id, this.getChangedValues(true, true, true), null, null);
+			store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, true)).withPostfixedTable(table, postfix), table+postfix, id, this.getChangedValues(true, true, true), null, null);
 			
 			HTableDescriptor td = this.getTableDescriptor(postfix);
 			HColumnDescriptor def = this.getColumnFamilyDescriptor(defaultCfField, td);
@@ -346,7 +347,7 @@ public class PropertyOverloadTest {
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(overloadedCfField, postfix, schema);
 			elt.postfix = postfix;
-			store.storeChanges(elt, this.getChangedFields(true, true, true), table+postfix, id, this.getChangedValues(true, true, true), null, null);
+			store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, true)).withPostfixedTable(table, postfix), table+postfix, id, this.getChangedValues(true, true, true), null, null);
 			
 			HTableDescriptor td = this.getTableDescriptor(postfix);
 			HColumnDescriptor ovr = this.getColumnFamilyDescriptor(overloadedCfField, td);
@@ -368,7 +369,7 @@ public class PropertyOverloadTest {
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(Element.class, postfix, schema);
 			elt.postfix = postfix;
-			store.storeChanges(elt, this.getChangedFields(true, true, true), table+postfix, id, this.getChangedValues(true, true, true), null, null);
+			store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, true)).withPostfixedTable(table, postfix), table+postfix, id, this.getChangedValues(true, true, true), null, null);
 			
 			HTableDescriptor td = this.getTableDescriptor(postfix);
 			HColumnDescriptor def = this.getColumnFamilyDescriptor(defaultCfField, td);
@@ -393,7 +394,7 @@ public class PropertyOverloadTest {
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(defaultCfField, postfix, schema);
 			elt.postfix = postfix;
-			store.storeChanges(elt, this.getChangedFields(true, true, true), table+postfix, id, this.getChangedValues(true, true, true), null, null);
+			store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, true)).withPostfixedTable(table, postfix), table+postfix, id, this.getChangedValues(true, true, true), null, null);
 			
 			HTableDescriptor td = this.getTableDescriptor(postfix);
 			HColumnDescriptor def = this.getColumnFamilyDescriptor(defaultCfField, td);

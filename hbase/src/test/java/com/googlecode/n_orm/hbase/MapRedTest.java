@@ -95,7 +95,7 @@ public class MapRedTest {
 			Map<String, byte[]> changes = new TreeMap<String, byte[]>();
 			changes.put("aval", new byte[] {1, 2, 3, 4});
 			changed.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changes );
-			store.storeChanges(null, null, tableName, UUID.randomUUID().toString(), changed, null, null);
+			store.storeChanges(null, tableName, UUID.randomUUID().toString(), changed, null, null);
 		}
 	}
 

@@ -25,10 +25,11 @@ import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
-import com.googlecode.n_orm.query.ClassConstraintBuilder;
+import com.googlecode.n_orm.storeapi.ActionnableStore;
 
 /**
  * Makes it possible to look for elements of a given class from/to different
@@ -131,9 +132,9 @@ public aspect FederatedTableManagement {
 		private long lastUpdate = -TableAlternativeCacheTTLInS;
 
 		/**
-		 * Known table alternatives for {@link #mainTable}
+		 * Known table postfixes for {@link #mainTable}
 		 */
-		private Set<String> alternatives = new TreeSet<String>();
+		private Set<String> postfixes = new TreeSet<String>();
 
 		public TableAlternatives(String mainTable) {
 			this.mainTable = mainTable;
@@ -148,8 +149,8 @@ public aspect FederatedTableManagement {
 		 *            where alternative meta-information should be retrieved
 		 *            from ; should be the store for a class having
 		 *            {@link #mainTable} as original table
-		 * @return tables that appeared with the update ; empty in case tables
-		 *         were not upated from store
+		 * @return postfixes that appeared with the update ; empty in case
+		 *         tables were not updated from store
 		 */
 		protected synchronized Set<String> updateAlternatives(Store store) {
 			long now = System.currentTimeMillis();
@@ -164,40 +165,48 @@ public aspect FederatedTableManagement {
 				// key is the original table
 				// family is FEDERATED_META_COLUMN_FAMILY
 				// obtained cell qualifiers are the stored alternatives.
-				Map<String, byte[]> res = store.get(null, null,
-						FEDERATED_META_TABLE, this.mainTable,
-						FEDERATED_META_COLUMN_FAMILY);
-				Set<String> newAlternatives = res == null ? new TreeSet<String>()
+				Map<String, byte[]> res = store.get(null, FEDERATED_META_TABLE,
+						this.mainTable, FEDERATED_META_COLUMN_FAMILY);
+				Set<String> newPosts = res == null ? new TreeSet<String>()
 						: new TreeSet<String>(res.keySet());
+
+				// We should always care about legacy table
+				boolean ckeckForLegacyTable = !newPosts.contains("");
 
 				// Checking for deleted tables in order to remove them from
 				// stored alternatives
-				Iterator<String> newAlternativesIt = newAlternatives.iterator();
-				Set<String> deletedTables = new TreeSet<String>();
+				Iterator<String> newAlternativesIt = newPosts.iterator();
+				Set<String> deletedPosts = new TreeSet<String>();
 				while (newAlternativesIt.hasNext()) {
-					String altTable = newAlternativesIt.next();
-					if (!store.hasTable(altTable)) {
+					String post = newAlternativesIt.next();
+					if (!store.hasTable(this.mainTable + post)) {
 						newAlternativesIt.remove();
-						deletedTables.add(altTable);
+						deletedPosts.add(post);
 					}
 				}
 				// Removing deleted tables from stored alternatives
-				if (!deletedTables.isEmpty()) {
+				if (!deletedPosts.isEmpty()) {
 					Map<String, Set<String>> removed = new TreeMap<String, Set<String>>();
-					removed.put(FEDERATED_META_COLUMN_FAMILY, deletedTables);
-					store.storeChanges(null, null, FEDERATED_META_TABLE,
+					removed.put(FEDERATED_META_COLUMN_FAMILY, deletedPosts);
+					store.storeChanges(null, FEDERATED_META_TABLE,
 							this.mainTable, null, removed, null);
 				}
 
 				// Computing tables we were not aware of
-				Set<String> diff = new TreeSet<String>(newAlternatives);
-				diff.removeAll(this.alternatives);
+				Set<String> diff = new TreeSet<String>(newPosts);
+				diff.removeAll(this.postfixes);
 				// Actually the following assertion is wrong, as a table might
 				// have been deleted...
 				// assert newAlternatives.containsAll(this.alternatives);
 
+				// Checking for legacy table
+				if (ckeckForLegacyTable && store.hasTable(mainTable)) {
+					this.addPostfix("", store);
+					newPosts.add("");
+				}
+
 				// Recording last state
-				this.alternatives = newAlternatives;
+				this.postfixes = newPosts;
 				return diff;
 			} else
 				// No alternative found as it was last updated too soon
@@ -205,23 +214,18 @@ public aspect FederatedTableManagement {
 		}
 
 		/**
-		 * Registering a new alternative for {@link #mainTable}. In case this
-		 * alternative was not known, it is stored in the given data store
+		 * Registering a new alternative postfix for {@link #mainTable}. In case
+		 * this postfix was not known, it is stored in the given data store
 		 * 
-		 * @param table
-		 *            the new alternative table ; name should start with
-		 *            {@link #mainTable}
+		 * @param postfix
+		 *            the new alternative postfix
 		 * @param store
 		 *            the store to which register this new alternative ; should
 		 *            be the store for a class having {@link #mainTable} as
 		 *            original table. null in case no write have ever been done
 		 */
-		public synchronized void addAlternative(String table, Store store) {
-			assert table.startsWith(this.mainTable);
-			// Avoid registering original table as an alternative to itself
-			if (table.equals(this.mainTable))
-				return;
-			if (this.alternatives.add(table) && store != null) {
+		public synchronized void addPostfix(String postfix, Store store) {
+			if (this.postfixes.add(postfix) && store != null) {
 				// We were not aware of that alternative ;
 				// let's register in the store
 				// Table is FEDERATED_META_TABLE
@@ -231,17 +235,17 @@ public aspect FederatedTableManagement {
 				ColumnFamilyData changes = new DefaultColumnFamilyData();
 				Map<String, byte[]> change = new TreeMap<String, byte[]>();
 				changes.put(FEDERATED_META_COLUMN_FAMILY, change);
-				change.put(table, null);
-				store.storeChanges(null, null, FEDERATED_META_TABLE,
-						this.mainTable, changes, null, null);
+				change.put(postfix, null);
+				store.storeChanges(null, FEDERATED_META_TABLE, this.mainTable,
+						changes, null, null);
 			}
 		}
 
 		/**
-		 * The known alternatives for {@link #mainTable}
+		 * The known alternative postfixes for {@link #mainTable}
 		 */
-		public Set<String> getAlternatives() {
-			return Collections.unmodifiableSet(this.alternatives);
+		public Set<String> getPostfixes() {
+			return Collections.unmodifiableSet(this.postfixes);
 		}
 	}
 
@@ -271,16 +275,16 @@ public aspect FederatedTableManagement {
 	 * 
 	 * @param mainTable
 	 *            the original table
-	 * @param alternativeTable
-	 *            the (possibly new) alternative
+	 * @param postfix
+	 *            the (possibly new) alternative postfix (can be "")
 	 * @param store
 	 *            the store in which storing alternative table ; should be the
 	 *            store for a class having {@link #mainTable} as original table
-	 * @see TableAlternatives#addAlternative(String, Store)
+	 * @see TableAlternatives#addPostfix(String, Store)
 	 */
-	private static void registerTable(String mainTable,
-			String alternativeTable, Store store) {
-		getAlternatives(mainTable).addAlternative(alternativeTable, store);
+	private static void registerPostfix(String mainTable, String postfix,
+			Store store) {
+		getAlternatives(mainTable).addPostfix(postfix, store);
 	}
 
 	/**
@@ -292,23 +296,6 @@ public aspect FederatedTableManagement {
 	 * @see Persisting#table()
 	 */
 	private transient String PersistingElementOverFederatedTable.tablePostfix;
-
-	public String PersistingElementOverFederatedTable.getTable() {
-		if (this.tablePostfix != null)
-			return this.getMainTable() + this.tablePostfix;
-		else
-			return this.getMainTable();
-	}
-
-	/**
-	 * The original table in which this persisting element would have been
-	 * stored in case it would not have been federated. The result can differ
-	 * from that one of {@link PersistingElement#getTable()} in case used
-	 * alternative table is known and different from this table.
-	 */
-	public String PersistingElementOverFederatedTable.getMainTable() {
-		return super.getTable();
-	}
 
 	/**
 	 * Sets table postfix as it is discovered.
@@ -337,42 +324,48 @@ public aspect FederatedTableManagement {
 		this.checkTablePostfixHasNotChanged();
 		if (oldPostfix != null && !oldPostfix.equals(this.tablePostfix)) {
 			throw new IllegalStateException("Found " + this + " from table "
-					+ this.getMainTable() + this.tablePostfix
-					+ " with postfix " + this.tablePostfix
-					+ " while another postfix " + oldPostfix
-					+ " was registered");
+					+ this.getTable() + this.tablePostfix + " with postfix "
+					+ this.tablePostfix + " while another postfix "
+					+ oldPostfix + " was registered");
 		}
 		if (store != null)
-			registerTable(this.getMainTable(), this.getMainTable()
-					+ this.tablePostfix, store);
+			registerPostfix(this.getTable(), this.tablePostfix, store);
 	}
 
 	// jut to be sure
 	declare error: set(* PersistingElementOverFederatedTable.tablePostfix) && !withincode(private void PersistingElementOverFederatedTable.setTablePostfix(..)) : "Avoid setting this attribute directly ; use setTablePostfix(String postfix, Store store) instead";
 
+	public String PersistingElementOverFederatedTable.getActualTable() {
+		if (this.tablePostfix == null)
+			return null;
+		return this.getTable() + this.tablePostfix;
+	}
+
 	/**
 	 * The list of tables where to find this object from what we can guess in
 	 * order of probability.
 	 */
-	private List<String> PersistingElementOverFederatedTable.getKnownPossibleTables() {
+	private List<String> PersistingElementOverFederatedTable.getKnownPossiblePostfixes() {
 		List<String> ret = new LinkedList<String>();
-		String mainTable = super.getTable();
 		// Table for this object is already known
 		if (this.tablePostfix != null) {
-			ret.add(mainTable + this.tablePostfix);
+			ret.add(this.tablePostfix);
 			return ret;
 		}
 
+		String mainTable = this.getTable();
 		TableAlternatives alternatives = getAlternatives(mainTable);
 		Set<String> possibilities = new TreeSet<String>(
-				alternatives.getAlternatives());
+				alternatives.getPostfixes());
+
 		// First, asks postfix if the element already knows
-		String possiblePostfixedTable = mainTable + this.getTablePostfix();
-		ret.add(possiblePostfixedTable);
-		possibilities.remove(possiblePostfixedTable);
+		String computedPostfix = this.getTablePostfix();
+		ret.add(computedPostfix);
+		possibilities.remove(computedPostfix);
 
 		// Otherwise, let's see main table
-		ret.add(mainTable);
+		ret.add("");
+
 		// And then all other known tables
 		ret.addAll(possibilities);
 
@@ -388,10 +381,10 @@ public aspect FederatedTableManagement {
 	 * 
 	 * @see TableAlternatives#updateAlternatives(Store)
 	 */
-	private Collection<String> PersistingElementOverFederatedTable.getPossibleTablesWithAnUpdate(
+	private Collection<String> PersistingElementOverFederatedTable.getPossiblePostfixesWithAnUpdate(
 			Store store) {
 		assert this.tablePostfix == null;
-		return getAlternatives(this.getMainTable()).updateAlternatives(store);
+		return getAlternatives(this.getTable()).updateAlternatives(store);
 	}
 
 	/**
@@ -416,9 +409,8 @@ public aspect FederatedTableManagement {
 				// Could still be forgiven in legacy mode
 				if (this.tablePostfix.length() != 0)
 					throw new IllegalStateException(this
-							+ " already registered in table "
-							+ this.getMainTable() + " with postfix "
-							+ this.tablePostfix
+							+ " already registered in table " + this.getTable()
+							+ " with postfix " + this.tablePostfix
 							+ " while computed postfix states now "
 							+ computedPostfix);
 			}
@@ -449,31 +441,31 @@ public aspect FederatedTableManagement {
 		Store store = this.getStore();
 
 		if (consistencyLevel.compareTo(Consistency.CONSISTENT_WITH_LEGACY) >= 0) {
-			String mainTable = this.getMainTable();
+			String mainTable = this.getTable();
 			String id = this.getIdentifier();
-			Set<String> testedTables = new HashSet<String>();
+			Set<String> testedPostfixes = new HashSet<String>();
 
 			// First trying with expected table
-			if (this.testTableLocation(mainTable + this.getTablePostfix(), id,
-					mainTable, testedTables, store))
+			if (this.testTableLocation(mainTable, this.getTablePostfix(), id,
+					testedPostfixes, store))
 				return true;
 
 			// Then trying with legacy table
-			if (this.testTableLocation(mainTable, id, mainTable, testedTables,
+			if (this.testTableLocation(mainTable, "", id, testedPostfixes,
 					store))
 				return true;
 
 			// In case of heavy consistency mode, test all possible tables
 			if (consistencyLevel.compareTo(Consistency.CONSISTENT) >= 0) {
-				for (String t : this.getKnownPossibleTables()) {
-					if (this.testTableLocation(t, id, mainTable, testedTables,
-							store))
+				for (String post : this.getKnownPossiblePostfixes()) {
+					if (this.testTableLocation(mainTable, post, id,
+							testedPostfixes, store))
 						return true;
 				}
 				// No found yet ; querying possible alternatives from store
-				for (String t : this.getPossibleTablesWithAnUpdate(store)) {
-					if (this.testTableLocation(t, id, mainTable, testedTables,
-							store))
+				for (String post : this.getPossiblePostfixesWithAnUpdate(store)) {
+					if (this.testTableLocation(mainTable, post, id,
+							testedPostfixes, store))
 						return true;
 				}
 			}
@@ -487,12 +479,13 @@ public aspect FederatedTableManagement {
 	}
 
 	private boolean PersistingElementOverFederatedTable.testTableLocation(
-			String t, String id, String mainTable, Set<String> alreadyTested,
-			Store store) {
-		assert t.startsWith(mainTable);
-		if (alreadyTested.add(t)) {
-			if (store.exists(this, t, id)) {
-				this.setTablePostfix(t.substring(mainTable.length()), store);
+			String mainTable, String postfix, String id,
+			Set<String> alreadyTested, Store store) {
+		if (alreadyTested.add(postfix)) {
+			if (store.exists(new MetaInformation().forElement(this)
+					.withPostfixedTable(mainTable, postfix), mainTable
+					+ postfix, id)) {
+				this.setTablePostfix(postfix, store);
 				return true;
 			}
 		}
@@ -507,68 +500,73 @@ public aspect FederatedTableManagement {
 		String ret = proceed();
 		return ret == null ? "" : ret;
 	}
+	
+	// Generic pointcut to state where things have to be woven
+	pointcut inNOrm(): 
+		within(com.googlecode.n_orm..*) && !within(*..*Test) && !within(FederatedTableManagement);
 
 	// ===================================
 	// element-level operations
 	// ===================================
 
 	// Store
-	void around(PersistingElementOverFederatedTable self, String table,
-			Store store):
+	void around(MetaInformation meta, String table, Store store):
 		call(void Store+.storeChanges(..))
-		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
+		&& inNOrm()
 		&& target(store)
-		&& args(self, Map<String, Field>, table, ..) {
-
+		&& args(meta, table, ..)
+		&& if(meta != null && meta.getElement() instanceof PersistingElementOverFederatedTable) {
+		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta
+				.getElement();
 		self.findTableLocation(ReadWrite.WRITE);
-
-		// Postfixing table name if necessary
-		if (!table.endsWith(self.tablePostfix)) {
-			String actualTable = table + self.tablePostfix;
-			// Should register table (even if looks like done when invoking
-			// findTableLocation) as we may be adding a postfix for a super
-			// table (remember federated mode is inherited and immutable)
-			registerTable(table, actualTable, store);
-			table = actualTable;
-		}
-
-		proceed(self, table, store);
+		registerPostfix(table, self.tablePostfix, store);
+		proceed(meta.withPostfixedTable(table, self.tablePostfix), table
+				+ self.tablePostfix, store);
 	}
 
 	// Activate
-	ColumnFamilyData around(PersistingElementOverFederatedTable self,
-			String table):
-		call(ColumnFamilyData Store.get(PersistingElement,String,String,Map<String, Field>))
-		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
-		&& args(self, table, ..)
-		// No need to around when postfix is already known as getTable returns the actual table
-		&& if(self.tablePostfix == null) {
-		if (self.findTableLocation(ReadWrite.READ)) // Element exists
-			return proceed(self, table + self.tablePostfix);
-		else
-			// Element does not exists
+	ColumnFamilyData around(MetaInformation meta, String table):
+		call(ColumnFamilyData Store.get(MetaInformation,String,String,Set<String>))
+		&& inNOrm()
+		&& args(meta, table, ..)
+		&& if(meta != null && meta.getElement() instanceof PersistingElementOverFederatedTable) {
+		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta
+				.getElement();
+		if (self.tablePostfix == null
+				&& !self.findTableLocation(ReadWrite.READ))
+			// We've just found that this element does not exist
 			return null;
+		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table
+				+ self.tablePostfix);
 	}
 
 	// Exists
-	boolean around(PersistingElementOverFederatedTable self):
-		call(boolean Store.exists(PersistingElement, String, String))
-		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
-		&& args(self,..)
-		// No need to around when postfix is already known as getTable returns the actual table
-		&& if(self.tablePostfix == null) {
-		return self.findTableLocation(ReadWrite.READ);
+	boolean around(MetaInformation meta, String table):
+		call(boolean Store.exists(MetaInformation, String, String))
+		&& inNOrm()
+		&& args(meta, table, ..)
+		&& if(meta != null && meta.getElement() instanceof PersistingElementOverFederatedTable) {
+		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta
+				.getElement();
+		if (self.tablePostfix == null
+				&& !self.findTableLocation(ReadWrite.READ))
+			// We've just found that this element does not exist
+			return false;
+		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table
+				+ self.tablePostfix);
 	}
 
 	// Delete
-	void around(PersistingElementOverFederatedTable self, String table):
+	void around(MetaInformation meta, String table):
 		call(void Store+.delete(..))
-		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
-		&& args(self, table, ..) {
+		&& inNOrm()
+		&& args(meta, table, ..)
+		&& if(meta != null && meta.getElement() instanceof PersistingElementOverFederatedTable) {
+		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta
+				.getElement();
 		self.findTableLocation(ReadWrite.READ_OR_WRITE);
-		if (!table.endsWith(self.tablePostfix))
-			table = table + self.tablePostfix;
-		proceed(self, table);
+		proceed(meta.withPostfixedTable(table, self.tablePostfix), table
+				+ self.tablePostfix);
 		self.setTablePostfix(null, null);
 	}
 
@@ -577,51 +575,53 @@ public aspect FederatedTableManagement {
 	// ===================================
 
 	// Exists
-	boolean around(PersistingElementOverFederatedTable self, String table):
-		call(boolean Store.exists(PersistingElement, Field, String, String, String))
-		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
-		&& args(self,Field, table, ..)
-		// No need to around when postfix is already known as getTable returns the actual table
-		&& if(self.tablePostfix == null) {
-
-		// Element does not exists
-		if (!self.findTableLocation(ReadWrite.READ))
+	boolean around(MetaInformation meta, String table):
+		call(boolean Store.exists(MetaInformation, String, String, String))
+		&& inNOrm()
+		&& args(meta, table, ..)
+		&& if(meta != null && meta.getElement() instanceof PersistingElementOverFederatedTable) {
+		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta
+				.getElement();
+		if (self.tablePostfix == null
+				&& !self.findTableLocation(ReadWrite.READ))
+			// We've just found that this element does not exist
 			return false;
-
-		return proceed(self, self.getTable());
+		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table
+				+ self.tablePostfix);
 	}
 
 	// Get column
-	byte[] around(PersistingElementOverFederatedTable self, String table):
-		call(byte[] Store.get(PersistingElement, Field, String, String, String, String))
-		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
-		&& args(self,Field, table, ..)
-		// No need to around when postfix is already known as getTable returns the actual table
-		&& if(self.tablePostfix == null) {
-
-		// Element does not exists
-		if (!self.findTableLocation(ReadWrite.READ))
+	byte[] around(MetaInformation meta, String table):
+		call(byte[] Store.get(MetaInformation, String, String, String, String))
+		&& inNOrm()
+		&& args(meta, table, ..)
+		&& if(meta != null && meta.getElement() instanceof PersistingElementOverFederatedTable) {
+		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta
+				.getElement();
+		if (self.tablePostfix == null
+				&& !self.findTableLocation(ReadWrite.READ))
+			// We've just found that this element does not exist
 			return null;
-
-		return proceed(self, self.getTable());
+		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table
+				+ self.tablePostfix);
 	}
 
 	// Get all columns
-	Map<String, byte[]> around(PersistingElementOverFederatedTable self,
-			String table):
-		(		call(Map<String, byte[]> Store.get(PersistingElement, Field, String, String, String))
-			||	call(Map<String, byte[]> Store.get(PersistingElement, Field, String, String, String, Constraint))
+	Map<String, byte[]> around(MetaInformation meta, String table):
+		(		call(Map<String, byte[]> Store.get(MetaInformation, String, String, String))
+			||	call(Map<String, byte[]> Store.get(MetaInformation, String, String, String, Constraint))
 		)
-		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
-		&& args(self,Field, table, ..)
-		// No need to around when postfix is already known as getTable returns the actual table
-		&& if(self.tablePostfix == null) {
-
-		// Element does not exists
-		if (!self.findTableLocation(ReadWrite.READ))
+		&& inNOrm()
+		&& args(meta, table, ..)
+		&& if(meta != null && meta.getElement() instanceof PersistingElementOverFederatedTable) {
+		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta
+				.getElement();
+		if (self.tablePostfix == null
+				&& !self.findTableLocation(ReadWrite.READ))
+			// We've just found that this element does not exist
 			return null;
-
-		return proceed(self, self.getTable());
+		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table
+				+ self.tablePostfix);
 	}
 
 	// ===================================
@@ -633,7 +633,7 @@ public aspect FederatedTableManagement {
 		/**
 		 * Runs the query on one possible alternative table
 		 */
-		protected abstract T localRun(String table);
+		protected abstract T localRun(String mainTable, String postfix);
 
 		/**
 		 * Merging two results for different alternative table into a single
@@ -645,12 +645,13 @@ public aspect FederatedTableManagement {
 		 */
 		protected abstract T add(T lhs, T rhs);
 
-		private Callable<T> createLocalAction(final String table) {
+		private Callable<T> createLocalAction(final String mainTable,
+				final String postfix) {
 			return new Callable<T>() {
 
 				@Override
 				public T call() throws Exception {
-					return localRun(table);
+					return localRun(mainTable, postfix);
 				}
 
 			};
@@ -663,27 +664,24 @@ public aspect FederatedTableManagement {
 		 * 
 		 * @param c
 		 */
-		public T globalRun(String table, Store store, Constraint c) {
+		public T globalRun(String mainTable, Store store, Constraint c) {
 
 			// Table was set in the query
-			if (c != null && (c instanceof ConstraintWithTable)) {
-				return this.localRun(((ConstraintWithTable) c).getTable());
+			if (c != null && (c instanceof ConstraintWithPostfix)) {
+				return this.localRun(mainTable,
+						((ConstraintWithPostfix) c).getPostfix());
 			}
 
 			ExecutorService exec = Executors
 					.newFixedThreadPool(ParallelGlobalSearch);
 			Collection<Future<T>> results = new LinkedList<Future<T>>();
 
-			// looking count in the main table
-			results.add(exec.submit(this.createLocalAction(table)));
-
-			TableAlternatives alts = getAlternatives(table);
+			TableAlternatives alts = getAlternatives(mainTable);
 			// Making sure we are aware of all possible alternative tables
 			alts.updateAlternatives(store);
 
-			for (final String t : alts.getAlternatives()) {
-				assert !t.equals(table);
-				results.add(exec.submit(this.createLocalAction(t)));
+			for (final String post : alts.getPostfixes()) {
+				results.add(exec.submit(this.createLocalAction(mainTable, post)));
 			}
 
 			// Waiting for results to show up
@@ -711,21 +709,24 @@ public aspect FederatedTableManagement {
 	}
 
 	// Count
-	long around(final Class<? extends PersistingElement> clazz,
-			final String table, final Constraint c, final Store store):
-		call(long Store.count(Class<? extends PersistingElement>, String, Constraint))
-		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
+	long around(final MetaInformation meta, final String table,
+			final Constraint c, final Store store):
+		call(long Store.count(MetaInformation, String, Constraint))
+		&& inNOrm()
 		&& target(store)
-		&& args(clazz, table, c) {
-		if (!clazz.getAnnotation(Persisting.class).federated().isFederated()) {
-			return proceed(clazz, table, c, store);
+		&& args(meta, table, c) {
+		Class<? extends PersistingElement> clazz = meta == null ? null : meta.getClazzNoCheck();
+		if (clazz == null || !clazz.getAnnotation(Persisting.class).federated().isFederated()) {
+			return proceed(meta, table, c, store);
 		}
 
-		return new GlobalAction<Long>() {
+		Long ret = new GlobalAction<Long>() {
 
 			@Override
-			protected Long localRun(final String t) {
-				return store.count(clazz, t, c);
+			protected Long localRun(String mainTable, String postfix) {
+				return store.count(new MetaInformation(meta)
+						.withPostfixedTable(mainTable, postfix), mainTable
+						+ postfix, c);
 			}
 
 			@Override
@@ -733,23 +734,29 @@ public aspect FederatedTableManagement {
 				return lhs + rhs;
 			}
 		}.globalRun(table, store, c);
+		return ret == null ? 0 : ret.longValue();
 	}
 
 	/**
 	 * A {@link Row} decorated with the table from which data was retrieved.
 	 */
 	private static class RowWithTable implements Row {
-		private final String table;
+		private final String mainTable, tablePostfix;
 		private final Row row;
 
-		public RowWithTable(String table, Row row) {
+		public RowWithTable(String mainTable, String tablePostfix, Row row) {
 			super();
-			this.table = table;
+			this.mainTable = mainTable;
+			this.tablePostfix = tablePostfix;
 			this.row = row;
 		}
 
-		public String getTable() {
-			return table;
+		public String getMainTable() {
+			return mainTable;
+		}
+
+		public String getTablePostfix() {
+			return tablePostfix;
 		}
 
 		@Override
@@ -769,18 +776,23 @@ public aspect FederatedTableManagement {
 	 */
 	private static class CloseableKeyIteratorWithTable implements
 			CloseableKeyIterator {
-		private final String table;
+		private final String mainTable, tablePostfix;
 		private final CloseableKeyIterator iterator;
 
-		public CloseableKeyIteratorWithTable(String table,
-				CloseableKeyIterator iterator) {
+		public CloseableKeyIteratorWithTable(String mainTable,
+				String tablePostfix, CloseableKeyIterator iterator) {
 			super();
-			this.table = table;
+			this.mainTable = mainTable;
+			this.tablePostfix = tablePostfix;
 			this.iterator = iterator;
 		}
 
-		public String getTable() {
-			return table;
+		public String getMainTable() {
+			return mainTable;
+		}
+
+		public String getTablePostfix() {
+			return tablePostfix;
 		}
 
 		@Override
@@ -799,7 +811,8 @@ public aspect FederatedTableManagement {
 		@Override
 		public Row next() {
 			Row r = iterator.next();
-			return r == null ? null : new RowWithTable(this.getTable(), r);
+			return r == null ? null : new RowWithTable(this.getMainTable(),
+					getTablePostfix(), r);
 		}
 
 		@Override
@@ -982,7 +995,7 @@ public aspect FederatedTableManagement {
 		@Override
 		public Row next() {
 			this.started = true;
-			com.googlecode.n_orm.FederatedTableManagement.AggregatingIterator.IteratorStatus.ResultReadyToGo ret = null;
+			IteratorStatus.ResultReadyToGo ret = null;
 			for (IteratorStatus is : this.status) {
 				ret = is.getNextIfLower(ret);
 			}
@@ -1001,23 +1014,27 @@ public aspect FederatedTableManagement {
 	}
 
 	// Search
-	CloseableKeyIterator around(final Class<? extends PersistingElement> clazz,
-			final String table, final Constraint c, final int limit,
-			final Map<String, Field> families, final Store store):
-		call(CloseableKeyIterator Store.get(Class<? extends PersistingElement>, String, Constraint,int, Map<String, Field>))
-		&& within(com.googlecode.n_orm..*) && !within(*Test) && !within(FederatedTableManagement)
+	CloseableKeyIterator around(final MetaInformation meta, final String table,
+			final Constraint c, final int limit, final Set<String> families,
+			final Store store):
+		call(CloseableKeyIterator Store.get(MetaInformation, String, Constraint,int, Set<String>))
+		&& inNOrm()
 		&& target(store)
-		&& args(clazz, table, c, limit, families) {
-		if (!clazz.getAnnotation(Persisting.class).federated().isFederated()) {
-			return proceed(clazz, table, c, limit, families, store);
+		&& args(meta, table, c, limit, families) {
+		Class<? extends PersistingElement> clazz = meta == null ? null : meta.getClazzNoCheck();
+		if (clazz == null || !clazz.getAnnotation(Persisting.class).federated().isFederated()) {
+			return proceed(meta, table, c, limit, families, store);
 		}
 
-		return new GlobalAction<CloseableKeyIterator>() {
+		CloseableKeyIterator ret = new GlobalAction<CloseableKeyIterator>() {
 
 			@Override
-			protected CloseableKeyIterator localRun(final String t) {
-				return new CloseableKeyIteratorWithTable(t, store.get(clazz, t,
-						c, limit, families));
+			protected CloseableKeyIterator localRun(String mainTable,
+					String postfix) {
+				return new CloseableKeyIteratorWithTable(mainTable, postfix,
+						store.get(new MetaInformation(meta).withPostfixedTable(
+								mainTable, postfix), mainTable + postfix, c,
+								limit, families));
 			}
 
 			@Override
@@ -1034,6 +1051,8 @@ public aspect FederatedTableManagement {
 				return lhs;
 			}
 		}.globalRun(table, store, c);
+
+		return ret == null ? new EmptyCloseableIterator() : ret;
 	}
 
 	// When creating an element from a row using a search, let's immediately set
@@ -1042,88 +1061,59 @@ public aspect FederatedTableManagement {
 		execution(PersistingElement createElementFromRow(Class, Map<String, Field>, Row)) 
 		&& args(.., row){
 		if (self != null) {
-			String mainTable = self.getMainTable();
-			String actualTable = row.getTable();
-			assert actualTable.startsWith(mainTable);
-			self.setTablePostfix(actualTable.substring(mainTable.length()),
-					self.getStore());
+			self.setTablePostfix(row.getTablePostfix(), self.getStore());
 		}
 	}
 
-	// Search with query
-	// Add a new method to search elements of a given table
-	private String SearchableClassConstraintBuilder.table = null;
+	// Remote process
+	void around(final MetaInformation meta, final String table, final Constraint c,
+			final Set<String> families, final Class<? extends PersistingElement> element,
+			final Process<? extends PersistingElement> action, final Callback callback,
+			final ActionnableStore store):
+		call(void ActionnableStore.process(MetaInformation, String, Constraint, Set<String>, Class, Process, Callback))
+		&& inNOrm()
+		&& target(store)
+		&& args(meta, table, c, families, element, action, callback) {
+		Class<? extends PersistingElement> clazz = meta == null ? null : meta.getClazzNoCheck();
+		if (clazz == null || !clazz.getAnnotation(Persisting.class).federated().isFederated()) {
+			proceed(meta, table, c, families, element, action, callback, store);
+			return;
+		}
 
-	public String SearchableClassConstraintBuilder/*<T extends PersistingElementOverFederatedTable>*/.getTable() {
-		return this.table;
-	}
+		new GlobalAction<Void>() {
 
-	/**
-	 * Sets the table to look for. This is only possible in case searched
-	 * element is over a {@link PersistingElementOverFederatedTable federated
-	 * table}. Element is thus searched from only one sigle table, whose name is
-	 * the original table, postfixed by the given parameter.
-	 * 
-	 * @param tablePostfix
-	 *            the table to look for has to have the given postfix (can be ""
-	 *            for original table)
-	 * @throws IllegalArgumentException
-	 *             in case this class is not over a
-	 *             {@link PersistingElementOverFederatedTable federated table}
-	 * @throws IllegalArgumentException
-	 *             in case this table cannot be part of the federation for
-	 *             {@link ConstraintBuilder#ofClass(Class) searched class} (i.e.
-	 *             it does not starts with original table name)
-	 * @throws IllegalArgumentException
-	 *             in case a different table was already set in the query
-	 */
-	public SearchableClassConstraintBuilder/*<U>*/ SearchableClassConstraintBuilder/*<U extends PersistingElementOverFederatedTable>*/.inTableWithPostfix(
-			String tablePostfix) {
-		if (!PersistingElementOverFederatedTable.class.isAssignableFrom(this
-				.getClazz()))
-			throw new IllegalArgumentException("Class "
-					+ this.getClazz().getName()
-					+ " is not federated ; cannot assign table in query");
+			@SuppressWarnings("unchecked")
+			@Override
+			protected Void localRun(String mainTable, String postfix) {
+				store.process(new MetaInformation(meta).withPostfixedTable(mainTable, postfix), mainTable+postfix, c, families, element, (Process<PersistingElement>)action, callback);
+				return null;
+			}
 
-		String mainTable = PersistingMixin.getInstance().getTable(
-				this.getClazz());
-		String table = mainTable + tablePostfix;
-
-		if (this.table != null && !this.table.equals(table))
-			throw new IllegalArgumentException(
-					"This query is already limited to table " + this.table
-							+ " ; cannot set it to " + table);
-
-		this.table = table;
-		return this;
+			@Override
+			protected Void add(Void lhs, Void rhs) {
+				return null;
+			}
+		}.globalRun(table, store, c);
 	}
 
 	// We're using Constraint to transmit searched table
-	public static class ConstraintWithTable extends Constraint {
-		private final String table;
+	public static class ConstraintWithPostfix extends Constraint {
+		private final String postfix;
 		private final Constraint constraint;
 
-		public ConstraintWithTable(Constraint c, String table) {
+		public ConstraintWithPostfix(Constraint c, String postfix) {
 			super(c == null ? null : c.getStartKey(), c == null ? null : c
 					.getEndKey());
 			this.constraint = c;
-			this.table = table;
+			this.postfix = postfix;
 		}
 
-		public String getTable() {
-			return this.table;
+		public String getPostfix() {
+			return this.postfix;
 		}
 
 		public Constraint getConstraint() {
 			return this.constraint;
 		}
-	}
-
-	// Created a tabled constraint in case query was set a table
-	Constraint around(SearchableClassConstraintBuilder self): 
-		execution(Constraint ClassConstraintBuilder.getConstraint())
-		&& target(self) 
-		&& if(self.getTable() != null) {
-		return new ConstraintWithTable(proceed(self), self.getTable());
 	}
 }

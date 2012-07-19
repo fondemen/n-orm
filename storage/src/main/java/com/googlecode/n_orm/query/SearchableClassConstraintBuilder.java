@@ -16,8 +16,10 @@ import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.ColumnFamiliyManagement;
 import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.FederatedTableManagement;
 import com.googlecode.n_orm.ImplicitActivation;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingElementOverFederatedTable;
 import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.ProcessCanceller;
 import com.googlecode.n_orm.ProcessException;
@@ -37,6 +39,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 
 	private Integer limit = null;
 	private String [] toBeActivated = null; //null: no activation, non null: autoactivation
+	private String tablePostfix = null;
 
 
 	public SearchableClassConstraintBuilder(Class<T> clazz) {
@@ -60,6 +63,10 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	public boolean hasNoLimit() {
 		return this.limit == null || this.limit < 1;
 	}
+
+	public String getTablePostfix() {
+		return this.tablePostfix;
+	}
 	
 	@Override
 	@SuppressWarnings("unchecked")
@@ -76,6 +83,50 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	@Continuator
 	public LimitConstraintBuilder<T> withAtMost(int limit) {
 		return new LimitConstraintBuilder<T>(this, limit);
+	}
+	
+	/**
+	 * Sets the table to look for. This is only possible in case searched
+	 * element is over a {@link PersistingElementOverFederatedTable federated
+	 * table}. Element is thus searched from only one sigle table, whose name is
+	 * the original table, postfixed by the given parameter.
+	 * 
+	 * @param tablePostfix
+	 *            the table to look for has to have the given postfix (can be ""
+	 *            for original table)
+	 * @throws IllegalArgumentException
+	 *             in case this class is not over a
+	 *             {@link PersistingElementOverFederatedTable federated table}
+	 * @throws IllegalArgumentException
+	 *             in case this table cannot be part of the federation for
+	 *             {@link ConstraintBuilder#ofClass(Class) searched class} (i.e.
+	 *             it does not starts with original table name)
+	 * @throws IllegalArgumentException
+	 *             in case a different table was already set in the query
+	 */
+	@Continuator
+	public SearchableClassConstraintBuilder<T> inTableWithPostfix(String tablePostfix) {
+		if (!PersistingElementOverFederatedTable.class.isAssignableFrom(this
+				.getClazz()))
+			throw new IllegalArgumentException("Class "
+					+ this.getClazz().getName()
+					+ " is not federated ; cannot assign table in query");
+
+		if (this.tablePostfix != null && !this.tablePostfix.equals(tablePostfix))
+			throw new IllegalArgumentException(
+					"This query is already limited to table postfix " + this.tablePostfix
+							+ " ; cannot set it to " + tablePostfix);
+
+		this.tablePostfix = tablePostfix;
+		return this;
+	}
+
+	@Override
+	public Constraint getConstraint() {
+		Constraint ret = super.getConstraint();
+		if (this.getTablePostfix() != null)
+			ret = new FederatedTableManagement.ConstraintWithPostfix(ret, getTablePostfix());
+		return ret;
 	}
 
 	/**
