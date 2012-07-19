@@ -19,6 +19,7 @@ import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 
 
 public abstract class ColumnFamily<T> implements Comparable<ColumnFamily<T>> {
@@ -143,7 +144,9 @@ public abstract class ColumnFamily<T> implements Comparable<ColumnFamily<T>> {
 		this.owner.checkIsValid();
 		String id = this.owner.getIdentifier();
 		assert id != null;
-		Map<String, byte[]> elements = c == null ? this.owner.getStore().get(this.owner, this.property, this.owner.getTable(), id, this.name) : this.owner.getStore().get(this.owner, this.property, this.owner.getTable(), id, this.name, c);
+		Map<String, byte[]> elements = c == null ?
+					this.owner.getStore().get(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), id, this.name)
+				:	this.owner.getStore().get(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), id, this.name, c);
 		this.rebuild(elements);
 	}
 
@@ -193,7 +196,7 @@ public abstract class ColumnFamily<T> implements Comparable<ColumnFamily<T>> {
 	 * Checks whether this column family is empty in the data store.
 	 */
 	public boolean isEmptyInStore() throws DatabaseNotReachedException {
-		return !this.getOwner().getStore().exists(this.owner, this.property, this.owner.getTable(), this.getOwner().getIdentifier(), this.getName());
+		return !this.getOwner().getStore().exists(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), this.getOwner().getIdentifier(), this.getName());
 	}
 
 	@Continuator
@@ -294,7 +297,7 @@ public abstract class ColumnFamily<T> implements Comparable<ColumnFamily<T>> {
 		}
 		assert this.increments == null || !this.increments.containsKey(key);
 		
-		byte[] res = this.owner.getStore().get(this.owner, this.property, this.owner.getTable(), this.owner.getIdentifier(), this.name, key);
+		byte[] res = this.owner.getStore().get(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), this.owner.getIdentifier(), this.name, key);
 		if (res == null)
 			return null;
 		T element = this.preparePut(key, res);

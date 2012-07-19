@@ -70,7 +70,7 @@ public class SimpleStoreWrapper implements Store {
 	 * .PersistingElement, java.lang.String, java.lang.String)
 	 */
 	@Override
-	public void delete(PersistingElement elt, String table, String id)
+	public void delete(MetaInformation meta, String table, String id)
 			throws DatabaseNotReachedException {
 		this.store.delete(table, id);
 	}
@@ -83,7 +83,7 @@ public class SimpleStoreWrapper implements Store {
 	 * .PersistingElement, java.lang.String, java.lang.String)
 	 */
 	@Override
-	public boolean exists(PersistingElement elt, String table, String row)
+	public boolean exists(MetaInformation meta, String table, String row)
 			throws DatabaseNotReachedException {
 		return this.store.exists(table, row);
 	}
@@ -97,7 +97,7 @@ public class SimpleStoreWrapper implements Store {
 	 * java.lang.String, java.lang.String)
 	 */
 	@Override
-	public boolean exists(PersistingElement elt, Field columnFamily,
+	public boolean exists(MetaInformation meta, 
 			String table, String row, String family)
 			throws DatabaseNotReachedException {
 		return this.store.exists(table, row, family);
@@ -111,10 +111,10 @@ public class SimpleStoreWrapper implements Store {
 	 * com.googlecode.n_orm.storeapi.Constraint, int, java.util.Set)
 	 */
 	@Override
-	public CloseableKeyIterator get(Class<? extends PersistingElement> type,
+	public CloseableKeyIterator get(MetaInformation meta,
 			String table, Constraint c, int limit,
-			Map<String, Field> families) throws DatabaseNotReachedException {
-		return this.store.get(table, c, limit, families == null ? null : families.keySet());
+			Set<String> families) throws DatabaseNotReachedException {
+		return this.store.get(table, c, limit, families);
 	}
 
 	/*
@@ -126,7 +126,7 @@ public class SimpleStoreWrapper implements Store {
 	 * java.lang.String, java.lang.String, java.lang.String)
 	 */
 	@Override
-	public byte[] get(PersistingElement elt, Field property, String table,
+	public byte[] get(MetaInformation meta, String table,
 			String row, String family, String key)
 			throws DatabaseNotReachedException {
 		return this.store.get(table, row, family, key);
@@ -141,7 +141,7 @@ public class SimpleStoreWrapper implements Store {
 	 * java.lang.String, java.lang.String)
 	 */
 	@Override
-	public Map<String, byte[]> get(PersistingElement elt, Field columnFamily,
+	public Map<String, byte[]> get(MetaInformation meta, 
 			String table, String id, String family)
 			throws DatabaseNotReachedException {
 		return store.get(table, id, family);
@@ -157,7 +157,7 @@ public class SimpleStoreWrapper implements Store {
 	 * com.googlecode.n_orm.storeapi.Constraint)
 	 */
 	@Override
-	public Map<String, byte[]> get(PersistingElement elt, Field columnFamily,
+	public Map<String, byte[]> get(MetaInformation meta, 
 			String table, String id, String family, Constraint c)
 			throws DatabaseNotReachedException {
 		return store.get(table, id, family, c);
@@ -171,10 +171,10 @@ public class SimpleStoreWrapper implements Store {
 	 * .PersistingElement, java.lang.String, java.lang.String, java.util.Set)
 	 */
 	@Override
-	public ColumnFamilyData get(PersistingElement elt,
+	public ColumnFamilyData get(MetaInformation meta, 
 			String table, String id,
-			Map<String, Field> families) throws DatabaseNotReachedException {
-		return store.get(table, id, families == null ? null : families.keySet());
+			Set<String> families) throws DatabaseNotReachedException {
+		return store.get(table, id, families);
 	}
 
 	/*
@@ -186,7 +186,7 @@ public class SimpleStoreWrapper implements Store {
 	 * java.util.Map, java.util.Map, java.util.Map)
 	 */
 	@Override
-	public void storeChanges(PersistingElement elt, Map<String, Field> changedFields,
+	public void storeChanges(MetaInformation meta,
 			String table, String id, ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
@@ -201,7 +201,7 @@ public class SimpleStoreWrapper implements Store {
 	 * java.lang.String, com.googlecode.n_orm.storeapi.Constraint)
 	 */
 	@Override
-	public long count(Class<? extends PersistingElement> type, String table,
+	public long count(MetaInformation meta, String table,
 			Constraint c) throws DatabaseNotReachedException {
 		return store.count(table, c);
 	}

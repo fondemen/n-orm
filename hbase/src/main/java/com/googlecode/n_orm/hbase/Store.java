@@ -94,6 +94,7 @@ import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.GenericStore;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 /**
@@ -1025,7 +1026,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 	}
 	
-	protected void handleProblem(Throwable e, Class<? extends PersistingElement> clazz, String table, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {		
+	protected void handleProblem(Throwable e, Class<? extends PersistingElement> clazz, String table, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {		
 		while (e instanceof UndeclaredThrowableException)
 			e = ((UndeclaredThrowableException)e).getCause();
 		
@@ -1044,7 +1045,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			if (td != null) {
 				this.uncache(table);
 				try {
-					this.getTableDescriptor(clazz, td.getNameAsString(), expectedFamilies);
+					this.getTableDescriptor(clazz, td.getNameAsString(), tablePostfix, expectedFamilies);
 				} catch (Exception x) {
 					throw new DatabaseNotReachedException(x);
 				}
@@ -1084,7 +1085,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			if (td != null) {
 				this.uncache(table);
 				try {
-					this.getTableDescriptor(clazz, td.getNameAsString(), expectedFamilies);
+					this.getTableDescriptor(clazz, td.getNameAsString(), tablePostfix, expectedFamilies);
 				} catch (Exception x) {
 					throw new DatabaseNotReachedException(x);
 				}
@@ -1108,10 +1109,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 	}
 	
-	protected <R> R tryPerform(Action<R> action, Class<? extends PersistingElement> clazz,  String tableName, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {
-		HTable table = this.getTable(clazz, tableName, expectedFamilies);
+	protected <R> R tryPerform(Action<R> action, Class<? extends PersistingElement> clazz,  String tableName, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {
+		HTable table = this.getTable(clazz, tableName, tablePostfix, expectedFamilies);
 		try {
-			return this.tryPerform(action, table, clazz, expectedFamilies);
+			return this.tryPerform(action, table, clazz, tablePostfix, expectedFamilies);
 		} finally {
 			this.returnTable(action.getTable());
 		}
@@ -1121,7 +1122,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	/**
 	 * Performs an action. Table should be replaced by action.getTable() as it can change in case of problem handling (like a connection lost).
 	 */
-	protected <R> R tryPerform(final Action<R> action, HTable table, Class<? extends PersistingElement> clazz, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {	
+	protected <R> R tryPerform(final Action<R> action, HTable table, Class<? extends PersistingElement> clazz, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {	
+		assert tablePostfix == null || Bytes.toString(table.getTableName()).endsWith(tablePostfix);
 		action.setTable(table);
 		try {
 			return action.perform();
@@ -1130,9 +1132,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			
 			String tableName = Bytes.toString(table.getTableName());
 			HTablePool tp = this.tablesC;
-			this.handleProblem(e, clazz, tableName, expectedFamilies);
+			this.handleProblem(e, clazz, tableName, tablePostfix, expectedFamilies);
 			if (tp != this.tablesC) { //Store was restarted ; we should get a new table client
-				table = this.getTable(clazz, tableName, expectedFamilies);
+				table = this.getTable(clazz, tableName, tablePostfix, expectedFamilies);
 				action.setTable(table);
 			}
 			try {
@@ -1303,7 +1305,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 	}
 	
-	protected HTableDescriptor getTableDescriptor(Class<? extends PersistingElement> clazz, String name, Map<String, Field> expectedFamilies) throws Exception {
+	protected HTableDescriptor getTableDescriptor(Class<? extends PersistingElement> clazz, String name, String tablePostfix, Map<String, Field> expectedFamilies) throws Exception {
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
 		boolean created = false;
@@ -1321,7 +1323,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 										byte [] famB = Bytes.toBytes(fam.getKey());
 										if (!td.hasFamily(famB)) {
 											HColumnDescriptor famD = new HColumnDescriptor(famB);
-											this.setValues(famD, name, clazz, fam.getValue());
+											this.setValues(famD, clazz, fam.getValue(), tablePostfix);
 											td.addFamily(famD);
 										}
 									}
@@ -1358,24 +1360,25 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 
 		if (!created && expectedFamilies != null && expectedFamilies.size()>0) {
-			this.enforceColumnFamiliesExists(td, clazz, expectedFamilies);
+			this.enforceColumnFamiliesExists(td, clazz, expectedFamilies, tablePostfix);
 		}
 		
 		return td;
 	}
 
-	protected HTable getTable(Class<? extends PersistingElement> clazz, String name, Map<String, Field> expectedFamilies)
+	protected HTable getTable(Class<? extends PersistingElement> clazz, String name, String tablePostfix, Map<String, Field> expectedFamilies)
 			throws DatabaseNotReachedException {
+		assert tablePostfix == null || name.endsWith(tablePostfix);
 		name = this.mangleTableName(name);
 		
 		try {
 			//Checking that this table actually exists with the expected column families
-			this.getTableDescriptor(clazz, name, expectedFamilies);
+			this.getTableDescriptor(clazz, name, tablePostfix, expectedFamilies);
 			return (HTable)this.tablesC.getTable(name);
 		} catch (Throwable x) {
-			this.handleProblem(x, clazz, name, expectedFamilies);
+			this.handleProblem(x, clazz, name, tablePostfix, expectedFamilies);
 			try {
-				this.getTableDescriptor(clazz, name, expectedFamilies);
+				this.getTableDescriptor(clazz, name, tablePostfix, expectedFamilies);
 			} catch (Exception y) {
 				throw new DatabaseNotReachedException(x);
 			}
@@ -1414,12 +1417,12 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		return td.hasFamily(Bytes.toBytes(family));
 	}
 	
-	private boolean asExpected(HColumnDescriptor columnDescriptor, String table, Class<? extends PersistingElement> clazz, Field cfField) {
+	private boolean asExpected(HColumnDescriptor columnDescriptor, Class<? extends PersistingElement> clazz, Field cfField, String tablePostfix) {
 		if (columnDescriptor == null) {
 			return false;
 		} else {
 			for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
-				if(hprop.alter(columnDescriptor, this, table, clazz, cfField)) {
+				if(hprop.alter(columnDescriptor, this, clazz, cfField, tablePostfix)) {
 					return false;
 				}
 			}
@@ -1427,14 +1430,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 	}
 	
-	private void setValues(HColumnDescriptor columnDescriptor, String table, Class<? extends PersistingElement> clazz, Field cfField) {
+	private void setValues(HColumnDescriptor columnDescriptor, Class<? extends PersistingElement> clazz, Field cfField, String tablePostfix) {
 		for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
-			hprop.setValue(columnDescriptor, this, table, clazz, cfField);
+			hprop.setValue(columnDescriptor, this, clazz, cfField, tablePostfix);
 		}
 	}
 	
 	private void enforceColumnFamiliesExists(HTableDescriptor tableD, Class<? extends PersistingElement> clazz, 
-			Map<String, Field> columnFamilies) throws DatabaseNotReachedException {
+			Map<String, Field> columnFamilies, String tablePostfix) throws DatabaseNotReachedException {
 		assert tableD != null;
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.size());
 		List<HColumnDescriptor> toBeAltered = new ArrayList<HColumnDescriptor>(columnFamilies.size());
@@ -1444,7 +1447,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			for (Entry<String, Field> cf : columnFamilies.entrySet()) {
 				byte[] cfname = Bytes.toBytes(cf.getKey());
 				HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
-				boolean asExpected = this.asExpected(family, tableName, clazz, cf.getValue());
+				boolean asExpected = this.asExpected(family, clazz, cf.getValue(), tablePostfix);
 				if (!recreated && !asExpected) {
 					logger.fine("Table " + tableName + " is not known to have family " + cf.getKey() + " properly configured: checking from HBase");
 					synchronized (this.sharedLockTable(tableName)) {
@@ -1452,9 +1455,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 							tableD = this.admin.getTableDescriptor(tableD.getName());
 						} catch (Exception e) {
 							errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
-							this.handleProblem(e, clazz, tableName, null);
+							this.handleProblem(e, clazz, tableName, tablePostfix, null);
 							try {
-								this.getTableDescriptor(clazz, tableName, columnFamilies);
+								this.getTableDescriptor(clazz, tableName, tablePostfix, columnFamilies);
 							} catch (Exception x) {
 								throw new DatabaseNotReachedException(x);
 							}
@@ -1464,16 +1467,16 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 						}
 					}
 					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
-					asExpected = this.asExpected(family, tableName, clazz, cf.getValue());
+					asExpected = this.asExpected(family, clazz, cf.getValue(), tablePostfix);
 					this.cache(tableName, tableD);
 					recreated = true;
 				}
 				if (family == null) {
 					HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
-					this.setValues(newFamily, tableName, clazz, cf.getValue());
+					this.setValues(newFamily, clazz, cf.getValue(), tablePostfix);
 					toBeAdded.add(newFamily);
 				} else if (!asExpected) {
-					this.setValues(family, tableName, clazz, cf.getValue());
+					this.setValues(family, clazz, cf.getValue(), tablePostfix);
 					toBeAltered.add(family);
 				}
 			}
@@ -1488,7 +1491,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 							try {
 								this.admin.disableTable(tableD.getName());
 							} catch (TableNotFoundException x) {
-								this.handleProblem(x, clazz, tableName, null);
+								this.handleProblem(x, clazz, tableName, tablePostfix, null);
 								this.admin.disableTable(tableD.getName());
 							}
 							if (! this.admin.isTableDisabled(tableD.getName()))
@@ -1498,7 +1501,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 								try {
 									this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 								} catch (TableNotFoundException x) {
-									this.handleProblem(x, clazz, tableName, null);
+									this.handleProblem(x, clazz, tableName, tablePostfix, null);
 									this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 								}
 							}
@@ -1506,7 +1509,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 								try {
 									this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
 								} catch (TableNotFoundException x) {
-									this.handleProblem(x, clazz, tableName, null);
+									this.handleProblem(x, clazz, tableName, tablePostfix, null);
 									this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
 								}
 							}
@@ -1523,7 +1526,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 									done = done && actualFamily != null;
 									if (done) {
 										for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
-											done = done && hprop.hasValue(actualFamily, this, tableName, clazz, columnFamilies.get(expectedFamily.getNameAsString()));
+											done = done && hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix);
 										}
 									}
 								}
@@ -1533,7 +1536,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 								if (!this.admin.isTableEnabled(tableD.getName()))
 									throw new IOException();
 							} catch (Exception x) {
-								this.handleProblem(x, clazz, tableName, null);
+								this.handleProblem(x, clazz, tableName, tablePostfix, null);
 								this.admin.enableTable(tableD.getName());
 								if (!this.admin.isTableEnabled(tableD.getName()))
 									throw new IOException("SEVERE: cannot enable table " + tableName);
@@ -1551,8 +1554,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 								if (actualFamily == null)
 									throw new IOException("Table " + tableName + " is now lacking familiy " + expectedFamily.getNameAsString());
 								for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
-									if (!hprop.hasValue(actualFamily, this, tableName, clazz, columnFamilies.get(expectedFamily.getNameAsString()))) {
-										throw new IOException("Table " + tableName + " still has family " + expectedFamily.getNameAsString() + " with property " + hprop + " not set to " + hprop.getValue(this, tableName, clazz, columnFamilies.get(expectedFamily.getNameAsString())));
+									if (!hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix)) {
+										throw new IOException("Table " + tableName + " still has family " + expectedFamily.getNameAsString() + " with property " + hprop + " not set to " + hprop.getValue(this, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix));
 									}
 								}
 							}
@@ -1580,7 +1583,17 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		return ret;
 	}
 	
+	protected Map<String, Field> toMap(Set<String> families, MetaInformation meta) {
+		return this.toMap(families, meta == null ? null : meta.getFamilies());
+	}
+	
 	protected Map<String, Field> toMap(Set<String> families, Map<String, Field> fields) {
+		if (families == null)
+			return null;
+		
+		if (fields != null && families.equals(fields.keySet()))
+			return fields;
+		
 		Map<String, Field> ret = new TreeMap<String, Field>();
 		
 		for (String family : families) {
@@ -1680,17 +1693,19 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	@Override
-	public ColumnFamilyData get(PersistingElement elt, String table, String id,
-			Map<String, Field> families) throws DatabaseNotReachedException {
+	public ColumnFamilyData get(MetaInformation meta, String table, String id,
+			Set<String> families) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return null;
 		
+		Map<String, Field> cf = toMap(families, meta);
+		
 		Get g = new Get(Bytes.toBytes(id));
-		for (String family : families.keySet()) {
+		for (String family : families) {
 			g.addFamily(Bytes.toBytes(family));
 		}
 
-		Result r = this.tryPerform(new GetAction(g), elt == null ? null : elt.getClass(), table, families);
+		Result r = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), cf);
 		if (r.isEmpty())
 			return null;
 		
@@ -1709,7 +1724,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	@Override
-	public void storeChanges(PersistingElement elt, Map<String, Field> changedFields, String table, String id,
+	public void storeChanges(MetaInformation meta, String table, String id,
 			ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
@@ -1724,9 +1739,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		//Storing (see later) an empty value with an empty qualifier within the properties family
 		//Thus the properties family is always involved
 		families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
-		Map<String, Field> fams = this.toMap(families, changedFields);
+		Map<String, Field> fams = this.toMap(families, meta);
 		
-		HTable t = this.getTable(elt == null ? null : elt.getClass(), table, fams);
+		HTable t = this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
 
 		try {
 			byte[] row = Bytes.toBytes(id);
@@ -1797,13 +1812,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			//Running puts and deletes
 			if (! actions.isEmpty()) {
 				act = new BatchAction(actions);
-				this.tryPerform(act, t, elt == null ? null : elt.getClass(), fams);
+				this.tryPerform(act, t, meta == null ? null : meta.getClazz(), meta == null ? null : meta.getTablePostfix(), fams);
 				t = act.getTable();
 			}
 			//Running increments
 			if (rowInc != null) {
 				act = new IncrementAction(rowInc);
-				this.tryPerform(act, t, elt == null ? null : elt.getClass(), fams);
+				this.tryPerform(act, t, meta == null ? null : meta.getClazz(), meta == null ? null : meta.getTablePostfix(), fams);
 				t = act.getTable();
 			}
 		} finally {
@@ -1813,38 +1828,38 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	@Override
-	public void delete(PersistingElement elt, String table, String id)
+	public void delete(MetaInformation meta, String table, String id)
 			throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return;
 		Delete d = new Delete(Bytes.toBytes(id));
-		this.tryPerform(new DeleteAction(d), elt == null ? null : elt.getClass(), table, null);
+		this.tryPerform(new DeleteAction(d), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
 	}
 
 	@Override
-	public boolean exists(PersistingElement elt, Field columnFamily, String table, String row, String family)
+	public boolean exists(MetaInformation meta, String table, String row, String family)
 			throws DatabaseNotReachedException {
 		if (!this.hasColumnFamily(table, family))
 			return false;
 
 		Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));
 		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-		return this.tryPerform(new ExistsAction(g), elt == null ? null : elt.getClass(), table, null);
+		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
 	}
 
 	@Override
-	public boolean exists(PersistingElement elt, String table, String row)
+	public boolean exists(MetaInformation meta, String table, String row)
 			throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return false;
 
 		Get g = new Get(Bytes.toBytes(row));
 		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-		return this.tryPerform(new ExistsAction(g), elt == null ? null : elt.getClass(), table, null);
+		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
 	}
 
 	@Override
-	public byte[] get(PersistingElement elt, Field property, String table, String row, String family, String key)
+	public byte[] get(MetaInformation meta, String table, String row, String family, String key)
 			throws DatabaseNotReachedException {
 		if (! this.hasColumnFamily(table, family))
 			return null;
@@ -1852,7 +1867,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
 				Bytes.toBytes(key));
 
-		Result result = this.tryPerform(new GetAction(g), elt == null ? null : elt.getClass(), table, this.toMap(family, property));
+		Result result = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), this.toMap(family, meta == null ? null : meta.getProperty()));
 		
 		if (result.isEmpty())
 			return null;
@@ -1860,15 +1875,15 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	@Override
-	public Map<String, byte[]> get(PersistingElement elt,
-			Field columnFamily, String table, String id, String family)
+	public Map<String, byte[]> get(MetaInformation meta,
+			String table, String id, String family)
 			throws DatabaseNotReachedException {
-		return this.get(elt, columnFamily, table, id, family, (Constraint) null);
+		return this.get(meta, table, id, family, (Constraint) null);
 	}
 
 	@Override
-	public Map<String, byte[]> get(PersistingElement elt,
-			Field columnFamily, String table, String id, String family,
+	public Map<String, byte[]> get(MetaInformation meta,
+			String table, String id, String family,
 			Constraint c) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return null;
@@ -1879,7 +1894,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			g.setFilter(createFamilyConstraint(c));
 		}
 
-		Result r = this.tryPerform(new GetAction(g), elt == null ? null : elt.getClass(), table, toMap(family, columnFamily));
+		Result r = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), toMap(family, meta == null ? null : meta.getProperty()));
 		if (r.isEmpty())
 			return null;
 		
@@ -1893,41 +1908,44 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	@Override
-	public long count(Class<? extends PersistingElement> type, String table, Constraint c) throws DatabaseNotReachedException {
+	public long count(MetaInformation meta, String table, Constraint c) throws DatabaseNotReachedException {
 		if (! this.hasTable(table))
 			return 0;
 		
-		return this.tryPerform(new CountAction(this, this.getScan(c, type, null)), type, table, null);
+		Class<? extends PersistingElement> type = meta == null ? null : meta.getClazz();
+		return this.tryPerform(new CountAction(this, this.getScan(c, type, null)), type, table, meta == null ? null : meta.getTablePostfix(), null);
 	}
 
 	@Override
-	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(Class<? extends PersistingElement> type, String table, Constraint c,
-			 int limit, Map<String, Field> families) throws DatabaseNotReachedException {
+	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(MetaInformation meta, String table, Constraint c,
+			 int limit, Set<String> families) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return new EmptyCloseableIterator();
 		
-		Scan s = this.getScan(c, type, families);
+		Map<String, Field> cf = toMap(families, meta);
+		
+		Scan s = this.getScan(c, meta.getClazz(), cf);
 		s.setFilter(this.addFilter(s.getFilter(), new PageFilter(limit)));
 		
-		ResultScanner r = this.tryPerform(new ScanAction(s), type, table, families);
-		return new CloseableIterator(this, type, table, c, limit, families, r, families != null);
+		ResultScanner r = this.tryPerform(new ScanAction(s), meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), cf);
+		return new CloseableIterator(this, meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), c, limit, cf, r, cf != null);
 	}
 
-	public void truncate(Class<? extends PersistingElement> clazz, String table, Constraint c) throws DatabaseNotReachedException {
+	public void truncate(MetaInformation meta, String table, Constraint c) throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return;
 		
 		logger.info("Truncating table " + table);
 		
-		TruncateAction action = new TruncateAction(this, this.getScan(c, clazz, null));
-		this.tryPerform(action, clazz, table, null);
+		TruncateAction action = new TruncateAction(this, this.getScan(c, meta == null ? null : meta.getClazz(), null));
+		this.tryPerform(action, meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
 		
 		logger.info("Truncated table " + table);
 	}
 
 	@Override
-	public <AE extends PersistingElement, E extends AE> void process(
-			final String table, Constraint c, Map<String, Field> families, Class<E> elementClass,
+	public <AE extends PersistingElement, E extends AE> void process(MetaInformation meta,
+			final String table, Constraint c, Set<String> families, Class<E> elementClass,
 			Process<AE> action, final Callback callback)
 			throws DatabaseNotReachedException {
 		if (! this.hasTable(table)) {
@@ -1935,11 +1953,12 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				callback.processCompleted();
 			return;
 		}
+		Map<String, Field> cf = toMap(families, meta);
 		final Class<?> actionClass = action.getClass();
 		try {
 			//Checking that cf are all there so that process will work
-			this.getTableDescriptor(elementClass, table, families);
-			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, elementClass, families), action, elementClass, families.keySet().toArray(new String[families.size()]));
+			this.getTableDescriptor(elementClass, table, meta == null ? null : meta.getTablePostfix(), cf);
+			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, elementClass, cf), action, elementClass, families.toArray(new String[families.size()]));
 			logger.log(Level.FINE, "Runing server-side process " + actionClass.getName() + " on table " + table + " with id " + job.hashCode());
 			if (callback != null) {
 				new Thread() {
