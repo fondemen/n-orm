@@ -100,6 +100,10 @@ public class PropertyUtils {
 
 	private static final Map<PropertyCacheKey, PropertyCacheValue> values = new ConcurrentHashMap<PropertyCacheKey, PropertyCacheValue>();
 
+	static void clearCachedValues() {
+		values.clear();
+	}
+	
 	private static abstract class TypeWithPostfix implements
 			Comparable<TypeWithPostfix> {
 		private final String postfix;

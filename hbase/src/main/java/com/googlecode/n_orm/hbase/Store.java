@@ -455,6 +455,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	public void setMaxRetries(int maxRetries) {
 		if (maxRetries <= 0)
 			throw new IllegalArgumentException("Cannot retry less than once");
+		PropertyUtils.clearCachedValues();
 		this.maxRetries = Integer.valueOf(maxRetries);
 	}
 
@@ -470,6 +471,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * <code>null</code> means default value (see {@link HConstants#DEFAULT_HBASE_RPC_TIMEOUT}).
 	 */
 	public void setClientTimeout(Integer clientTimeout) {
+		PropertyUtils.clearCachedValues();
 		this.clientTimeout = clientTimeout;
 	}
 
@@ -487,6 +489,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * Use this carefully ; read <a href="http://hbase.apache.org/book/perf.reading.html#perf.hbase.client.caching">the HBase documentation</a>.
 	 */
 	public void setScanCaching(Integer scanCaching) {
+		PropertyUtils.clearCachedValues();
 		this.scanCaching = scanCaching;
 	}
 
@@ -500,6 +503,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	public void setMapRedScanCaching(int mapRedScanCaching) {
+		PropertyUtils.clearCachedValues();
 		this.mapRedScanCaching = mapRedScanCaching;
 	}
 
@@ -523,11 +527,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 */
 	public void setCompression(String compression) {
 		if (compression == null) {
+			PropertyUtils.clearCachedValues();
 			this.compression = null;
 		} else {
 			for (String cmp : compression.split("-or-")) {
 				Algorithm newCompression = getCompressionByName(cmp);
 				if (newCompression != null) {
+					PropertyUtils.clearCachedValues();
 					this.compression = newCompression;
 					break;
 				}
@@ -571,6 +577,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * @see #getCompression()
 	 */
 	public void setForceCompression(boolean forceCompression) {
+		PropertyUtils.clearCachedValues();
 		this.forceCompression = forceCompression;
 	}
 
@@ -587,6 +594,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * null is considered as unset (i.e. the default value)
 	 */
 	public void setInMemory(Boolean inMemory) {
+		PropertyUtils.clearCachedValues();
 		this.inMemory = inMemory;
 	}
 
@@ -605,6 +613,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * @see #isInMemory()
 	 */
 	public void setForceInMemory(boolean forceInMemory) {
+		PropertyUtils.clearCachedValues();
 		this.forceInMemory = forceInMemory;
 	}
 
@@ -621,6 +630,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * null or value &lt= 0 is considered as unset (i.e. the default value).
 	 */
 	public void setTimeToLiveSeconds(Integer timeToLiveSeconds) {
+		PropertyUtils.clearCachedValues();
 		this.timeToLiveSeconds = timeToLiveSeconds;
 	}
 
@@ -639,6 +649,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * @see #getTimeToLiveSeconds()
 	 */
 	public void setForceTimeToLive(boolean forceTimeToLive) {
+		PropertyUtils.clearCachedValues();
 		this.forceTimeToLive = forceTimeToLive;
 	}
 
@@ -655,6 +666,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * null or value &lt= 0 is considered as unset (i.e. the default value).
 	 */
 	public void setMaxVersions(Integer maxVersions) {
+		PropertyUtils.clearCachedValues();
 		this.maxVersions = maxVersions;
 	}
 
@@ -673,6 +685,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * @see #getMaxVersions()
 	 */
 	public void setForceMaxVersions(boolean forceMaxVersions) {
+		PropertyUtils.clearCachedValues();
 		this.forceMaxVersions = forceMaxVersions;
 	}
 
@@ -689,6 +702,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * null is considered as unset (i.e. the default value).
 	 */
 	public void setBloomFilterType(StoreFile.BloomType bloomFilterType) {
+		PropertyUtils.clearCachedValues();
 		this.bloomFilterType = bloomFilterType;
 	}
 
@@ -707,6 +721,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * @see #getBloomFilterType()
 	 */
 	public void setForceBloomFilterType(boolean forceBloomFilterType) {
+		PropertyUtils.clearCachedValues();
 		this.forceBloomFilterType = forceBloomFilterType;
 	}
 
@@ -723,6 +738,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * null is considered as unset (i.e. the default value).
 	 */
 	public void setBlockCacheEnabled(Boolean blockCacheEnabled) {
+		PropertyUtils.clearCachedValues();
 		this.blockCacheEnabled = blockCacheEnabled;
 	}
 
@@ -741,6 +757,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * @see #getBlockCacheEnabled()
 	 */
 	public void setForceBlockCacheEnabled(boolean forceBlockCacheEnabled) {
+		PropertyUtils.clearCachedValues();
 		this.forceBlockCacheEnabled = forceBlockCacheEnabled;
 	}
 
@@ -757,6 +774,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * null is considered as unset (i.e. the default value).
 	 */
 	public void setBlockSize(Integer blockSize) {
+		PropertyUtils.clearCachedValues();
 		this.blockSize = blockSize;
 	}
 
@@ -775,6 +793,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * @see #getBlockSize()
 	 */
 	public void setForceBlockSize(boolean forceBlockSize) {
+		PropertyUtils.clearCachedValues();
 		this.forceBlockSize = forceBlockSize;
 	}
 
@@ -791,6 +810,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * null or &lt= 0 or &gt=2 is considered as unset (i.e. the default value).
 	 */
 	public void setReplicationScope(Integer replicationScope) {
+		PropertyUtils.clearCachedValues();
 		this.replicationScope = replicationScope;
 	}
 
@@ -809,6 +829,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * @see #getReplicationScope()
 	 */
 	public void setForceReplicationScope(boolean forceReplicationScope) {
+		PropertyUtils.clearCachedValues();
 		this.forceReplicationScope = forceReplicationScope;
 	}
 
@@ -825,6 +846,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * Map/reduce jobs are usually hard to run, so if this method is faster in case of large data on large cluster, it should be avoided on small clusters.
 	 */
 	public void setCountMapRed(boolean countMapRed) {
+		PropertyUtils.clearCachedValues();
 		this.countMapRed = countMapRed;
 	}
 
@@ -841,6 +863,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * Map/reduce jobs are usually hard to run, so if this method is faster in case of large data on large cluster, it should be avoided on small clusters.
 	 */
 	public void setTruncateMapRed(boolean truncateMapRed) {
+		PropertyUtils.clearCachedValues();
 		this.truncateMapRed = truncateMapRed;
 	}
 
@@ -858,6 +881,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * To be used with care !
 	 */
 	public void setMapRedSendJobJars(boolean mapRedSendJars) {
+		PropertyUtils.clearCachedValues();
 		this.mapRedSendJobJars = mapRedSendJars;
 	}
 
@@ -875,6 +899,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * To be used with care !
 	 */
 	public void setMapRedSendNOrmJars(boolean mapRedSendJars) {
+		PropertyUtils.clearCachedValues();
 		this.mapRedSendNOrmJars = mapRedSendJars;
 	}
 
@@ -892,6 +917,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * To be used with care !
 	 */
 	public void setMapRedSendHBaseJars(boolean mapRedSendJars) {
+		PropertyUtils.clearCachedValues();
 		this.mapRedSendHBaseJars = mapRedSendJars;
 	}
 
