@@ -6,19 +6,18 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.StoreFile;
 
-import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
-import com.googlecode.n_orm.PersistingMixin;
-import com.googlecode.n_orm.hbase.HBaseSchema.SettableBoolean;
 
 public class PropertyUtils {
-	public static final HColumnFamilyProperty[] properties;
+	public static final HColumnFamilyProperty<?>[] properties;
 
 	static {
 		properties = new HColumnFamilyProperty[] { new InMemoryProperty(),
@@ -27,6 +26,79 @@ public class PropertyUtils {
 				new BlockCacheProperty(), new BlockSizeProperty(),
 				new ReplicationScopeProperty() };
 	}
+
+	// A class to be used as the key for properties cache
+	private static class PropertyCacheKey {
+		private final int hashCode;
+		private final Class<? extends PersistingElement> clazz;
+		private final Field field;
+		private final String postfix;
+
+		private PropertyCacheKey(Class<? extends PersistingElement> clazz,
+				Field field, String postfix) {
+			super();
+			this.clazz = clazz;
+			this.field = field;
+			this.postfix = postfix;
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((clazz == null) ? 0 : clazz.hashCode());
+			result = prime * result + ((field == null) ? 0 : field.hashCode());
+			result = prime * result
+					+ ((postfix == null) ? 0 : postfix.hashCode());
+			this.hashCode = result;
+		}
+
+		@Override
+		public int hashCode() {
+			return this.hashCode;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			PropertyCacheKey other = (PropertyCacheKey) obj;
+			if (hashCode != other.hashCode)
+				return false;
+			if (clazz == null) {
+				if (other.clazz != null)
+					return false;
+			} else if (!clazz.equals(other.clazz))
+				return false;
+			if (field == null) {
+				if (other.field != null)
+					return false;
+			} else if (!field.equals(other.field))
+				return false;
+			if (postfix == null) {
+				if (other.postfix != null)
+					return false;
+			} else if (!postfix.equals(other.postfix))
+				return false;
+			return true;
+		}
+	}
+
+	// A class to be used as the value for properties cache
+	private static class PropertyCacheValue {
+		private final Map<HBaseProperty<?>, Object> values = new ConcurrentHashMap<HBaseProperty<?>, Object>();
+
+		public Object getValue(HBaseProperty<?> property) {
+			return this.values.get(property);
+		}
+
+		public Object setValue(HBaseProperty<?> property, Object value) {
+			assert value != null;
+			return this.values.put(property, value);
+		}
+	}
+
+	private static final Map<PropertyCacheKey, PropertyCacheValue> values = new ConcurrentHashMap<PropertyCacheKey, PropertyCacheValue>();
 
 	private static abstract class TypeWithPostfix implements
 			Comparable<TypeWithPostfix> {
@@ -314,6 +386,7 @@ public class PropertyUtils {
 
 	static void clearAllSchemaSpecificities() {
 		specificities.clear();
+		values.clear();
 	}
 
 	/**
@@ -337,6 +410,7 @@ public class PropertyUtils {
 		if (clazz == null)
 			throw new NullPointerException();
 		specificities.put(new ClassWithPostfix(clazz, tablePostfix), schema);
+		values.clear();
 	}
 
 	/**
@@ -358,9 +432,11 @@ public class PropertyUtils {
 			throw new NullPointerException();
 		specificities.put(new ColumnFamilyWithPostfix(field, tablePostfix),
 				schema);
+		values.clear();
 	}
 
 	public static abstract class HBaseProperty<T> {
+		private static final Object UNKNOWN_VALUE = new Object();
 
 		abstract String getName();
 
@@ -370,11 +446,36 @@ public class PropertyUtils {
 
 		abstract boolean isSet(T value);
 
+		final T getValue(Store store, Class<? extends PersistingElement> clazz,
+				Field field, String tablePostfix) {
+			boolean inCache = true;
+			PropertyCacheKey cacheKey = new PropertyCacheKey(clazz, field,
+					tablePostfix);
+			
+			PropertyCacheValue cacheVal = values.get(cacheKey);
+			if (cacheVal == null) {
+				cacheVal = new PropertyCacheValue();
+				values.put(cacheKey, cacheVal);
+				inCache = false;
+			}
+			
+			Object res = inCache ? cacheVal.getValue(this) : null;
+			@SuppressWarnings("unchecked")
+			T ret = inCache && res != UNKNOWN_VALUE ? (T)res : null;
+			if (res == null) { //Not in cache
+				ret = this.getValueInt(store, clazz, field, tablePostfix);
+				cacheVal.setValue(this, ret == null ? UNKNOWN_VALUE : ret);
+			}
+			
+			return ret;
+		}
+
 		/**
 		 * @return null if unset
 		 */
-		T getValue(Store store, Class<? extends PersistingElement> clazz,
-				Field field, String tablePostfix) {
+		private T getValueInt(Store store,
+				Class<? extends PersistingElement> clazz, Field field,
+				String tablePostfix) {
 			List<HBaseSchema> possibleSchemas = new LinkedList<HBaseSchema>();
 			HBaseSchema tmp;
 
