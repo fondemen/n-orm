@@ -2,6 +2,7 @@ package com.googlecode.n_orm.hbase;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -86,15 +87,25 @@ public class PropertyUtils {
 
 	// A class to be used as the value for properties cache
 	private static class PropertyCacheValue {
-		private final Map<HBaseProperty<?>, Object> values = new ConcurrentHashMap<HBaseProperty<?>, Object>();
+		private final Map<HBaseProperty<?>, Object> values = new TreeMap<HBaseProperty<?>, Object>(
+				new Comparator<HBaseProperty<?>>() {
 
-		public Object getValue(HBaseProperty<?> property) {
-			return this.values.get(property);
-		}
+					@Override
+					public int compare(HBaseProperty<?> o1, HBaseProperty<?> o2) {
+						return o1.getName().compareTo(o2.getName());
+					}
+				});
 
-		public Object setValue(HBaseProperty<?> property, Object value) {
-			assert value != null;
-			return this.values.put(property, value);
+		public Object getValue(HBaseProperty<?> property, Store store,
+				Class<? extends PersistingElement> clazz, Field field,
+				String tablePostfix) {
+			Object ret = this.values.get(property);
+			if (ret == null && !this.values.containsKey(property)) {
+				ret = this.values
+						.put(property, property.getValueInt(store, clazz,
+								field, tablePostfix));
+			}
+			return ret;
 		}
 	}
 
@@ -103,7 +114,7 @@ public class PropertyUtils {
 	static void clearCachedValues() {
 		values.clear();
 	}
-	
+
 	private static abstract class TypeWithPostfix implements
 			Comparable<TypeWithPostfix> {
 		private final String postfix;
@@ -440,8 +451,6 @@ public class PropertyUtils {
 	}
 
 	public static abstract class HBaseProperty<T> {
-		private static final Object UNKNOWN_VALUE = new Object();
-
 		abstract String getName();
 
 		abstract T readValue(HBaseSchema ann);
@@ -450,31 +459,35 @@ public class PropertyUtils {
 
 		abstract boolean isSet(T value);
 
+		/**
+		 * Gets the value for this property for the given field, class, or store
+		 * (in that order of preference). Result is cached in
+		 * {@link PropertyUtils#values}.
+		 * 
+		 * @return null if unset
+		 */
+		@SuppressWarnings("unchecked")
 		final T getValue(Store store, Class<? extends PersistingElement> clazz,
 				Field field, String tablePostfix) {
-			boolean inCache = true;
 			PropertyCacheKey cacheKey = new PropertyCacheKey(clazz, field,
 					tablePostfix);
-			
+
 			PropertyCacheValue cacheVal = values.get(cacheKey);
 			if (cacheVal == null) {
 				cacheVal = new PropertyCacheValue();
 				values.put(cacheKey, cacheVal);
-				inCache = false;
 			}
-			
-			Object res = inCache ? cacheVal.getValue(this) : null;
-			@SuppressWarnings("unchecked")
-			T ret = inCache && res != UNKNOWN_VALUE ? (T)res : null;
-			if (res == null) { //Not in cache
-				ret = this.getValueInt(store, clazz, field, tablePostfix);
-				cacheVal.setValue(this, ret == null ? UNKNOWN_VALUE : ret);
-			}
-			
-			return ret;
+
+			return (T) cacheVal.getValue(this, store, clazz, field,
+					tablePostfix);
 		}
 
 		/**
+		 * Actual method that determines the value for this property according
+		 * to field, class and store (in that order). This method is used by
+		 * {@link PropertyCacheValue values} of the {@link PropertyUtils#values
+		 * property cache} when not set.
+		 * 
 		 * @return null if unset
 		 */
 		private T getValueInt(Store store,
