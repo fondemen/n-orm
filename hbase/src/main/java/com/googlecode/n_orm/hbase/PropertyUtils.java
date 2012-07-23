@@ -92,7 +92,7 @@ public class PropertyUtils {
 
 					@Override
 					public int compare(HBaseProperty<?> o1, HBaseProperty<?> o2) {
-						return o1.getName().compareTo(o2.getName());
+						return o2.hashCode() - o1.hashCode();
 					}
 				});
 
