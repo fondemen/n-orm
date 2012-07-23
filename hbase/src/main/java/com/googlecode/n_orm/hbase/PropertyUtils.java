@@ -101,9 +101,8 @@ public class PropertyUtils {
 				String tablePostfix) {
 			Object ret = this.values.get(property);
 			if (ret == null && !this.values.containsKey(property)) {
-				ret = this.values
-						.put(property, property.getValueInt(store, clazz,
-								field, tablePostfix));
+				ret = property.getValueInt(store, clazz, field, tablePostfix);
+				this.values.put(property, ret);
 			}
 			return ret;
 		}
