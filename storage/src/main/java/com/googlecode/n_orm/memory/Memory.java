@@ -9,15 +9,21 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.EmptyCloseableIterator;
 import com.googlecode.n_orm.Transient;
 import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.memory.EvictionQueue.EvictionThread;
 import com.googlecode.n_orm.memory.Memory.Table.Row;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily.ByteValue;
@@ -29,11 +35,14 @@ import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.SimpleStore;
 
 /**
- * Reference implementation for a store based on {@link ConcurrentSkipListMap}.
+ * Thread-safe (to our best knowledge) reference implementation for a store based on {@link ConcurrentSkipListMap}s.
  * This store entirely resides into memory, and is only available for the current JVM.
- * It is well suited for testing.
- * This store is thread-safe.
- * This store does not supports mixing incrementing and absolute values.
+ * This store does not supports mixing incrementing and absolute values on the same column qualifier.
+ * In addition to others {@link SimpleStore}, this store is able to automatically evict a row in case
+ * is used {@link #storeChanges(String, String, ColumnFamilyData, Map, Map, Long)} instead of
+ * {@link #storeChanges(String, String, ColumnFamilyData, Map, Map)}. However, unlike other caches,
+ * eviction happens in any case (almost) after the delay is expired, even if the row is accessed
+ * (read or write) eventually.
  */
 public class Memory implements SimpleStore {
 	public static final Memory INSTANCE = new Memory();
@@ -194,6 +203,11 @@ public class Memory implements SimpleStore {
 	 */
 	private static final byte[] NULL_VALUE = new byte[0];
 	
+	/**
+	 * A value to state that a {@link Table.Row} never expires
+	 */
+	private static final long NEVER_EXPIRES = -1;
+	
 	private static final ExecutorService ColumnRemover = Executors.newSingleThreadExecutor();
 	
 	/**
@@ -232,12 +246,38 @@ public class Memory implements SimpleStore {
 		/**
 		 * A row owning a set of Column families.
 		 * Column families are created lazily as soon as they are requested by {@link #get(String)}.
+		 * This element can be set an eviction date: (almost) at that date, the row is removed from the table.
+		 * Any {@link Memory#storeChanges(String, String, ColumnFamilyData, Map, Map) update} is waited for
+		 * completion before notifying eviction listeners.
+		 * In case of a write on this row (i.e. on its families and columns), you should first call
+		 * {@link #startUpdate(Long)} and then {@link #stopUpdate()} once completed.
 		 */
 		public class Row extends LazyMap<Row.ColumnFamily> implements com.googlecode.n_orm.storeapi.Row {
 			/**
 			 * The identifier for this row
 			 */
 			public final String key;
+			
+			/**
+			 * The date (epoch) when this row should be evicted.
+			 * Default value is -1 (never).
+			 */
+			public final AtomicLong evictionDate = new AtomicLong(NEVER_EXPIRES);
+			
+			/**
+			 * A lock to set {@link #pendingWriteOperations} and {@link #waitingForEviction}
+			 *  in case of a programmed eviction
+			 */
+			private ReentrantReadWriteLock writeOperationUpdateLock = new ReentrantReadWriteLock();
+			/**
+			 * Number of {@link Memory#storeChanges(String, String, ColumnFamilyData, Map, Map) updates}
+			 * being performed in case of a programmed eviction
+			 */
+			private AtomicInteger pendingWriteOperations = new AtomicInteger();
+			/**
+			 * A lock to wait for updates completion when an eviction is to be done
+			 */
+			private CountDownLatch waitingForEviction;
 			
 			public Row(String key) {
 				super(false);
@@ -267,6 +307,123 @@ public class Memory implements SimpleStore {
 					ret.put(element.getKey(), element.getValue().getValues(null, null));
 				}
 				return ret;
+			}
+			
+			/**
+			 * Sets the time to live for this row if not set already.
+			 * Note that unlike other caches, this date is set only once, and eventual operations
+			 * on this row do not change the planned eviction date.
+			 * @param ttlMs the delay in milliseconds from now when this row should be evicted
+			 */
+			public void setEvictionDelay(long ttlMs) {
+				if (ttlMs <= 0)
+					throw new IllegalArgumentException("Attempting to set a TTL of " + ttlMs + "ms on row " + this.getKey() + " of table " + Table.this.name);
+				if (this.evictionDate.get() == NEVER_EXPIRES)
+					this.setEvictionDate(System.currentTimeMillis()+ttlMs);
+			}
+			
+			/**
+			 * Sets the eviction date for this row if and only if not set already.
+			 * Setup the eviction queue in case it is the first to be set.
+			 * @param evictionDate
+			 */
+			public void setEvictionDate(long evictionDate) {
+				if (this.evictionDate.get() == NEVER_EXPIRES && this.evictionDate.compareAndSet(NEVER_EXPIRES, evictionDate)) {
+					// It's the first time this row is set an eviction date...
+					Memory.this.getEvictionQueue().put(evictionDate, this);
+				}
+			}
+			
+			/**
+			 * Removes this row because of a passed eviction date.
+			 * Though this method immediately removes the row from its table, this operation
+			 * waits for any {@link Memory#storeChanges(String, String, ColumnFamilyData, Map, Map) update}
+			 * completion before returning.
+			 * No one is supposed to call this method but {@link EvictionThread}
+			 */
+			public void evict() throws InterruptedException {
+				if (! (Thread.currentThread() instanceof EvictionQueue.EvictionThread))
+					throw new IllegalAccessError("Only an eviction thread can evict a row");
+				
+				if (this.pendingWriteOperations == null)
+					return; //Already evicted
+
+				this.writeOperationUpdateLock.writeLock().lock();
+				try {
+					Table.this.map.remove(this.key, this);
+					
+					// Preparing wait on update operations completions if necessary
+					int updates = this.pendingWriteOperations.get();
+					if (updates > 0)
+						waitingForEviction = new CountDownLatch(updates);
+					this.pendingWriteOperations = null;
+				} finally {
+					this.writeOperationUpdateLock.writeLock().unlock();
+				}
+				
+				// Waiting on update completions as some are performing
+				if (this.waitingForEviction != null) {
+					this.waitingForEviction.await(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+				}
+			}
+
+			/**
+			 * Method to be called before any update to this row (i.e. it columns).
+			 * In case this methode returns false, do not change this row at it has certainly been removed from the table.
+			 * @param ttlMs the time-to-live in milliseconds expected for this row (see {@link #setEvictionDelay(long)}) ;
+			 * 		null means no ttl is to be set
+			 * @return false if this row should not be changed
+			 */
+			public boolean startUpdate(Long ttlMs) {
+				if (ttlMs != null)
+					this.setEvictionDelay(ttlMs);
+				
+				// We're not in eviction mode
+				if (evictionDate.get() == NEVER_EXPIRES)
+					return true;
+				
+				// There must be another thread running evict()
+				if (this.pendingWriteOperations == null) {
+					Thread.yield();
+					return false;
+				}
+				
+				this.writeOperationUpdateLock.readLock().lock();
+				try {
+					// There must be another thread running evict()
+					if (this.pendingWriteOperations == null) {
+						Thread.yield();
+						return false;
+					}
+					// Registering our update intent
+					this.pendingWriteOperations.incrementAndGet();
+					return true;
+				} finally {
+					this.writeOperationUpdateLock.readLock().unlock();
+				}
+			}
+
+			/**
+			 * This operation should be called after {@link #startUpdate(Long)} and updates on this row.
+			 * Not doing this after {@link #startUpdate(Long)} leads to dramatic deadlocks pretty much
+			 * like forgetting an {@link Lock#unlock()}...
+			 */
+			public void stopUpdate() {
+				// We're not in eviction mode
+				if (evictionDate.get() == NEVER_EXPIRES)
+					return;
+				
+				// No need to lock
+				assert this.pendingWriteOperations != null;
+				if (this.pendingWriteOperations != null) {
+					// Registering our update is done
+					this.pendingWriteOperations.decrementAndGet();
+				} else if (this.waitingForEviction != null) {
+					// It seems that the eviction thread was waiting for us...
+					this.waitingForEviction.countDown();
+				} else {
+					assert false : "Neither update counter nor eviction countdown while signaling update end";
+				}
 			}
 
 			/**
@@ -490,7 +647,12 @@ public class Memory implements SimpleStore {
 	 */
 	private AtomicLong nextTransactionId = new AtomicLong(Long.MIN_VALUE);
 	
-	private Memory() {}
+	/**
+	 * The expiration queue in case this memory store was set an expiring row
+	 */
+	private AtomicReference<EvictionQueue> evictionQueue = new AtomicReference<EvictionQueue>();
+	
+	public Memory() {}
 
 	@Override
 	public void start() {
@@ -562,50 +724,72 @@ public class Memory implements SimpleStore {
 			ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> incremented) {
-		long transaction = this.nextTransactionId.incrementAndGet();
+		this.storeChanges(table, id, changed, removed, incremented, null);
+	}
+
+	/**
+	 * Stores changes as for {@link #storeChanges(String, String, ColumnFamilyData, Map, Map)},
+	 * but programming an eviction as soon as a delay is passed.
+	 * @param ttlMs the time to live of the element ; TTL won't be reset by eventual operations on this element...
+	 */
+	public void storeChanges(String table, String id,
+			ColumnFamilyData changed,
+			Map<String, Set<String>> removed,
+			Map<String, Map<String, Number>> incremented,
+			Long ttlMs) {
 		
 		IllegalArgumentException x = null;
 		
-		Row r = this.getRow(table, id, true);
+		Row r;
+		do {
+			r = this.getRow(table, id, true);
+		} while (r == null || !r.startUpdate(ttlMs));
 		
-		if (changed != null)
-			for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
-				ColumnFamily f = r.get(change.getKey());
-				for (Entry<String, byte[]> value : change.getValue().entrySet()) {
-					Value<?> val = f.get(value.getKey());
-					if (val instanceof ByteValue) {
-						((ByteValue)val).setValue(value.getValue(), transaction);
-					} else {
-						x = new IllegalArgumentException("Cannot set an incrementing value " + value.getKey() + " in family " + change.getKey() + " for row " + id + " in table " + table);
-					}
-				}
-			}
+		long transaction = this.nextTransactionId.incrementAndGet();
 		
-		if (removed != null)
-			for (Entry<String, Set<String>> remove : removed.entrySet()) {
-				ColumnFamily f = r.getNoCreate(remove.getKey());
-				if (f != null) {
-					for (String qual : remove.getValue()) {
-						Value<?> val = f.getNoCreate(qual);
+		try {
+		
+			if (changed != null)
+				for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
+					ColumnFamily f = r.get(change.getKey());
+					for (Entry<String, byte[]> value : change.getValue().entrySet()) {
+						Value<?> val = f.get(value.getKey());
 						if (val instanceof ByteValue) {
-							((ByteValue)val).setValue(DELETED_VALUE, transaction);
+							((ByteValue)val).setValue(value.getValue(), transaction);
 						} else {
-							x = new IllegalArgumentException("Cannot remove an incrementing value " + qual + " in family " + remove.getKey() + " for row " + id + " in table " + table);
+							x = new IllegalArgumentException("Cannot set an incrementing value " + value.getKey() + " in family " + change.getKey() + " for row " + id + " in table " + table);
 						}
 					}
 				}
-			}
-		
-		if (incremented != null)
-			for (Entry<String, Map<String, Number>> incr : incremented.entrySet()) {
-				ColumnFamily f = r.get(incr.getKey());
-				for (Entry<String, Number> entry : incr.getValue().entrySet()) {
-					f.incr(entry.getKey(), entry.getValue());
+			
+			if (removed != null)
+				for (Entry<String, Set<String>> remove : removed.entrySet()) {
+					ColumnFamily f = r.getNoCreate(remove.getKey());
+					if (f != null) {
+						for (String qual : remove.getValue()) {
+							Value<?> val = f.getNoCreate(qual);
+							if (val instanceof ByteValue) {
+								((ByteValue)val).setValue(DELETED_VALUE, transaction);
+							} else {
+								x = new IllegalArgumentException("Cannot remove an incrementing value " + qual + " in family " + remove.getKey() + " for row " + id + " in table " + table);
+							}
+						}
+					}
 				}
-			}
-		
-		if (x != null)
-			throw x;
+			
+			if (incremented != null)
+				for (Entry<String, Map<String, Number>> incr : incremented.entrySet()) {
+					ColumnFamily f = r.get(incr.getKey());
+					for (Entry<String, Number> entry : incr.getValue().entrySet()) {
+						f.incr(entry.getKey(), entry.getValue());
+					}
+				}
+			
+			if (x != null)
+				throw x;
+		} finally {
+			r.stopUpdate();
+		}
 	}
 
 	@Override
@@ -717,6 +901,33 @@ public class Memory implements SimpleStore {
 			public void close() {
 			}
 		}; 
+	}
+	
+	/**
+	 * Adds a listener to the eviction queue.
+	 * In case the eviction queue does not exists, creates and starts it.
+	 * @param l the listener that will be notified {@link EvictionListener#rowEvicted(com.googlecode.n_orm.storeapi.Row)}
+	 * after a row is evicted.
+	 */
+	public void addEvictionListener(EvictionListener l) {
+		getEvictionQueue().addEvictionListener(l);
+	}
+	
+	/**
+	 * Returns the eviction queue ; sets it up and starts it in case it does not already exists.
+	 */
+	private EvictionQueue getEvictionQueue() {
+		EvictionQueue eq = this.evictionQueue.get();
+		if (eq == null) {
+			//It looks like the first time an eviction is set on this store...
+			EvictionQueue tmp = new EvictionQueue();
+			if (this.evictionQueue.compareAndSet(null, tmp)) {
+				//Indeed
+				tmp.start();
+				eq = tmp;
+			}
+		}
+		return eq;
 	}
 
 }
