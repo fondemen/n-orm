@@ -239,6 +239,12 @@ public class Memory implements SimpleStore {
 			 */
 			public final String key;
 			
+			/**
+			 * The next transaction number.
+			 * Should increment over time.
+			 */
+			private AtomicLong nextTransactionId = new AtomicLong(Long.MIN_VALUE);
+			
 			public Row(String key) {
 				super(false);
 				this.key = key;
@@ -484,12 +490,6 @@ public class Memory implements SimpleStore {
 		
 	};
 	
-	/**
-	 * The next transaction number.
-	 * Should increment over time.
-	 */
-	private AtomicLong nextTransactionId = new AtomicLong(Long.MIN_VALUE);
-	
 	private Memory() {}
 
 	@Override
@@ -562,11 +562,11 @@ public class Memory implements SimpleStore {
 			ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> incremented) {
-		long transaction = this.nextTransactionId.incrementAndGet();
 		
 		IllegalArgumentException x = null;
 		
 		Row r = this.getRow(table, id, true);
+		long transaction = r.nextTransactionId.incrementAndGet();
 		
 		if (changed != null)
 			for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
