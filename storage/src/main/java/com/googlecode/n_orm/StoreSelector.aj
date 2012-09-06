@@ -22,6 +22,7 @@ import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.storeapi.SimpleStore;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
+import com.googlecode.n_orm.storeapi.WriteRetensionStore;
 import com.googlecode.n_orm.StoreSelector;
 
 public aspect StoreSelector {
@@ -54,8 +55,8 @@ public aspect StoreSelector {
 	public static final String STORE_DRIVERCLASS_SINGLETON_PROPERTY = "singleton";
 	public static final String STORE_DRIVERCLASS_STATIC_ACCESSOR = "static-accessor";
 	public static final String STORE_REFERENCE = "as-for-package";
+	public static final String STORE_WRITE_RETENTION = "with-write-retention";
 
-	private Map<String, Object> locks = new TreeMap<String, Object>();
 	private Map<String, StoreProperties> classStores = new TreeMap<String, StoreProperties>();
 	private Map<String, StoreProperties> packageStores = new TreeMap<String, StoreProperties>();
 	
@@ -88,41 +89,22 @@ public aspect StoreSelector {
 		}
 	}
 	
-	private Object getLock(Class<?> clazz) {
-		return this.getLock(clazz.getName());
-	}
-	
-	private Object getLock(Package pack) {
-		return this.getLock(pack.getName());
-	}
-	
-	private synchronized Object getLock(String elementId) {
-		Object ret = this.locks.get(elementId);
-		if (ret == null) {
-			ret = new Object();
-			this.locks.put(elementId, ret);
-		}
-		return ret;
-	}
-	
 	//For test purpose
-	public Properties findProperties(Class<?> clazz) throws IOException {
+	public synchronized Properties findProperties(Class<?> clazz) throws IOException {
 		return this.findPropertiesInt(clazz).properties;
 	}
     
-    private StoreProperties findPropertiesInt(Class<?> clazz) throws IOException {
-    	synchronized (this.getLock(clazz)) {
-	    	File dir = new File(clazz.getName().replace('.', '/') /*+ ".class"*/).getParentFile();
-	    	//@ TODO: consider using thread group to find class loaders of all threads
-	    	List<ClassLoader> classloaders = Arrays.asList(ClassLoader.getSystemClassLoader(), Thread.currentThread().getContextClassLoader(), clazz.getClassLoader());
-	    	
-	    	try {
-	    		StoreProperties ret = this.findPropertiesInt(dir, classloaders);
-	    		classStores.put(clazz.getName(), ret);
-	    		return ret;
-	    	} catch (IOException x) {
-	    		throw new IOException("Cannot find storage properties for class " + clazz, x.getCause());
-	    	}
+    private synchronized StoreProperties findPropertiesInt(Class<?> clazz) throws IOException {
+    	File dir = new File(clazz.getName().replace('.', '/') /*+ ".class"*/).getParentFile();
+    	//@ TODO: consider using thread group to find class loaders of all threads
+    	List<ClassLoader> classloaders = Arrays.asList(ClassLoader.getSystemClassLoader(), Thread.currentThread().getContextClassLoader(), clazz.getClassLoader());
+    	
+    	try {
+    		StoreProperties ret = this.findPropertiesInt(dir, classloaders);
+    		classStores.put(clazz.getName(), ret);
+    		return ret;
+    	} catch (IOException x) {
+    		throw new IOException("Cannot find storage properties for class " + clazz, x.getCause());
     	}
     }
     
@@ -131,46 +113,45 @@ public aspect StoreSelector {
 			throw new IOException();
     		
 		final String pack = dir.getPath().replace('/', '.').replace('\\', '.');
-		synchronized (getLock(pack)) {
-			StoreProperties ret = packageStores.get(pack);
-    		if (ret != null) {
-    			//assert ret.pack.equals(pack) && ret.properties != null; //Actually, not in case of a STORE_REFERENCE
-    			return ret;
-    		}
-    		
-    		File f = new File(dir, PROPERTY_FILE);
-    		String path = f.getPath();
-    		//Evil windows states that \ is a separator while / is expected by getResourceAsStream
-    		if (File.separatorChar == '\\')
-    			path = path.replace('\\', '/');
-    		InputStream in = null;
-    		for (ClassLoader loader : classLoaders) {
-				in = loader.getResourceAsStream(path);
-				if (in != null) break;
-			}
+		StoreProperties ret = packageStores.get(pack);
+		if (ret != null) {
+			//assert ret.pack.equals(pack) && ret.properties != null; //Actually, not in case of a STORE_REFERENCE
+			return ret;
+		}
+		
+		File f = new File(dir, PROPERTY_FILE);
+		String path = f.getPath();
+		//Evil windows states that \ is a separator while / is expected by getResourceAsStream
+		if (File.separatorChar == '\\')
+			path = path.replace('\\', '/');
+		InputStream in = null;
+		for (ClassLoader loader : classLoaders) {
+			in = loader.getResourceAsStream(path);
+			if (in != null) break;
+		}
+			
+		if (in != null) {
+    		try {
+    	    	Properties res = new Properties();
+    			res.load(in);
     			
-    		if (in != null)
-	    		try {
-	    	    	Properties res = new Properties();
-	    			res.load(in);
-	    			
-	    			//Check whether this is a reference to another file
-	    			String ref = res.getProperty(STORE_REFERENCE);
-	    			if (ref != null) {
-	    				//Let's continue searching from the given path
-	    				dir = new File(ref.replace('.', '/').replace('\\', '/'), PROPERTY_FILE);
-	    			} else { //We found it and it's not an indirection
-		    			ret = new StoreProperties(res, pack);
-		    			packageStores.put(ret.pack, ret);
-		    			return ret;
-	    			}
-	    		} catch (IOException x) {
-	    		}
+    			//Check whether this is a reference to another file
+    			String ref = res.getProperty(STORE_REFERENCE);
+    			if (ref != null) {
+    				//Let's continue searching from the given path
+    				dir = new File(ref.replace('.', '/').replace('\\', '/'), PROPERTY_FILE);
+    			} else { //We found it and it's not an indirection
+	    			ret = new StoreProperties(res, pack);
+	    			packageStores.put(ret.pack, ret);
+	    			return ret;
+    			}
+    		} catch (IOException x) {
+    		}
 		}
 		
 		//Not found ; let's try in the package above...
 		try {
-			StoreProperties ret = this.findPropertiesInt(dir.getParentFile(), classLoaders);
+			ret = this.findPropertiesInt(dir.getParentFile(), classLoaders);
 			packageStores.put(pack, ret);
 			return ret;
 		} catch (IOException x) {
@@ -180,108 +161,105 @@ public aspect StoreSelector {
     }
     
     //For test purpose.
-    public void setPropertiesFor(Class<? extends PersistingElement> clazz, Properties properties) {
-    	synchronized (this.getLock(clazz)) {
-    		this.classStores.put(clazz.getName(), new StoreProperties(properties, clazz.getPackage().getName()));
-    	}
+    public synchronized void setPropertiesFor(Class<? extends PersistingElement> clazz, Properties properties) {
+    	this.classStores.put(clazz.getName(), new StoreProperties(properties, clazz.getPackage().getName()));
     }
     
     //For test purpose.
-    public void setPropertiesFor(Class<? extends PersistingElement> clazz, Store store) {
-    	synchronized (this.getLock(clazz)) {
-    		Properties props = new Properties();
-    		props.setProperty(STORE_DRIVERCLASS_PROPERTY, store.getClass().getName());
-    		StoreProperties sprop = new StoreProperties(new Properties(), clazz.getPackage().getName());
-    		sprop.store = store;
-    		this.classStores.put(clazz.getName(), sprop);
-    	}
+    public synchronized void setPropertiesFor(Class<? extends PersistingElement> clazz, Store store) {
+		Properties props = new Properties();
+		props.setProperty(STORE_DRIVERCLASS_PROPERTY, store.getClass().getName());
+		StoreProperties sprop = new StoreProperties(new Properties(), clazz.getPackage().getName());
+		sprop.store = store;
+		this.classStores.put(clazz.getName(), sprop);
     }
 	
 	public synchronized Store getStoreFor(Class<? extends PersistingElement> clazz) throws DatabaseNotReachedException {
-		synchronized (this.getLock(clazz)) {
-			StoreProperties ret;
-			
-			ret = classStores.get(clazz.getName());
-			if (ret != null) {
-				if (ret.store != null)
-					return ret.store;
-			} else {
-				synchronized (getLock(clazz.getPackage())) {
-					ret = packageStores.get(clazz.getPackage().getName());
-				}
-				if (ret != null && ret.store != null) {
+		StoreProperties ret;
+		
+		ret = classStores.get(clazz.getName());
+		if (ret != null) {
+			if (ret.store != null)
+				return ret.store;
+		} else {
+			ret = packageStores.get(clazz.getPackage().getName());
+			if (ret != null && ret.store != null) {
+				classStores.put(clazz.getName(), ret);
+				return ret.store;
+			}
+		}
+		
+		try {
+			if (ret == null) {
+				ret = findPropertiesInt(clazz);
+				if (ret.store != null) {
 					classStores.put(clazz.getName(), ret);
 					return ret.store;
 				}
 			}
 			
-			try {
-				if (ret == null) {
-					ret = findPropertiesInt(clazz);
-					if (ret.store != null) {
-						classStores.put(clazz.getName(), ret);
-						return ret.store;
+			assert ret.store == null && ret.properties != null;
+			Properties properties = ret.properties;
+
+			Class<?> storeClass = Class.forName(properties.getProperty(STORE_DRIVERCLASS_PROPERTY));
+			Object store;
+			if (properties.containsKey(STORE_DRIVERCLASS_STATIC_ACCESSOR)) {
+				String accessorName = properties.getProperty(STORE_DRIVERCLASS_STATIC_ACCESSOR);
+				Method accessor = null;
+				//Detecting parameters number
+				int pmnr = 0;
+				while (properties.getProperty(Integer.toString(pmnr+1)) != null)
+					pmnr++;
+				//Finding static method to invoke
+				for (Method m : storeClass.getMethods()) {
+					if (m.getName().equals(accessorName) && (m.getModifiers() & Modifier.STATIC) != 0 && m.getParameterTypes().length == pmnr) {
+						accessor = m;
+						break;
 					}
 				}
-				
-				assert ret.store == null && ret.properties != null;
-				Properties properties = ret.properties;
-	
-				Class<?> storeClass = Class.forName(properties.getProperty(STORE_DRIVERCLASS_PROPERTY));
-				Object store;
-				if (properties.containsKey(STORE_DRIVERCLASS_STATIC_ACCESSOR)) {
-					String accessorName = properties.getProperty(STORE_DRIVERCLASS_STATIC_ACCESSOR);
-					Method accessor = null;
-					//Detecting parameters number
-					int pmnr = 0;
-					while (properties.getProperty(Integer.toString(pmnr+1)) != null)
-						pmnr++;
-					//Finding static method to invoke
-					for (Method m : storeClass.getMethods()) {
-						if (m.getName().equals(accessorName) && (m.getModifiers() & Modifier.STATIC) != 0 && m.getParameterTypes().length == pmnr) {
-							accessor = m;
-							break;
-						}
-					}
-					if (accessor == null)
-						throw new IllegalArgumentException("Could not find static accessor method " + accessorName + " in class " + storeClass);
-					List<Object> args = new ArrayList<Object>(pmnr);
-					int i = 1;
-					for (Class<?> c : accessor.getParameterTypes()) {
-						String valAsString = properties.getProperty(Integer.toString(i));
-						if (valAsString == null)
-							throw new IllegalArgumentException("Missing required value " + Integer.toString(i));
-						Object val = ConvertUtils.convert(valAsString, c);
-						args.add(val);
-						i++;
-					}
-					store = accessor.invoke(null, args.toArray());
-				} else if (properties.containsKey(STORE_DRIVERCLASS_SINGLETON_PROPERTY))
-					store = PropertyManagement.getInstance().readValue(null, storeClass.getField(properties.getProperty(STORE_DRIVERCLASS_SINGLETON_PROPERTY)));
-				else
-					store = storeClass.newInstance();
-				
-				assert store != null;
-				
-				for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(store)) {
-					if (PropertyUtils.isWriteable(store, property.getName()) && properties.containsKey(property.getName())) {
-						PropertyUtils.setProperty(store, property.getName(), ConvertUtils.convert(properties.getProperty(property.getName()), property.getPropertyType()));
-					}
+				if (accessor == null)
+					throw new IllegalArgumentException("Could not find static accessor method " + accessorName + " in class " + storeClass);
+				List<Object> args = new ArrayList<Object>(pmnr);
+				int i = 1;
+				for (Class<?> c : accessor.getParameterTypes()) {
+					String valAsString = properties.getProperty(Integer.toString(i));
+					if (valAsString == null)
+						throw new IllegalArgumentException("Missing required value " + Integer.toString(i));
+					Object val = ConvertUtils.convert(valAsString, c);
+					args.add(val);
+					i++;
 				}
-				
-				if (store instanceof Store)
-					ret.store = (Store)store;
-				else if (store instanceof SimpleStore)
-					ret.store = SimpleStoreWrapper.getWrapper((SimpleStore)store);
-				else
-					throw new IllegalArgumentException("Error while getting store for class " + clazz.getName() + ": found store " + store.toString() + " of class " + store.getClass().getName() + " which is not compatible with " + Store.class.getName() + " or " + SimpleStore.class.getName());
-	
-				ret.store.start();
-				classStores.put(clazz.getName(), ret);
-				return ret.store;
-			} catch (Exception x) {
-				throw new DatabaseNotReachedException(x);
+				store = accessor.invoke(null, args.toArray());
+			} else if (properties.containsKey(STORE_DRIVERCLASS_SINGLETON_PROPERTY))
+				store = PropertyManagement.getInstance().readValue(null, storeClass.getField(properties.getProperty(STORE_DRIVERCLASS_SINGLETON_PROPERTY)));
+			else
+				store = storeClass.newInstance();
+			
+			assert store != null;
+			
+			for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(store)) {
+				if (PropertyUtils.isWriteable(store, property.getName()) && properties.containsKey(property.getName())) {
+					PropertyUtils.setProperty(store, property.getName(), ConvertUtils.convert(properties.getProperty(property.getName()), property.getPropertyType()));
+				}
 			}
+			
+			if (store instanceof Store)
+				ret.store = (Store)store;
+			else if (store instanceof SimpleStore)
+				ret.store = SimpleStoreWrapper.getWrapper((SimpleStore)store);
+			else
+				throw new IllegalArgumentException("Error while getting store for class " + clazz.getName() + ": found store " + store.toString() + " of class " + store.getClass().getName() + " which is not compatible with " + Store.class.getName() + " or " + SimpleStore.class.getName());
+
+			if (ret.properties.containsKey(STORE_WRITE_RETENTION)) {
+				String wrStr = ret.properties.getProperty(STORE_WRITE_RETENTION);
+				ret.store = new WriteRetensionStore(Long.parseLong(wrStr), ret.store);
+			}
+			
+			classStores.put(clazz.getName(), ret);
+			ret.store.start();
+			return ret.store;
+		} catch (Exception x) {
+			throw new DatabaseNotReachedException(x);
 		}
 	}
 }

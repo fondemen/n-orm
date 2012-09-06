@@ -30,6 +30,7 @@ import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
+import com.googlecode.n_orm.storeapi.DelegatingStore;
 
 /**
  * Makes it possible to look for elements of a given class from/to different
@@ -503,7 +504,7 @@ public aspect FederatedTableManagement {
 	
 	// Generic pointcut to state where things have to be woven
 	pointcut inNOrm(): 
-		within(com.googlecode.n_orm..*) && !within(*..*Test) && !within(FederatedTableManagement);
+		within(com.googlecode.n_orm..*) && !within(*..*Test) && !within(FederatedTableManagement) && !within(DelegatingStore+);
 
 	// ===================================
 	// element-level operations
