@@ -453,7 +453,7 @@ public aspect FederatedTableManagement {
 			this.checkTablePostfixHasNotChanged();
 			return false;
 		}
-
+		String computedPostfix = this.getTablePostfix();
 		Consistency consistencyLevel = this.getFederatedMode().getConsistency(
 				mode);
 
@@ -465,7 +465,7 @@ public aspect FederatedTableManagement {
 			Set<String> testedPostfixes = new HashSet<String>();
 
 			// First trying with expected table
-			if (this.testTableLocation(mainTable, this.getTablePostfix(), id,
+			if (this.testTableLocation(mainTable, computedPostfix, id,
 					testedPostfixes, store))
 				return true;
 
@@ -492,7 +492,7 @@ public aspect FederatedTableManagement {
 
 		// Still not found ; setting postfix to computed value
 		// Only registering in case we are sure table exists (or about to)
-		this.setTablePostfix(this.getTablePostfix(), mode.isRead() ? null
+		this.setTablePostfix(computedPostfix, mode.isRead() ? null
 				: store);
 		return false;
 	}
