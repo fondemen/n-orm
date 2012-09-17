@@ -7,10 +7,12 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -20,16 +22,24 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.beanutils.ConvertUtils;
 import org.apache.commons.beanutils.PropertyUtils;
+import org.apache.commons.beanutils.converters.DateConverter;
+import org.apache.commons.beanutils.converters.DateTimeConverter;
 
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.consoleannotations.Trigger;
+import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class ShellProcessor
 {
-	private static Set<Method> additionalMethods;
+	private static Set<Method> additionalMethods, keyMethods;
 	
 	static {
+		DateTimeConverter converter = new DateConverter();
+		converter.setPatterns(new String[] {"yyyy-MM-dd_HH:mm:ss.SSS", "dow mon dd hh:mm:ss zzz yyyy"});
+		converter.setLocale(Locale.getDefault());
+		ConvertUtils.register(converter, Date.class);
+		
 		additionalMethods = new HashSet<Method>();
 		try {
 			additionalMethods.add(Object.class.getMethod("equals", Object.class));
@@ -44,6 +54,17 @@ public class ShellProcessor
 			additionalMethods.add(Iterator.class.getMethod("hasNext"));
 			additionalMethods.add(Iterator.class.getMethod("next"));
 			additionalMethods.add(Closeable.class.getMethod("close"));
+			additionalMethods.add(List.class.getMethod("get", int.class));
+		} catch (SecurityException e) {
+			e.printStackTrace();
+		} catch (NoSuchMethodException e) {
+			e.printStackTrace();
+		}
+		
+		keyMethods = new HashSet<Method>();
+		try {
+			keyMethods.add(SearchableClassConstraintBuilder.class.getMethod("withKey", String.class));
+			keyMethods.add(SearchableClassConstraintBuilder.class.getMethod("andWithKey", String.class));
 		} catch (SecurityException e) {
 			e.printStackTrace();
 		} catch (NoSuchMethodException e) {
@@ -59,6 +80,10 @@ public class ShellProcessor
 			this.element = element;
 			this.command = command;
 		}
+	}
+	
+	static boolean isKeyMethod(Method m) {
+		return keyMethods.contains(m);
 	}
 		
 	// Fields
