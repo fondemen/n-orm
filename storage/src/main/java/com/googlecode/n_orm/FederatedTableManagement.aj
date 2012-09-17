@@ -90,16 +90,6 @@ public aspect FederatedTableManagement {
 	 * {@link SearchableClassConstraintBuilder#go() grabbing} elements from a
 	 * class.
 	 */
-	public static int getParallelglobalsearch() {
-		return ParallelGlobalSearch;
-	}
-
-	/**
-	 * The maximum number of threads to be used while performing global actions
-	 * like a {@link SearchableClassConstraintBuilder#count() counting} or
-	 * {@link SearchableClassConstraintBuilder#go() grabbing} elements from a
-	 * class.
-	 */
 	public static int getParallelGlobalSearch() {
 		return ParallelGlobalSearch;
 	}
@@ -342,6 +332,37 @@ public aspect FederatedTableManagement {
 		return this.getTable() + this.tablePostfix;
 	}
 
+	private transient FederatedMode PersistingElementOverFederatedTable.federatedMode = null;
+
+	/**
+	 * The federated mode for this persisting element.
+	 */
+	public FederatedMode PersistingElementOverFederatedTable.getFederatedMode() {
+		if (this.federatedMode == null) {
+			this.federatedMode = this.getClass()
+					.getAnnotation(Persisting.class).federated();
+		}
+		return this.federatedMode;
+	}
+
+	/**
+	 * Overloads the federated mode for this specific element. You cannot set
+	 * the federated mode to {@link FederatedMode#NONE}. This method has only an
+	 * impact before actual postfix for the element is found, i.e. before any
+	 * operation such as {@link PersistingElement#store()} or
+	 * {@link PersistingElement#activate(String...)} is called.
+	 * 
+	 * @throws IllegalArgumentException
+	 *             if mode is set to {@link FederatedMode#NONE}.
+	 */
+	public void PersistingElementOverFederatedTable.setFederatedMode(
+			FederatedMode mode) {
+		if (FederatedMode.NONE.equals(mode))
+			throw new IllegalArgumentException("Cannot set federated mode to "
+					+ mode + " on " + this);
+		this.federatedMode = mode;
+	}
+
 	/**
 	 * The list of tables where to find this object from what we can guess in
 	 * order of probability.
@@ -400,8 +421,7 @@ public aspect FederatedTableManagement {
 	 * @see FederatedMode#isCheckForChangingPostfix()
 	 */
 	private void PersistingElementOverFederatedTable.checkTablePostfixHasNotChanged() {
-		FederatedMode fm = this.getClass().getAnnotation(Persisting.class)
-				.federated();
+		FederatedMode fm = this.getFederatedMode();
 		if (this.tablePostfix != null && fm.isCheckForChangingPostfix()) {
 			// Let's check whether a new computation for table postfix changes
 			// its value...
@@ -434,10 +454,9 @@ public aspect FederatedTableManagement {
 			this.checkTablePostfixHasNotChanged();
 			return false;
 		}
-
-		Consistency consistencyLevel = this.getClass()
-				.getAnnotation(Persisting.class).federated()
-				.getConsistency(mode);
+		String computedPostfix = this.getTablePostfix();
+		Consistency consistencyLevel = this.getFederatedMode().getConsistency(
+				mode);
 
 		Store store = this.getStore();
 
@@ -447,7 +466,7 @@ public aspect FederatedTableManagement {
 			Set<String> testedPostfixes = new HashSet<String>();
 
 			// First trying with expected table
-			if (this.testTableLocation(mainTable, this.getTablePostfix(), id,
+			if (this.testTableLocation(mainTable, computedPostfix, id,
 					testedPostfixes, store))
 				return true;
 
@@ -474,7 +493,7 @@ public aspect FederatedTableManagement {
 
 		// Still not found ; setting postfix to computed value
 		// Only registering in case we are sure table exists (or about to)
-		this.setTablePostfix(this.getTablePostfix(), mode.isRead() ? null
+		this.setTablePostfix(computedPostfix, mode.isRead() ? null
 				: store);
 		return false;
 	}
@@ -501,7 +520,7 @@ public aspect FederatedTableManagement {
 		String ret = proceed();
 		return ret == null ? "" : ret;
 	}
-	
+
 	// Generic pointcut to state where things have to be woven
 	pointcut inNOrm(): 
 		within(com.googlecode.n_orm..*) && !within(*..*Test) && !within(FederatedTableManagement) && !within(DelegatingStore+);
@@ -629,6 +648,14 @@ public aspect FederatedTableManagement {
 	// global-level operations
 	// ===================================
 
+	private static boolean isFederated(Class<? extends PersistingElement> clazz) {
+		return clazz != null
+				&& PersistingElementOverFederatedTable.class
+						.isAssignableFrom(clazz)
+				&& clazz.getAnnotation(Persisting.class).federated()
+						.isFederated();
+	}
+
 	private static abstract class GlobalAction<T> {
 
 		/**
@@ -716,8 +743,9 @@ public aspect FederatedTableManagement {
 		&& inNOrm()
 		&& target(store)
 		&& args(meta, table, c) {
-		Class<? extends PersistingElement> clazz = meta == null ? null : meta.getClazzNoCheck();
-		if (clazz == null || !clazz.getAnnotation(Persisting.class).federated().isFederated()) {
+		Class<? extends PersistingElement> clazz = meta == null ? null : meta
+				.getClazzNoCheck();
+		if (!isFederated(clazz)) {
 			return proceed(meta, table, c, store);
 		}
 
@@ -1022,8 +1050,9 @@ public aspect FederatedTableManagement {
 		&& inNOrm()
 		&& target(store)
 		&& args(meta, table, c, limit, families) {
-		Class<? extends PersistingElement> clazz = meta == null ? null : meta.getClazzNoCheck();
-		if (clazz == null || !clazz.getAnnotation(Persisting.class).federated().isFederated()) {
+		Class<? extends PersistingElement> clazz = meta == null ? null : meta
+				.getClazzNoCheck();
+		if (!isFederated(clazz)) {
 			return proceed(meta, table, c, limit, families, store);
 		}
 
@@ -1067,16 +1096,18 @@ public aspect FederatedTableManagement {
 	}
 
 	// Remote process
-	void around(final MetaInformation meta, final String table, final Constraint c,
-			final Set<String> families, final Class<? extends PersistingElement> element,
-			final Process<? extends PersistingElement> action, final Callback callback,
-			final ActionnableStore store):
+	void around(final MetaInformation meta, final String table,
+			final Constraint c, final Set<String> families,
+			final Class<? extends PersistingElement> element,
+			final Process<? extends PersistingElement> action,
+			final Callback callback, final ActionnableStore store):
 		call(void ActionnableStore.process(MetaInformation, String, Constraint, Set<String>, Class, Process, Callback))
 		&& inNOrm()
 		&& target(store)
 		&& args(meta, table, c, families, element, action, callback) {
-		Class<? extends PersistingElement> clazz = meta == null ? null : meta.getClazzNoCheck();
-		if (clazz == null || !clazz.getAnnotation(Persisting.class).federated().isFederated()) {
+		Class<? extends PersistingElement> clazz = meta == null ? null : meta
+				.getClazzNoCheck();
+		if (!isFederated(clazz)) {
 			proceed(meta, table, c, families, element, action, callback, store);
 			return;
 		}
@@ -1086,7 +1117,9 @@ public aspect FederatedTableManagement {
 			@SuppressWarnings("unchecked")
 			@Override
 			protected Void localRun(String mainTable, String postfix) {
-				store.process(new MetaInformation(meta).withPostfixedTable(mainTable, postfix), mainTable+postfix, c, families, element, (Process<PersistingElement>)action, callback);
+				store.process(new MetaInformation(meta).withPostfixedTable(
+						mainTable, postfix), mainTable + postfix, c, families,
+						element, (Process<PersistingElement>) action, callback);
 				return null;
 			}
 
