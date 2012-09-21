@@ -8,7 +8,7 @@ class StringConverter extends SimpleConverter<String> {
 	}
 
 	@Override
-	public String getDefaultValue() {
+	public String getDefaultValue(Class<?> type) {
 		return null;
 	}
 
