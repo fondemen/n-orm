@@ -9,7 +9,7 @@ class DateConverter extends SimpleConverter<Date> {
 	}
 
 	@Override
-	public Date getDefaultValue() {
+	public Date getDefaultValue(Class<?> type) {
 		return null;
 	}
 

@@ -11,7 +11,7 @@ class PersistingConverter extends Converter<PersistingElement> {
 	}
 
 	@Override
-	public PersistingElement getDefaultValue() {
+	public PersistingElement getDefaultValue(Class<?> type) {
 		return null;
 	}
 
