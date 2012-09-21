@@ -54,7 +54,7 @@ abstract class Converter<T> implements
 				.compareTo(rhs.getClazz().getName());
 	}
 
-	public abstract T getDefaultValue();
+	public abstract T getDefaultValue(Class<?> type);
 
 	public Object fromStringReverted(String rep, Class<?> type) {
 		throw new UnreversibleTypeException(type);
