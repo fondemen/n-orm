@@ -41,6 +41,7 @@ public class SimpleStorageTest {
 		public int[] intsProp; 
 		public transient String tProp1;
 		@Transient public String tProp2;
+		public Long LongProp;
 
 		public SimpleElement(String key1, String[] key2) {
 			super();
@@ -487,5 +488,31 @@ public class SimpleStorageTest {
 	public void activationAfterStore() {
 		sut1.activateIfNotAlready();
 		hadNoQuery();
+	}
+	
+	@Test
+	public void activateLongNullValue() {
+		SimpleElement sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.delete();
+		sut.activate();
+		assertNull(sut.LongProp);
+	}
+	
+	@Test
+	public void storeLongNonNUllAndThenNullValue() {
+		SimpleElement sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		sut.LongProp = 1L;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		assertEquals(Long.valueOf(1L), sut.LongProp);
+		sut.LongProp = null;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		assertNull(sut.LongProp);
 	}
 }
