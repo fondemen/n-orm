@@ -37,7 +37,32 @@ public class WriteRetentionStore extends DelegatingStore {
 	private static final Map<Integer, Set<WriteRetentionStore>> knownStores = new HashMap<Integer, Set<WriteRetentionStore>>();
 	
 	// One should find the same WriteRetentionStore given a write retention time and a target store
+	/**
+	 * Returns a {@link WriteRetentionStore} with s as {@link DelegatingStore#getActualStore() delegate} ;
+	 * in case s is already a {@link WriteRetentionStore} with a different {@link #getWriteRetentionMs()},
+	 * return another {@link WriteRetentionStore} with same {@link DelegatingStore#getActualStore() delegate}
+	 * as s.
+	 * @param writeRetentionMs time during which updates are retended to delegate store
+	 * @param s the actual store, or a {@link WriteRetentionStore} with delegating to the actual store
+	 * @throws IllegalArgumentException if s is a delegation chain that contains a {@link WriteRetentionStore}
+	 */
 	public static WriteRetentionStore getWriteRetentionStore(long writeRetentionMs, Store s) {
+		
+		if (s instanceof WriteRetentionStore) {
+			if (((WriteRetentionStore)s).getWriteRetentionMs() == writeRetentionMs)
+				return (WriteRetentionStore) s;
+			
+			s = ((WriteRetentionStore)s).getActualStore();
+		}
+		
+		//Checking whether a WriteRetentionStore exists in the delegating chain
+		Store schk = s;
+		while (schk instanceof DelegatingStore) {
+			if (schk instanceof WriteRetentionStore)
+				throw new IllegalArgumentException(s.toString() + " is already a write-retention store as it already delegates to " + schk + " ; cannot create write-retention store above it");
+			schk = ((DelegatingStore)schk).getActualStore();
+		}
+		
 		Set<WriteRetentionStore> res;
 		// Return candidate if not exists
 		WriteRetentionStore ret = new WriteRetentionStore(writeRetentionMs, s);
@@ -666,6 +691,18 @@ public class WriteRetentionStore extends DelegatingStore {
 		this.writeRetentionMs = writeRetentionMs;
 		this.writeQueue = new DelayQueue<StoreRequest>();
 		this.writesByRows = new ConcurrentHashMap<RowInTable, StoreRequest>();
+	}
+
+	/**
+	 * Minimum time in ms during which and update (i.e. a
+	 * {@link Store#storeChanges(MetaInformation, String, String, ColumnFamilyData, Map, Map)
+	 * store} or a {@link Store#delete(MetaInformation, String, String) delete})
+	 * are retained before being sent to the {@link #getActualStore() actual
+	 * store}. During this time, updates are merged to dramatically reduce
+	 * number of updates on a same row.
+	 */
+	public long getWriteRetentionMs() {
+		return writeRetentionMs;
 	}
 
 	@Override
