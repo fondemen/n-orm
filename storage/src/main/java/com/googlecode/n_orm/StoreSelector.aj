@@ -19,10 +19,10 @@ import org.apache.commons.beanutils.PropertyUtils;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.cache.write.WriteRetentionStore;
 import com.googlecode.n_orm.storeapi.SimpleStore;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
-import com.googlecode.n_orm.storeapi.WriteRetensionStore;
 import com.googlecode.n_orm.StoreSelector;
 
 public aspect StoreSelector {
@@ -280,7 +280,7 @@ public aspect StoreSelector {
 
 				if (ret.properties.containsKey(STORE_WRITE_RETENTION)) {
 					String wrStr = ret.properties.getProperty(STORE_WRITE_RETENTION);
-					ret.store = new WriteRetensionStore(Long.parseLong(wrStr), ret.store);
+					ret.store = WriteRetentionStore.getWriteRetentionStore(Long.parseLong(wrStr), ret.store);
 				}
 				
 				ret.store.start();

@@ -179,7 +179,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * </code><br>
 	 * <br>
 	 * <code>Element elt = new Element("key").getCachedVersion();</code>
-	 * @see com.googlecode.n_orm.cache.Cache
+	 * @see com.googlecode.n_orm.cache.perthread.Cache
 	 */
 	PersistingElement getCachedVersion();
 	
