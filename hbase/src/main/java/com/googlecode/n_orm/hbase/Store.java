@@ -75,7 +75,7 @@ import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
-import com.googlecode.n_orm.cache.Cache;
+import com.googlecode.n_orm.cache.perthread.Cache;
 import com.googlecode.n_orm.hbase.PropertyUtils.HBaseProperty;
 import com.googlecode.n_orm.hbase.PropertyUtils.HColumnFamilyProperty;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
