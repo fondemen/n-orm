@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.cache;
+package com.googlecode.n_orm.cache.perthread;
 
 import static org.junit.Assert.*;
 
@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import com.googlecode.n_orm.BookStore;
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.cache.perthread.Cache;
 
 public class CacheTest {
 	
