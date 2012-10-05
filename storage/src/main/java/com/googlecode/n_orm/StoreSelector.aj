@@ -212,6 +212,7 @@ public aspect StoreSelector {
 					ret = packageStores.get(clazz.getPackage().getName());
 				}
 				if (ret != null && ret.store != null) {
+					ret = checkForRetention(ret, clazz);
 					classStores.put(clazz.getName(), ret);
 					return ret.store;
 				}
@@ -221,6 +222,7 @@ public aspect StoreSelector {
 				if (ret == null) {
 					ret = findPropertiesInt(clazz);
 					if (ret.store != null) {
+						ret = checkForRetention(ret, clazz);
 						classStores.put(clazz.getName(), ret);
 						return ret.store;
 					}
@@ -282,6 +284,8 @@ public aspect StoreSelector {
 					String wrStr = ret.properties.getProperty(STORE_WRITE_RETENTION);
 					ret.store = WriteRetentionStore.getWriteRetentionStore(Long.parseLong(wrStr), ret.store);
 				}
+
+				ret = checkForRetention(ret, clazz);
 				
 				ret.store.start();
 				classStores.put(clazz.getName(), ret);
@@ -290,5 +294,17 @@ public aspect StoreSelector {
 				throw new DatabaseNotReachedException(x);
 			}
 		}
+	}
+	
+	private StoreProperties checkForRetention(StoreProperties sp,
+			Class<? extends PersistingElement> clazz) {
+		assert sp.store != null;
+		Persisting pa = clazz.getAnnotation(Persisting.class);
+		if (pa.writeRetentionMs() > 0) {
+			StoreProperties ret = new StoreProperties(sp.properties, sp.pack);
+			ret.store = WriteRetentionStore.getWriteRetentionStore(pa.writeRetentionMs(), sp.store);
+			return ret;
+		} else
+			return sp;
 	}
 }

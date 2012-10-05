@@ -12,6 +12,7 @@ import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.cache.write.WriteRetentionStore;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.cf.SetColumnFamily;
@@ -110,6 +111,18 @@ public @interface Persisting {
 	String table() default "";
 
 	/**
+	 * The time updates to the data store should be retained before they are
+	 * sent. In case this number is 0 or below, no retention is applied. This
+	 * parameter is helpful when a row is quite often updated. Note that
+	 * activations are not aware of non-sent updates, (e.g. an
+	 * {@link PersistingElement#activate(Object[])} will not see new values for
+	 * at least duration indicated by this parameter).
+	 * 
+	 * @see WriteRetentionStore
+	 */
+	long writeRetentionMs() default 0;
+
+	/**
 	 * States whether key values should be stored in the property column family.
 	 * The normal case is that keys are encoded in identifier of the instances.
 	 */
@@ -118,7 +131,9 @@ public @interface Persisting {
 	/**
 	 * States whether values (properties and column families) should also be
 	 * stored in superclasses. The normal case is not as information is stored
-	 * in the table for the instance's class already.
+	 * in the table for the instance's class already. This option is helpful if
+	 * you plan to create queries on superclasses that should also activate
+	 * properties.
 	 */
 	boolean storeAlsoInSuperClasses() default false;
 
