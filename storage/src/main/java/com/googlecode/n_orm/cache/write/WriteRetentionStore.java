@@ -1,5 +1,6 @@
-package com.googlecode.n_orm.storeapi;
+package com.googlecode.n_orm.cache.write;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -16,6 +17,7 @@ import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -23,10 +25,49 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.Transient;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.DelegatingStore;
+import com.googlecode.n_orm.storeapi.MetaInformation;
+import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
-public class WriteRetensionStore extends DelegatingStore {
+public class WriteRetentionStore extends DelegatingStore {
 	private static final byte[] DELETED_VALUE = new byte[0];
+	
+	private static final Map<Integer, Set<WriteRetentionStore>> knownStores = new HashMap<Integer, Set<WriteRetentionStore>>();
+	
+	// One should find the same WriteRetentionStore given a write retention time and a target store
+	public static WriteRetentionStore getWriteRetentionStore(long writeRetentionMs, Store s) {
+		Set<WriteRetentionStore> res;
+		// Return candidate if not exists
+		WriteRetentionStore ret = new WriteRetentionStore(writeRetentionMs, s);
+		int h = ret.hashCode();
+		
+		// Getting existing stores for this hash
+		synchronized(knownStores) {
+			res = knownStores.get(h);
+			
+			// No known store for this hash
+			if (res == null) {
+				res = new TreeSet<WriteRetentionStore>();
+				knownStores.put(h, res);
+			}
+		}
+		
+		// Getting proper store from the set of known stores
+		// or referencing the candidate if not found
+		synchronized(res) {
+			// Checking for existing store for this hash
+			for (WriteRetentionStore kwrs : res) {
+				if (kwrs.equals(ret))
+					return kwrs;
+			}
+			
+			// No store found ; referencing and then returning ret
+			res.add(ret);
+			return ret;
+		}
+	}
 
 	private static class RequestIsOutException extends Exception {
 		private static final long serialVersionUID = 4904072123077338091L;
@@ -38,6 +79,8 @@ public class WriteRetensionStore extends DelegatingStore {
 
 		public RowInTable(String table, String id) {
 			super();
+			if (id == null || table == null)
+				throw new IllegalArgumentException();
 			this.table = table;
 			this.id = id;
 			this.h = this.computeHashCode();
@@ -51,8 +94,8 @@ public class WriteRetensionStore extends DelegatingStore {
 		private int computeHashCode() {
 			final int prime = 31;
 			int result = 1;
-			result = prime * result + ((id == null) ? 0 : id.hashCode());
-			result = prime * result + ((table == null) ? 0 : table.hashCode());
+			result = prime * result + id.hashCode();
+			result = prime * result + table.hashCode();
 			return result;
 		}
 
@@ -67,15 +110,9 @@ public class WriteRetensionStore extends DelegatingStore {
 			RowInTable other = (RowInTable) obj;
 			if (h != other.h)
 				return false;
-			if (id == null) {
-				if (other.id != null)
-					return false;
-			} else if (!id.equals(other.id))
+			if (!id.equals(other.id))
 				return false;
-			if (table == null) {
-				if (other.table != null)
-					return false;
-			} else if (!table.equals(other.table))
+			if (!table.equals(other.table))
 				return false;
 			return true;
 		}
@@ -119,23 +156,21 @@ public class WriteRetensionStore extends DelegatingStore {
 		private final String rowId;
 		/**
 		 * A map storing request data according to transaction number. Column
-		 * can be a {@link byte[]}, a {@link WriteRetensionStore#DELETED_VALUE
+		 * can be a {@link byte[]}, a {@link WriteRetentionStore#DELETED_VALUE
 		 * delete marker}, or a {@link Number}. If {@link byte[]} or
-		 * {@link WriteRetensionStore#DELETED_VALUE delete marker}, only latest
+		 * {@link WriteRetentionStore#DELETED_VALUE delete marker}, only latest
 		 * value is valid; if {@link Number}, datum corresponds to an increment
 		 * an all values for all transaction should be summed to get the actual
 		 * increment.
 		 */
 		private final ConcurrentMap<
-				String /* family */,
-				ConcurrentMap<
-					String /* column */,
-					ConcurrentNavigableMap<
-						Long /* transaction id */,
-						Object /* byte[] || Long (increment) || DELETED_VALUE */
-					>
-				>
-			> elements;
+			String /* family */,
+			ConcurrentMap<
+				String /* column */,
+				ConcurrentNavigableMap<
+					Long /* transaction id */,
+					Object /* byte[] || Long (increment) || DELETED_VALUE */
+		>>> elements;
 
 		private StoreRequest(long outDateNanos, String table, String rowId) {
 			super();
@@ -213,84 +248,91 @@ public class WriteRetensionStore extends DelegatingStore {
 				addMeta(meta);
 
 				// Adding changes
-				for (Entry<String, Map<String, byte[]>> famChanges : changed
-						.entrySet()) {
-					ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>> famData = this
-							.getFamilyData(famChanges.getKey());
-					for (Entry<String, byte[]> colChange : famChanges
-							.getValue().entrySet()) {
-						ConcurrentNavigableMap<Long, Object> columnData = this
-								.getColumnData(famChanges.getKey(), famData,
-										colChange.getKey());
-						Object old = columnData.put(transactionId,
-								colChange.getValue());
-						// There must not have a previous put for the same
-						// transaction
-						assert old == null;
-						if (columnData.size() > 1) {
-							// Other transaction already added some data in ;
-							// removing the oldest one to avoid memory
-							// consumption
-							// Not removing more as concurrent polls can happen
-							// here
-							Entry<Long, Object> r = columnData.pollFirstEntry();
-							// Removed element must belong to an older
-							// transaction
-							assert r == null
-									|| r.getKey().longValue() < transactionId;
-							// Removed element must be raw data (i.e. not a
-							// number
-							// from an increment)
-							assert r == null || r.getValue() instanceof byte[];
+				if (changed != null) {
+					for (Entry<String, Map<String, byte[]>> famChanges : changed
+							.entrySet()) {
+						ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>> famData = this
+								.getFamilyData(famChanges.getKey());
+						for (Entry<String, byte[]> colChange : famChanges
+								.getValue().entrySet()) {
+							ConcurrentNavigableMap<Long, Object> columnData = this
+									.getColumnData(famChanges.getKey(),
+											famData, colChange.getKey());
+							Object old = columnData.put(transactionId,
+									colChange.getValue());
+							// There must not have a previous put for the same transaction
+							assert old == null;
+							if (columnData.size() > 2) {
+								// Other transaction already added some data in ;
+								// removing the oldest one to avoid memory consumption
+								// Not removing more as concurrent polls can happen here
+								Entry<Long, Object> r = columnData
+										.pollFirstEntry();
+//								// Removed element must belong to an older transaction
+								// Actually we cannot check that as the current transaction
+								// might be removed by a newer one !
+//								assert r == null
+//										|| r.getKey().longValue() < transactionId;
+								// Column data must not be left empty
+								assert !columnData.isEmpty();
+								// Removed element must be raw data (i.e. not a number from an increment)
+								assert r == null
+										|| r.getValue() instanceof byte[];
+							}
 						}
 					}
 				}
 
 				// Adding increments
-				for (Entry<String, Map<String, Number>> famincrements : increments
-						.entrySet()) {
-					ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>> famData = this
-							.getFamilyData(famincrements.getKey());
-					for (Entry<String, Number> colIncrements : famincrements
-							.getValue().entrySet()) {
-						ConcurrentNavigableMap<Long, Object> columnData = this
-								.getColumnData(famincrements.getKey(), famData,
-										colIncrements.getKey());
-						Object old = columnData.put(transactionId,
-								colIncrements.getValue());
-						// There must not have a previous put for the same
-						// transaction
-						assert old == null;
-						// Not removing older entries as the actual output is
-						// the sum of the values for the different transactions
+				if (increments != null) {
+					for (Entry<String, Map<String, Number>> famincrements : increments
+							.entrySet()) {
+						ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>> famData = this
+								.getFamilyData(famincrements.getKey());
+						for (Entry<String, Number> colIncrements : famincrements
+								.getValue().entrySet()) {
+							ConcurrentNavigableMap<Long, Object> columnData = this
+									.getColumnData(famincrements.getKey(),
+											famData, colIncrements.getKey());
+							Object old = columnData.put(transactionId,
+									colIncrements.getValue());
+							// There must not have a previous put for the same transaction
+							assert old == null;
+							// Not removing older entries as the actual output is
+							// the sum of the values for the different transactions
+						}
 					}
 				}
 
 				// Adding deletion markers
-				for (Entry<String, Set<String>> famRemoves : removed.entrySet()) {
-					ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>> famData = this
-							.getFamilyData(famRemoves.getKey());
-					for (String colRemoved : famRemoves.getValue()) {
-						ConcurrentNavigableMap<Long, Object> columnData = this
-								.getColumnData(famRemoves.getKey(), famData,
-										colRemoved);
-						Object old = columnData.put(transactionId,
-								DELETED_VALUE);
-						// There must not have a previous put for the same
-						// transaction
-						assert old == null;
-						// There might be an inconsistency in input parameters
-						if (columnData.size() > 1 && old != null) {
-							// Other transaction already added some data in ;
-							// removing the oldest one to avoid memory
-							// consumption
-							// Not removing more as concurrent polls can happen
-							// here
-							Entry<Long, Object> r = columnData.pollFirstEntry();
-							// Removed element must belong to an older
-							// transaction
-							assert r == null
-									|| r.getKey().longValue() < transactionId;
+				if (removed != null) {
+					for (Entry<String, Set<String>> famRemoves : removed
+							.entrySet()) {
+						ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>> famData = this
+								.getFamilyData(famRemoves.getKey());
+						for (String colRemoved : famRemoves.getValue()) {
+							ConcurrentNavigableMap<Long, Object> columnData = this
+									.getColumnData(famRemoves.getKey(),
+											famData, colRemoved);
+							Object old = columnData.put(transactionId,
+									DELETED_VALUE);
+							// There must not have a previous put for the same transaction
+							assert old == null;
+							// There might be an inconsistency in input parameters
+							if (columnData.size() > 2 && old != null) {
+								// Other transaction already added some data in ;
+								// removing the oldest one to avoid memory consumption
+								// Not removing more as concurrent polls can happen here
+								Entry<Long, Object> r = columnData
+										.pollFirstEntry();
+//								// Removed element must belong to an older transaction
+								// Actually we cannot check that as the current transaction
+								// might be removed by a newer one !
+//								assert r == null
+//										|| r.getKey().longValue() < transactionId;
+								// Column data must not be left empty
+								assert !columnData.isEmpty();
+							}
 						}
 					}
 				}
@@ -408,14 +450,17 @@ public class WriteRetensionStore extends DelegatingStore {
 				final AtomicInteger counter) {
 			counter.incrementAndGet();
 			this.sendLock.writeLock().lock();
+			long lastTransaction;
 			try {
 				this.sent = true;
 				// Immediately letting other threads know that it's over
+				lastTransaction = transactionDistributor.get();
 			} finally {
 				this.sendLock.writeLock().unlock();
 			}
+			// After this line, this request cannot be changed by any thread !
 
-			Long lastDeletion = this.deletions.last();
+			Long lastDeletion = this.deletions.isEmpty() ? null : this.deletions.last();
 
 			long lastStore = Long.MIN_VALUE;
 
@@ -466,7 +511,7 @@ public class WriteRetensionStore extends DelegatingStore {
 								if (val == DELETED_VALUE)
 									sum = 0;
 								else
-									sum += ((Number)val).longValue();
+									sum += ((Number) val).longValue();
 							}
 
 							Map<String, Number> incCols = increments
@@ -480,6 +525,10 @@ public class WriteRetensionStore extends DelegatingStore {
 					}
 				}
 			}
+
+			// Checking that no other thread has indeed made another request
+			// meanwhile
+			assert lastTransaction == this.transactionDistributor.get() : "A request about to be sent has changed !";
 
 			// Sending using the executor
 			// Checking whether it's a store or a delete
@@ -553,7 +602,7 @@ public class WriteRetensionStore extends DelegatingStore {
 							it.next()
 									.send(getActualStore(),
 											sender,
-											WriteRetensionStore.this.requestsBeingSending);
+											WriteRetentionStore.this.requestsBeingSending);
 							it.remove();
 						}
 
@@ -581,7 +630,7 @@ public class WriteRetensionStore extends DelegatingStore {
 					StoreRequest r = writeQueue.take();
 					writesByRows.remove(new RowInTable(r.table, r.rowId));
 					r.send(getActualStore(), this.sender,
-							WriteRetensionStore.this.requestsBeingSending);
+							WriteRetentionStore.this.requestsBeingSending);
 				} catch (InterruptedException e) {
 				}
 			}
@@ -592,32 +641,39 @@ public class WriteRetensionStore extends DelegatingStore {
 	private abstract static class Operation {
 		public abstract void run(StoreRequest req) throws RequestIsOutException;
 	}
+	
+	
+	
+	//Whether this store was already started
+	private AtomicBoolean started = new AtomicBoolean(false);
 
 	// Time before request is sent
-	private long writeRetensionMs;
+	private long writeRetentionMs;
 
 	// Waiting queue
 	private final DelayQueue<StoreRequest> writeQueue;
 	// Index for requests according to the row
 	@Transient
 	private final ConcurrentMap<RowInTable, StoreRequest> writesByRows;
-	
-	private volatile boolean stopped = false;
-	
-	//Number of requests currently being sending
-	private final AtomicInteger requestsBeingSending = new AtomicInteger();
 
-	public WriteRetensionStore(long writeRetensionMs, Store s) {
+	private volatile boolean stopped = false;
+
+	// Number of requests currently being sending
+	private final AtomicInteger requestsBeingSending = new AtomicInteger();
+	
+	private WriteRetentionStore(long writeRetentionMs, Store s) {
 		super(s);
-		this.writeRetensionMs = writeRetensionMs;
+		this.writeRetentionMs = writeRetentionMs;
 		this.writeQueue = new DelayQueue<StoreRequest>();
 		this.writesByRows = new ConcurrentHashMap<RowInTable, StoreRequest>();
 	}
 
 	@Override
 	public void start() throws DatabaseNotReachedException {
-		new EvictionThread().start();
-		super.start();
+		if (started.compareAndSet(false, true)) {
+			new EvictionThread().start();
+			super.start();
+		}
 	}
 
 	@Override
@@ -673,11 +729,11 @@ public class WriteRetensionStore extends DelegatingStore {
 		RowInTable element = new RowInTable(table, id);
 		boolean tbd;
 		do {
-			StoreRequest req = this.writesByRows.get(element);
+			StoreRequest req = null;//this.writesByRows.get(element);
 			if (req == null) {
-				req = new StoreRequest(System.nanoTime()
-						+ TimeUnit.NANOSECONDS.convert(this.writeRetensionMs,
-								TimeUnit.MILLISECONDS), table, id);
+				req = new StoreRequest(
+						TimeUnit.NANOSECONDS.convert(this.writeRetentionMs,
+								TimeUnit.MILLISECONDS) + System.nanoTime(), table, id);
 				StoreRequest tmp = this.writesByRows.putIfAbsent(element, req);
 				if (tmp == null) {
 					// req was added ; should also be put in the delay queue
@@ -689,17 +745,11 @@ public class WriteRetensionStore extends DelegatingStore {
 			}
 			try {
 				r.run(req);
-				//Request is planned and merged ; leaving the infinite loop
+				// Request is planned and merged ; leaving the infinite loop
 				tbd = false;
 			} catch (RequestIsOutException x) {
-				// We've tried to update a request that went out meanwhile ;
-				// retrying
-				// req should not be part anymore of known requests
-				this.writesByRows.remove(element, req);
-				//Let's be sure that we don't send again the same request
-				this.writeQueue.remove(req);
-				
-				//Failed to plan request ; retrying eventually
+				// We've tried to update a request that went out meanwhile
+				// retrying eventually
 				tbd = true;
 				Thread.yield();
 			}
@@ -711,5 +761,31 @@ public class WriteRetensionStore extends DelegatingStore {
 	 */
 	public int getPendingRequests() {
 		return this.writeQueue.size() + requestsBeingSending.get();
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + this.getActualStore().hashCode();
+		result = prime * result
+				+ (int) (writeRetentionMs ^ (writeRetentionMs >>> 32));
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		WriteRetentionStore other = (WriteRetentionStore) obj;
+		if (writeRetentionMs != other.writeRetentionMs)
+			return false;
+		if (!this.getActualStore().equals(other.getActualStore()))
+			return false;
+		return true;
 	}
 }
