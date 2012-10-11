@@ -452,22 +452,40 @@ public class WriteRetentionTest {
 		assertArrayEquals(changedValue2, store.get(null, table, rowId, changedCf, changedKey));
 	}
 	
-	@Test
+	@Test(timeout=5000)
 	public void continuousWrite() {
 		WriteRetentionStore sut = sut50;
 		
 		long start = System.currentTimeMillis();
+		long askedQueries = 0;
+		long sentQueries = 0;
 		
 		do {
 			sut.storeChanges(null, table, rowId, aChange, null, null);
+			askedQueries++;
 		} while(System.currentTimeMillis()-start < 80);
-		assertEquals(1, Memory.INSTANCE.getQueriesAndReset()); // the only store query
+		int memQueries = 0;
+		//Waiting for a query to be sent
+		while((memQueries = Memory.INSTANCE.getQueriesAndReset()) == 0) {
+			sut.storeChanges(null, table, rowId, aChange, null, null);
+			askedQueries++;
+			Thread.yield();
+		}
+		sentQueries += memQueries;
+		// Checking correct values are stored
 		assertArrayEquals(changedValue1, store.get(null, table, rowId, changedCf, changedKey));
 		do {
 			sut.storeChanges(null, table, rowId, anotherChange, null, null);
+			askedQueries++;
 		} while(System.currentTimeMillis()-start < 140);
 		this.waitForPendingRequests();
+		long duration = System.currentTimeMillis()-start;
+		sentQueries += Memory.INSTANCE.getQueriesAndReset();
+		
+		assertTrue(sentQueries < askedQueries);
+		assertTrue(sentQueries <= (1+(duration/50)));
 		assertArrayEquals(changedValue2, store.get(null, table, rowId, changedCf, changedKey));
+		//System.out.println("sent " + sentQueries + "(expected " + (1+(duration/50)) + ") ; asked " + askedQueries);
 	}
 	
 	@Test(timeout=10000)
@@ -561,5 +579,6 @@ public class WriteRetentionTest {
 		assertTrue(q > 0);
 		assertEquals(duration/50, q, 2);
 		assertEquals(Long.valueOf(parallelWrites), ConversionTools.convert(Long.class, Memory.INSTANCE.get(table, rowId, incrementedCf, incrementedKey)));
+		//System.out.println("sent: " + q +" (expected " + (duration/50) + ") ; asked " + parallelWrites);
 	}
 }
