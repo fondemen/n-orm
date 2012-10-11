@@ -3,14 +3,17 @@ package com.googlecode.n_orm.cache.write;
 import static org.junit.Assert.*;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
@@ -18,8 +21,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.hamcrest.Matcher;
 import org.junit.After;
@@ -37,6 +43,206 @@ import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
 import com.googlecode.n_orm.storeapi.Store;
 
 public class WriteRetentionTest {
+	
+	private static class FixedThreadPool implements ExecutorService {
+		private final int threadNumber;
+		private final AtomicInteger remainingSubmittableThreads;
+		private final ConcurrentHashMap<Thread, Future<?>> threads = new ConcurrentHashMap<Thread, Future<?>>();
+		private volatile boolean done = false;
+		private final CountDownLatch starterLatch;
+		
+		public FixedThreadPool(int threadNumber) {
+			super();
+			this.threadNumber = threadNumber;
+			this.remainingSubmittableThreads = new AtomicInteger(threadNumber);
+			starterLatch = new CountDownLatch(threadNumber);
+		}
+
+		@Override
+		public void execute(Runnable command) {
+			this.submit(command);
+		}
+
+		@Override
+		public void shutdown() {
+			this.done = true;
+		}
+
+		@Override
+		public List<Runnable> shutdownNow() {
+			this.done = true;
+			List<Runnable> ret = new LinkedList<Runnable>();
+			for (Thread t : this.threads.keySet()) {
+				if (t.isAlive() && !t.isInterrupted())
+					t.interrupt();
+				ret.add(t);
+			}
+			return ret;
+		}
+
+		@Override
+		public boolean isShutdown() {
+			return ! done;
+		}
+
+		@Override
+		public boolean isTerminated() {
+			return this.threads.isEmpty();
+		}
+
+		@Override
+		public boolean awaitTermination(long timeout, TimeUnit unit)
+				throws InterruptedException {
+			return false;
+		}
+
+		@Override
+		public <T> Future<T> submit(final Callable<T> task) {
+			if (this.done)
+				throw new RuntimeException("Cannot submit another task");
+			final int submissionNumber = this.remainingSubmittableThreads.decrementAndGet();
+			if (submissionNumber < 0)
+				throw new RuntimeException("Cannot submit another task");
+			if (this.done)
+				throw new RuntimeException("Cannot submit another task");
+			final AtomicReference<T> res = new AtomicReference<T>();
+			final AtomicReference<Exception> ex = new AtomicReference<Exception>();
+			final AtomicBoolean done = new AtomicBoolean(false);
+			final AtomicBoolean canceled = new AtomicBoolean(false);
+			final Thread t = new Thread(new Runnable() {
+				
+				@Override
+				public void run() {
+					try {
+						if (canceled.get())
+							return;
+						starterLatch.countDown();
+						if (canceled.get())
+							return;
+						starterLatch.await();
+						if (canceled.get())
+							return;
+						res.compareAndSet(null, task.call());
+					} catch (Exception e) {
+						ex.compareAndSet(null, e);
+					} finally {
+						synchronized(done) {
+							done.compareAndSet(false, true);
+							done.notifyAll();
+						}
+						threads.remove(Thread.currentThread());
+					}
+				}
+			});
+			Future<T> ret = new Future<T>() {
+
+				@Override
+				public boolean cancel(boolean mayInterruptIfRunning) {
+					if (!canceled.compareAndSet(false, true))
+						return false;
+					
+					if (mayInterruptIfRunning && t.isAlive())
+						t.interrupt();
+					
+					return true;
+				}
+
+				@Override
+				public boolean isCancelled() {
+					return canceled.get();
+				}
+
+				@Override
+				public boolean isDone() {
+					return done.get() || FixedThreadPool.this.done;
+				}
+
+				@Override
+				public T get() throws InterruptedException, ExecutionException {
+					if (done.get() == false) {
+						synchronized(done) {
+							if (done.get() == false) {
+								done.wait();
+							}
+						}
+					}
+					if (ex.get() != null)
+						throw new ExecutionException(ex.get());
+					
+					return res.get();
+				}
+
+				@Override
+				public T get(long timeout, TimeUnit unit)
+						throws InterruptedException, ExecutionException,
+						TimeoutException {
+					if (done.get() == false) {
+						synchronized(done) {
+							if (done.get() == false) {
+								done.wait(TimeUnit.MILLISECONDS.convert(timeout, unit));
+							}
+						}
+					}
+					if (ex.get() != null)
+						throw new ExecutionException(ex.get());
+					
+					return res.get();
+				}
+			};
+			t.start();
+			this.threads.putIfAbsent(t, ret);
+			return ret;
+		}
+
+		@Override
+		public <T> Future<T> submit(final Runnable task, final T result) {
+			return this.submit(new Callable<T>() {
+
+				@Override
+				public T call() throws Exception {
+					task.run();
+					return result;
+				}
+			});
+		}
+
+		@Override
+		public Future<?> submit(Runnable task) {
+			return this.submit(task, null);
+		}
+
+		@Override
+		public <T> List<Future<T>> invokeAll(
+				Collection<? extends Callable<T>> tasks)
+				throws InterruptedException {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public <T> List<Future<T>> invokeAll(
+				Collection<? extends Callable<T>> tasks, long timeout,
+				TimeUnit unit) throws InterruptedException {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
+				throws InterruptedException, ExecutionException {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public <T> T invokeAny(Collection<? extends Callable<T>> tasks,
+				long timeout, TimeUnit unit) throws InterruptedException,
+				ExecutionException, TimeoutException {
+			// TODO Auto-generated method stub
+			return null;
+		}
+		
+	}
 
 	private static final String table = "testtable";
 	private static final String rowId = "testrow";
@@ -111,28 +317,18 @@ public class WriteRetentionTest {
 	@Test
 	public void getAlwaysSameRetensionStore() throws InterruptedException, ExecutionException {
 		final int parallelGets = 100;
-		final Object wait = new Object();
 		final Store s = Mockito.mock(Store.class);
-		final CountDownLatch waitForAllTasksToBeStarted = new CountDownLatch(parallelGets);
 		Callable<WriteRetentionStore> getWRS = new Callable<WriteRetentionStore>() {
 
 			@Override
 			public WriteRetentionStore call() throws Exception {
-				waitForAllTasksToBeStarted.countDown();
-				synchronized(wait) {
-					wait.wait();
-				}
 				return WriteRetentionStore.getWriteRetentionStore(1234, s);
 			}
 		};
-		ExecutorService es = Executors.newCachedThreadPool();
+		ExecutorService es = new FixedThreadPool(parallelGets);
 		Collection<Future<WriteRetentionStore>> results = new LinkedList<Future<WriteRetentionStore>>();
 		for (int i = 0; i < parallelGets; i++) {
 			results.add(es.submit(getWRS));
-		}
-		waitForAllTasksToBeStarted.await();
-		synchronized(wait) {
-			wait.notifyAll();
 		}
 		es.shutdown();
 		WriteRetentionStore found = null;
@@ -279,8 +475,6 @@ public class WriteRetentionTest {
 		final WriteRetentionStore sut = sut50Mock;
 		int parallelWrites = 200;
 
-		final Object wait = new Object();
-		final CountDownLatch waitForAllTasksToBeStarted = new CountDownLatch(parallelWrites);
 		final CountDownLatch changing = new CountDownLatch(parallelWrites);
 		final AtomicLong start = new AtomicLong();
 		
@@ -288,19 +482,13 @@ public class WriteRetentionTest {
 			
 			@Override
 			public void run() {
-				waitForAllTasksToBeStarted.countDown();
-				synchronized(wait) {
-					try {
-						wait.wait();
-					} catch (InterruptedException e) {
-						throw new RuntimeException(e);
-					}
-				}
+				
+				start.compareAndSet(0, System.currentTimeMillis());
 				
 				//Writing during at least 50ms so that a request is out
-				do {
+				while (System.currentTimeMillis()-start.get() < 50) {
 					sut.storeChanges(null, table, rowId, aChange, null, null);
-				} while (System.currentTimeMillis()-start.get() < 50);
+				}
 				
 				changing.countDown();
 				try {
@@ -320,17 +508,11 @@ public class WriteRetentionTest {
 		InOrder inOrder = Mockito.inOrder(mockStore);
 
 		Collection<Future<?>> results = new LinkedList<Future<?>>();
-		ExecutorService es = Executors.newCachedThreadPool();
+		ExecutorService es = new FixedThreadPool(parallelWrites);
 		for (int i = 0; i < parallelWrites; i++) {
 			results.add(es.submit(wr));
 		}
 		es.shutdown();
-		waitForAllTasksToBeStarted.await();
-		
-		synchronized(wait) {
-			wait.notifyAll();
-			start.set(System.currentTimeMillis());
-		}
 		
 		//Waiting for results and checking exceptions
 		for (Future<?> f : results) {
@@ -349,39 +531,23 @@ public class WriteRetentionTest {
 	public void parrallelIncrements() throws Exception {
 		final WriteRetentionStore sut = sut50;
 		int parallelWrites = 200;
+		final AtomicLong start = new AtomicLong();
 		
-		final Object wait = new Object();
-		final CountDownLatch waitForAllTasksToBeStarted = new CountDownLatch(parallelWrites);
 		Runnable r = new Runnable() {
 			
 			@Override
 			public void run() {
-				waitForAllTasksToBeStarted.countDown();
-				synchronized(wait) {
-					try {
-						wait.wait();
-					} catch (InterruptedException e) {
-						throw new RuntimeException(e);
-					}
-
-					sut.storeChanges(null, table, rowId, null, null, anIncrement);
-				}
+				start.compareAndSet(0, System.currentTimeMillis());
+				sut.storeChanges(null, table, rowId, null, null, anIncrement);
 			}
 		};
 
 		Collection<Future<?>> results = new LinkedList<Future<?>>();
-		ExecutorService es = Executors.newCachedThreadPool();
+		ExecutorService es =  new FixedThreadPool(parallelWrites);
 		for (int i = 0; i < parallelWrites; i++) {
 			results.add(es.submit(r));
 		}
 		es.shutdown();
-		waitForAllTasksToBeStarted.await();
-		
-		long start;
-		synchronized(wait) {
-			wait.notifyAll();
-			start = System.currentTimeMillis();
-		}
 		
 		//Waiting for results and checking exceptions
 		for (Future<?> f : results) {
@@ -389,7 +555,7 @@ public class WriteRetentionTest {
 		}
 		
 		this.waitForPendingRequests();
-		long duration = System.currentTimeMillis()-start;
+		long duration = System.currentTimeMillis()-start.get();
 		
 		int q = Memory.INSTANCE.getQueriesAndReset();
 		assertTrue(q > 0);

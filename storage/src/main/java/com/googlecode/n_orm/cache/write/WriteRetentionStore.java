@@ -1,7 +1,9 @@
 package com.googlecode.n_orm.cache.write;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -34,7 +36,7 @@ import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 public class WriteRetentionStore extends DelegatingStore {
 	private static final byte[] DELETED_VALUE = new byte[0];
 	
-	private static final Map<Integer, Set<WriteRetentionStore>> knownStores = new HashMap<Integer, Set<WriteRetentionStore>>();
+	private static final Map<Integer, Collection<WriteRetentionStore>> knownStores = new HashMap<Integer, Collection<WriteRetentionStore>>();
 	
 	// One should find the same WriteRetentionStore given a write retention time and a target store
 	/**
@@ -63,7 +65,7 @@ public class WriteRetentionStore extends DelegatingStore {
 			schk = ((DelegatingStore)schk).getActualStore();
 		}
 		
-		Set<WriteRetentionStore> res;
+		Collection<WriteRetentionStore> res;
 		// Return candidate if not exists
 		WriteRetentionStore ret = new WriteRetentionStore(writeRetentionMs, s);
 		int h = ret.hashCode();
@@ -74,7 +76,7 @@ public class WriteRetentionStore extends DelegatingStore {
 			
 			// No known store for this hash
 			if (res == null) {
-				res = new TreeSet<WriteRetentionStore>();
+				res = new LinkedList<WriteRetentionStore>();
 				knownStores.put(h, res);
 			}
 		}
