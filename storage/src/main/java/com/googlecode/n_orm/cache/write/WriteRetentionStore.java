@@ -23,6 +23,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -295,7 +297,7 @@ public class WriteRetentionStore extends DelegatingStore {
 			long transactionId = this.startUpdate();
 			try {
 				addMeta(meta);
-
+				
 				// Adding changes
 				if (changed != null) {
 					for (Entry<String, Map<String, byte[]>> famChanges : changed
@@ -310,24 +312,10 @@ public class WriteRetentionStore extends DelegatingStore {
 							Object old = columnData.put(transactionId,
 									colChange.getValue());
 							// There must not have a previous put for the same transaction
-							assert old == null;
-							if (columnData.size() > 2) {
-								// Other transaction already added some data in ;
-								// removing the oldest one to avoid memory consumption
-								// Not removing more as concurrent polls can happen here
-								Entry<Long, Object> r = columnData
-										.pollFirstEntry();
-//								// Removed element must belong to an older transaction
-								// Actually we cannot check that as the current transaction
-								// might be removed by a newer one !
-//								assert r == null
-//										|| r.getKey().longValue() < transactionId;
-								// Column data must not be left empty
-								assert !columnData.isEmpty();
-								// Removed element must be raw data (i.e. not a number from an increment)
-								assert r == null
-										|| r.getValue() instanceof byte[];
-							}
+							assert old == null;		
+							
+							// Cleaning up memory for overridden values
+							columnData.headMap(transactionId, false).clear();
 						}
 					}
 				}
@@ -347,8 +335,6 @@ public class WriteRetentionStore extends DelegatingStore {
 									colIncrements.getValue());
 							// There must not have a previous put for the same transaction
 							assert old == null;
-							// Not removing older entries as the actual output is
-							// the sum of the values for the different transactions
 						}
 					}
 				}
@@ -367,21 +353,9 @@ public class WriteRetentionStore extends DelegatingStore {
 									DELETED_VALUE);
 							// There must not have a previous put for the same transaction
 							assert old == null;
-							// There might be an inconsistency in input parameters
-							if (columnData.size() > 2 && old != null) {
-								// Other transaction already added some data in ;
-								// removing the oldest one to avoid memory consumption
-								// Not removing more as concurrent polls can happen here
-								/*Entry<Long, Object> r =*/ columnData
-										.pollFirstEntry();
-//								// Removed element must belong to an older transaction
-								// Actually we cannot check that as the current transaction
-								// might be removed by a newer one !
-//								assert r == null
-//										|| r.getKey().longValue() < transactionId;
-								// Column data must not be left empty
-								assert !columnData.isEmpty();
-							}
+							
+							// Cleaning up memory for overridden values
+							columnData.headMap(transactionId, false).clear();
 						}
 					}
 				}
@@ -440,31 +414,7 @@ public class WriteRetentionStore extends DelegatingStore {
 			}
 			return ret;
 		}
-
-		/**
-		 * Cleans up data a little bit data before this transaction in order to
-		 * free memory if transaction can be divided by 10.
-		 */
-		private void cleanup(long transaction) {
-			if (transaction % 10 == 0) {
-				for (Entry<String, ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>>> famData : this.elements
-						.entrySet()) {
-					for (Entry<String, ConcurrentNavigableMap<Long, Object>> colData : famData
-							.getValue().entrySet()) {
-						Iterator<Long> it = colData.getValue().keySet()
-								.iterator();
-						while (it.hasNext()) {
-							long dataTransaction = it.next();
-							if (dataTransaction < transaction)
-								it.remove();
-							else
-								break;
-						}
-					}
-				}
-			}
-		}
-
+		
 		@Override
 		public int compareTo(Delayed d) {
 			if (this == d)
