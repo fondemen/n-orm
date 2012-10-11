@@ -196,7 +196,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		/**
 		 * When this element was deleted last.
 		 */
-		private ConcurrentSkipListSet<Long> deletions = new ConcurrentSkipListSet<Long>();
+		@Transient private ConcurrentSkipListSet<Long> deletions = new ConcurrentSkipListSet<Long>();
 		
 		private final Store store;
 		private final AtomicReference<MetaInformation> meta;
@@ -211,7 +211,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * an all values for all transaction should be summed to get the actual
 		 * increment.
 		 */
-		private final ConcurrentMap<
+		@Transient private final ConcurrentMap<
 			String /* family */,
 			ConcurrentMap<
 				String /* column */,
@@ -270,7 +270,7 @@ public class WriteRetentionStore extends DelegatingStore {
 			long transaction = this.startUpdate();
 			try {
 				this.deletions.add(transaction);
-				if (this.deletions.size() > 1) {
+				if (this.deletions.size() > 2) {
 					this.deletions.pollFirst();
 				}
 
@@ -488,8 +488,6 @@ public class WriteRetentionStore extends DelegatingStore {
 		/**
 		 * Sending this request. Waits for current updates to be done.
 		 * 
-		 * @param store
-		 *            the store to which send the request
 		 * @param sender
 		 *            the executor for sending the request
 		 * @param counter
@@ -582,11 +580,20 @@ public class WriteRetentionStore extends DelegatingStore {
 			// Sending using the executor
 			// Checking whether it's a store or a delete
 			if (lastDeletion == null || lastDeletion < lastStore) {
+				
+				// A delete resets all columns ;
+				// cannot simulate that just using a store
+				final boolean shouldDelete = lastDeletion != null;
+				
 				sender.execute(new Runnable() {
 
 					@Override
 					public void run() {
 						try {
+							// Deleting all cells if necessary
+							if (shouldDelete)
+								StoreRequest.this.store.delete(meta.get(), table, rowId);
+							
 							StoreRequest.this.store.storeChanges(meta.get(), table, rowId,
 									changes, removed, increments);
 						} catch (RuntimeException x) {
