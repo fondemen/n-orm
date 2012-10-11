@@ -36,6 +36,19 @@ import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 public class WriteRetentionStore extends DelegatingStore {
 	private static final byte[] DELETED_VALUE = new byte[0];
 	
+	// Waiting queue
+	private static final DelayQueue<StoreRequest> writeQueue = new DelayQueue<StoreRequest>();
+	// Index for requests according to the row
+	@Transient
+	private static final ConcurrentMap<RowInTable, StoreRequest> writesByRows = new ConcurrentHashMap<RowInTable, StoreRequest>();
+
+	// Number of requests currently being sending
+	private static final AtomicInteger requestsBeingSending = new AtomicInteger();
+	
+	// Whether we are being stopping (JVM shutdown)
+	private static volatile boolean stopped = false;
+	
+	// Known stores
 	private static final Map<Integer, Collection<WriteRetentionStore>> knownStores = new HashMap<Integer, Collection<WriteRetentionStore>>();
 	
 	// One should find the same WriteRetentionStore given a write retention time and a target store
@@ -94,6 +107,13 @@ public class WriteRetentionStore extends DelegatingStore {
 			res.add(ret);
 			return ret;
 		}
+	}
+
+	/**
+	 * The approximate number of pending write requests.
+	 */
+	public static int getPendingRequests() {
+		return writeQueue.size() + requestsBeingSending.get();
 	}
 
 	private static class RequestIsOutException extends Exception {
@@ -177,7 +197,8 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * When this element was deleted last.
 		 */
 		private ConcurrentSkipListSet<Long> deletions = new ConcurrentSkipListSet<Long>();
-
+		
+		private final Store store;
 		private final AtomicReference<MetaInformation> meta;
 		private final String table;
 		private final String rowId;
@@ -199,8 +220,9 @@ public class WriteRetentionStore extends DelegatingStore {
 					Object /* byte[] || Long (increment) || DELETED_VALUE */
 		>>> elements;
 
-		private StoreRequest(long outDateNanos, String table, String rowId) {
+		private StoreRequest(Store actualStore, long outDateNanos, String table, String rowId) {
 			super();
+			this.store = actualStore;
 			this.outDateNanos = outDateNanos;
 			this.meta = new AtomicReference<MetaInformation>();
 			this.table = table;
@@ -350,7 +372,7 @@ public class WriteRetentionStore extends DelegatingStore {
 								// Other transaction already added some data in ;
 								// removing the oldest one to avoid memory consumption
 								// Not removing more as concurrent polls can happen here
-								Entry<Long, Object> r = columnData
+								/*Entry<Long, Object> r =*/ columnData
 										.pollFirstEntry();
 //								// Removed element must belong to an older transaction
 								// Actually we cannot check that as the current transaction
@@ -473,7 +495,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * @param counter
 		 *            a counter to be decremented when the request is sent
 		 */
-		public void send(final Store store, ExecutorService sender,
+		public void send(ExecutorService sender,
 				final AtomicInteger counter) {
 			counter.incrementAndGet();
 			this.sendLock.writeLock().lock();
@@ -565,7 +587,7 @@ public class WriteRetentionStore extends DelegatingStore {
 					@Override
 					public void run() {
 						try {
-							store.storeChanges(meta.get(), table, rowId,
+							StoreRequest.this.store.storeChanges(meta.get(), table, rowId,
 									changes, removed, increments);
 						} catch (RuntimeException x) {
 							x.printStackTrace();
@@ -581,7 +603,7 @@ public class WriteRetentionStore extends DelegatingStore {
 					@Override
 					public void run() {
 						try {
-							store.delete(meta.get(), table, rowId);
+							StoreRequest.this.store.delete(meta.get(), table, rowId);
 						} catch (RuntimeException x) {
 							x.printStackTrace();
 							throw x;
@@ -595,7 +617,7 @@ public class WriteRetentionStore extends DelegatingStore {
 
 	}
 
-	private class EvictionThread extends Thread {
+	private static class EvictionThread extends Thread {
 		private final ExecutorService sender = Executors.newCachedThreadPool();
 
 		private volatile boolean alreadyStarted = false;
@@ -627,9 +649,8 @@ public class WriteRetentionStore extends DelegatingStore {
 						Iterator<StoreRequest> it = writeQueue.iterator();
 						while (it.hasNext()) {
 							it.next()
-									.send(getActualStore(),
-											sender,
-											WriteRetentionStore.this.requestsBeingSending);
+									.send(	sender,
+											requestsBeingSending);
 							it.remove();
 						}
 
@@ -656,8 +677,7 @@ public class WriteRetentionStore extends DelegatingStore {
 				try {
 					StoreRequest r = writeQueue.take();
 					writesByRows.remove(new RowInTable(r.table, r.rowId));
-					r.send(getActualStore(), this.sender,
-							WriteRetentionStore.this.requestsBeingSending);
+					r.send(this.sender, requestsBeingSending);
 				} catch (InterruptedException e) {
 				}
 			}
@@ -669,30 +689,19 @@ public class WriteRetentionStore extends DelegatingStore {
 		public abstract void run(StoreRequest req) throws RequestIsOutException;
 	}
 	
-	
+	static {
+		new EvictionThread().start();
+	}
 	
 	//Whether this store was already started
 	private AtomicBoolean started = new AtomicBoolean(false);
 
 	// Time before request is sent
 	private long writeRetentionMs;
-
-	// Waiting queue
-	private final DelayQueue<StoreRequest> writeQueue;
-	// Index for requests according to the row
-	@Transient
-	private final ConcurrentMap<RowInTable, StoreRequest> writesByRows;
-
-	private volatile boolean stopped = false;
-
-	// Number of requests currently being sending
-	private final AtomicInteger requestsBeingSending = new AtomicInteger();
 	
 	private WriteRetentionStore(long writeRetentionMs, Store s) {
 		super(s);
 		this.writeRetentionMs = writeRetentionMs;
-		this.writeQueue = new DelayQueue<StoreRequest>();
-		this.writesByRows = new ConcurrentHashMap<RowInTable, StoreRequest>();
 	}
 
 	/**
@@ -710,7 +719,6 @@ public class WriteRetentionStore extends DelegatingStore {
 	@Override
 	public void start() throws DatabaseNotReachedException {
 		if (started.compareAndSet(false, true)) {
-			new EvictionThread().start();
 			super.start();
 		}
 	}
@@ -771,12 +779,14 @@ public class WriteRetentionStore extends DelegatingStore {
 			StoreRequest req = null;//this.writesByRows.get(element);
 			if (req == null) {
 				req = new StoreRequest(
+						this.getActualStore(),
 						TimeUnit.NANOSECONDS.convert(this.writeRetentionMs,
-								TimeUnit.MILLISECONDS) + System.nanoTime(), table, id);
-				StoreRequest tmp = this.writesByRows.putIfAbsent(element, req);
+								TimeUnit.MILLISECONDS) + System.nanoTime(),
+						table, id);
+				StoreRequest tmp = writesByRows.putIfAbsent(element, req);
 				if (tmp == null) {
 					// req was added ; should also be put in the delay queue
-					this.writeQueue.put(req);
+					writeQueue.put(req);
 				} else {
 					// Another thread added request for this element before us
 					req = tmp;
@@ -793,13 +803,6 @@ public class WriteRetentionStore extends DelegatingStore {
 				Thread.yield();
 			}
 		} while (tbd);
-	}
-
-	/**
-	 * The approximate number of pending write requests.
-	 */
-	public int getPendingRequests() {
-		return this.writeQueue.size() + requestsBeingSending.get();
 	}
 
 	@Override
