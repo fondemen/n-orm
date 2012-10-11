@@ -6,7 +6,6 @@
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>hbase</artifactId>
 	<name>HBase driver for n-orm</name>
 	<version>hbase-${hbase.version}-n-orm-${project.parent.version}</version>
