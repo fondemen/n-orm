@@ -414,7 +414,7 @@ public class WriteRetentionTest {
 		assertFalse(store.exists(null, table, rowId));
 		assertEquals(2, Memory.INSTANCE.getQueriesAndReset()); // 2 exists ; no delete
 		Thread.sleep(90);
-		assertTrue(Memory.INSTANCE.hadAQuery()); // the store query
+		assertEquals(2, Memory.INSTANCE.getQueriesAndReset()); // the delete followed by the store query
 		assertTrue(store.exists(null, table, rowId));
 		assertArrayEquals(changedValue2, store.get(null, table, rowId, changedCf, changedKey));
 	}
@@ -450,6 +450,21 @@ public class WriteRetentionTest {
 		assertTrue(Memory.INSTANCE.hadAQuery()); // the store query
 		assertTrue(store.exists(null, table, rowId));
 		assertArrayEquals(changedValue2, store.get(null, table, rowId, changedCf, changedKey));
+	}
+	
+	@Test
+	public void deleteAndChangeExisting() throws InterruptedException {
+		WriteRetentionStore sut = sut50;
+
+		Memory.INSTANCE.storeChanges(table, rowId, aChange, null, null);
+		Memory.INSTANCE.resetQueries();
+		sut.delete(null, table, rowId);
+		sut.storeChanges(null, table, rowId, null, null, anIncrement);
+		Thread.sleep(90);
+		//assertTrue(Memory.INSTANCE.hadAQuery()); // the store query
+		assertTrue(store.exists(null, table, rowId));
+		assertArrayEquals(ConversionTools.convert(1L), store.get(null, table, rowId, incrementedCf, incrementedKey));
+		assertNull(store.get(null, table, rowId, changedCf, changedKey));
 	}
 	
 	@Test(timeout=5000)
