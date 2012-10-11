@@ -21,7 +21,7 @@ import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory;
 import com.googlecode.n_orm.mocked.ElementInFederatedMockedStore;
-import com.googlecode.n_orm.mocked.MockedStoreTest;
+import com.googlecode.n_orm.mocked.MockedStore;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
