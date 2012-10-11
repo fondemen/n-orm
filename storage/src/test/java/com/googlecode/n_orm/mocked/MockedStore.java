@@ -15,8 +15,8 @@ import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
-public class MockedStoreTest implements ActionnableStore{
-	public static final MockedStoreTest INSTANCE = new MockedStoreTest();
+public class MockedStore implements ActionnableStore{
+	public static final MockedStore INSTANCE = new MockedStore();
 	
 	private final ActionnableStore mock = Mockito.mock(ActionnableStore.class);
 
