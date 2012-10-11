@@ -271,13 +271,17 @@ public class WriteRetentionStore extends DelegatingStore {
 		public void delete(MetaInformation meta) throws RequestIsOutException {
 			long transaction = this.startUpdate();
 			try {
-				this.deletions.add(transaction);
-				if (this.deletions.size() > 2) {
-					this.deletions.pollFirst();
-				}
-
 				this.addMeta(meta);
+				
+				this.deletions.add(transaction);
 
+				// Cleaning up memory
+				this.deletions.headSet(transaction, false).clear();
+				for (Entry<String, ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>>> fam : this.elements.entrySet()) {
+					for (Entry<String, ConcurrentNavigableMap<Long, Object>> col : fam.getValue().entrySet()) {
+						col.getValue().headMap(transaction, false).clear();
+					}
+				}
 			} finally {
 				this.doneUpdate();
 			}
@@ -471,6 +475,9 @@ public class WriteRetentionStore extends DelegatingStore {
 						.getValue().entrySet()) {
 					Entry<Long, Object> lastEntry = colData.getValue()
 							.lastEntry();
+					// There can be no entry in case of a row delete after a column update
+					if (lastEntry == null)
+						continue;
 					Long transaction = lastEntry.getKey();
 					lastStore = Math.max(lastStore, transaction);
 					// Considering only those values after last deletion
