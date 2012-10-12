@@ -38,12 +38,13 @@ import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 public class WriteRetentionStore extends DelegatingStore {
 	private static final byte[] DELETED_VALUE = new byte[0];
 	
-	// Waiting queue
+	// Event queue
 	private static final DelayQueue<StoreRequest> writeQueue = new DelayQueue<StoreRequest>();
+	
 	// Index for requests according to the row
 	@Transient
 	private static final ConcurrentMap<RowInTable, StoreRequest> writesByRows = new ConcurrentHashMap<RowInTable, StoreRequest>();
-
+	
 	// Number of requests currently being sending
 	private static final AtomicInteger requestsBeingSending = new AtomicInteger();
 	
@@ -640,9 +641,13 @@ public class WriteRetentionStore extends DelegatingStore {
 			while (this.running) {
 				try {
 					StoreRequest r = writeQueue.take();
-					writesByRows.remove(new RowInTable(r.table, r.rowId));
+					StoreRequest s = writesByRows.remove(new RowInTable(r.table, r.rowId));
+					assert r == s;
 					r.send(this.sender, requestsBeingSending);
 				} catch (InterruptedException e) {
+				} catch (Throwable e) {
+					System.err.println("Problem while sending request out of write cache");
+					e.printStackTrace();
 				}
 			}
 		}
@@ -738,9 +743,8 @@ public class WriteRetentionStore extends DelegatingStore {
 	 */
 	private void runLater(String table, String id, Operation r) {
 		RowInTable element = new RowInTable(table, id);
-		boolean tbd;
-		do {
-			StoreRequest req = null;//this.writesByRows.get(element);
+		while(true) {
+			StoreRequest req = this.writesByRows.get(element);
 			if (req == null) {
 				req = new StoreRequest(
 						this.getActualStore(),
@@ -751,6 +755,7 @@ public class WriteRetentionStore extends DelegatingStore {
 				if (tmp == null) {
 					// req was added ; should also be put in the delay queue
 					writeQueue.put(req);
+					//System.out.println("Request planned for " + table + ':' + id + " on " + System.currentTimeMillis() + " by " + req);
 				} else {
 					// Another thread added request for this element before us
 					req = tmp;
@@ -759,14 +764,13 @@ public class WriteRetentionStore extends DelegatingStore {
 			try {
 				r.run(req);
 				// Request is planned and merged ; leaving the infinite loop
-				tbd = false;
+				break;
 			} catch (RequestIsOutException x) {
 				// We've tried to update a request that went out meanwhile
-				// retrying eventually
-				tbd = true;
-				Thread.yield();
 			}
-		} while (tbd);
+			// retrying eventually
+			Thread.yield();
+		}
 	}
 
 	@Override

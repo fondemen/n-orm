@@ -519,13 +519,13 @@ public class WriteRetentionTest {
 				start.compareAndSet(0, System.currentTimeMillis());
 				
 				//Writing during at least 50ms so that a request is out
-				while (System.currentTimeMillis()-start.get() < 50) {
+				while (System.currentTimeMillis()-start.get() < 60) {
 					sut.storeChanges(null, table, rowId, aChange, null, null);
 				}
 				
 				changing.countDown();
 				try {
-					changing.await(500, TimeUnit.MILLISECONDS);
+					changing.await();
 				} catch (InterruptedException e) {
 					throw new RuntimeException(e);
 				}
@@ -551,7 +551,9 @@ public class WriteRetentionTest {
 		for (Future<?> f : results) {
 			f.get();
 		}
-		
+
+		this.waitForPendingRequests();
+		Thread.yield();
 		this.waitForPendingRequests();
 		
 		//Checking sent requests
@@ -592,8 +594,8 @@ public class WriteRetentionTest {
 		
 		int q = Memory.INSTANCE.getQueriesAndReset();
 		assertTrue(q > 0);
-		assertEquals(duration/50, q, 2);
 		assertEquals(Long.valueOf(parallelWrites), ConversionTools.convert(Long.class, Memory.INSTANCE.get(table, rowId, incrementedCf, incrementedKey)));
+		assertTrue(1+2*(duration/50) > q);
 		//System.out.println("sent: " + q +" (expected " + (duration/50) + ") ; asked " + parallelWrites);
 	}
 }
