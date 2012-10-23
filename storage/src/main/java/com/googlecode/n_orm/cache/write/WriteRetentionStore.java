@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Transient;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
@@ -45,6 +46,9 @@ public class WriteRetentionStore extends DelegatingStore {
 	
 	// Whether we are being stopping (JVM shutdown)
 	private static volatile boolean shutdown = false;
+
+	// Thread responsible for dequeue
+	private static final EvictionThread evictionThread;
 	
 	// Known stores
 	private static final Map<Integer, Collection<WriteRetentionStore>> knownStores = new HashMap<Integer, Collection<WriteRetentionStore>>();
@@ -189,6 +193,11 @@ public class WriteRetentionStore extends DelegatingStore {
 		 */
 		private final AtomicLong transactionDistributor = new AtomicLong(
 				Long.MIN_VALUE);
+		
+		/**
+		 * Last transaction that was sent, be it completed or not ; negative if not sent yet
+		 */
+		private volatile Long lastSentTransaction = null;
 
 		/**
 		 * Whether this request was sent and this request object must not be used anymore
@@ -202,9 +211,9 @@ public class WriteRetentionStore extends DelegatingStore {
 
 		/**
 		 * The epoch date in nanoseconds at which this request should be sent to
-		 * the data store
+		 * the data store ; -1 in case request is not planned
 		 */
-		private long outDateNanos;
+		private final AtomicLong outDateNanos = new AtomicLong(-1);
 		
 		/**
 		 * Merged meta information
@@ -440,17 +449,18 @@ public class WriteRetentionStore extends DelegatingStore {
 			if (this == d)
 				return 0;
 			StoreRequest o = (StoreRequest) d;
-			if (this.outDateNanos == o.outDateNanos) {
+			long thisOut = this.outDateNanos.get(), oOut = o.outDateNanos.get();
+			if (thisOut == oOut) {
 				return this.row.compareTo(o.row);
-			} else if (this.outDateNanos < o.outDateNanos)
+			} else if (thisOut < oOut)
 				return -1;
-			else // if (this.outDateNanos > o.outDateNanos)
+			else // if (thisOut > oOut)
 				return 1;
 		}
 
 		@Override
 		public long getDelay(TimeUnit unit) {
-			return unit.convert(this.outDateNanos - System.nanoTime(),
+			return unit.convert(this.outDateNanos.get() - System.nanoTime(),
 					TimeUnit.NANOSECONDS);
 		}
 
@@ -461,17 +471,21 @@ public class WriteRetentionStore extends DelegatingStore {
 		 *            the executor for sending the request
 		 * @param counter
 		 *            a counter to be decremented when the request is sent
+		 * @param flushing
+		 *            whether this send is a normal operation of a flush operation
 		 */
 		public void send(ExecutorService sender,
-				final AtomicInteger counter) {
-			// Not sending this request if dead
-			assert !this.dead;
-			// Not sending this request before delay is expired
-			assert this.outDateNanos <= System.nanoTime();
-			// This request should be the one for this row
-			assert this == writesByRows.get(this.row);
-			counter.incrementAndGet();
+				final AtomicInteger counter, boolean flushing) {
+			// Can be sent by the eviction thread after a flush
+			if (this.dead) {
+				// No new transaction is ignored
+				assert transactionDistributor.get() <= (this.lastSentTransaction == null ? Long.MIN_VALUE : this.lastSentTransaction);
+				return;
+			}
+			// Not sending this request before delay is expired unless we flush
+			assert flushing || this.outDateNanos.get() <= System.nanoTime();
 			long lastTransactionTmp;
+			Long lastSentTransaction;
 			// A copy of the elements, deletes and meta to be sent now
 			ConcurrentMap<String, ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>>> elements;
 			ConcurrentSkipListSet<Long> deletions;
@@ -479,142 +493,183 @@ public class WriteRetentionStore extends DelegatingStore {
 			this.sendLock.writeLock().lock();
 			try {
 				// This code cannot be executed concurrently with an update
+				
+				lastTransactionTmp = transactionDistributor.get();
+				// Is it really necessary to send those elements ?
+				// Might not be the case if the element was flushed
+				if (this.lastSentTransaction != null && lastTransactionTmp <= this.lastSentTransaction) {
+					return;
+				}
+				lastSentTransaction = this.lastSentTransaction;
+				this.lastSentTransaction = lastTransactionTmp;
+				
 				// Preparing this request to be used while current status is being sent by resetting all
 				elements = this.elements;
 				this.elements = new ConcurrentHashMap<String, ConcurrentMap<String,ConcurrentNavigableMap<Long,Object>>>();
 				deletions = this.deletions;
 				this.deletions = new ConcurrentSkipListSet<Long>();
 				metaTmp = this.meta.getAndSet(null);
-				lastTransactionTmp = transactionDistributor.get();
+				// As from this line, there MUST be a send request
 			} finally {
 				this.sendLock.writeLock().unlock();
 			}
 			final MetaInformation meta = metaTmp;
 			final long lastTransaction = lastTransactionTmp;
 			
-			// As from this line, we are not considering transactions later than lastTransaction
-			// If a new transaction happens, request will be planned again once sent
-			
-			Long lastDeletion = deletions.isEmpty() ? null : deletions.last();
-			// Last no-delete update in order to know whether this element should be deleted or not
-			long lastStore = Long.MIN_VALUE;
+			// This request should be the one for this row
+			assert this == writesByRows.get(this.row);
 
-			// Grabbing changed values.
-			final ColumnFamilyData changes = new DefaultColumnFamilyData();
-			final Map<String, Set<String>> removed = new TreeMap<String, Set<String>>();
-			final Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String, Number>>();
-			for (Entry<String, ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>>> famData : elements
-					.entrySet()) {
-				for (Entry<String, ConcurrentNavigableMap<Long, Object>> colData : famData
-						.getValue().entrySet()) {
-					Entry<Long, Object> lastEntry = colData.getValue()
-							.lastEntry();
-					// There can be no entry in case of a row delete after a column update
-					if (lastEntry == null)
-						continue;
-					Long transaction = lastEntry.getKey();
-					lastStore = Math.max(lastStore, transaction);
-					// Considering only those values after last deletion
-					if (lastDeletion == null || lastDeletion < transaction) {
-						Object latest = lastEntry.getValue();
-						if (latest instanceof byte[]) {
-							if (latest == DELETED_VALUE) {
-								// Column should be deleted
-								Set<String> remCols = removed.get(famData
-										.getKey());
-								if (remCols == null) {
-									remCols = new TreeSet<String>();
-									removed.put(famData.getKey(), remCols);
+			// The action to be ran for sending this request
+			Runnable action;
+			counter.incrementAndGet();
+			try {
+
+				this.outDateNanos.set(-1);
+				
+				// As from this line, we are not considering transactions later than lastTransaction
+				// If a new transaction happens, request will be planned again once sent
+				
+				Long lastDeletion = deletions.isEmpty() ? null : deletions.last();
+				if (lastDeletion != null && lastSentTransaction != null && lastDeletion < lastSentTransaction) {
+					assert false;
+					lastDeletion = null;
+				}
+				// Last no-delete update in order to know whether this element should be deleted or not
+				long lastStore = Long.MIN_VALUE;
+	
+				// Grabbing changed values.
+				final ColumnFamilyData changes = new DefaultColumnFamilyData();
+				final Map<String, Set<String>> removed = new TreeMap<String, Set<String>>();
+				final Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String, Number>>();
+				for (Entry<String, ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>>> famData : elements
+						.entrySet()) {
+					for (Entry<String, ConcurrentNavigableMap<Long, Object>> colData : famData
+							.getValue().entrySet()) {
+						Entry<Long, Object> lastEntry = colData.getValue()
+								.lastEntry();
+						// There can be no entry in case of a row delete after a column update
+						if (lastEntry == null)
+							continue;
+						Long transaction = lastEntry.getKey();
+						if (lastSentTransaction != null && transaction < lastSentTransaction) {
+							assert false;
+							continue;
+						}
+						lastStore = Math.max(lastStore, transaction);
+						// Considering only those values after last deletion
+						if (lastDeletion == null || lastDeletion < transaction) {
+							Object latest = lastEntry.getValue();
+							if (latest instanceof byte[]) {
+								if (latest == DELETED_VALUE) {
+									// Column should be deleted
+									Set<String> remCols = removed.get(famData
+											.getKey());
+									if (remCols == null) {
+										remCols = new TreeSet<String>();
+										removed.put(famData.getKey(), remCols);
+									}
+									remCols.add(colData.getKey());
+								} else {
+									// Column should be changed
+									Map<String, byte[]> chgCols = changes
+											.get(famData.getKey());
+									if (chgCols == null) {
+										chgCols = new TreeMap<String, byte[]>();
+										changes.put(famData.getKey(), chgCols);
+									}
+									chgCols.put(colData.getKey(), (byte[]) latest);
 								}
-								remCols.add(colData.getKey());
 							} else {
-								// Column should be changed
-								Map<String, byte[]> chgCols = changes
+								assert latest instanceof Number;
+								// Column should be incremented
+								// Summing all values to know the actual increment
+								long sum = 0;
+								for (Entry<Long, Object> incr : colData.getValue()
+										.entrySet()) {
+									Object val = incr.getValue();
+									try {
+										sum += ((Number) val).longValue();
+									} catch (ClassCastException x) {
+										// Just in case datum was updated (not incremented) meanwhile
+										// This is robustness code as it's not likely to happen
+										if (val == DELETED_VALUE)
+											sum = 0;
+										else // if (val instanceof byte[]) 
+											sum = ConversionTools.convert(Long.class, (byte[])val).longValue();
+									}
+								}
+	
+								Map<String, Number> incCols = increments
 										.get(famData.getKey());
-								if (chgCols == null) {
-									chgCols = new TreeMap<String, byte[]>();
-									changes.put(famData.getKey(), chgCols);
+								if (incCols == null) {
+									incCols = new TreeMap<String, Number>();
+									increments.put(famData.getKey(), incCols);
 								}
-								chgCols.put(colData.getKey(), (byte[]) latest);
+								incCols.put(colData.getKey(), sum);
 							}
-						} else {
-							assert latest instanceof Number;
-							// Column should be incremented
-							// Summing all values to know the actual increment
-							long sum = 0;
-							for (Entry<Long, Object> incr : colData.getValue()
-									.entrySet()) {
-								Object val = incr.getValue();
-								try {
-									sum += ((Number) val).longValue();
-								} catch (ClassCastException x) {
-									// Just in case datum was updated (not incremented) meanwhile
-									// This is robustness code as it's not likely to happen
-									if (val == DELETED_VALUE)
-										sum = 0;
-									else // if (val instanceof byte[]) 
-										sum = ConversionTools.convert(Long.class, (byte[])val).longValue();
-								}
-							}
-
-							Map<String, Number> incCols = increments
-									.get(famData.getKey());
-							if (incCols == null) {
-								incCols = new TreeMap<String, Number>();
-								increments.put(famData.getKey(), incCols);
-							}
-							incCols.put(colData.getKey(), sum);
 						}
 					}
 				}
-			}
-
-			// Sending using the executor
-			// Checking whether it's a store or a delete
-			if (lastDeletion == null || lastDeletion < lastStore) {
-				
-				// A delete resets all columns ;
-				// cannot simulate that just using a store
-				final boolean shouldDelete = lastDeletion != null;
-				
-				sender.execute(new Runnable() {
-
-					@Override
-					public void run() {
-						try {
-							// Deleting all cells if necessary
-							if (shouldDelete)
+	
+				assert lastDeletion == null || lastTransaction >= lastDeletion;
+				assert lastTransaction >= lastStore;
+	
+				// Sending using the executor
+				// Checking whether it's a store or a delete
+				if (lastDeletion == null || lastDeletion < lastStore) {
+					
+					// A delete resets all columns ;
+					// cannot simulate that just using a store
+					final boolean shouldDelete = lastDeletion != null;
+					
+					action = new Runnable() {
+	
+						@Override
+						public void run() {
+							try {
+								// Deleting all cells if necessary
+								if (shouldDelete)
+									getActualStore().delete(meta, row.table, row.id);
+								
+								getActualStore().storeChanges(meta, row.table, row.id,
+										changes, removed, increments);
+								
+							} catch (RuntimeException x) {
+								x.printStackTrace();
+								throw x;
+							} finally {
+								counter.decrementAndGet();
+								requestSent(lastTransaction);
+							}
+						}
+					};
+				} else {
+					action = new Runnable() {
+	
+						@Override
+						public void run() {
+							try {
 								getActualStore().delete(meta, row.table, row.id);
-							
-							getActualStore().storeChanges(meta, row.table, row.id,
-									changes, removed, increments);
-							
-						} catch (RuntimeException x) {
-							x.printStackTrace();
-							throw x;
-						} finally {
-							counter.decrementAndGet();
-							requestSent(lastTransaction);
+							} catch (RuntimeException x) {
+								x.printStackTrace();
+								throw x;
+							} finally {
+								counter.decrementAndGet();
+								requestSent(lastTransaction);
+							}
 						}
-					}
-				});
-			} else {
-				sender.execute(new Runnable() {
-
-					@Override
-					public void run() {
-						try {
-							getActualStore().delete(meta, row.table, row.id);
-						} catch (RuntimeException x) {
-							x.printStackTrace();
-							throw x;
-						} finally {
-							counter.decrementAndGet();
-							requestSent(lastTransaction);
-						}
-					}
-				});
+					};
+				}
+			
+			} catch (Throwable r) {
+				counter.decrementAndGet();
+				throw r instanceof RuntimeException ? (RuntimeException)r : new RuntimeException(r);
 			}
+			
+			if (sender == null)
+				action.run();
+			else
+				sender.submit(action);
 		}
 		
 		/**
@@ -622,10 +677,14 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * @param lastTransactionBeforeSending 
 		 */
 		private void requestSent(long lastTransactionBeforeSending) {
+			assert this.lastSentTransaction >= lastTransactionBeforeSending;
 			this.sendLock.writeLock().lock();
 			try {
-				// No update can happen when execution this section
-				if (this.transactionDistributor.get() > lastTransactionBeforeSending) {
+				// It's last sent transaction that should check whether this element should be back in the queue
+				if (lastTransactionBeforeSending < this.lastSentTransaction)
+					return;
+				// No update can happen when executing this section
+				if (this.transactionDistributor.get() > this.lastSentTransaction) {
 					// This request is THE only request for its row
 					assert this == writesByRows.get(this.row);
 					// A transaction happened while sending ; re-planning
@@ -650,10 +709,13 @@ public class WriteRetentionStore extends DelegatingStore {
 			// Cannot plan if this request is out
 			assert !this.dead;
 			// Cannot plan an already registered request
-			assert this.outDateNanos < System.nanoTime();
-			this.outDateNanos = TimeUnit.NANOSECONDS.convert(WriteRetentionStore.this.writeRetentionMs,
-					TimeUnit.MILLISECONDS) + System.nanoTime();
-			writeQueue.put(this);
+			long nextExecutionDate = TimeUnit.NANOSECONDS.convert(WriteRetentionStore.this.writeRetentionMs,
+				TimeUnit.MILLISECONDS) + System.nanoTime();
+			if (this.outDateNanos.compareAndSet(-1, nextExecutionDate)) {
+				writeQueue.put(this);
+			} else {
+				assert writeQueue.contains(this);
+			}
 		}
 
 	}
@@ -694,13 +756,18 @@ public class WriteRetentionStore extends DelegatingStore {
 						// Sending pending requests using one single thread
 						ExecutorService sender = Executors
 								.newSingleThreadExecutor();
-						Iterator<StoreRequest> it = writeQueue.iterator();
-						while (it.hasNext()) {
-							it.next()
-									.send(	sender,
-											requestsBeingSending);
-							it.remove();
-						}
+						boolean removed;
+						do {
+							Iterator<StoreRequest> it = writeQueue.iterator();
+							removed = it.hasNext();
+							while (it.hasNext()) {
+								it.next()
+										.send(	sender,
+												requestsBeingSending,
+												true);
+								it.remove();
+							}
+						} while (removed);
 
 						// Waiting for all to be sent
 						EvictionThread.this.sender.shutdown();
@@ -724,7 +791,7 @@ public class WriteRetentionStore extends DelegatingStore {
 			while (this.running) {
 				try {
 					StoreRequest r = writeQueue.take();
-					r.send(this.sender, requestsBeingSending);
+					r.send(this.sender, requestsBeingSending, false);
 				} catch (InterruptedException e) {
 				} catch (Throwable e) {
 					System.err.println("Problem while sending request out of write cache");
@@ -742,7 +809,8 @@ public class WriteRetentionStore extends DelegatingStore {
 	static {
 		if (DELETED_VALUE == new byte[0])
 			throw new Error("JVM problem : " + WriteRetentionStore.class.getSimpleName() + " requires that new byte[0] != new byte[0]");
-		new EvictionThread().start();
+		evictionThread = new EvictionThread();
+		evictionThread.start();
 	}
 	
 	// Index for requests according to the row
@@ -777,6 +845,22 @@ public class WriteRetentionStore extends DelegatingStore {
 		if (started.compareAndSet(false, true)) {
 			super.start();
 		}
+	}
+	
+	/**
+	 * Sends immediately planned requests for the given element.
+	 * @param table the table of the element
+	 * @param identifier the identifier of the element
+	 * @return whether some requests were found regarding this element
+	 */
+	public boolean flush(String table, String identifier) {
+		RowInTable row = new RowInTable(table, identifier);
+		StoreRequest req = this.writesByRows.get(row);
+		if (req != null) {
+			req.send(null, requestsBeingSending, true);
+			return true;
+		} else
+			return false;
 	}
 
 	@Override

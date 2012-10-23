@@ -356,6 +356,17 @@ public class WriteRetentionTest {
 	}
 	
 	@Test
+	public void flush() throws InterruptedException {
+		WriteRetentionStore sut = sut200;
+		
+		sut.storeChanges(null, table, rowId, aChange, null, null);
+		assertFalse(store.exists(null, table, rowId));
+		sut.flush(table, rowId);
+		assertTrue(store.exists(null, table, rowId));
+		assertArrayEquals(changedValue1, store.get(null, table, rowId, changedCf, changedKey));
+	}
+	
+	@Test
 	public void twoChanges() throws InterruptedException {
 		WriteRetentionStore sut = sut50;
 		sut.storeChanges(null, table, rowId, aChange, null, null);
@@ -380,9 +391,9 @@ public class WriteRetentionTest {
 		Thread.sleep(10);
 		assertTrue(store.exists(null, table, rowId));
 		assertEquals(2, Memory.INSTANCE.getQueriesAndReset()); // 2 exists ; no delete
-		Thread.sleep(90);
-		assertTrue(Memory.INSTANCE.hadAQuery()); // the delete query
+		this.waitForPendingRequests();
 		assertFalse(store.exists(null, table, rowId));
+		assertEquals(2, Memory.INSTANCE.getQueriesAndReset()); // the delete and the exists queries
 	}
 	
 	@Test
@@ -597,5 +608,56 @@ public class WriteRetentionTest {
 		assertEquals(Long.valueOf(parallelWrites), ConversionTools.convert(Long.class, Memory.INSTANCE.get(table, rowId, incrementedCf, incrementedKey)));
 		assertTrue(1+2*(duration/50) > q);
 		//System.out.println("sent: " + q +" (expected " + (duration/50) + ") ; asked " + parallelWrites);
+	}
+	
+	@Test
+	public void parrallelIncrementsWithSomeFlushes() throws Exception {
+		final WriteRetentionStore sut = sut50;
+		int parallelWrites = 200;
+		final AtomicLong start = new AtomicLong();
+		
+		Runnable r = new Runnable() {
+			
+			@Override
+			public void run() {
+				start.compareAndSet(0, System.currentTimeMillis());
+				sut.storeChanges(null, table, rowId, null, null, anIncrement);
+			}
+		};
+		
+		Runnable rf = new Runnable() {
+			
+			@Override
+			public void run() {
+				start.compareAndSet(0, System.currentTimeMillis());
+				sut.storeChanges(null, table, rowId, null, null, anIncrement);
+				sut.flush(table, rowId);
+			}
+		};
+
+		Collection<Future<?>> results = new LinkedList<Future<?>>();
+		ExecutorService es =  new FixedThreadPool(parallelWrites);
+		for (int i = 0; i < parallelWrites; i++) {
+			if (i%10 != 0) {
+				results.add(es.submit(r));
+			} else {
+				results.add(es.submit(rf));
+			}
+		}
+		es.shutdown();
+		
+		//Waiting for results and checking exceptions
+		for (Future<?> f : results) {
+			f.get();
+		}
+		
+		this.waitForPendingRequests();
+		long duration = System.currentTimeMillis()-start.get();
+		
+		int q = Memory.INSTANCE.getQueriesAndReset();
+		assertTrue(q > 0);
+		assertEquals(Long.valueOf(parallelWrites), ConversionTools.convert(Long.class, Memory.INSTANCE.get(table, rowId, incrementedCf, incrementedKey)));
+		assertTrue(1+2*(duration/50)+parallelWrites/10 > q);
+		//System.out.println("sent: " + q +" (expected " + (parallelWrites/10 + duration/50) + ") ; asked " + parallelWrites);
 	}
 }
