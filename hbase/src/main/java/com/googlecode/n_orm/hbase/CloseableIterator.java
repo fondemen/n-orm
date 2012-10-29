@@ -75,7 +75,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 		} else {
 			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);
 		}
-		CloseableIterator newResult = (CloseableIterator) store.get(new MetaInformation().forClass(clazz).withColumnFamilies(families), table, constraint, limit, families.keySet());
+		CloseableIterator newResult = (CloseableIterator) store.get(new MetaInformation().forClass(clazz).withColumnFamilies(families), table, constraint, limit, families == null ? null : families.keySet());
 		this.setResult(newResult.result);
 	}
 
