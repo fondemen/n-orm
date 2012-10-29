@@ -143,7 +143,8 @@ public class Constraint {
 								break;
 							}
 						}
-						throw new IllegalArgumentException(actualVal + " is not a possible enum value for key " + f);
+						if (! type.isInstance(actualVal)) // Enum value not found
+							throw new IllegalArgumentException(actualVal + " is not a possible enum value for key " + f);
 					} else
 						actualVal = ConvertUtils.convert((String)actualVal, type);
 				}
