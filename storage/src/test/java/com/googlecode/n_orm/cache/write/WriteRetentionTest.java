@@ -641,8 +641,8 @@ public class WriteRetentionTest {
 		long duration = System.currentTimeMillis()-start.get();
 		
 		int q = Memory.INSTANCE.getQueriesAndReset();
-		assertTrue(q > 0);
 		assertEquals(Long.valueOf(parallelWrites), ConversionTools.convert(Long.class, Memory.INSTANCE.get(table, rowId, incrementedCf, incrementedKey)));
+		assertTrue(q > 0);
 		assertTrue(1+2*(duration/50) > q);
 		//System.out.println("sent: " + q +" (expected " + (duration/50) + ") ; asked " + parallelWrites);
 	}
