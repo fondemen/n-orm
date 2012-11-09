@@ -55,6 +55,31 @@ public class WriteRetentionStore extends DelegatingStore {
 	private static final AtomicInteger requestsBeingSending = new AtomicInteger();
 	
 	/**
+	 * Whether or not hit ratio should be captured
+	 */
+	private static boolean captureHitRatio = false;
+
+	/**
+	 * Number of requests asked
+	 */
+	private static final AtomicLong requestsIn = new AtomicLong();
+	
+	/**
+	 * Number of requests sent
+	 */
+	private static final AtomicLong requestsOut = new AtomicLong();
+	
+	/**
+	 * Cumulative latencies
+	 */
+	private static final AtomicLong requestsCumulativeLatency = new AtomicLong();
+	
+	/**
+	 * Number of latencies accumulated into {@link #requestsCumulativeLatency}
+	 */
+	private static final AtomicLong requestsLatencySamples = new AtomicLong();
+	
+	/**
 	 * Whether we are being stopping (JVM shutdown)
 	 */
 	private static volatile boolean shutdown = false;
@@ -132,6 +157,77 @@ public class WriteRetentionStore extends DelegatingStore {
 	 */
 	public static int getPendingRequests() {
 		return writeQueue.size() + requestsBeingSending.get();
+	}
+	
+	/**
+	 * Whether hit ratio metrics should be captured
+	 */
+	public static boolean isCapureHitRatio() {
+		return WriteRetentionStore.captureHitRatio;
+	}
+	
+	/**
+	 * Whether hit ratio metrics should be captured
+	 */
+	public static void setCapureHitRatio(boolean captureHitRatio) {
+		WriteRetentionStore.captureHitRatio = captureHitRatio;
+	}
+	
+	/**
+	 * Resets any hit-ratio-related metrics {@link #getHitRatio()}, {@link #getRequestsIn()}, {@link #getRequestsOut()}, and {@link #getAverageLatencyMs()}
+	 */
+	public static void resetCapureHitRatioMetrics() {
+		requestsLatencySamples.set(0);
+		requestsCumulativeLatency.set(0);
+		requestsIn.set(getPendingRequests());
+		requestsOut.set(0);
+	}
+
+	/**
+	 * Number of requests asked ; {@link #isCapureHitRatio()} should be on to capture this metric
+	 */
+	public static long getRequestsIn() {
+		return requestsIn.get();
+	}
+
+	/**
+	 * Number of requests sent ; {@link #isCapureHitRatio()} should be on to capture this metric
+	 */
+	public static long getRequestsOut() {
+		return requestsOut.get();
+	}
+	
+	/**
+	 * The hit ratio (requests asked / requests (to be)sent ; {@link #isCapureHitRatio()} should be on to capture this metric
+	 */
+	public static double getHitRatio() {
+		if (getRequestsIn() == 0)
+			return Double.NaN;
+		long in = getRequestsIn();
+		return (double)(in - getRequestsOut() - getPendingRequests()) / (double)(in);
+	}
+	
+	/**
+	 * The cumulative latency (ms) between time at which a request should have been sent and the time it is actually sent
+	 */
+	public static long getCumulativeLatencyMs() {
+		return requestsCumulativeLatency.get();
+	}
+	
+	/**
+	 * Number of latencies accumulated by {@link #getCumulativeLatencyMs()}
+	 */
+	public static long getLatencySamples() {
+		return requestsLatencySamples.get();
+	}
+	
+	/**
+	 * The average latency (ms) between time at which a request should have been sent and the time it is actually sent
+	 */
+	public static long getAverageLatencyMs() {
+		if (getLatencySamples() == 0)
+			return 0;
+		return getCumulativeLatencyMs() / getLatencySamples();
 	}
 
 	/**
@@ -234,7 +330,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * The epoch date in nanoseconds at which this request should be sent to
 		 * the data store ; -1 in case request is not planned
 		 */
-		private final AtomicLong outDateNanos = new AtomicLong(-1);
+		private final AtomicLong outDateMs = new AtomicLong(-1);
 		
 		/**
 		 * Merged meta information
@@ -268,6 +364,11 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * When this element was last deleted.
 		 */
 		@Transient private volatile ConcurrentSkipListSet<Long> deletions = new ConcurrentSkipListSet<Long>();
+		
+		/**
+		 * The time at which transaction was planned to be released
+		 */
+		@Transient private final ConcurrentNavigableMap<Long /* transaction */, Long /* out date */> outDates = new ConcurrentSkipListMap<Long, Long>();
 
 		private StoreRequest(RowInTable row) {
 			super();
@@ -294,7 +395,16 @@ public class WriteRetentionStore extends DelegatingStore {
 				throw new RequestIsOutException();
 			}
 
-			return this.transactionDistributor.getAndIncrement();
+			long ret = this.transactionDistributor.incrementAndGet();
+
+			if (captureHitRatio && this.outDateMs.get() != -1) {
+				Entry<Long, Long> old = outDates.floorEntry(ret);
+				assert old == null || old.getValue() != -1;
+				if (old == null || old.getValue() != this.outDateMs.get())
+					outDates.put(ret, this.outDateMs.get());
+			}
+			
+			return ret;
 		}
 
 		/**
@@ -470,7 +580,7 @@ public class WriteRetentionStore extends DelegatingStore {
 			if (this == d)
 				return 0;
 			StoreRequest o = (StoreRequest) d;
-			long thisOut = this.outDateNanos.get(), oOut = o.outDateNanos.get();
+			long thisOut = this.outDateMs.get(), oOut = o.outDateMs.get();
 			if (thisOut == oOut) {
 				return this.row.compareTo(o.row);
 			} else if (thisOut < oOut)
@@ -481,8 +591,8 @@ public class WriteRetentionStore extends DelegatingStore {
 
 		@Override
 		public long getDelay(TimeUnit unit) {
-			return unit.convert(this.outDateNanos.get() - System.nanoTime(),
-					TimeUnit.NANOSECONDS);
+			return unit.convert(this.outDateMs.get() - System.currentTimeMillis(),
+					TimeUnit.MILLISECONDS);
 		}
 
 		/**
@@ -496,7 +606,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		 *            whether this send is a normal operation of a flush operation
 		 */
 		public void send(ExecutorService sender,
-				final AtomicInteger counter, boolean flushing) {
+				final AtomicInteger counter, final boolean flushing) {
 			// Can be sent by the eviction thread after a flush
 			if (this.dead) {
 				// No new transaction is ignored
@@ -504,7 +614,7 @@ public class WriteRetentionStore extends DelegatingStore {
 				return;
 			}
 			// Not sending this request before delay is expired unless we flush
-			assert flushing || this.outDateNanos.get() <= System.nanoTime();
+			assert flushing || this.outDateMs.get() <= System.currentTimeMillis();
 			long lastTransactionTmp;
 			Long lastSentTransaction;
 			// A copy of the elements, deletes and meta to be sent now
@@ -530,7 +640,9 @@ public class WriteRetentionStore extends DelegatingStore {
 				deletions = this.deletions;
 				this.deletions = new ConcurrentSkipListSet<Long>();
 				metaTmp = this.meta.getAndSet(null);
+				
 				// As from this line, there MUST be a send request
+				this.outDateMs.set(-1);
 			} finally {
 				this.sendLock.writeLock().unlock();
 			}
@@ -541,11 +653,9 @@ public class WriteRetentionStore extends DelegatingStore {
 			assert this == writesByRows.get(this.row);
 
 			// The action to be ran for sending this request
-			Runnable action;
+			Runnable action;				
 			counter.incrementAndGet();
 			try {
-
-				this.outDateNanos.set(-1);
 				
 				// As from this line, we are not considering transactions later than lastTransaction
 				// If a new transaction happens, request will be planned again once sent
@@ -634,6 +744,12 @@ public class WriteRetentionStore extends DelegatingStore {
 	
 				assert lastDeletion == null || lastTransaction >= lastDeletion;
 				assert lastTransaction >= lastStore;
+				
+				// Capturing planned out date in case of hit ratio computation
+				boolean captureHitRatio = WriteRetentionStore.captureHitRatio;
+				final Long plannedMs = captureHitRatio ? this.outDates.get(lastTransaction) : null;
+				if (captureHitRatio)
+					this.outDates.headMap(lastTransaction, true).clear();
 	
 				// Sending using the executor
 				// Checking whether it's a store or a delete
@@ -648,6 +764,12 @@ public class WriteRetentionStore extends DelegatingStore {
 						@Override
 						public void run() {
 							try {
+								if (!flushing && plannedMs != null && plannedMs > 0) {
+									requestsLatencySamples.incrementAndGet();
+									long delay = System.currentTimeMillis()-plannedMs;
+									requestsCumulativeLatency.addAndGet(delay);
+								}
+								
 								// Deleting all cells if necessary
 								if (shouldDelete)
 									getActualStore().delete(meta, row.table, row.id);
@@ -670,6 +792,12 @@ public class WriteRetentionStore extends DelegatingStore {
 						@Override
 						public void run() {
 							try {
+								if (!flushing && plannedMs != null && plannedMs > 0) {
+									requestsLatencySamples.incrementAndGet();
+									long delay = System.currentTimeMillis()-plannedMs;
+									requestsCumulativeLatency.addAndGet(delay);
+								}
+								
 								getActualStore().delete(meta, row.table, row.id);
 							} catch (RuntimeException x) {
 								logger.log(Level.WARNING, "Catched problem while deleting " + StoreRequest.this + " ; some data might have been be lost: " + x.getMessage(), x);
@@ -698,8 +826,10 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * @param lastTransactionBeforeSending 
 		 */
 		private void requestSent(long lastTransactionBeforeSending) {
+			if (captureHitRatio)
+				requestsOut.incrementAndGet();
+			long delay = System.currentTimeMillis() - this.outDateMs.get();
 			assert this.lastSentTransaction >= lastTransactionBeforeSending;
-			long delay = System.currentTimeMillis() - (this.outDateNanos.get()/1000);
 			this.sendLock.writeLock().lock();
 			try {
 				// It's last sent transaction that should check whether this element should be back in the queue
@@ -712,7 +842,7 @@ public class WriteRetentionStore extends DelegatingStore {
 					assert this == writesByRows.get(this.row);
 					// A transaction happened while sending ; re-planning
 					this.plan();
-					logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " after a delay of " + delay + "ms replanned for " + new Date(this.outDateNanos.get() / 1000));
+					logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " after a delay of " + delay + "ms replanned for " + new Date(this.outDateMs.get()));
 				} else {
 					// No transaction happened ; killing this object and releasing memory
 					this.dead = true;
@@ -733,10 +863,9 @@ public class WriteRetentionStore extends DelegatingStore {
 		public void plan() {
 			// Cannot plan if this request is out
 			assert !this.dead;
-			// Cannot plan an already registered request
-			long nextExecutionDate = TimeUnit.NANOSECONDS.convert(WriteRetentionStore.this.writeRetentionMs,
-				TimeUnit.MILLISECONDS) + System.nanoTime();
-			if (this.outDateNanos.compareAndSet(-1, nextExecutionDate)) {
+
+			long nextExecutionDate = WriteRetentionStore.this.writeRetentionMs + System.currentTimeMillis();
+			if (this.outDateMs.compareAndSet(-1, nextExecutionDate)) {
 				writeQueue.put(this);
 			} else {
 				assert writeQueue.contains(this);
@@ -752,9 +881,9 @@ public class WriteRetentionStore extends DelegatingStore {
 					+ (this.dead ? 
 							"" :
 							"planned for " +
-								new Date(this.outDateNanos.get()/1000) +
+								new Date(this.outDateMs.get()) +
 								" (in " +
-								(this.outDateNanos.get()/1000-System.currentTimeMillis()) +
+								(this.outDateMs.get()-System.currentTimeMillis()) +
 								"ms)");
 		}
 	}
@@ -989,6 +1118,8 @@ public class WriteRetentionStore extends DelegatingStore {
 	 *            the operation to be performed
 	 */
 	private void runLater(String table, String id, Operation r) {
+		if (captureHitRatio)
+			requestsIn.incrementAndGet();
 		RowInTable element = new RowInTable(table, id);
 		while(true) {
 			StoreRequest req = new StoreRequest(element);

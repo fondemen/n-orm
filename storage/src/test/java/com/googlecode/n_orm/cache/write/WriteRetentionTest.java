@@ -2,6 +2,7 @@ package com.googlecode.n_orm.cache.write;
 
 import static org.junit.Assert.*;
 
+import java.lang.management.ManagementFactory;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.hamcrest.Matcher;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -265,6 +267,8 @@ public class WriteRetentionTest {
 	
 	@BeforeClass
 	public static void setupPossibleSuts() {
+//		WriteRetentionStore.setCapureHitRatio(true);
+		
 		sut50Mock = WriteRetentionStore.getWriteRetentionStore(1, mockStore);
 		sut50Mock.start();
 		sut50 = WriteRetentionStore.getWriteRetentionStore(50, store);
@@ -293,6 +297,17 @@ public class WriteRetentionTest {
 		anIncrement.put(incrementedCf, incr );
 	}
 	
+//	@AfterClass
+//	public static void printStats() {
+//		System.out.println("Average latency " + WriteRetentionStore.getAverageLatencyMs());
+//		System.out.println("Cumulative latency " + WriteRetentionStore.getCumulativeLatencyMs());
+//		System.out.println("Counted latencies " + WriteRetentionStore.getLatencySamples());
+//		System.out.println("Requests in " + WriteRetentionStore.getRequestsIn());
+//		System.out.println("Requests out " + WriteRetentionStore.getRequestsOut());
+//		System.out.println("hit ratio " + (100*WriteRetentionStore.getHitRatio()) + '%');
+//		System.out.println("Max threads " + ManagementFactory.getThreadMXBean().getPeakThreadCount());
+//	}
+	
 	@Before
 	public void cleanupStore() {
 		Memory.INSTANCE.reset();
@@ -302,22 +317,18 @@ public class WriteRetentionTest {
 	public void resetMock() {
 		Mockito.reset(mockStore);
 	}
-	
+
 	@After
 	public void waitForPendingRequests() {
-		for (WriteRetentionStore wrs : new WriteRetentionStore[] {sut50Mock, sut50, sut200}) {
-			waitForPendingRequests(wrs);
-		}
-	}
-
-	private void waitForPendingRequests(WriteRetentionStore wrs) {
-		while(wrs.getPendingRequests() != 0)
-			try {
+		try {
+			while(WriteRetentionStore.getPendingRequests() != 0)
 				Thread.sleep(10);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			Thread.sleep(10);
+			while(WriteRetentionStore.getPendingRequests() != 0)
+				Thread.sleep(10);
+		} catch (InterruptedException e1) {
+			e1.printStackTrace();
+		}
 	}
 	
 	@Test
@@ -388,7 +399,7 @@ public class WriteRetentionTest {
 		e.store();
 		assertFalse(e.existsInStore());
 		
-		this.waitForPendingRequests(wrs);
+		this.waitForPendingRequests();
 		assertTrue(e.existsInStore());
 	}
 	
