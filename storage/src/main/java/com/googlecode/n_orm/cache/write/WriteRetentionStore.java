@@ -18,6 +18,7 @@ import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -726,12 +727,24 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * live. A shutdown hook sends all pending requests.
 	 */
 	private static class EvictionThread extends Thread {
-		private final ExecutorService sender = Executors.newCachedThreadPool();
+		private final ExecutorService sender = Executors.newCachedThreadPool(new ThreadFactory() {
+			
+			@Override
+			public Thread newThread(Runnable r) {
+				Thread ret = new Thread(r, "n-orm write cache sender");
+				ret.setDaemon(false);
+				return ret;
+			}
+		});
 
 		private volatile boolean alreadyStarted = false;
 		private volatile boolean running = true;
 		
-		private EvictionThread() {}
+		private EvictionThread() {
+			super("n-orm write cache eviction thread");
+			this.setDaemon(false);
+			this.setPriority(Thread.MAX_PRIORITY);
+		}
 
 		@Override
 		public synchronized void start() {
@@ -741,7 +754,7 @@ public class WriteRetentionStore extends DelegatingStore {
 			super.start();
 			// Registering last chance to evict all the list of elements in the
 			// store
-			Runtime.getRuntime().addShutdownHook(new Thread() {
+			Runtime.getRuntime().addShutdownHook(new Thread("n-orm write cache shutdown handler") {
 
 				@Override
 				public void run() {
@@ -755,7 +768,16 @@ public class WriteRetentionStore extends DelegatingStore {
 
 						// Sending pending requests using one single thread
 						ExecutorService sender = Executors
-								.newSingleThreadExecutor();
+								.newSingleThreadExecutor(new ThreadFactory() {
+									
+									@Override
+									public Thread newThread(Runnable r) {
+										Thread ret = new Thread(r, "n-orm write cache flush before shutdown");
+										ret.setPriority(MAX_PRIORITY);
+										ret.setDaemon(false);
+										return ret;
+									}
+								});
 						boolean removed;
 						do {
 							Iterator<StoreRequest> it = writeQueue.iterator();
