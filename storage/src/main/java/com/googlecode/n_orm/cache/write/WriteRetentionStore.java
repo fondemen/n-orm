@@ -44,19 +44,29 @@ public class WriteRetentionStore extends DelegatingStore {
 	
 	private static final byte[] DELETED_VALUE = new byte[0];
 	
-	// Event queue
+	/**
+	 * Event queue
+	 */
 	private static final DelayQueue<StoreRequest> writeQueue = new DelayQueue<StoreRequest>();
 	
-	// Number of requests currently being sending
+	/**
+	 * Number of requests currently being sending
+	 */
 	private static final AtomicInteger requestsBeingSending = new AtomicInteger();
 	
-	// Whether we are being stopping (JVM shutdown)
+	/**
+	 * Whether we are being stopping (JVM shutdown)
+	 */
 	private static volatile boolean shutdown = false;
 
-	// Thread responsible for dequeue
+	/**
+	 * Thread responsible for dequeue
+	 */
 	private static final EvictionThread evictionThread;
 	
-	// Known stores
+	/**
+	 * Known stores
+	 */
 	private static final Map<Integer, Collection<WriteRetentionStore>> knownStores = new HashMap<Integer, Collection<WriteRetentionStore>>();
 	
 	// One should find the same WriteRetentionStore given a write retention time and a target store
@@ -873,14 +883,20 @@ public class WriteRetentionStore extends DelegatingStore {
 		evictionThread.start();
 	}
 	
-	// Index for requests according to the row
+	/**
+	 * Index for requests according to the row
+	 */
 	@Transient
 	private final ConcurrentMap<RowInTable, StoreRequest> writesByRows = new ConcurrentHashMap<RowInTable, StoreRequest>();
 	
-	//Whether this store was already started
+	/**
+	 * Whether this store was already started
+	 */
 	private AtomicBoolean started = new AtomicBoolean(false);
 
-	// Time before request is sent
+	/**
+	 * Time before request is sent
+	 */
 	private long writeRetentionMs;
 	
 	private WriteRetentionStore(long writeRetentionMs, Store s) {
