@@ -6,10 +6,8 @@
 		<groupId>com.googlecode.n_orm</groupId>
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
-	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>parent-aspect</artifactId>
 	<name>n-orm aspect parent pom</name>
-	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<scm>
 		<connection>scm:hg:http://n-orm.googlecode.com/hg/</connection>
