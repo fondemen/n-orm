@@ -35,6 +35,8 @@ import org.junit.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
+import com.googlecode.n_orm.Key;
+import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
@@ -304,14 +306,18 @@ public class WriteRetentionTest {
 	@After
 	public void waitForPendingRequests() {
 		for (WriteRetentionStore wrs : new WriteRetentionStore[] {sut50Mock, sut50, sut200}) {
-			while(wrs.getPendingRequests() != 0)
-				try {
-					Thread.sleep(10);
-				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+			waitForPendingRequests(wrs);
 		}
+	}
+
+	private void waitForPendingRequests(WriteRetentionStore wrs) {
+		while(wrs.getPendingRequests() != 0)
+			try {
+				Thread.sleep(10);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 	}
 	
 	@Test
@@ -364,6 +370,37 @@ public class WriteRetentionTest {
 		sut.flush(table, rowId);
 		assertTrue(store.exists(null, table, rowId));
 		assertArrayEquals(changedValue1, store.get(null, table, rowId, changedCf, changedKey));
+	}
+	
+	@Persisting(writeRetentionMs=100)
+	public static class Element {
+		@Key public String key;
+		public String value;
+	}
+	
+	@Test
+	public void storeFromAPI() throws InterruptedException {
+		Element e = new Element(); e.key = this.rowId;
+		assertEquals(WriteRetentionStore.class, e.getStore().getClass());
+		
+		WriteRetentionStore wrs = (WriteRetentionStore)e.getStore();
+		
+		e.store();
+		assertFalse(e.existsInStore());
+		
+		this.waitForPendingRequests(wrs);
+		assertTrue(e.existsInStore());
+	}
+	
+	@Test
+	public void flushFromAPI() throws InterruptedException {
+		Element e = new Element(); e.key = this.rowId;
+		assertEquals(WriteRetentionStore.class, e.getStore().getClass());
+		
+		WriteRetentionStore wrs = (WriteRetentionStore)e.getStore();
+		
+		e.storeNoCache();
+		assertTrue(e.existsInStore());
 	}
 	
 	@Test
