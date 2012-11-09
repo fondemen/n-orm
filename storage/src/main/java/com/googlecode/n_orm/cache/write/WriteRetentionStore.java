@@ -813,7 +813,11 @@ public class WriteRetentionStore extends DelegatingStore {
 			while (this.running) {
 				try {
 					StoreRequest r = writeQueue.take();
+					// Requests in preparation of sending are marked twice so that a "0" is
+					// a bit less likely to be a false 0
+					requestsBeingSending.incrementAndGet();
 					r.send(this.sender, requestsBeingSending, false);
+					requestsBeingSending.decrementAndGet();
 				} catch (InterruptedException e) {
 				} catch (Throwable e) {
 					System.err.println("Problem while sending request out of write cache");
