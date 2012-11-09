@@ -697,4 +697,47 @@ public class WriteRetentionTest {
 		assertTrue(1+2*(duration/50)+parallelWrites/10 > q);
 		//System.out.println("sent: " + q +" (expected " + (parallelWrites/10 + duration/50) + ") ; asked " + parallelWrites);
 	}
+	
+	@Test(timeout=10000)
+	public void continuousWriteMultiThreadedOnDifferentKeys() throws InterruptedException, ExecutionException {
+		final WriteRetentionStore sut = sut50;
+		int parallelWrites = 200;
+
+		Collection<Future<?>> results = new LinkedList<Future<?>>();
+		ExecutorService es = new FixedThreadPool(parallelWrites);
+		for (int i = 0; i < parallelWrites; i++) {
+			final int nr = i;
+			results.add(es.submit(new Runnable() {
+				
+				@Override
+				public void run() {
+					String id = rowId + nr;
+					
+					sut.storeChanges(null, table, id, aChange, null, null);
+				}
+			}));
+		}
+		es.shutdown();
+		
+		//Waiting for results and checking exceptions
+		for (Future<?> f : results) {
+			f.get();
+		}
+
+		this.waitForPendingRequests();
+		Thread.yield();
+		this.waitForPendingRequests();
+		
+		//Checking all ids are here
+		for(int i = 0; i < parallelWrites; ++i) {
+			String id = rowId+i;
+			boolean exists = Memory.INSTANCE.exists(table, id);
+			if (! exists)
+				this.waitForPendingRequests();
+				
+			assertTrue("Can't find element " + id, Memory.INSTANCE.exists(table, id));
+		}
+		assertFalse(Memory.INSTANCE.exists(table, rowId+parallelWrites));
+		assertFalse(Memory.INSTANCE.exists(table, rowId+(parallelWrites+1)));
+	}
 }
