@@ -68,6 +68,17 @@ public privileged aspect PersistingMixin {
 		return this.getIdentifier().compareTo(((PersistingElement)rhs).getIdentifier());
 	}
 	
+	public String identifierToString(String ident) {
+		if (ident == null)
+			return "unset";
+
+		ident = ident.replace(KeyManagement.KEY_SEPARATOR, ":");
+		ident = ident.replace(KeyManagement.KEY_END_SEPARATOR, "}");
+		ident = ident.replace(KeyManagement.ARRAY_SEPARATOR, ";");
+		
+		return ident;
+	}
+	
 	private transient String PersistingElement.stringRep = null;
 	public String PersistingElement.toString() {
 		if (this.stringRep != null ) {
@@ -82,10 +93,7 @@ public privileged aspect PersistingMixin {
 			sb.append(" with no key yet (missing some key values)");
 			ret = sb.toString();
 		} else {
-			ident = ident.replace(KeyManagement.KEY_SEPARATOR, ":");
-			ident = ident.replace(KeyManagement.KEY_END_SEPARATOR, "}");
-			ident = ident.replace(KeyManagement.ARRAY_SEPARATOR, ";");
-			sb.append(" with key " + ident);
+			sb.append(" with key " + PersistingMixin.getInstance().identifierToString(ident));
 			ret = sb.toString();
 			this.stringRep = ret;
 		}

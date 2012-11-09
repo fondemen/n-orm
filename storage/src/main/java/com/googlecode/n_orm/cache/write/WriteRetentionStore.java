@@ -1,6 +1,7 @@
 package com.googlecode.n_orm.cache.write;
 
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -25,9 +26,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.Transient;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
@@ -37,6 +40,8 @@ import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 public class WriteRetentionStore extends DelegatingStore {
+	public static final Logger logger = Logger.getLogger(DelegatingStore.class.getName()); 
+	
 	private static final byte[] DELETED_VALUE = new byte[0];
 	
 	// Event queue
@@ -180,6 +185,11 @@ public class WriteRetentionStore extends DelegatingStore {
 			if (this == o)
 				return 0;
 			return this.h - o.h;
+		}
+		
+		@Override
+		public String toString() {
+			return "element " + PersistingMixin.getInstance().identifierToString(this.id) + " in table " + this.table;
 		}
 	}
 
@@ -636,7 +646,7 @@ public class WriteRetentionStore extends DelegatingStore {
 										changes, removed, increments);
 								
 							} catch (RuntimeException x) {
-								x.printStackTrace();
+								logger.log(Level.WARNING, "Catched problem while updating " + StoreRequest.this + " ; some data might have been lost: " + x.getMessage(), x);
 								throw x;
 							} finally {
 								counter.decrementAndGet();
@@ -652,7 +662,7 @@ public class WriteRetentionStore extends DelegatingStore {
 							try {
 								getActualStore().delete(meta, row.table, row.id);
 							} catch (RuntimeException x) {
-								x.printStackTrace();
+								logger.log(Level.WARNING, "Catched problem while deleting " + StoreRequest.this + " ; some data might have been be lost: " + x.getMessage(), x);
 								throw x;
 							} finally {
 								counter.decrementAndGet();
@@ -679,23 +689,27 @@ public class WriteRetentionStore extends DelegatingStore {
 		 */
 		private void requestSent(long lastTransactionBeforeSending) {
 			assert this.lastSentTransaction >= lastTransactionBeforeSending;
+			long delay = System.currentTimeMillis() - (this.outDateNanos.get()/1000);
 			this.sendLock.writeLock().lock();
 			try {
 				// It's last sent transaction that should check whether this element should be back in the queue
-				if (lastTransactionBeforeSending < this.lastSentTransaction)
+				if (lastTransactionBeforeSending < this.lastSentTransaction) {
 					return;
+				}
 				// No update can happen when executing this section
 				if (this.transactionDistributor.get() > this.lastSentTransaction) {
 					// This request is THE only request for its row
 					assert this == writesByRows.get(this.row);
 					// A transaction happened while sending ; re-planning
 					this.plan();
+					logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " after a delay of " + delay + "ms replanned for " + new Date(this.outDateNanos.get() / 1000));
 				} else {
 					// No transaction happened ; killing this object and releasing memory
 					this.dead = true;
 					StoreRequest s = writesByRows.remove(this.row);
 					// This request was THE only request for its row
 					assert this == s;
+					logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " after a delay of " + delay + "ms");
 				}
 				
 			} finally {
@@ -718,7 +732,21 @@ public class WriteRetentionStore extends DelegatingStore {
 				assert writeQueue.contains(this);
 			}
 		}
-
+		
+		@Override
+		public String toString() {
+			return "write-cached "
+					+ (this.dead ? "sent" : "")
+					+ " request for "
+					+ this.row
+					+ (this.dead ? 
+							"" :
+							"planned for " +
+								new Date(this.outDateNanos.get()/1000) +
+								" (in " +
+								(this.outDateNanos.get()/1000-System.currentTimeMillis()) +
+								"ms)");
+		}
 	}
 
 	/**
@@ -799,6 +827,8 @@ public class WriteRetentionStore extends DelegatingStore {
 								Long.MAX_VALUE, TimeUnit.MILLISECONDS);
 						sender.awaitTermination(Long.MAX_VALUE,
 								TimeUnit.MILLISECONDS);
+						
+						assert writeQueue.isEmpty();
 
 					} catch (InterruptedException e) {
 						throw new RuntimeException(e);
@@ -811,8 +841,9 @@ public class WriteRetentionStore extends DelegatingStore {
 		@Override
 		public void run() {
 			while (this.running) {
+				StoreRequest r = null;
 				try {
-					StoreRequest r = writeQueue.take();
+					r = writeQueue.take();
 					// Requests in preparation of sending are marked twice so that a "0" is
 					// a bit less likely to be a false 0
 					requestsBeingSending.incrementAndGet();
@@ -820,8 +851,11 @@ public class WriteRetentionStore extends DelegatingStore {
 					requestsBeingSending.decrementAndGet();
 				} catch (InterruptedException e) {
 				} catch (Throwable e) {
-					System.err.println("Problem while sending request out of write cache");
-					e.printStackTrace();
+					if (r == null) {
+						logger.log(Level.WARNING, "Problem waiting for request out of write cache: " + e.getMessage(), e);
+					} else {
+						logger.log(Level.SEVERE, "Problem while sending request out of write cache ; request " + r + " lost: " + e.getMessage(), e);
+					}
 				}
 			}
 		}
@@ -946,7 +980,7 @@ public class WriteRetentionStore extends DelegatingStore {
 			if (tmp == null) {
 				// req was added ; should also be put in the delay queue
 				req.plan();
-				//System.out.println("Request planned for " + table + ':' + id + " on " + System.currentTimeMillis() + " by " + req);
+				logger.fine("Request planned for " + table + ':' + id + " on " + System.currentTimeMillis() + " by " + req);
 			} else {
 				// Another thread added request for this element before us
 				req = tmp;
