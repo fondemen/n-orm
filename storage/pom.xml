@@ -7,7 +7,6 @@
 		<relativePath>../parent-aspect/pom.xml</relativePath>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>storage</artifactId>
 	<name>n-orm core</name>
 	<version>${project.parent.version}</version>
@@ -52,4 +51,6 @@ Different data stores are possible, especially column-oriented data stores such 
 			<url>file://${basedir}/../../n-orm.wiki/storage</url>
 		</site>
 	</distributionManagement>
+	<build>
+	</build>
 </project>
