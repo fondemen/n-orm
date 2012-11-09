@@ -136,7 +136,17 @@ public class Constraint {
 				Object actualVal = values.get(keys.get(i));
 				Class<?> type = f.getType();
 				if ((actualVal instanceof String) && (! type.isInstance(actualVal))) {
-					actualVal = ConvertUtils.convert((String)actualVal, type);
+					if (type.isEnum()) {
+						for (Object ec : type.getEnumConstants()) {
+							if (((Enum<?>)ec).name().equals(actualVal)) {
+								actualVal = ec;
+								break;
+							}
+						}
+						if (! type.isInstance(actualVal)) // Enum value not found
+							throw new IllegalArgumentException(actualVal + " is not a possible enum value for key " + f);
+					} else
+						actualVal = ConvertUtils.convert((String)actualVal, type);
 				}
 				String rep = f.getAnnotation(Key.class).reverted() ?
 							ConversionTools.convertToStringReverted(actualVal, type)
