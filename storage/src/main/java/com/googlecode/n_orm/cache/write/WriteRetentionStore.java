@@ -30,7 +30,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PersistingMixin;
+import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.Transient;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
@@ -39,6 +42,34 @@ import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
+/**
+ * A {@link DelegatingStore} that retains all writes
+ * ({@link #storeChanges(MetaInformation, String, String, ColumnFamilyData, Map, Map)}
+ * and {@link #delete(MetaInformation, String, String)}, that is {@link PersistingElement#store()} and
+ * {@link PersistingElement#delete()}) during a certain amount of time. This kind of store is obviously
+ * thread safe, and interesting in case rows are often updated by dramatically lowering the number of
+ * write requests on the {@link #getActualStore() actual store}.
+ * <p>Writes are actually issued to the {@link #getActualStore() actual store} after a
+ * {@link #getWriteRetentionMs() given time}. If other writes for the same persisting element occur during
+ * this period, they are merged with retained write for this persisting element and eventually sent.
+ * As an example, if a persisting element is stored at time t1, changed and stored again at time t2
+ * such that t2-t1 is less than the {@link #getWriteRetentionMs() retention time}, only one store request
+ * is issued to the {@link #getActualStore() actual store}, after t1+{@link #getWriteRetentionMs() retention time}.</p>
+ * <p>Reads (as {@link #get(MetaInformation, String, String, Set)}, {@link PersistingElement#activate(Object[])})
+ * do not explore data "retended" here. As a example, activating, changing, storing, and then
+ * activating again a persisting element using this kind of store can re-activate it as it was before the change.
+ * Same remark holds for testing an element of existence, counting element, or getting a list of elements
+ * that match criteria.</p>
+ * <p>This store can be supervised using {@link #getPendingRequests()}. To grab more metrics (such as the number of
+ * requests {{@link #getRequestsIn()} in}, {@link #getRequestsOut() out},
+ * {@link #getAverageLatencyMs() time between a request should be sent and is sent}...), you need to enable
+ * {@link #setCapureHitRatio(boolean)} to true, which is not the case by default as it introduces some overhead.
+ * It is possible to enable and then disable addtional capture on a regular basis to get metrics samples.
+ * In this latter case, older metrics can be {@link #resetCapureHitRatioMetrics() reseted}.</p>
+ * <p>This store can be activated using {@link Persisting#writeRetentionMs() the @Persisting annotation} on a class
+ * or by setting the {@link StoreSelector#STORE_WRITE_RETENTION with-write-retention} property on the
+ * storage.properties file.</p>
+ */
 public class WriteRetentionStore extends DelegatingStore {
 	public static final Logger logger = Logger.getLogger(DelegatingStore.class.getName()); 
 	
