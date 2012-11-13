@@ -369,11 +369,6 @@ public class Memory implements SimpleStore {
 					protected NavigableMap<Long /* last change */, byte[]> value = new ConcurrentSkipListMap<Long, byte[]>();
 					
 					protected ReentrantReadWriteLock deletionLock = new ReentrantReadWriteLock();
-					
-					/**
-					 * The unsigned number of set operations.
-					 */
-					protected AtomicLong sets = new AtomicLong(Long.MIN_VALUE);
 
 					public ByteValue(String qualifier) {
 						super(qualifier);

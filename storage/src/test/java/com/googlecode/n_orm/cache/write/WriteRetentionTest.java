@@ -267,7 +267,7 @@ public class WriteRetentionTest {
 	
 	@BeforeClass
 	public static void setupPossibleSuts() {
-//		WriteRetentionStore.setCapureHitRatio(true);
+		WriteRetentionStore.setCapureHitRatio(true);
 		
 		sut50Mock = WriteRetentionStore.getWriteRetentionStore(1, mockStore);
 		sut50Mock.start();
@@ -297,16 +297,16 @@ public class WriteRetentionTest {
 		anIncrement.put(incrementedCf, incr );
 	}
 	
-//	@AfterClass
-//	public static void printStats() {
-//		System.out.println("Average latency " + WriteRetentionStore.getAverageLatencyMs());
-//		System.out.println("Cumulative latency " + WriteRetentionStore.getCumulativeLatencyMs());
-//		System.out.println("Counted latencies " + WriteRetentionStore.getLatencySamples());
-//		System.out.println("Requests in " + WriteRetentionStore.getRequestsIn());
-//		System.out.println("Requests out " + WriteRetentionStore.getRequestsOut());
-//		System.out.println("hit ratio " + (100*WriteRetentionStore.getHitRatio()) + '%');
-//		System.out.println("Max threads " + ManagementFactory.getThreadMXBean().getPeakThreadCount());
-//	}
+	@AfterClass
+	public static void printStats() {
+		System.out.println("Average latency " + WriteRetentionStore.getAverageLatencyMs());
+		System.out.println("Cumulative latency " + WriteRetentionStore.getCumulativeLatencyMs());
+		System.out.println("Counted latencies " + WriteRetentionStore.getLatencySamples());
+		System.out.println("Requests in " + WriteRetentionStore.getRequestsIn());
+		System.out.println("Requests out " + WriteRetentionStore.getRequestsOut());
+		System.out.println("hit ratio " + (100*WriteRetentionStore.getHitRatio()) + '%');
+		System.out.println("Max threads " + ManagementFactory.getThreadMXBean().getPeakThreadCount());
+	}
 	
 	@Before
 	public void cleanupStore() {
