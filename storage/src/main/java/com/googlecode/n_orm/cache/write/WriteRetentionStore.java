@@ -22,7 +22,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -41,6 +40,7 @@ import com.googlecode.n_orm.storeapi.DelegatingStore;
 import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+import com.googlecode.n_orm.utils.LongAdder;
 
 /**
  * A {@link DelegatingStore} that retains all writes
@@ -83,7 +83,7 @@ public class WriteRetentionStore extends DelegatingStore {
 	/**
 	 * Number of requests currently being sending
 	 */
-	private static final AtomicInteger requestsBeingSending = new AtomicInteger();
+	private static final LongAdder requestsBeingSending = new LongAdder();
 	
 	/**
 	 * Whether or not hit ratio should be captured
@@ -93,22 +93,22 @@ public class WriteRetentionStore extends DelegatingStore {
 	/**
 	 * Number of requests asked
 	 */
-	private static final AtomicLong requestsIn = new AtomicLong();
+	private static final LongAdder requestsIn = new LongAdder();
 	
 	/**
 	 * Number of requests sent
 	 */
-	private static final AtomicLong requestsOut = new AtomicLong();
+	private static final LongAdder requestsOut = new LongAdder();
 	
 	/**
 	 * Cumulative latencies
 	 */
-	private static final AtomicLong requestsCumulativeLatency = new AtomicLong();
+	private static final LongAdder requestsCumulativeLatency = new LongAdder();
 	
 	/**
 	 * Number of latencies accumulated into {@link #requestsCumulativeLatency}
 	 */
-	private static final AtomicLong requestsLatencySamples = new AtomicLong();
+	private static final LongAdder requestsLatencySamples = new LongAdder();
 	
 	/**
 	 * Whether we are being stopping (JVM shutdown)
@@ -187,7 +187,7 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * The approximate number of pending write requests.
 	 */
 	public static int getPendingRequests() {
-		return writeQueue.size() + requestsBeingSending.get();
+		return writeQueue.size() + requestsBeingSending.intValue();
 	}
 	
 	/**
@@ -208,24 +208,25 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * Resets any hit-ratio-related metrics {@link #getHitRatio()}, {@link #getRequestsIn()}, {@link #getRequestsOut()}, and {@link #getAverageLatencyMs()}
 	 */
 	public static void resetCapureHitRatioMetrics() {
-		requestsLatencySamples.set(0);
-		requestsCumulativeLatency.set(0);
-		requestsIn.set(getPendingRequests());
-		requestsOut.set(0);
+		requestsLatencySamples.reset();
+		requestsCumulativeLatency.reset();
+		requestsIn.reset();
+		requestsIn.add(getPendingRequests());
+		requestsOut.reset();
 	}
 
 	/**
 	 * Number of requests asked ; {@link #isCapureHitRatio()} should be on to capture this metric
 	 */
 	public static long getRequestsIn() {
-		return requestsIn.get();
+		return requestsIn.longValue();
 	}
 
 	/**
 	 * Number of requests sent ; {@link #isCapureHitRatio()} should be on to capture this metric
 	 */
 	public static long getRequestsOut() {
-		return requestsOut.get();
+		return requestsOut.longValue();
 	}
 	
 	/**
@@ -242,14 +243,14 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * The cumulative latency (ms) between time at which a request should have been sent and the time it is actually sent
 	 */
 	public static long getCumulativeLatencyMs() {
-		return requestsCumulativeLatency.get();
+		return requestsCumulativeLatency.longValue();
 	}
 	
 	/**
 	 * Number of latencies accumulated by {@link #getCumulativeLatencyMs()}
 	 */
 	public static long getLatencySamples() {
-		return requestsLatencySamples.get();
+		return requestsLatencySamples.longValue();
 	}
 	
 	/**
@@ -637,7 +638,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		 *            whether this send is a normal operation of a flush operation
 		 */
 		public void send(ExecutorService sender,
-				final AtomicInteger counter, final boolean flushing) {
+				final LongAdder counter, final boolean flushing) {
 			// Can be sent by the eviction thread after a flush
 			if (this.dead) {
 				// No new transaction is ignored
@@ -685,7 +686,7 @@ public class WriteRetentionStore extends DelegatingStore {
 
 			// The action to be ran for sending this request
 			Runnable action;				
-			counter.incrementAndGet();
+			counter.increment();
 			try {
 				
 				// As from this line, we are not considering transactions later than lastTransaction
@@ -796,9 +797,9 @@ public class WriteRetentionStore extends DelegatingStore {
 						public void run() {
 							try {
 								if (!flushing && plannedMs != null && plannedMs > 0) {
-									requestsLatencySamples.incrementAndGet();
+									requestsLatencySamples.increment();
 									long delay = System.currentTimeMillis()-plannedMs;
-									requestsCumulativeLatency.addAndGet(delay);
+									requestsCumulativeLatency.add(delay);
 								}
 								
 								// Deleting all cells if necessary
@@ -812,7 +813,7 @@ public class WriteRetentionStore extends DelegatingStore {
 								logger.log(Level.WARNING, "Catched problem while updating " + StoreRequest.this + " ; some data might have been lost: " + x.getMessage(), x);
 								throw x;
 							} finally {
-								counter.decrementAndGet();
+								counter.decrement();
 								requestSent(lastTransaction);
 							}
 						}
@@ -824,9 +825,9 @@ public class WriteRetentionStore extends DelegatingStore {
 						public void run() {
 							try {
 								if (!flushing && plannedMs != null && plannedMs > 0) {
-									requestsLatencySamples.incrementAndGet();
+									requestsLatencySamples.increment();
 									long delay = System.currentTimeMillis()-plannedMs;
-									requestsCumulativeLatency.addAndGet(delay);
+									requestsCumulativeLatency.add(delay);
 								}
 								
 								getActualStore().delete(meta, row.table, row.id);
@@ -834,7 +835,7 @@ public class WriteRetentionStore extends DelegatingStore {
 								logger.log(Level.WARNING, "Catched problem while deleting " + StoreRequest.this + " ; some data might have been be lost: " + x.getMessage(), x);
 								throw x;
 							} finally {
-								counter.decrementAndGet();
+								counter.decrement();
 								requestSent(lastTransaction);
 							}
 						}
@@ -842,7 +843,7 @@ public class WriteRetentionStore extends DelegatingStore {
 				}
 			
 			} catch (Throwable r) {
-				counter.decrementAndGet();
+				counter.decrement();
 				throw r instanceof RuntimeException ? (RuntimeException)r : new RuntimeException(r);
 			}
 			
@@ -858,7 +859,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		 */
 		private void requestSent(long lastTransactionBeforeSending) {
 			if (captureHitRatio)
-				requestsOut.incrementAndGet();
+				requestsOut.increment();
 			long delay = System.currentTimeMillis() - this.outDateMs.get();
 			assert this.lastSentTransaction >= lastTransactionBeforeSending;
 			this.sendLock.writeLock().lock();
@@ -921,7 +922,7 @@ public class WriteRetentionStore extends DelegatingStore {
 
 	/**
 	 * Code for the thread responsible for reading {@link WriteRetentionStore#writeQueue the queue} and
-	 * {@link StoreRequest#send(ExecutorService, AtomicInteger) sending requests}. Only one thread should 
+	 * {@link StoreRequest#send(ExecutorService, LongAdder) sending requests}. Only one thread should 
 	 * live. A shutdown hook sends all pending requests.
 	 */
 	private static class EvictionThread extends Thread {
@@ -1016,9 +1017,9 @@ public class WriteRetentionStore extends DelegatingStore {
 					r = writeQueue.take();
 					// Requests in preparation of sending are marked twice so that a "0" is
 					// a bit less likely to be a false 0
-					requestsBeingSending.incrementAndGet();
+					requestsBeingSending.increment();
 					r.send(this.sender, requestsBeingSending, false);
-					requestsBeingSending.decrementAndGet();
+					requestsBeingSending.decrement();
 				} catch (InterruptedException e) {
 				} catch (Throwable e) {
 					if (r == null) {
@@ -1150,7 +1151,7 @@ public class WriteRetentionStore extends DelegatingStore {
 	 */
 	private void runLater(String table, String id, Operation r) {
 		if (captureHitRatio)
-			requestsIn.incrementAndGet();
+			requestsIn.increment();
 		RowInTable element = new RowInTable(table, id);
 		while(true) {
 			StoreRequest req = new StoreRequest(element);

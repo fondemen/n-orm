@@ -5,15 +5,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.aspectj.lang.reflect.MethodSignature;
 
+import com.googlecode.n_orm.utils.LongAdder;
+
 public aspect QueryCounter {
-	private AtomicInteger Memory.queries = new AtomicInteger();
+	private LongAdder Memory.queries = new LongAdder();
 	
 	public void Memory.resetQueries() {
-		this.queries.set(0);
+		this.queries.reset();
 	}
 	
 	public int Memory.getQueriesAndReset() {
-		return this.queries.getAndSet(0);
+		int ret = queries.intValue();
+		queries.reset();
+		return ret;
 	}
 	
 	public boolean Memory.hadAQuery() {
@@ -30,7 +34,7 @@ public aspect QueryCounter {
 	
 	before(Memory self): runningQuery(self) && if(self.running == null) {
 		self.running = ((MethodSignature)thisJoinPointStaticPart.getSignature()).getMethod();
-		self.queries.incrementAndGet();
+		self.queries.increment();
 	}
 	
 	after(Memory self): runningQuery(self) {
