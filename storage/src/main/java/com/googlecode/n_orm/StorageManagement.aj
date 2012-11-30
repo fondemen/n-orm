@@ -26,11 +26,13 @@ import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.DelegatingStore;
 import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.cache.write.WriteRetentionStore;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.consoleannotations.Trigger;
@@ -67,6 +69,38 @@ public aspect StorageManagement {
 		}
 		this.exists= Boolean.FALSE;
 		assert !this.existsInStore();
+	}
+	
+	@Continuator
+	public void PersistingElement.storeNoCache() throws DatabaseNotReachedException {
+		// Checking for a write cache
+		Store s = this.getStore();
+		WriteRetentionStore writeCache = null;
+		while (s instanceof DelegatingStore) {
+			if (s instanceof WriteRetentionStore) {
+				writeCache = (WriteRetentionStore)s;
+				// There should have only one write cache in the stack
+				break;
+			}
+			s = ((DelegatingStore)s).getActualStore();
+		}
+		
+		// Performing store request
+		this.store();
+		
+		// Flushing write cache in case it exists
+		if (writeCache != null) {
+			writeCache.flush(this.getTable(), this.getIdentifier());
+			// Handling superclasses
+			Collection<Class<? extends PersistingElement>> persistingSuperClasses = this.getPersistingSuperClasses();
+			if (!persistingSuperClasses.isEmpty()) {
+				PersistingMixin px = PersistingMixin.getInstance();
+				String ident = this.getFullIdentifier();
+				for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
+					writeCache.flush(px.getTable(sc), ident);
+				}
+			}
+		}
 	}
 	
 	@Continuator

@@ -258,4 +258,10 @@ public class DummyPersistingElement implements PersistingElement {
 
 	}
 
+	@Override
+	public void storeNoCache() throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		
+	}
+
 }

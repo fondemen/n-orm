@@ -3,6 +3,8 @@ package com.googlecode.n_orm.storeapi;
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
@@ -20,6 +22,8 @@ public class MetaInformation {
 	private Field property;
 	private PersistingElement element;
 	private String tablePostfix;
+	
+	private final Object mutex = new Object();
 
 	public MetaInformation() {
 	}
@@ -30,6 +34,58 @@ public class MetaInformation {
 		this.property = clone.property;
 		this.element = clone.element;
 		this.tablePostfix = clone.tablePostfix;
+	}
+	
+	/**
+	 * Thread-safe merge of another meta information object.
+	 * Meta information to integrate should have similar element, class, and property.
+	 */
+	public void integrate(MetaInformation rhs) {
+		if (rhs.clazz != null) {
+			if (this.clazz == null)
+				this.clazz = rhs.clazz;
+			else
+				assert this.clazz.equals(rhs.clazz);
+		}
+		
+		if (rhs.element != null) {
+			if (this.element == null)
+				this.element = rhs.element;
+			else
+				assert this.element.equals(rhs.element);
+		}
+		
+		if (rhs.property != null) {
+			if (this.property == null)
+				this.property = rhs.property;
+			else
+				assert this.property.equals(rhs.property);
+		}
+		
+		if (rhs.tablePostfix != null) {
+			if (this.tablePostfix == null)
+				this.tablePostfix = rhs.tablePostfix;
+			else
+				assert this.tablePostfix.equals(rhs.tablePostfix);
+		}
+		
+		if (rhs.families != null) {
+			boolean integrateFamilies = true;
+			if (this.families == null) {
+				synchronized(mutex) {
+					if (this.families == null) {
+						this.families = new ConcurrentSkipListMap<String, Field>(rhs.families);
+						integrateFamilies = false;
+					}
+				}
+			}
+			if (integrateFamilies) {
+				for (Entry<String, Field> fam : rhs.families.entrySet()) {
+					Field old = this.families.put(fam.getKey(), fam.getValue());
+					assert old == null || old.equals(fam.getValue());
+				}
+			}
+		}
 	}
 
 	public MetaInformation forClass(Class<? extends PersistingElement> clazz) {

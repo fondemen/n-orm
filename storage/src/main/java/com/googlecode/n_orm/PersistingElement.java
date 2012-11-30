@@ -19,6 +19,7 @@ import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
+import com.googlecode.n_orm.cache.write.WriteRetentionStore;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.storeapi.SimpleStore;
 import com.googlecode.n_orm.consoleannotations.Continuator;
@@ -159,6 +160,14 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	void store() throws DatabaseNotReachedException;
 	
 	/**
+	 * Store this persisting element as {@link #store()} but ignoring any {@link WriteRetentionStore write cache}.
+	 * Actually, in case this element has a write cache, request is still sent to the cache, but then flushed immediately so that previous requests regarding this element are merged and sent.
+	 * @throws DatabaseNotReachedException
+	 */
+	@Continuator
+	void storeNoCache() throws DatabaseNotReachedException;
+	
+	/**
 	 * Deletes rows representing this persisting element in the store.
 	 * @see #store()
 	 */
@@ -179,7 +188,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * </code><br>
 	 * <br>
 	 * <code>Element elt = new Element("key").getCachedVersion();</code>
-	 * @see com.googlecode.n_orm.cache.Cache
+	 * @see com.googlecode.n_orm.cache.perthread.Cache
 	 */
 	PersistingElement getCachedVersion();
 	

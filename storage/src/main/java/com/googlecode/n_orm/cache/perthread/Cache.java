@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.cache;
+package com.googlecode.n_orm.cache.perthread;
 
 import java.util.HashMap;
 import java.util.Iterator;
