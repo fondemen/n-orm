@@ -6,6 +6,7 @@ import org.junit.Test;
 
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
 import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.cache.write.WriteRetentionStore;
 import com.googlecode.n_orm.memory.Memory;
 
 
@@ -72,5 +73,57 @@ public class StoreTest {
 	
 	@Test public void testSameStore() {
 		assertSame(new com.googlecode.n_orm.simplestoragefile.Element().getStore(), new com.googlecode.n_orm.simplestoragefile.Element2().getStore());
+	}
+	
+	@Persisting(writeRetentionMs=2)
+	public static class WriteRetendedPE {
+		@Key public String key;
+	}
+	@Test public void testWriteRetensionStore() {
+		WriteRetendedPE p = new WriteRetendedPE();
+		Store s = p.getStore();
+		assertEquals(WriteRetentionStore.class, s.getClass());
+		assertEquals(2, ((WriteRetentionStore)s).getWriteRetentionMs());
+		
+		//Checking access from cache
+		p = new WriteRetendedPE();
+		Store s2 = p.getStore();
+		assertSame(s, s2);
+	}
+	
+	@Test public void testWriteRetensionStoreStorageFile() {
+		com.googlecode.n_orm.writeretentionstoragefile.Element p = new com.googlecode.n_orm.writeretentionstoragefile.Element();
+		Store s = p.getStore();
+		assertEquals(WriteRetentionStore.class, s.getClass());
+		assertEquals(3, ((WriteRetentionStore)s).getWriteRetentionMs());
+		
+		//Checking access from cache
+		p = new com.googlecode.n_orm.writeretentionstoragefile.Element();
+		Store s2 = p.getStore();
+		assertSame(s, s2);
+	}
+	
+	@Test public void testWriteRetensionStoreStorageFileOverridden() {
+		com.googlecode.n_orm.writeretentionstoragefile.ElementWithWRSet p = new com.googlecode.n_orm.writeretentionstoragefile.ElementWithWRSet();
+		Store s = p.getStore();
+		assertEquals(WriteRetentionStore.class, s.getClass());
+		assertEquals(4, ((WriteRetentionStore)s).getWriteRetentionMs());
+		
+		//Checking access from cache
+		p = new com.googlecode.n_orm.writeretentionstoragefile.ElementWithWRSet();
+		Store s2 = p.getStore();
+		assertSame(s, s2);
+	}
+	
+	@Test public void testWriteRetensionStoreStorageFileOverriddenWithSameParameter() {
+		com.googlecode.n_orm.writeretentionstoragefile.Element o = new com.googlecode.n_orm.writeretentionstoragefile.Element();
+		com.googlecode.n_orm.writeretentionstoragefile.ElementWithSameWRSet p = new com.googlecode.n_orm.writeretentionstoragefile.ElementWithSameWRSet();
+		Store s1 = p.getStore(), s2 = o.getStore();
+		assertSame(s1, s2);
+		
+		//Checking access from cache
+		p = new com.googlecode.n_orm.writeretentionstoragefile.ElementWithSameWRSet();
+		s2 = p.getStore();
+		assertSame(s1, s2);
 	}
 }
