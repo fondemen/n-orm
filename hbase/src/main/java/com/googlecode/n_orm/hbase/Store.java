@@ -52,7 +52,6 @@ import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
-import org.apache.hadoop.hbase.filter.PageFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.io.hfile.Compression;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
@@ -1951,7 +1950,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		Map<String, Field> cf = toMap(families, meta);
 		
 		Scan s = this.getScan(c, meta.getClazz(), cf);
-		s.setFilter(this.addFilter(s.getFilter(), new PageFilter(limit)));
+		int cacheSize = s.getCaching();
+		if (cacheSize > limit)
+			s.setCaching(limit);
 		
 		ResultScanner r = this.tryPerform(new ScanAction(s), meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), cf);
 		return new CloseableIterator(this, meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), c, limit, cf, r, cf != null);
