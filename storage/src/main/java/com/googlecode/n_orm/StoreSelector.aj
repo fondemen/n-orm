@@ -283,7 +283,14 @@ public aspect StoreSelector {
 
 				if (ret.properties.containsKey(STORE_WRITE_RETENTION)) {
 					String wrStr = ret.properties.getProperty(STORE_WRITE_RETENTION);
-					ret.store = WriteRetentionStore.getWriteRetentionStore(Long.parseLong(wrStr), ret.store);
+					boolean disabled = wrStr.endsWith("-disabled");
+					if (disabled) {
+						wrStr = wrStr.substring(0, wrStr.length() - "-disabled".length());
+					}
+					WriteRetentionStore wrs = WriteRetentionStore.getWriteRetentionStore(Long.parseLong(wrStr), ret.store);
+					if(disabled)
+						wrs.setEnabledByDefault(false);
+					ret.store = wrs;
 				}
 
 				ret = checkForRetention(ret, clazz);
