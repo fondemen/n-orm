@@ -60,6 +60,10 @@ import com.googlecode.n_orm.utils.LongAdder;
  * activating again a persisting element using this kind of store can re-activate it as it was before the change.
  * Same remark holds for testing an element of existence, counting element, or getting a list of elements
  * that match criteria.</p>
+ * <p>This store can be deactivated ; in the latter case, it merely acts as a delegating store with no delay.
+ * To en/de-activate, use {@link #setEnabledByDefault(boolean)}. A thread can anyway be authorized to activate for
+ * itself (and only itself) any de-activated write retention store if calling before
+ * {@link #setEnabledForCurrentThread(boolean)}.</p>
  * <p>This store can be supervised using {@link #getPendingRequests()}. To grab more metrics (such as the number of
  * requests {{@link #getRequestsIn()} in}, {@link #getRequestsOut() out},
  * {@link #getAverageLatencyMs() time between a request should be sent and is sent}...), you need to enable
@@ -72,13 +76,19 @@ import com.googlecode.n_orm.utils.LongAdder;
  */
 public class WriteRetentionStore extends DelegatingStore {
 	public static final Logger logger = Logger.getLogger(DelegatingStore.class.getName()); 
-	
+
 	private static final byte[] DELETED_VALUE = new byte[0];
+	private static final byte[] NULL_VALUE = new byte[0];
 	
 	/**
 	 * Event queue
 	 */
 	private static final DelayQueue<StoreRequest> writeQueue = new DelayQueue<StoreRequest>();
+	
+	/**
+	 * Whether write retention should be enabled for a given thread
+	 */
+	private static ThreadLocal<Boolean> enabled = new ThreadLocal<Boolean>();
 	
 	/**
 	 * Number of requests currently being sending
@@ -181,6 +191,23 @@ public class WriteRetentionStore extends DelegatingStore {
 			res.add(ret);
 			return ret;
 		}
+	}
+
+	/**
+	 * Whether write retention should be enabled for this thread even for
+	 * {@link #setEnabledByDefault(boolean) de-activated} write-retention stores.
+	 */
+	public static boolean isEnabledForCurrentThread() {
+		Boolean ret = enabled.get();
+		return ret != null && ret;
+	}
+
+	/**
+	 * Whether write retention should be enabled for this thread even for
+	 * {@link #setEnabledByDefault(boolean) de-activated} write-retention stores.
+	 */
+	public static void setEnabledForCurrentThread(boolean enabled) {
+		WriteRetentionStore.enabled.set(enabled);
 	}
 
 	/**
@@ -499,8 +526,9 @@ public class WriteRetentionStore extends DelegatingStore {
 							ConcurrentNavigableMap<Long, Object> columnData = this
 									.getColumnData(famChanges.getKey(),
 											famData, colChange.getKey());
+							byte[] chval = colChange.getValue();
 							Object old = columnData.put(transactionId,
-									colChange.getValue());
+									chval == null ? NULL_VALUE : chval);
 							// There must not have a previous put for the same transaction
 							assert old == null;		
 							
@@ -740,7 +768,7 @@ public class WriteRetentionStore extends DelegatingStore {
 										chgCols = new TreeMap<String, byte[]>();
 										changes.put(famData.getKey(), chgCols);
 									}
-									chgCols.put(colData.getKey(), (byte[]) latest);
+									chgCols.put(colData.getKey(), latest == null ? null : (byte[]) latest);
 								}
 							} else {
 								assert latest instanceof Number;
@@ -1060,6 +1088,11 @@ public class WriteRetentionStore extends DelegatingStore {
 	 */
 	private long writeRetentionMs;
 	
+	/**
+	 * Whether write retention should be enabled by default
+	 */
+	private boolean enabledByDefault = true;
+	
 	private WriteRetentionStore(long writeRetentionMs, Store s) {
 		super(s);
 		this.writeRetentionMs = writeRetentionMs;
@@ -1075,6 +1108,21 @@ public class WriteRetentionStore extends DelegatingStore {
 	 */
 	public long getWriteRetentionMs() {
 		return writeRetentionMs;
+	}
+
+	/**
+	 * Whether write retention is enabled by default for thread that did not call {@link #setEnabledForCurrentThread(boolean)}.
+	 */
+	public boolean isEnabledByDefault() {
+		return this.enabledByDefault;
+	}
+
+
+	/**
+	 * Whether write retention is enabled by default for thread that did not call {@link #setEnabledForCurrentThread(boolean)}.
+	 */
+	public void setEnabledByDefault(boolean enabled) {
+		this.enabledByDefault = enabled;
 	}
 
 	@Override
@@ -1103,7 +1151,7 @@ public class WriteRetentionStore extends DelegatingStore {
 	@Override
 	public void delete(final MetaInformation meta, String table, String id)
 			throws DatabaseNotReachedException {
-		if (shutdown) {
+		if (!isRetending()) {
 			this.getActualStore().delete(meta, table, id);
 			return;
 		}
@@ -1123,7 +1171,7 @@ public class WriteRetentionStore extends DelegatingStore {
 			final Map<String, Set<String>> removed,
 			final Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {
-		if (shutdown) {
+		if (!isRetending()) {
 			this.getActualStore().storeChanges(meta, table, id, changed,
 					removed, increments);
 			return;
@@ -1136,6 +1184,16 @@ public class WriteRetentionStore extends DelegatingStore {
 				req.update(meta, changed, removed, increments);
 			}
 		});
+	}
+
+	/**
+	 * Whether this store is actually retending writes.
+	 * It will return true if JVM is not in a shutdown process and if store is
+	 * {@link #setEnabledByDefault(boolean) enabled} or thread is
+	 * {@link #setEnabledForCurrentThread(boolean) enabled}.
+	 */
+	private boolean isRetending() {
+		return !shutdown && (this.isEnabledByDefault() || isEnabledForCurrentThread());
 	}
 
 	/**
