@@ -20,6 +20,7 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cache.write.WriteRetentionStore;
+import com.googlecode.n_orm.storeapi.DelegatingStore;
 import com.googlecode.n_orm.storeapi.SimpleStore;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
@@ -294,6 +295,14 @@ public aspect StoreSelector {
 				throw new DatabaseNotReachedException(x);
 			}
 		}
+	}
+
+	/**
+	 * Get store for given class bypassing any {@link com.googlecode.n_orm.storeapi.DelegatingStore}
+	 */
+	public Store getActualStoreFor(Class<? extends PersistingElement> clazz) throws DatabaseNotReachedException {
+		Store ret = this.getStoreFor(clazz);
+		return ret instanceof DelegatingStore ? ((DelegatingStore)ret).getDeepActualStore() : ret;
 	}
 	
 	private StoreProperties checkForRetention(StoreProperties sp,

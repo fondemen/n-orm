@@ -130,6 +130,13 @@ public aspect FederatedTableManagement {
 		public TableAlternatives(String mainTable) {
 			this.mainTable = mainTable;
 		}
+		
+		/**
+		 * Returns the store bypassing any cache.
+		 */
+		private Store getActualStore(Store store) {
+			return store instanceof DelegatingStore ? ((DelegatingStore)store).getActualStore() : store;
+		}
 
 		/**
 		 * Updates alternatives according to meta-informations stored in the
@@ -150,6 +157,9 @@ public aspect FederatedTableManagement {
 
 				// Reminding when alternatives were last updated
 				this.lastUpdate = now;
+				
+				//Bypassing any cache
+				store = this.getActualStore(store);
 
 				// Querying the store (to be found as qualifiers for columns)
 				// Table is FEDERATED_META_TABLE
@@ -219,6 +229,10 @@ public aspect FederatedTableManagement {
 			if (this.postfixes.add(postfix) && store != null) {
 				// We were not aware of that alternative ;
 				// let's register in the store
+				
+				//Bypassing any cache
+				store = this.getActualStore(store);
+				
 				// Table is FEDERATED_META_TABLE
 				// key is the original table
 				// family is FEDERATED_META_COLUMN_FAMILY
