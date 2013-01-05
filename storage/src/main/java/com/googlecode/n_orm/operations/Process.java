@@ -198,7 +198,7 @@ public class Process {
 
 	public static <AE extends PersistingElement, E extends AE> void processElementsRemotely(final Class<E> clazz, final Constraint c, final com.googlecode.n_orm.Process<AE> process, final Callback callback, final int limit, final String[] families, final int threadNumber, final long timeout) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
 		
-		Store store = StoreSelector.getInstance().getStoreFor(clazz);
+		Store store = StoreSelector.getInstance().getActualStoreFor(clazz);
 		if (store instanceof ActionnableStore) {
 			Map<String, Field> autoActivatedFamilies = StorageManagement.getAutoActivatedFamilies(clazz, families);
 			((ActionnableStore)store).process(new MetaInformation().forClass(clazz).withColumnFamilies(autoActivatedFamilies), PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies == null ? null : autoActivatedFamilies.keySet(), clazz, process, callback);
