@@ -1,24 +1,24 @@
 package com.googlecode.n_orm.storeapi;
 
 import java.lang.reflect.Field;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.Transient;
+import com.googlecode.n_orm.utils.UnmodifiableOverridingMap;
 
 /**
  * Simple unchecked class to be sent to data stores for additional and optional
  * information regarding queries.
  */
 public class MetaInformation {
-
+	
 	// Adding a field here should alter the cloning constructor, equals and
 	// hascode methods.
 	private Class<? extends PersistingElement> clazz;
-	private Map<String, Field> families;
+	@Transient private Map<String, Field> families;
 	private Field property;
 	private PersistingElement element;
 	private String tablePostfix;
@@ -70,21 +70,16 @@ public class MetaInformation {
 		}
 		
 		if (rhs.families != null) {
-			boolean integrateFamilies = true;
-			if (this.families == null) {
+			if (this.families == null || !(this.families instanceof UnmodifiableOverridingMap)) {
 				synchronized(mutex) {
-					if (this.families == null) {
-						this.families = new ConcurrentSkipListMap<String, Field>(rhs.families);
-						integrateFamilies = false;
+					if (this.families == null || !(this.families instanceof UnmodifiableOverridingMap)) {
+						Map<String, Field> oldFam = this.families;
+						this.families = new UnmodifiableOverridingMap<String, Field>();
+						((UnmodifiableOverridingMap<String, Field>)this.families).override(oldFam);
 					}
 				}
 			}
-			if (integrateFamilies) {
-				for (Entry<String, Field> fam : rhs.families.entrySet()) {
-					Field old = this.families.put(fam.getKey(), fam.getValue());
-					assert old == null || old.equals(fam.getValue());
-				}
-			}
+			((UnmodifiableOverridingMap<String, Field>)this.families).override(rhs.families);
 		}
 	}
 
@@ -106,7 +101,7 @@ public class MetaInformation {
 	}
 
 	public MetaInformation withColumnFamilies(Map<String, Field> families) {
-		this.families = families == null ? null : Collections.unmodifiableMap(families);
+		this.families = families == null ? null : new HashMap<String, Field>(families);
 		return this;
 	}
 
