@@ -202,7 +202,7 @@ public class ProcessTest {
 			com.googlecode.n_orm.operations.Process.ProcessReport<Novel> ret = StorageManagement.findElements().ofClass(Novel.class).withAtMost(1000).elements().forEach(new ThreadUnsafeProcess(), 3, 20000, executor);
 			assertTrue(ret.awaitTermination(10000));
 			executor.shutdown();
-			assertTrue(executor.awaitTermination(1, TimeUnit.MILLISECONDS));
+			assertTrue(executor.awaitTermination(5, TimeUnit.MILLISECONDS));
 		 }
 
 }

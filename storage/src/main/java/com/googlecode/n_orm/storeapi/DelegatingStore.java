@@ -17,8 +17,39 @@ public class DelegatingStore implements Store {
 		this.actualStore = actualStore;
 	}
 	
+	/**
+	 * Returns the {@link Store} to which requests will be delegated to.
+	 */
 	public Store getActualStore() {
 		return this.actualStore;
+	}
+	
+	/**
+	 * Finds the {@link Store} to which requests will be delegated to in the delegation chains of the given class.
+	 */
+	public <T extends Store> T getActualStore(Class<T>clazz) {
+		Store ret = this;
+		while (true) {
+			if (ret == null)
+				return null;
+			else if (clazz.isInstance(ret))
+				return clazz.cast(ret);
+			else if (ret instanceof DelegatingStore)
+				ret = ((DelegatingStore)ret).getActualStore();
+			else
+				return null;
+		}
+	}
+	
+	
+	/**
+	 * Returns the leaf {@link Store} of the delegation chain.
+	 */
+	public Store getDeepActualStore() {
+		Store ret = this.getActualStore();
+		while (ret instanceof DelegatingStore)
+			ret = ((DelegatingStore)ret).getActualStore();
+		return ret;
 	}
 	
 	public void start() throws DatabaseNotReachedException {

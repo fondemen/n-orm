@@ -59,7 +59,8 @@ public aspect StorageManagement {
 
 	@Continuator
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
-		this.getStore().delete(new MetaInformation().forElement(this), this.getTable(), this.getIdentifier());
+		Store s = this.getStore();
+		s.delete(new MetaInformation().forElement(this), this.getTable(), this.getIdentifier());
 		Collection<Class<? extends PersistingElement>> psc = this.getPersistingSuperClasses();
 		if (!psc.isEmpty()) {
 			PersistingMixin px = PersistingMixin.getInstance();
@@ -68,7 +69,8 @@ public aspect StorageManagement {
 			}
 		}
 		this.exists= Boolean.FALSE;
-		assert !this.existsInStore();
+		assert ((s instanceof DelegatingStore) && ((DelegatingStore)s).getActualStore(WriteRetentionStore.class) != null)
+			|| !this.existsInStore() : "delete for " + this + " failed: still found in data store";
 	}
 	
 	@Continuator
