@@ -131,6 +131,11 @@ public class WriteRetentionStore extends DelegatingStore {
 	private static final EvictionThread evictionThread;
 	
 	/**
+	 * Maximum global number of threads used for sending requests to store
+	 */
+	private static volatile int MAX_SENDER_THREADS = 40;
+	
+	/**
 	 * Known stores
 	 */
 	private static final Map<Integer, Collection<WriteRetentionStore>> knownStores = new HashMap<Integer, Collection<WriteRetentionStore>>();
@@ -209,6 +214,21 @@ public class WriteRetentionStore extends DelegatingStore {
 	public static void setEnabledForCurrentThread(boolean enabled) {
 		WriteRetentionStore.enabled.set(enabled);
 	}
+
+	/**
+	 * Maximum global number of threads used for sending requests to store ; default is 40.
+	 */
+	public static int getMaxSenderThreads() {
+		return MAX_SENDER_THREADS;
+	}
+
+	/**
+	 * Maximum global number of threads used for sending requests to store
+	 */
+	public static void setMaxSenderThreads(int maxSenderThreads) {
+		MAX_SENDER_THREADS = maxSenderThreads;
+	}
+
 
 	/**
 	 * The approximate number of pending write requests.
@@ -961,7 +981,7 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * live. A shutdown hook sends all pending requests.
 	 */
 	private static class EvictionThread extends Thread {
-		private final ExecutorService sender = Executors.newCachedThreadPool(new ThreadFactory() {
+		private final ExecutorService sender = Executors.newFixedThreadPool(MAX_SENDER_THREADS, new ThreadFactory() {
 			
 			@Override
 			public Thread newThread(Runnable r) {
