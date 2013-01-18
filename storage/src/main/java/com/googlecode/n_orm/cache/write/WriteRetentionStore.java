@@ -349,7 +349,10 @@ public class WriteRetentionStore extends DelegatingStore {
 				return 1;
 			if (this == o)
 				return 0;
-			return this.h - o.h;
+			int ret = this.h - o.h;
+			if (ret != 0)
+				return ret;
+			return this.table.compareTo(o.table) + this.id.compareTo(o.id);
 		}
 		
 		@Override
@@ -455,6 +458,8 @@ public class WriteRetentionStore extends DelegatingStore {
 			}
 
 			long ret = this.transactionDistributor.incrementAndGet();
+			
+			assert this.lastSentTransaction == null || ret > this.lastSentTransaction;
 
 			if (captureHitRatio && this.outDateMs.get() != -1) {
 				Entry<Long, Long> old = outDates.floorEntry(ret);
@@ -471,7 +476,9 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * 
 		 * @throws RequestIsOutException
 		 */
-		private void doneUpdate() throws RequestIsOutException {
+		private void doneUpdate(long transaction) throws RequestIsOutException {
+			assert this.lastSentTransaction == null || transaction > this.lastSentTransaction;
+			
 			this.sendLock.readLock().unlock();
 		}
 
@@ -496,7 +503,7 @@ public class WriteRetentionStore extends DelegatingStore {
 					}
 				}
 			} finally {
-				this.doneUpdate();
+				this.doneUpdate(transaction);
 			}
 		}
 
@@ -580,7 +587,7 @@ public class WriteRetentionStore extends DelegatingStore {
 					}
 				}
 			} finally {
-				this.doneUpdate();
+				this.doneUpdate(transactionId);
 			}
 		}
 
@@ -693,7 +700,12 @@ public class WriteRetentionStore extends DelegatingStore {
 				}
 				lastSentTransaction = this.lastSentTransaction;
 				this.lastSentTransaction = lastTransactionTmp;
+
+				// This request should be the one for this row
+				assert this == writesByRows.get(this.row);
 				
+				// As from this line, there MUST be a send request
+				this.outDateMs.set(-1);
 				// Preparing this request to be used while current status is being sent by resetting all
 				elements = this.elements;
 				this.elements = new ConcurrentHashMap<String, ConcurrentMap<String,ConcurrentNavigableMap<Long,Object>>>();
@@ -701,16 +713,11 @@ public class WriteRetentionStore extends DelegatingStore {
 				this.deletions = new ConcurrentSkipListSet<Long>();
 				metaTmp = this.meta.getAndSet(null);
 				
-				// As from this line, there MUST be a send request
-				this.outDateMs.set(-1);
 			} finally {
 				this.sendLock.writeLock().unlock();
 			}
 			final MetaInformation meta = metaTmp;
 			final long lastTransaction = lastTransactionTmp;
-			
-			// This request should be the one for this row
-			assert this == writesByRows.get(this.row);
 
 			// The action to be ran for sending this request
 			Runnable action;				
