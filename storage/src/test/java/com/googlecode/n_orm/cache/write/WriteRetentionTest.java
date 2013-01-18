@@ -31,12 +31,15 @@ import org.junit.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
+import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+import com.googlecode.n_orm.storeapi.DelegatingStore;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
 import com.googlecode.n_orm.storeapi.Store;
 
@@ -56,6 +59,8 @@ public class WriteRetentionTest {
 	private static WriteRetentionStore sut50;
 	private static WriteRetentionStore sut200;
 	private static WriteRetentionStore sut50Mock;
+	private static WriteRetentionStore sutSlowDS;
+	private static WriteRetentionStore sutSlowMock;
 	private static Store store = SimpleStoreWrapper.getWrapper(Memory.INSTANCE);
 	private static Store mockStore = Mockito.mock(Store.class);
 	
@@ -69,6 +74,66 @@ public class WriteRetentionTest {
 		sut50.start();
 		sut200 = WriteRetentionStore.getWriteRetentionStore(200, store);
 		sut200.start();
+
+		sutSlowDS = WriteRetentionStore.getWriteRetentionStore(50, new DelegatingStore(store) {
+
+			@Override
+			public void delete(MetaInformation meta, String table, String id)
+					throws DatabaseNotReachedException {
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException x) {
+					assert false;
+				}
+				super.delete(meta, table, id);
+			}
+
+			@Override
+			public void storeChanges(MetaInformation meta, String table,
+					String id, ColumnFamilyData changed,
+					Map<String, Set<String>> removed,
+					Map<String, Map<String, Number>> increments)
+					throws DatabaseNotReachedException {
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException x) {
+					assert false;
+				}
+				super.storeChanges(meta, table, id, changed, removed, increments);
+			}
+			
+		});
+		sutSlowDS.start();
+		
+		sutSlowMock = WriteRetentionStore.getWriteRetentionStore(50, new DelegatingStore(mockStore) {
+
+			@Override
+			public void delete(MetaInformation meta, String table, String id)
+					throws DatabaseNotReachedException {
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException x) {
+					assert false;
+				}
+				super.delete(meta, table, id);
+			}
+
+			@Override
+			public void storeChanges(MetaInformation meta, String table,
+					String id, ColumnFamilyData changed,
+					Map<String, Set<String>> removed,
+					Map<String, Map<String, Number>> increments)
+					throws DatabaseNotReachedException {
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException x) {
+					assert false;
+				}
+				super.storeChanges(meta, table, id, changed, removed, increments);
+			}
+			
+		});
+		sutSlowMock.start();
 		
 		aChange = new DefaultColumnFamilyData();
 		Map<String, byte[]> changedValues = new TreeMap<String, byte[]>();
@@ -433,9 +498,105 @@ public class WriteRetentionTest {
 		//System.out.println("sent " + sentQueries + "(expected " + (1+(duration/50)) + ") ; asked " + askedQueries);
 	}
 	
+	@Test(timeout=5000)
+	public void continuousWriteOnSlowDS() {
+		WriteRetentionStore sut = sutSlowDS;
+		
+		long start = System.currentTimeMillis();
+		long askedQueries = 0;
+		long sentQueries = 0;
+		
+		do {
+			sut.storeChanges(null, table, rowId, aChange, null, null);
+			askedQueries++;
+		} while(System.currentTimeMillis()-start < 80);
+		int memQueries = 0;
+		//Waiting for a query to be sent
+		while((memQueries = Memory.INSTANCE.getQueriesAndReset()) == 0) {
+			sut.storeChanges(null, table, rowId, aChange, null, null);
+			askedQueries++;
+			Thread.yield();
+		}
+		sentQueries += memQueries;
+		// Checking correct values are stored
+		while (store.get(null, table, rowId, changedCf, changedKey)==null) Thread.yield();
+		assertArrayEquals(changedValue1, store.get(null, table, rowId, changedCf, changedKey));
+		do {
+			sut.storeChanges(null, table, rowId, anotherChange, null, null);
+			askedQueries++;
+		} while(System.currentTimeMillis()-start < 140);
+		this.waitForPendingRequests();
+		long duration = System.currentTimeMillis()-start;
+		sentQueries += Memory.INSTANCE.getQueriesAndReset();
+		
+		assertTrue(sentQueries < askedQueries);
+		assertTrue(sentQueries <= (1+(duration/50)));
+		assertArrayEquals(changedValue2, store.get(null, table, rowId, changedCf, changedKey));
+		//System.out.println("sent " + sentQueries + "(expected " + (1+(duration/50)) + ") ; asked " + askedQueries);
+	}
+	
 	@Test(timeout=10000)
 	public void continuousWriteMultiThreaded() throws InterruptedException, ExecutionException {
 		final WriteRetentionStore sut = sut50Mock;
+		int parallelWrites = 200;
+
+		final CountDownLatch changing = new CountDownLatch(parallelWrites);
+		final AtomicLong start = new AtomicLong();
+		
+		Runnable wr = new Runnable() {
+			
+			@Override
+			public void run() {
+				
+				start.compareAndSet(0, System.currentTimeMillis());
+				
+				//Writing during at least 50ms so that a request is out
+				while (System.currentTimeMillis()-start.get() < 60) {
+					sut.storeChanges(null, table, rowId, aChange, null, null);
+				}
+				
+				changing.countDown();
+				try {
+					changing.await();
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+
+				sut.storeChanges(null, table, rowId, null, aDelete, null);
+				sut.storeChanges(null, table, rowId, null, aDelete, null);
+				sut.storeChanges(null, table, rowId, null, aDelete, null);
+			}
+		};
+
+		Map<String, Set<String>> emptyRem = new TreeMap<String, Set<String>>();
+		Map<String, Map<String, Number>> emptyInc = new TreeMap<String, Map<String,Number>>();
+		InOrder inOrder = Mockito.inOrder(mockStore);
+
+		Collection<Future<?>> results = new LinkedList<Future<?>>();
+		ExecutorService es = new FixedThreadPool(parallelWrites);
+		for (int i = 0; i < parallelWrites; i++) {
+			results.add(es.submit(wr));
+		}
+		es.shutdown();
+		
+		//Waiting for results and checking exceptions
+		for (Future<?> f : results) {
+			f.get();
+		}
+
+		this.waitForPendingRequests();
+		Thread.yield();
+		this.waitForPendingRequests();
+		
+		//Checking sent requests
+		inOrder.verify(mockStore, Mockito.atLeastOnce()).storeChanges(null, table, rowId, aChange, emptyRem , emptyInc );
+		inOrder.verify(mockStore, Mockito.atLeastOnce()).storeChanges(null, table, rowId, new DefaultColumnFamilyData(), aDelete, emptyInc);
+		inOrder.verifyNoMoreInteractions();
+	}
+	
+	@Test(timeout=10000)
+	public void continuousWriteMultiThreadedOnSLowDS() throws InterruptedException, ExecutionException {
+		final WriteRetentionStore sut = sutSlowMock;
 		int parallelWrites = 200;
 
 		final CountDownLatch changing = new CountDownLatch(parallelWrites);
@@ -532,8 +693,98 @@ public class WriteRetentionTest {
 	}
 	
 	@Test
+	public void parrallelIncrementsOnSlowDataStore() throws Exception {
+		WriteRetentionStore.setCapureHitRatio(true);
+		
+		final WriteRetentionStore sut = sutSlowDS;
+		int parallelWrites = 200;
+		final AtomicLong start = new AtomicLong();
+		
+		Runnable r = new Runnable() {
+			
+			@Override
+			public void run() {
+				start.compareAndSet(0, System.currentTimeMillis());
+				sut.storeChanges(null, table, rowId, null, null, anIncrement);
+			}
+		};
+
+		Collection<Future<?>> results = new LinkedList<Future<?>>();
+		ExecutorService es =  new FixedThreadPool(parallelWrites);
+		for (int i = 0; i < parallelWrites; i++) {
+			results.add(es.submit(r));
+		}
+		es.shutdown();
+		
+		//Waiting for results and checking exceptions
+		for (Future<?> f : results) {
+			f.get();
+		}
+		
+		this.waitForPendingRequests();
+		long duration = System.currentTimeMillis()-start.get();
+		
+		int q = Memory.INSTANCE.getQueriesAndReset();
+		assertEquals(Long.valueOf(parallelWrites), ConversionTools.convert(Long.class, Memory.INSTANCE.get(table, rowId, incrementedCf, incrementedKey)));
+		assertTrue(q > 0);
+		//assertTrue(1+2*(duration/50) > q);
+		System.out.println("sent: " + q + " ; asked " + parallelWrites + " ; duration " + duration);
+	}
+	
+	@Test
 	public void parrallelIncrementsWithSomeFlushes() throws Exception {
 		final WriteRetentionStore sut = sut50;
+		int parallelWrites = 200;
+		final AtomicLong start = new AtomicLong();
+		
+		Runnable r = new Runnable() {
+			
+			@Override
+			public void run() {
+				start.compareAndSet(0, System.currentTimeMillis());
+				sut.storeChanges(null, table, rowId, null, null, anIncrement);
+			}
+		};
+		
+		Runnable rf = new Runnable() {
+			
+			@Override
+			public void run() {
+				start.compareAndSet(0, System.currentTimeMillis());
+				sut.storeChanges(null, table, rowId, null, null, anIncrement);
+				sut.flush(table, rowId);
+			}
+		};
+
+		Collection<Future<?>> results = new LinkedList<Future<?>>();
+		ExecutorService es =  new FixedThreadPool(parallelWrites);
+		for (int i = 0; i < parallelWrites; i++) {
+			if (i%10 != 0) {
+				results.add(es.submit(r));
+			} else {
+				results.add(es.submit(rf));
+			}
+		}
+		es.shutdown();
+		
+		//Waiting for results and checking exceptions
+		for (Future<?> f : results) {
+			f.get();
+		}
+		
+		this.waitForPendingRequests();
+		long duration = System.currentTimeMillis()-start.get();
+		
+		int q = Memory.INSTANCE.getQueriesAndReset();
+		assertTrue(q > 0);
+		assertEquals(Long.valueOf(parallelWrites), ConversionTools.convert(Long.class, Memory.INSTANCE.get(table, rowId, incrementedCf, incrementedKey)));
+		assertTrue(1+2*(duration/50)+parallelWrites/10 > q);
+		//System.out.println("sent: " + q +" (expected " + (parallelWrites/10 + duration/50) + ") ; asked " + parallelWrites);
+	}
+	
+	@Test
+	public void parrallelIncrementsWithSomeFlushesOnSlowDS() throws Exception {
+		final WriteRetentionStore sut = sutSlowDS;
 		int parallelWrites = 200;
 		final AtomicLong start = new AtomicLong();
 		
@@ -585,6 +836,49 @@ public class WriteRetentionTest {
 	@Test(timeout=10000)
 	public void continuousWriteMultiThreadedOnDifferentKeys() throws InterruptedException, ExecutionException {
 		final WriteRetentionStore sut = sut50;
+		int parallelWrites = 200;
+
+		Collection<Future<?>> results = new LinkedList<Future<?>>();
+		ExecutorService es = new FixedThreadPool(parallelWrites);
+		for (int i = 0; i < parallelWrites; i++) {
+			final int nr = i;
+			results.add(es.submit(new Runnable() {
+				
+				@Override
+				public void run() {
+					String id = rowId + nr;
+					
+					sut.storeChanges(null, table, id, aChange, null, null);
+				}
+			}));
+		}
+		es.shutdown();
+		
+		//Waiting for results and checking exceptions
+		for (Future<?> f : results) {
+			f.get();
+		}
+
+		this.waitForPendingRequests();
+		Thread.yield();
+		this.waitForPendingRequests();
+		
+		//Checking all ids are here
+		for(int i = 0; i < parallelWrites; ++i) {
+			String id = rowId+i;
+			boolean exists = Memory.INSTANCE.exists(table, id);
+			if (! exists)
+				this.waitForPendingRequests();
+				
+			assertTrue("Can't find element " + id, Memory.INSTANCE.exists(table, id));
+		}
+		assertFalse(Memory.INSTANCE.exists(table, rowId+parallelWrites));
+		assertFalse(Memory.INSTANCE.exists(table, rowId+(parallelWrites+1)));
+	}
+	
+	@Test(timeout=10000)
+	public void continuousWriteMultiThreadedOnDifferentKeysOnSlowDataStore() throws InterruptedException, ExecutionException {
+		final WriteRetentionStore sut = sutSlowDS;
 		int parallelWrites = 200;
 
 		Collection<Future<?>> results = new LinkedList<Future<?>>();
