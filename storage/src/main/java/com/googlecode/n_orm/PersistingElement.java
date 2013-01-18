@@ -175,6 +175,14 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	void delete() throws DatabaseNotReachedException;
 	
 	/**
+	 * Deletes rows representing this persisting element in the store.
+	 * Actually, in case this element has a write cache, request is still sent to the cache, but then flushed immediately so that previous requests regarding this element are merged and sent.
+	 * @see #store()
+	 */
+	@Continuator
+	void deleteNoCache() throws DatabaseNotReachedException;
+	
+	/**
 	 * If an element with the same id as this element exists in the cache, returns the element from the cache, otherwise returns this element which will be placed in the cache.
 	 * Advantage of this method is to use as much as possible the internal cache, which makes possible to get a possibly already activated object, and get results faster using {@link #exists()}, {@link #activateIfNotAlready(String...)}, {@link #activateColumnFamilyIfNotAlready(String)}, or {@link #activateColumnFamilyIfNotAlready(String, Object, Object)}.<br>
 	 * Typically, this method is used just after the object construction, as soon as keys are valued. An example is the following:<br>

@@ -58,6 +58,38 @@ public aspect StorageManagement {
 	}
 
 	@Continuator
+	public void PersistingElement.flush() {
+		Store s = this.getStore();
+		while (s instanceof DelegatingStore) {
+			if (s instanceof WriteRetentionStore) {
+				WriteRetentionStore writeCache = (WriteRetentionStore)s;
+				// There should have only one write cache in the stack
+				writeCache.flush(this.getTable(), this.getIdentifier());
+				// Handling superclasses
+				Collection<Class<? extends PersistingElement>> persistingSuperClasses = this.getPersistingSuperClasses();
+				if (!persistingSuperClasses.isEmpty()) {
+					PersistingMixin px = PersistingMixin.getInstance();
+					String ident = this.getFullIdentifier();
+					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
+						writeCache.flush(px.getTable(sc), ident);
+					}
+				}
+				return;
+			}
+			s = ((DelegatingStore)s).getActualStore();
+		}
+	}
+	
+	@Continuator
+	public void PersistingElement.deleteNoCache() throws DatabaseNotReachedException {
+		// Performing delete request
+		this.delete();
+		
+		// Flushing write cache in case it exists
+		this.flush();
+	}
+
+	@Continuator
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
 		Store s = this.getStore();
 		s.delete(new MetaInformation().forElement(this), this.getTable(), this.getIdentifier());
@@ -75,34 +107,11 @@ public aspect StorageManagement {
 	
 	@Continuator
 	public void PersistingElement.storeNoCache() throws DatabaseNotReachedException {
-		// Checking for a write cache
-		Store s = this.getStore();
-		WriteRetentionStore writeCache = null;
-		while (s instanceof DelegatingStore) {
-			if (s instanceof WriteRetentionStore) {
-				writeCache = (WriteRetentionStore)s;
-				// There should have only one write cache in the stack
-				break;
-			}
-			s = ((DelegatingStore)s).getActualStore();
-		}
-		
 		// Performing store request
 		this.store();
 		
 		// Flushing write cache in case it exists
-		if (writeCache != null) {
-			writeCache.flush(this.getTable(), this.getIdentifier());
-			// Handling superclasses
-			Collection<Class<? extends PersistingElement>> persistingSuperClasses = this.getPersistingSuperClasses();
-			if (!persistingSuperClasses.isEmpty()) {
-				PersistingMixin px = PersistingMixin.getInstance();
-				String ident = this.getFullIdentifier();
-				for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
-					writeCache.flush(px.getTable(sc), ident);
-				}
-			}
-		}
+		this.flush();
 	}
 	
 	@Continuator
