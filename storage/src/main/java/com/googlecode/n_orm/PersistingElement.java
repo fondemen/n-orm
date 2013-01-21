@@ -322,6 +322,12 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	void activateColumnFamilyIfNotAlready(String name, long lastActivationTimeoutMs, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
 	/**
+	 * Flushes any outgoing request pending on a {@link com.googlecode.n_orm.cache.write.WriteRetentionStore write-retention store}.
+	 */
+	@Continuator
+	void flush();
+	
+	/**
 	 * To be equal, two persisting elements must implement the same class and have the same identifier, no matter they have same values for properties and column families.
 	 * @see Object#equals(Object)
 	 */
