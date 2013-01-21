@@ -730,6 +730,10 @@ public class WriteRetentionStore extends DelegatingStore {
 				// Is it really necessary to send those elements ?
 				// Might not be the case if the element was flushed
 				if (this.lastSentTransaction != null && lastTransactionTmp <= this.lastSentTransaction) {
+					// If this request is not a flush (i.e. out of delay) and without new transaction, we should close it
+					if(!flushing) {
+						this.close();
+					}
 					return;
 				}
 				
@@ -964,16 +968,24 @@ public class WriteRetentionStore extends DelegatingStore {
 					}
 				} else {
 					// No transaction happened ; killing this object and releasing memory
-					this.dead = true;
-					StoreRequest s = writesByRows.remove(this.row);
-					// This request was THE only request for its row
-					assert this == s;
-					logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " and not replanned");
+					this.close();
 				}
 				
 			} finally {
 				this.sendLock.writeLock().unlock();
 			}
+		}
+		
+		/**
+		 * Closing request definitively ; MUST be invoked within a write lock
+		 */
+		private void close() {
+			assert this.sendLock.writeLock().isHeldByCurrentThread();
+			this.dead = true;
+			StoreRequest s = writesByRows.remove(this.row);
+			// This request was THE only request for its row
+			assert this == s;
+			logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " and not replanned");
 		}
 
 		/**
