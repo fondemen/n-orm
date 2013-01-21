@@ -730,17 +730,12 @@ public class WriteRetentionStore extends DelegatingStore {
 				// Is it really necessary to send those elements ?
 				// Might not be the case if the element was flushed
 				if (this.lastSentTransaction != null && lastTransactionTmp <= this.lastSentTransaction) {
-					// This is unlikely to happen as in case of a previous flush,
-					// either we are dead (flush completed, no more transaction -> this store request is dead
-					// or we are trying to run this code with flush is being sending -> protected by test above...
-					assert false;
 					return;
 				}
 				
 				// As from this line, there MUST be a send request
 				this.sending = true;
 				outDateTmp = this.outDateMs.getAndSet(-1);
-				assert outDateTmp != -1;
 				
 				lastSentTransaction = this.lastSentTransaction;
 				this.lastSentTransaction = lastTransactionTmp;
@@ -873,7 +868,7 @@ public class WriteRetentionStore extends DelegatingStore {
 						public void run() {
 							try {
 								try {
-									if (!flushing) {
+									if (!flushing && outDate != -1) {
 										requestsLatencySamples.increment();
 										long delay = System.currentTimeMillis()-outDate;
 										assert delay > 0;
@@ -905,7 +900,7 @@ public class WriteRetentionStore extends DelegatingStore {
 						public void run() {
 							try {
 								try {
-									if (!flushing) {
+									if (!flushing && outDate != -1) {
 										requestsLatencySamples.increment();
 										long delay = System.currentTimeMillis()-outDate;
 										assert delay > 0;
@@ -959,8 +954,14 @@ public class WriteRetentionStore extends DelegatingStore {
 					// This request is THE only request for its row
 					assert this == writesByRows.get(this.row);
 					// A transaction happened while sending ; re-planning
-					this.plan();
-					logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " replanned for " + new Date(this.outDateMs.get()));
+					try {
+						this.plan();
+						logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " replanned for " + new Date(this.outDateMs.get()));
+					} catch (RequestIsOutException x) {
+						// We are the only process authorized to try to plan at this point
+						// (indeed, this store request is still indexed by writesByRows)
+						assert false;
+					}
 				} else {
 					// No transaction happened ; killing this object and releasing memory
 					this.dead = true;
@@ -978,12 +979,14 @@ public class WriteRetentionStore extends DelegatingStore {
 		/**
 		 * Computing next update and registering in the delay queue
 		 */
-		private void plan() {
+		private void plan() throws RequestIsOutException {
 			// Cannot plan if this request is out of indexed requests
-			assert !this.dead;
+			if (this.dead)
+				throw new RequestIsOutException();
 			
-			// must not plan while sending
-			assert !this.sending;
+			// No need to plan while sending as once sending is performed, re-planning is automatic
+			if (this.sending)
+				return;
 
 			long nextExecutionDate = WriteRetentionStore.this.writeRetentionMs + System.currentTimeMillis();
 			if (this.outDateMs.compareAndSet(-1, nextExecutionDate)) {
@@ -1277,9 +1280,10 @@ public class WriteRetentionStore extends DelegatingStore {
 		while(true) {
 			StoreRequest req = new StoreRequest(element);
 			StoreRequest tmp = writesByRows.putIfAbsent(element, req);
+			boolean shouldPlan = false;
 			if (tmp == null) {
 				// req was added ; should also be put in the delay queue
-				req.plan();
+				shouldPlan = true;
 				logger.fine("Request planned for " + table + ':' + id + " on " + System.currentTimeMillis() + " by " + req);
 			} else {
 				// Another thread added request for this element before us
@@ -1287,6 +1291,9 @@ public class WriteRetentionStore extends DelegatingStore {
 			}
 			try {
 				r.run(req);
+				// Planning only after request is merged as merge might happen AFTER request is out (and finally never sent)
+				if (shouldPlan)
+					req.plan();
 				// Request is planned and merged ; leaving the infinite loop
 				break;
 			} catch (RequestIsOutException x) {
