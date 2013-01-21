@@ -12,6 +12,7 @@ import com.googlecode.n_orm.PersistingElementListener;
 import com.googlecode.n_orm.UnknownColumnFamily;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 
@@ -260,6 +261,20 @@ public class DummyPersistingElement implements PersistingElement {
 
 	@Override
 	public void storeNoCache() throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	@Continuator
+	public void deleteNoCache() throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	@Continuator
+	public void flush() {
 		// TODO Auto-generated method stub
 		
 	}
