@@ -6,23 +6,19 @@ import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.management.ManagementFactory;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -34,6 +30,7 @@ import org.mockito.Mockito;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.Transient;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
@@ -45,6 +42,44 @@ import com.googlecode.n_orm.storeapi.Store;
 
 public class WriteRetentionTest {
 	
+	private static class SlowWriteDelegatingStore extends DelegatingStore {
+		/** The set of requests being sending */
+		@Transient private Set<String> sending = Collections.synchronizedSet(new HashSet<String>());
+
+		private SlowWriteDelegatingStore(Store actualStore) {
+			super(actualStore);
+		}
+
+		@Override
+		public void delete(MetaInformation meta, String table, String id)
+				throws DatabaseNotReachedException {
+			assert sending.add(table+'/'+id) : "request on table " + table + " with id " + id + " running twice";
+			try {
+				Thread.sleep(500);
+			} catch (InterruptedException x) {
+				assert false;
+			}
+			super.delete(meta, table, id);
+			assert sending.remove(table+'/'+id);
+		}
+
+		@Override
+		public void storeChanges(MetaInformation meta, String table,
+				String id, ColumnFamilyData changed,
+				Map<String, Set<String>> removed,
+				Map<String, Map<String, Number>> increments)
+				throws DatabaseNotReachedException {
+			assert sending.add(table+'/'+id) : "request on table " + table + " with id " + id + " running twice";
+			try {
+				Thread.sleep(500);
+			} catch (InterruptedException x) {
+				assert false;
+			}
+			super.storeChanges(meta, table, id, changed, removed, increments);
+			assert sending.remove(table+'/'+id);
+		}
+		
+	}
 	private static final String table = "testtable";
 	private static final String rowId = "testrow";
 	private static final String changedCf = "changedCf";
@@ -75,64 +110,10 @@ public class WriteRetentionTest {
 		sut200 = WriteRetentionStore.getWriteRetentionStore(200, store);
 		sut200.start();
 
-		sutSlowDS = WriteRetentionStore.getWriteRetentionStore(50, new DelegatingStore(store) {
-
-			@Override
-			public void delete(MetaInformation meta, String table, String id)
-					throws DatabaseNotReachedException {
-				try {
-					Thread.sleep(500);
-				} catch (InterruptedException x) {
-					assert false;
-				}
-				super.delete(meta, table, id);
-			}
-
-			@Override
-			public void storeChanges(MetaInformation meta, String table,
-					String id, ColumnFamilyData changed,
-					Map<String, Set<String>> removed,
-					Map<String, Map<String, Number>> increments)
-					throws DatabaseNotReachedException {
-				try {
-					Thread.sleep(500);
-				} catch (InterruptedException x) {
-					assert false;
-				}
-				super.storeChanges(meta, table, id, changed, removed, increments);
-			}
-			
-		});
+		sutSlowDS = WriteRetentionStore.getWriteRetentionStore(50, new SlowWriteDelegatingStore(store));
 		sutSlowDS.start();
 		
-		sutSlowMock = WriteRetentionStore.getWriteRetentionStore(50, new DelegatingStore(mockStore) {
-
-			@Override
-			public void delete(MetaInformation meta, String table, String id)
-					throws DatabaseNotReachedException {
-				try {
-					Thread.sleep(500);
-				} catch (InterruptedException x) {
-					assert false;
-				}
-				super.delete(meta, table, id);
-			}
-
-			@Override
-			public void storeChanges(MetaInformation meta, String table,
-					String id, ColumnFamilyData changed,
-					Map<String, Set<String>> removed,
-					Map<String, Map<String, Number>> increments)
-					throws DatabaseNotReachedException {
-				try {
-					Thread.sleep(500);
-				} catch (InterruptedException x) {
-					assert false;
-				}
-				super.storeChanges(meta, table, id, changed, removed, increments);
-			}
-			
-		});
+		sutSlowMock = WriteRetentionStore.getWriteRetentionStore(50, new SlowWriteDelegatingStore(mockStore));
 		sutSlowMock.start();
 		
 		aChange = new DefaultColumnFamilyData();
@@ -327,10 +308,8 @@ public class WriteRetentionTest {
 	
 	@Test
 	public void storeFromAPI() throws InterruptedException {
-		Element e = new Element(); e.key = this.rowId;
+		Element e = new Element(); e.key = rowId;
 		assertEquals(WriteRetentionStore.class, e.getStore().getClass());
-		
-		WriteRetentionStore wrs = (WriteRetentionStore)e.getStore();
 		
 		e.store();
 		assertFalse(e.existsInStore());
@@ -341,10 +320,8 @@ public class WriteRetentionTest {
 	
 	@Test
 	public void flushFromAPI() throws InterruptedException {
-		Element e = new Element(); e.key = this.rowId;
+		Element e = new Element(); e.key = rowId;
 		assertEquals(WriteRetentionStore.class, e.getStore().getClass());
-		
-		WriteRetentionStore wrs = (WriteRetentionStore)e.getStore();
 		
 		e.storeNoCache();
 		assertTrue(e.existsInStore());
