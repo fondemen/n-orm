@@ -155,7 +155,7 @@ public class ElementWithWriteRetensionTest {
 		assertEquals(incrNr*parallelThreads, e.incr);
 	}
 	
-	@Test(timeout=10000)
+	@Test(timeout=20000)
 	public final void parallelIncrementsOn2Elements() throws InterruptedException, ExecutionException {
 		final int incrNr = 1000;
 		final int parallelThreads = 10;
