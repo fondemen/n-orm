@@ -44,17 +44,26 @@ public class ElementWithWriteRetensionTest {
 	@After
 	public void waitForPendingRequests() {
 		try {
-			while(WriteRetentionStore.getPendingRequests() != 0)
+			int maxTurns = 1000;
+			while(WriteRetentionStore.getPendingRequests() != 0) {
 				Thread.sleep(10);
+				maxTurns--;
+				if (maxTurns <= 0)
+					throw new IllegalStateException();
+			}
 			Thread.sleep(10);
-			while(WriteRetentionStore.getPendingRequests() != 0)
+			while(WriteRetentionStore.getPendingRequests() != 0) {
 				Thread.sleep(10);
+				maxTurns--;
+				if (maxTurns <= 0)
+					throw new IllegalStateException();
+			}
 		} catch (InterruptedException e1) {
 			e1.printStackTrace();
 		}
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void createDelete() {
 		final String key = "anelement";
 		
@@ -75,7 +84,7 @@ public class ElementWithWriteRetensionTest {
 		assertFalse(e.existsInStore());
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void createDeleteWithFlushes() {
 		final String key = "anelement";
 		
@@ -92,7 +101,7 @@ public class ElementWithWriteRetensionTest {
 		assertFalse(e.existsInStore());
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void storeSet() {
 		final String key = "anelement";
 		

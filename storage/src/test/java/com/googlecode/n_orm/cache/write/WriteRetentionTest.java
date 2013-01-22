@@ -170,17 +170,26 @@ public class WriteRetentionTest {
 	@After
 	public void waitForPendingRequests() {
 		try {
-			while(WriteRetentionStore.getPendingRequests() != 0)
+			int maxTurns = 1000;
+			while(WriteRetentionStore.getPendingRequests() != 0) {
 				Thread.sleep(10);
+				maxTurns--;
+				if (maxTurns <= 0)
+					throw new IllegalStateException();
+			}
 			Thread.sleep(10);
-			while(WriteRetentionStore.getPendingRequests() != 0)
+			while(WriteRetentionStore.getPendingRequests() != 0) {
 				Thread.sleep(10);
+				maxTurns--;
+				if (maxTurns <= 0)
+					throw new IllegalStateException();
+			}
 		} catch (InterruptedException e1) {
 			e1.printStackTrace();
 		}
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void getAlwaysSameRetensionStore() throws InterruptedException, ExecutionException {
 		final int parallelGets = 100;
 		final Store s = Mockito.mock(Store.class);
@@ -208,7 +217,7 @@ public class WriteRetentionTest {
 		}
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void retensionChange() throws InterruptedException {
 		WriteRetentionStore sut = sut200;
 		
@@ -221,7 +230,7 @@ public class WriteRetentionTest {
 		assertArrayEquals(changedValue1, store.get(null, table, rowId, changedCf, changedKey));
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void disableForThread() throws InterruptedException {
 		WriteRetentionStore sut = sut200;
 		sut.setEnabledByDefault(false);
@@ -244,7 +253,7 @@ public class WriteRetentionTest {
 		assertArrayEquals(changedValue1, store.get(null, table, rowId, changedCf, changedKey));
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void disableByDefaultForThread() throws Throwable {
 		final WriteRetentionStore sut = sut200;
 		
@@ -289,7 +298,7 @@ public class WriteRetentionTest {
 			throw x[0];
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void flush() throws InterruptedException {
 		WriteRetentionStore sut = sut200;
 		
@@ -306,7 +315,7 @@ public class WriteRetentionTest {
 		public String value;
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void storeFromAPI() throws InterruptedException {
 		Element e = new Element(); e.key = rowId;
 		assertEquals(WriteRetentionStore.class, e.getStore().getClass());
@@ -318,7 +327,7 @@ public class WriteRetentionTest {
 		assertTrue(e.existsInStore());
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void flushFromAPI() throws InterruptedException {
 		Element e = new Element(); e.key = rowId;
 		assertEquals(WriteRetentionStore.class, e.getStore().getClass());
@@ -327,7 +336,7 @@ public class WriteRetentionTest {
 		assertTrue(e.existsInStore());
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void twoChanges() throws InterruptedException {
 		WriteRetentionStore sut = sut50;
 		sut.storeChanges(null, table, rowId, aChange, null, null);
@@ -341,7 +350,7 @@ public class WriteRetentionTest {
 		assertArrayEquals(changedValue2, store.get(null, table, rowId, changedCf, changedKey));
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void delete() throws InterruptedException {
 		WriteRetentionStore sut = sut50;
 		Memory.INSTANCE.storeChanges(table, rowId, aChange, null, null);
@@ -357,7 +366,7 @@ public class WriteRetentionTest {
 		assertEquals(2, Memory.INSTANCE.getQueriesAndReset()); // the delete and the exists queries
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void changeAndDelete() throws InterruptedException {
 		WriteRetentionStore sut = sut50;
 		Memory.INSTANCE.storeChanges(table, rowId, aChange, null, null);
@@ -374,7 +383,7 @@ public class WriteRetentionTest {
 		assertFalse(store.exists(null, table, rowId));
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void changeAndDeleteAndChange() throws InterruptedException {
 		WriteRetentionStore sut = sut50;
 
@@ -391,7 +400,7 @@ public class WriteRetentionTest {
 		assertArrayEquals(changedValue2, store.get(null, table, rowId, changedCf, changedKey));
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void changeAndDeleteCell() throws InterruptedException {
 		WriteRetentionStore sut = sut50;
 
@@ -407,7 +416,7 @@ public class WriteRetentionTest {
 		assertFalse(store.exists(null, table, rowId, changedCf));
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void changeAndDeleteAndChangeCell() throws InterruptedException {
 		WriteRetentionStore sut = sut50;
 
@@ -424,7 +433,7 @@ public class WriteRetentionTest {
 		assertArrayEquals(changedValue2, store.get(null, table, rowId, changedCf, changedKey));
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void deleteAndChangeExisting() throws InterruptedException {
 		WriteRetentionStore sut = sut50;
 
@@ -630,7 +639,7 @@ public class WriteRetentionTest {
 		inOrder.verifyNoMoreInteractions();
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void parrallelIncrements() throws Exception {
 		WriteRetentionStore.setCapureHitRatio(true);
 		
@@ -669,7 +678,7 @@ public class WriteRetentionTest {
 		System.out.println("sent: " + q + " ; asked " + parallelWrites + " ; duration " + duration);
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void parrallelIncrementsOnSlowDataStore() throws Exception {
 		WriteRetentionStore.setCapureHitRatio(true);
 		
@@ -708,7 +717,7 @@ public class WriteRetentionTest {
 		System.out.println("sent: " + q + " ; asked " + parallelWrites + " ; duration " + duration);
 	}
 	
-	@Test
+	@Test(timeout=10000)
 	public void parrallelIncrementsWithSomeFlushes() throws Exception {
 		final WriteRetentionStore sut = sut50;
 		int parallelWrites = 200;
@@ -759,7 +768,7 @@ public class WriteRetentionTest {
 		//System.out.println("sent: " + q +" (expected " + (parallelWrites/10 + duration/50) + ") ; asked " + parallelWrites);
 	}
 	
-	@Test
+	@Test//(timeout=10000)
 	public void parrallelIncrementsWithSomeFlushesOnSlowDS() throws Exception {
 		final WriteRetentionStore sut = sutSlowDS;
 		int parallelWrites = 200;
