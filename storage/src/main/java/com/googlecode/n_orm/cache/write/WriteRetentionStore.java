@@ -452,11 +452,6 @@ public class WriteRetentionStore extends DelegatingStore {
 		 */
 		@Transient private volatile ConcurrentSkipListSet<Long> deletions = new ConcurrentSkipListSet<Long>();
 		
-		/**
-		 * The time at which transaction was planned to be released
-		 */
-		@Transient private final ConcurrentNavigableMap<Long /* transaction */, Long /* out date */> outDates = new ConcurrentSkipListMap<Long, Long>();
-
 		private StoreRequest(RowInTable row) {
 			super();
 			this.row = row;
@@ -486,16 +481,6 @@ public class WriteRetentionStore extends DelegatingStore {
 			
 			assert this.lastSentTransaction == null || ret > this.lastSentTransaction;
 
-			if (captureHitRatio) {
-				long outDate = this.outDateMs.get();
-				if (outDate != -1) {
-					Entry<Long, Long> old = outDates.floorEntry(ret);
-					assert old == null || old.getValue() != -1;
-					if (old == null || old.getValue() != outDate)
-						outDates.put(ret, outDate);
-				}
-			}
-			
 			return ret;
 		}
 
@@ -721,6 +706,8 @@ public class WriteRetentionStore extends DelegatingStore {
 			this.sendLock.writeLock().lock();
 			try {
 				// This code cannot be executed concurrently with an update or another send start/stop
+				
+				outDateTmp = this.outDateMs.get();
 				if (!flushing)
 					this.outDateMs.set(-1);
 
@@ -751,7 +738,6 @@ public class WriteRetentionStore extends DelegatingStore {
 				
 				// As from this line, there MUST be a send request
 				this.sending = true;
-				outDateTmp = this.outDateMs.get();
 				
 				lastSentTransaction = this.lastSentTransaction;
 				this.lastSentTransaction = lastTransactionTmp;
@@ -865,11 +851,6 @@ public class WriteRetentionStore extends DelegatingStore {
 				assert lastDeletion == null || lastTransaction >= lastDeletion;
 				assert lastTransaction >= lastStore;
 				
-				// Capturing planned out date in case of hit ratio computation
-				boolean captureHitRatio = WriteRetentionStore.captureHitRatio;
-				if (captureHitRatio)
-					this.outDates.headMap(lastTransaction, true).clear();
-	
 				// Sending using the executor
 				// Checking whether it's a store or a delete
 				if (lastDeletion == null || lastDeletion < lastStore) {
