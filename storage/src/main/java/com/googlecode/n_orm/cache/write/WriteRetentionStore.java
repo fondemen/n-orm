@@ -689,6 +689,13 @@ public class WriteRetentionStore extends DelegatingStore {
 			return unit.convert(this.outDateMs.get() - System.currentTimeMillis(),
 					TimeUnit.MILLISECONDS);
 		}
+		
+		/**
+		 * Tells this request that is is out of the planning queue
+		 */
+		private void dequeued() {
+			
+		}
 
 		/**
 		 * Sending this request. Waits for current updates to be done.
@@ -714,6 +721,8 @@ public class WriteRetentionStore extends DelegatingStore {
 			this.sendLock.writeLock().lock();
 			try {
 				// This code cannot be executed concurrently with an update or another send start/stop
+				if (!flushing)
+					this.outDateMs.set(-1);
 
 				lastTransactionTmp = transactionDistributor.get();
 				boolean shouldLeave = false;
@@ -729,20 +738,20 @@ public class WriteRetentionStore extends DelegatingStore {
 				}
 				
 				if (shouldLeave) {
-					//if (! flushing) {
+					if (! flushing) {
 						// Replanning
 						try {
 							this.plan();
 						} catch (RequestIsOutException x) {
 							assert this.lastSentTransaction == null ? this.transactionDistributor.get() == Long.MIN_VALUE : this.lastSentTransaction == this.transactionDistributor.get();
 						}
-					//}
+					}
 					return;
 				}
 				
 				// As from this line, there MUST be a send request
 				this.sending = true;
-				outDateTmp = this.outDateMs.getAndSet(-1);
+				outDateTmp = this.outDateMs.get();
 				
 				lastSentTransaction = this.lastSentTransaction;
 				this.lastSentTransaction = lastTransactionTmp;
@@ -958,14 +967,16 @@ public class WriteRetentionStore extends DelegatingStore {
 					// This request is THE only request for its row
 					assert this == writesByRows.get(this.row);
 					
-					// A transaction happened while sending ; re-planning
-					try {
-						this.plan();
-						logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " replanned for " + new Date(this.outDateMs.get()));
-					} catch (RequestIsOutException x) {
-						// We are the only process authorized to try to plan at this point
-						// (indeed, this store request is still indexed by writesByRows)
-						assert false;
+					if (!afterFlush) {
+						// A transaction happened while sending ; re-planning
+						try {
+							this.plan();
+							logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " replanned for " + new Date(this.outDateMs.get()));
+						} catch (RequestIsOutException x) {
+							// We are the only process authorized to try to plan at this point
+							// (indeed, this store request is still indexed by writesByRows)
+							assert false;
+						}
 					}
 				} else {
 					// No transaction happened ; killing this object and releasing memory
@@ -996,10 +1007,6 @@ public class WriteRetentionStore extends DelegatingStore {
 			// Cannot plan if this request is out of indexed requests
 			if (this.dead)
 				throw new RequestIsOutException();
-			
-			// No need to plan while sending as once sending is performed, re-planning is automatic
-			if (this.sending)
-				return;
 
 			long nextExecutionDate = WriteRetentionStore.this.writeRetentionMs + System.currentTimeMillis();
 			if (this.outDateMs.compareAndSet(-1, nextExecutionDate)) {
