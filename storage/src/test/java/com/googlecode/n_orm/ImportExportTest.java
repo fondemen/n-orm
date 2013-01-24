@@ -100,8 +100,9 @@ public class ImportExportTest {
 		 
 		 // Serialize in a file
 		 FileOutputStream fos = new FileOutputStream(f);
-		 searchQuery.exportTo(new ObjectOutputStream(fos));
-		 fos.close();
+		 ObjectOutputStream oos = new ObjectOutputStream(fos);
+		 searchQuery.exportTo(oos);
+		 oos.close();
 		 
 		 // Test if the file has been created
 		 assertTrue(f.exists());
@@ -137,8 +138,9 @@ public class ImportExportTest {
 		 
 		 // Serialize in a file
 		 FileOutputStream fos = new FileOutputStream(f);
-		 long exported = searchQuery.exportTo(new ObjectOutputStream(fos));
-		 fos.close();
+		 ObjectOutputStream oos = new ObjectOutputStream(fos);
+		 long exported = searchQuery.exportTo(oos);
+		 oos.close();
 		 assertEquals(searchQuery.count(), exported);
 		 
 		 // Test if the file has been created
