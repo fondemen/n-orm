@@ -258,7 +258,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
 	 * Invoking this method is blocking until execution is completed.<br>
 	 * In case you only use one thread, process will be performed in this thread.<br>
-	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(String...)} elements stored in the process to see changes.
 	 * @param action the action to be performed over each element of the query.
 	 * @param threadNumber the maximum number of concurrent threads
 	 * @param timeoutMs the max allowed time to execute this task ; useless in case threadNumber is 1
@@ -275,7 +275,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
 	 * Invoking this method is blocking until execution is completed.<br>
 	 * In case you only use one thread, process will be performed in this thread.<br>
-	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(String...)} elements stored in the process to see changes.
 	 * @param action the action to be performed over each element of the query.
 	 * @param threadNumber the maximum number of concurrent threads
 	 * @param canceller a canceller object regularly observed while performing request ; in case this object responds <code>false</code> after invoked {@link com.googlecode.n_orm.ProcessCanceller#isCancelled()}, this methods returns a {@link ProcessException} with message found by {@link com.googlecode.n_orm.ProcessCanceller#getErrorMessage(com.googlecode.n_orm.operations.Process)}
@@ -291,7 +291,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * Performs an action for each element corresponding to the query using parallel threads ; method might return before process is ended.
 	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
 	 * Invoking this method can be blocking as long as threadNumber is less that the number of elements to be treated.<br>
-	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(String...)} elements stored in the process to see changes.
 	 * @param action the action to be performed over each element of the query.
 	 * @param threadNumber the maximum number of concurrent threads
 	 * @param timeoutMs the max allowed time to execute this task ; useless in case threadNumber is 1
@@ -311,7 +311,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * Performs an action for each element corresponding to the query using parallel threads ; method might return before process is ended.
 	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
 	 * Invoking this method can be blocking as long as threadNumber is less that the number of elements to be treated.<br>
-	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(Object[])} elements stored in the process to see changes.
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(String...)} elements stored in the process to see changes.
 	 * @param action the action to be performed over each element of the query.
 	 * @param threadNumber the maximum number of concurrent threads
 	 * @param canceller a canceller object regularly observed while performing request ; in case this object responds <code>false</code> after invoked {@link com.googlecode.n_orm.ProcessCanceller#isCancelled()}, this methods returns a {@link ProcessException} with message found by {@link com.googlecode.n_orm.ProcessCanceller#getErrorMessage(com.googlecode.n_orm.operations.Process)}
