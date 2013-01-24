@@ -20,8 +20,13 @@ import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.StoreTestLauncher;
 
 public class ElementWithWriteRetensionTest {
+	
+	public ElementWithWriteRetensionTest() throws Exception {
+		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
+	}
 	
 	@Persisting(writeRetentionMs=100)
 	public static class Element {
