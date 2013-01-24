@@ -7,6 +7,7 @@ import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import org.junit.After;
@@ -31,6 +32,7 @@ public class CollectionStorageTest {
 	
 	public CollectionStorageTest() throws Exception {
 		StoreTestLauncher stl = StoreTestLauncher.INSTANCE;
+		Properties props = stl.prepare(this.getClass());
 		if (stl instanceof MemoryStoreTestLauncher)
 			this.mstl = (MemoryStoreTestLauncher)stl;
 		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
