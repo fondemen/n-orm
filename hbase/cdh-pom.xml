@@ -18,8 +18,8 @@
 	</scm>
 	
 	<properties>
-		<hbase.version>0.90.4-cdh3u3</hbase.version>
-		<hadoop.version>0.20.2-cdh3u3</hadoop.version>
+		<hbase.version>0.92.1-cdh4.1.2</hbase.version>
+		<hadoop.version>2.0.0-mr1-cdh4.1.2</hadoop.version>
 	</properties>
 
 	<dependencies>
@@ -140,6 +140,17 @@
 			<version>1.9.0</version>
 			<type>pom</type>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-jdk14</artifactId>
+			<version>1.4.3</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-client</artifactId>
+			<version>${hadoop.version}</version>
+			<scope>provided</scope>
 		</dependency>
 	</dependencies>
 

@@ -123,6 +123,8 @@ public class ConcurrentTest {
 			store1.truncate(null, table, (Constraint)null);
 			assertEquals(0, store1.count(null, table, (Constraint)null));
 		}
+		if (!store1.getAdmin().isTableEnabled("t1"))
+			store1.getAdmin().enableTable("t1");
 	}
 	
 	@Test
@@ -134,7 +136,7 @@ public class ConcurrentTest {
 		assertTrue(store1.exists(null, "t1", "idt1"));
 	}
 	
-	@Test//(timeout=60000)
+	@Test(timeout=60000)
 	public void creatingNewTableFrom2Threads() throws Throwable {
 		final int [] done = new int[] {2};
 		this.deleteTable("t1");
@@ -311,12 +313,16 @@ public class ConcurrentTest {
 			assertTrue(it.hasNext());
 			store1.getAdmin().disableTable("t1");
 			assertEquals("idt2", it.next().getKey());
-	
-			store1.getAdmin().disableTable("t1");
+
+			if (store1.getAdmin().isTableEnabled("t1"))
+				store1.getAdmin().disableTable("t1");
 			
 			assertFalse(it.hasNext());
 		
 		} finally {
+			if (!store1.getAdmin().isTableEnabled("t1"))
+				store1.getAdmin().enableTable("t1");
+			
 			it.close();
 		}
 	}
