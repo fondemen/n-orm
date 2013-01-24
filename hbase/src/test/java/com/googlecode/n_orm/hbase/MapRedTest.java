@@ -44,7 +44,7 @@ public class MapRedTest {
 			td.addFamily(new HColumnDescriptor(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 			store.getAdmin().createTable(td);
 		}
-		if (!store.getAdmin().isTableDisabled(tableName)) {
+		if (store.getAdmin().isTableDisabled(tableName)) {
 			store.getAdmin().enableTable(tableName);
 		}
 		table = new HTable(store.getConf(), tableName);
