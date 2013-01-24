@@ -1,0 +1,4 @@
+To install hbase into the maven repository, download the server and run install.sh as provided here.
+Variable HBASE_HOME should point to the location of the repository.
+
+Provided scripts (install.sh and pom.xml) are for hbase 0.20.6
