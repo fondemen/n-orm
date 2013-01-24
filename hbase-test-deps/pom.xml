@@ -12,8 +12,8 @@
 	<packaging>pom</packaging>
 
 	<properties>
-		<hbase.version>0.90.4</hbase.version>
-		<hadoop.version>0.20-append-r1056497</hadoop.version>
+		<hbase.version>0.92.1</hbase.version>
+		<hadoop.version>1.0.0</hadoop.version>
 	</properties>
 
 	<dependencies>
