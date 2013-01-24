@@ -15,6 +15,10 @@ import com.googlecode.n_orm.conversion.UnreversibleTypeException;
 
 
 public class ReveresedOrderSearchTest {
+	
+	public ReveresedOrderSearchTest() throws Exception {
+		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
+	}
 
 	
 	@Persisting(table="ReveresedOrderSearchTest")

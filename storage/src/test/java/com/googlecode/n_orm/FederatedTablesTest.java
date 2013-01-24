@@ -32,6 +32,10 @@ import com.googlecode.n_orm.storeapi.Store;
 
 public class FederatedTablesTest {
 	public static final String key = "akey";
+	
+	public FederatedTablesTest() throws Exception {
+		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
+	}
 
 	@Persisting(table = "t", federated = FederatedMode.RCONS)
 	public static class Element {
