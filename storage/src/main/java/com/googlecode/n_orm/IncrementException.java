@@ -2,9 +2,6 @@ package com.googlecode.n_orm;
 
 import java.lang.reflect.Field;
 
-import com.googlecode.n_orm.Incrementing;
-
-
 /**
  * Thrown in case a property annotated with {@link Incrementing} is given a lower value than before.
  */

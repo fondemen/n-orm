@@ -1,22 +1,21 @@
 package com.googlecode.n_orm.cf;
 
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.apache.commons.collections.map.AbstractTestMap;
 import org.apache.commons.collections.set.AbstractTestSet;
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 
+@SuppressWarnings("rawtypes")
 public class MapEntrySetTest extends AbstractTestSet {
 	@Persisting
 	public static class Element {
+		private static final long serialVersionUID = -7260810865742571676L;
 		@Key
 		public String key;
 		public MapColumnFamily<String, String> elements = new MapColumnFamily<String, String>();
@@ -45,6 +44,7 @@ public class MapEntrySetTest extends AbstractTestSet {
 		return this.toEntries( new String[] { "Zero", "0" } );
 	}
 	
+	@SuppressWarnings("unchecked")
 	public Entry<String, String>[] toEntries(String[] vals) {
 		Entry[] ret = new Entry[vals.length];
 		Map m = new TreeMap<String, String>();

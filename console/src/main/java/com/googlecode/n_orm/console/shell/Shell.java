@@ -8,8 +8,6 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 import jline.ArgumentCompletor;
 import jline.Completor;
@@ -89,7 +87,7 @@ public class Shell
 					if (ctx == null)
 						continue;
 					if (ctx instanceof SearchableClassConstraintBuilder) {
-						Class<? extends PersistingElement> clazz = ((SearchableClassConstraintBuilder)ctx).getClazz();
+						Class<? extends PersistingElement> clazz = ((SearchableClassConstraintBuilder<?>)ctx).getClazz();
 						if (clazz != null) { // That should be true
 							List<String> keys = new LinkedList<String>();
 							for (Field f : KeyManagement.getInstance().detectKeys(clazz)) {
@@ -112,7 +110,7 @@ public class Shell
 							argCompletor = new ArgumentCompletor(
 									new SimpleCompletor[] {
 											new SimpleCompletor(new String[] {m.getName()}),
-											new SimpleCompletor(this.mapClassNames.toArray(EMPTY_STRING_ARRAY))
+											new SimpleCompletor(Shell.mapClassNames.toArray(EMPTY_STRING_ARRAY))
 											});
 						}
 						else
@@ -141,7 +139,7 @@ public class Shell
 		ArgumentCompletor argCompletorNew = new ArgumentCompletor(
 				new SimpleCompletor[] {
 					new SimpleCompletor(new String[] {shellProcessor.getNewCommand()}),
-					new SimpleCompletor(this.mapClassNames.toArray(EMPTY_STRING_ARRAY))
+					new SimpleCompletor(Shell.mapClassNames.toArray(EMPTY_STRING_ARRAY))
 				});
 		
 		// Create the completors

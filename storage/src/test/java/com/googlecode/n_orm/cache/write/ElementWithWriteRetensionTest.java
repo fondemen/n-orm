@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -30,6 +31,8 @@ public class ElementWithWriteRetensionTest {
 	
 	@Persisting(writeRetentionMs=100)
 	public static class Element {
+		private static final long serialVersionUID = -6565207299905763791L;
+
 		@Key public String key;
 		
 		@Incrementing public long incr;
@@ -174,13 +177,16 @@ public class ElementWithWriteRetensionTest {
 		final int incrNr = 1000;
 		final int parallelThreads = 10;
 		
-		final String key1 = "anelement", key2 = "anotherElement";
+		// 2 different random ids in order to overcome HBase bug 3725
+		final String key1 = UUID.randomUUID().toString(), key2 = UUID.randomUUID().toString();
 		Element e1 = new Element();
 		e1.key = key1;
-		e1.deleteNoCache();
 		Element e2 = new Element();
 		e2.key = key2;
 		e2.deleteNoCache();
+
+		assertFalse(e1.existsInStore());
+		assertFalse(e2.existsInStore());
 		
 		Runnable r = new Runnable() {
 			@Override

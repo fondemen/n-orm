@@ -1,6 +1,5 @@
 package com.googlecode.n_orm;
 
-import static org.junit.Assert.*;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +32,8 @@ public class FederatedTableProcessTest {
 		
 		Process<ElementInFederatedMockedStore> process = new Process<ElementInFederatedMockedStore>() {
 			
+			private static final long serialVersionUID = 1L;
+
 			@Override
 			public void process(ElementInFederatedMockedStore element) throws Throwable {				
 			}

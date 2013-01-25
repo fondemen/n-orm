@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +18,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.googlecode.n_orm.FederatedMode.Consistency;
-import com.googlecode.n_orm.FederatedMode.ReadWrite;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
@@ -795,6 +792,7 @@ public aspect FederatedTableManagement {
 			this.row = row;
 		}
 
+		@SuppressWarnings("unused")
 		public String getMainTable() {
 			return mainTable;
 		}

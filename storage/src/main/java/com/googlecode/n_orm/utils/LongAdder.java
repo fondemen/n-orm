@@ -189,7 +189,7 @@ public class LongAdder extends Striped64 implements Serializable {
         return (double)sum();
     }
 
-    private void writeObject(java.io.ObjectOutputStream s)
+    private void writeObject(ObjectOutputStream s)
         throws java.io.IOException {
         s.defaultWriteObject();
         s.writeLong(sum());
