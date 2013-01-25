@@ -22,7 +22,7 @@ public class UnreversibleTypeException extends IllegalArgumentException {
 	}
 
 	public UnreversibleTypeException(Class<?> type, Throwable cause) {
-		super("Cannot reverse type " + type);
+		super("Cannot reverse type " + type, cause);
 		this.type = type;
 	}
 

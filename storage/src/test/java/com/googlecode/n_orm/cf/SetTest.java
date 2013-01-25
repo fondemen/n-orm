@@ -10,6 +10,7 @@ import com.googlecode.n_orm.Persisting;
 public class SetTest extends AbstractTestSet {
 	@Persisting
 	public static class Element {
+		private static final long serialVersionUID = -4029776831971817540L;
 		@Key
 		public String key;
 		public SetColumnFamily<String> elements = new SetColumnFamily<String>();

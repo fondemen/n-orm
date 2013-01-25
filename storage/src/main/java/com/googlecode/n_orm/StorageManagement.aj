@@ -1,10 +1,7 @@
 package com.googlecode.n_orm;
 
-import java.io.FileInputStream;
 import java.lang.reflect.Field;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
@@ -14,8 +11,6 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.Callable;
-
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.ImplicitActivation;
@@ -357,7 +352,7 @@ public aspect StorageManagement {
 		Map<String, Field> toBeActivated = getActualFamiliesToBeActivated(timeout, families);
 		
 		if (! toBeActivated.isEmpty()) {
-			ColumnFamilyData rawData = this.getStore().get(new MetaInformation().forElement(this).withColumnFamilies(toBeActivated), this.getTable(), this.getIdentifier(), toBeActivated == null ? null : toBeActivated.keySet());
+			ColumnFamilyData rawData = this.getStore().get(new MetaInformation().forElement(this).withColumnFamilies(toBeActivated), this.getTable(), this.getIdentifier(), toBeActivated.keySet());
 			activateFromRawData(toBeActivated.keySet(), rawData);
 		}
 	}
@@ -393,9 +388,9 @@ public aspect StorageManagement {
 		}
 	}
 	
-	public static <E extends PersistingElement> E getFromRawData(Class<E> type, Row row) {
+	public static <E extends PersistingElement> E getFromRawData(Class<E> type, Row row, Set<String> toBeActivated) {
 		E element = StorageManagement.getElement(type, row.getKey());
-		element.activateFromRawData(row.getValues().keySet(), row.getValues());
+		element.activateFromRawData(toBeActivated, row.getValues());
 		return element;
 	}
 

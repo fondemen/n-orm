@@ -4,13 +4,9 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.Map;
 
-import com.googlecode.n_orm.IncrementException;
-import com.googlecode.n_orm.Persisting;
-import com.googlecode.n_orm.PersistingElement;
 /**
- * This annotation may be placed either on a number property, or on a {@link Map} of numbers.
+ * This annotation may be placed either on a number property, or on a {@link java.util.Map} of numbers.
  * By default, the property is only allowed to increment over time.
  * For maps, it's the element at a given key that must not decrement.
  * Regarding storage, it's not the actual value that is sent when invoking {@link PersistingElement#store()}, but the difference.

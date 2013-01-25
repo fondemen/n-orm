@@ -171,6 +171,16 @@ public class UnmodifiableOverridingMap<K, V> extends AbstractMap<K, V> implement
 							public V setValue(V value) {
 								throw new UnsupportedOperationException();
 							}
+							
+							@Override
+							public boolean equals(Object o) {
+								return this==o || (
+										o != null &&
+										(o instanceof Entry) &&
+										((Entry<?,?>)o).getKey().equals(this.getKey()) &&
+										((Entry<?,?>)o).getValue().equals(this.getValue())
+										);
+							}
 
 							@Override
 					        public final int hashCode() {

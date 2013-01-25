@@ -9,7 +9,6 @@ public class InnerClassConstraintBuilder<T extends PersistingElement> extends Cl
 	private final ClassConstraintBuilder<T> constraintBuilder;
 	private final Field key;
 
-	@SuppressWarnings("unchecked")
 	public InnerClassConstraintBuilder(Field key, ClassConstraintBuilder<T> constraintBuilder) {
 		super(key.getType());
 		this.constraintBuilder = constraintBuilder;
@@ -22,7 +21,6 @@ public class InnerClassConstraintBuilder<T extends PersistingElement> extends Cl
 		return new InnerKeyConstraintBuilder<T>(this, f);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Continuator
 	public SearchableClassConstraintBuilder<T> and() {
 		this.constraintBuilder.setSubConstraint(key, this.getConstraint());

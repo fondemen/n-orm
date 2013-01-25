@@ -1,11 +1,9 @@
 package com.googlecode.n_orm.storeapi;
 
-import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 /**
@@ -91,8 +89,6 @@ public interface Store {
 	 * Returns all elements in families ; no side-effect. In case element with
 	 * the given key is missing, null is returned.
 	 * 
-	 * @param elt
-	 *            the element to be activated (may be null)
 	 * @param table
 	 *            the table from which to find the element
 	 * @param id

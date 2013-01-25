@@ -67,15 +67,12 @@ import org.apache.zookeeper.recipes.lock.SharedExclusiveLock;
 import org.codehaus.plexus.util.DirectoryScanner;
 
 import com.googlecode.n_orm.Callback;
-import com.googlecode.n_orm.ColumnFamiliyManagement;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.EmptyCloseableIterator;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.cache.perthread.Cache;
-import com.googlecode.n_orm.hbase.PropertyUtils.HBaseProperty;
 import com.googlecode.n_orm.hbase.PropertyUtils.HColumnFamilyProperty;
 import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
 import com.googlecode.n_orm.hbase.actions.Action;
@@ -115,7 +112,7 @@ import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
  * <br></code>
  * One important property to configure is {@link #setScanCaching(Integer)}.<br>
  * Most properties can be overloaded at class or column-family level by using the annotation {@link HBaseSchema}. 
- * This store supports remote processes (see {@link StorageManagement#processElementsRemotely(Class, Constraint, Process, Callback, int, String...)} and {@link SearchableClassConstraintBuilder#remoteForEach(Process, Callback)}) as it implements {@link ActionnableStore} by using HBase/Hadoop Map-only jobs. However, be careful when configuring your hadoop: all jars containing your process and n-orm (with dependencies) should be available.
+ * This store supports remote processes (see {@link com.googlecode.n_orm.operations.Process#processElementsRemotely(Class, Constraint, Process, Callback, int, String[], int, long)} and {@link SearchableClassConstraintBuilder#remoteForEach(Process, Callback, int, long)}) as it implements {@link ActionnableStore} by using HBase/Hadoop Map-only jobs. However, be careful when configuring your hadoop: all jars containing your process and n-orm (with dependencies) should be available.
  * By default, all known jars are sent (which might become a problem is same jars are sent over and over).
  * You can change this using e.g. {@link #setMapRedSendJars(boolean)}.
  */
@@ -494,8 +491,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 
 	/**
 	 * The number of elements that this store scans at once during a Map/Reduce task (see <a href="http://hbase.apache.org/book/perf.reading.html#perf.hbase.client.caching">the HBase documentation</a>).
-	 * @see StorageManagement#processElementsRemotely(Class, Constraint, Process, Callback, int, String...)
-	 * @see SearchableClassConstraintBuilder#remoteForEach(Process, Callback)
+	 * @see com.googlecode.n_orm.operations.Process#processElementsRemotely(Class, Constraint, Process, Callback, int, String[], int, long)
+	 * @see SearchableClassConstraintBuilder#remoteForEach(Process, Callback, int, long)
 	 */
 	public int getMapRedScanCaching() {
 		return mapRedScanCaching;
@@ -833,14 +830,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	/**
-	 * Whether counts (e.g. {@link #count(String, Constraint)}) should use a map/reduce job.
+	 * Whether counts (e.g. {@link #count(MetaInformation, String, Constraint)}) should use a map/reduce job.
 	 */
 	public boolean isCountMapRed() {
 		return countMapRed;
 	}
 
 	/**
-	 * Whether counts (e.g. {@link Store#count(String, Constraint)}) should use a map/reduce job.
+	 * Whether counts (e.g. {@link Store#count(MetaInformation, String, Constraint)}) should use a map/reduce job.
 	 * Default value is false.
 	 * Map/reduce jobs are usually hard to run, so if this method is faster in case of large data on large cluster, it should be avoided on small clusters.
 	 */
@@ -850,14 +847,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	/**
-	 * Whether truncates (e.g. {@link #truncate(String, Constraint)}) should use a map/reduce job.
+	 * Whether truncates (e.g. {@link #truncate(MetaInformation, String, Constraint)}) should use a map/reduce job.
 	 */
 	public boolean isTruncateMapRed() {
 		return truncateMapRed;
 	}
 
 	/**
-	 * Whether truncates (e.g. {@link #truncate(String, Constraint)}) should use a map/reduce job.
+	 * Whether truncates (e.g. {@link #truncate(MetaInformation, String, Constraint)}) should use a map/reduce job.
 	 * Default value is false.
 	 * Map/reduce jobs are usually hard to run, so if this method is faster in case of large data on large cluster, it should be avoided on small clusters.
 	 */
@@ -1949,13 +1946,15 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		Map<String, Field> cf = toMap(families, meta);
 		
-		Scan s = this.getScan(c, meta.getClazz(), cf);
+		Class<? extends PersistingElement> clazz = meta == null ? null : meta.getClazz();
+		Scan s = this.getScan(c, clazz, cf);
 		int cacheSize = s.getCaching();
 		if (cacheSize > limit)
 			s.setCaching(limit);
 		
-		ResultScanner r = this.tryPerform(new ScanAction(s), meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), cf);
-		return new CloseableIterator(this, meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), c, limit, cf, r, cf != null);
+		String tablePostfix = meta == null ? null : meta.getTablePostfix();
+		ResultScanner r = this.tryPerform(new ScanAction(s), clazz, table, tablePostfix, cf);
+		return new CloseableIterator(this, clazz, table, tablePostfix, c, limit, cf, r, cf != null);
 	}
 
 	public void truncate(MetaInformation meta, String table, Constraint c) throws DatabaseNotReachedException {

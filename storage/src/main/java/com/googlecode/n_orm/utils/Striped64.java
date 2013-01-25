@@ -17,7 +17,9 @@ import java.util.Random;
  * extends Number so that concrete subclasses must publicly do so.
  */
 abstract class Striped64 extends Number {
-    /*
+	private static final long serialVersionUID = 6300516272826366635L;
+
+	/*
      * This class maintains a lazily-initialized table of atomically
      * updated variables, plus an extra "base" field. The table size
      * is a power of two. Indexing uses masked per-thread hash codes.
@@ -94,7 +96,7 @@ abstract class Striped64 extends Number {
         volatile long q0, q1, q2, q3, q4, q5, q6;
         Cell(long x) { value = x; }
 
-        final boolean cas(long cmp, long val) {
+		boolean cas(long cmp, long val) {
             return UNSAFE.compareAndSwapLong(this, valueOffset, cmp, val);
         }
 
