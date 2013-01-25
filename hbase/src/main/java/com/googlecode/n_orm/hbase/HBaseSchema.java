@@ -6,16 +6,12 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import com.googlecode.n_orm.Persisting;
-import com.googlecode.n_orm.PersistingElement;
-import com.googlecode.n_orm.cf.ColumnFamily;
-
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.FIELD})
 @Inherited
 /**
- * Alters default values for a particular {@link Persisting} class or one of its column families.
- * Values defined by this annotation are just ignored in case the store for this element is not targeting HBase (see {@link PersistingElement#getStore()}).
+ * Alters default values for a particular {@link com.googlecode.n_orm.Persisting} class or one of its column families.
+ * Values defined by this annotation are just ignored in case the store for this element is not targeting HBase (see {@link com.googlecode.n_orm.PersistingElement#getStore()}).
  * Unless stated, values provided by this annotation have higher priority than their equivalent in {@link Store}.
  * Values for a column family have higher priority than values for a persisting element.
  */
@@ -41,10 +37,10 @@ public @interface HBaseSchema {
 	String compression() default "";
 	
 	/**
-	 * Sets a default value for {@link Store#getScanCaching()} for this {@link PersistingElement} or {@link ColumnFamily}.
+	 * Sets a default value for {@link Store#getScanCaching()} for this {@link com.googlecode.n_orm.PersistingElement} or {@link com.googlecode.n_orm.cf.ColumnFamily}.
 	 * Value less or equal than 0 is equivalent to an unset value.
 	 * In case different column families are read at same time, the lowest value is taken.
-	 * In case a value is defined at family level for at least one of the activated families (see {@link PersistingElement#activate(String...)}), class- and store-level scan caching is ignored.
+	 * In case a value is defined at family level for at least one of the activated families (see {@link com.googlecode.n_orm.PersistingElement#activate(String...)}), class- and store-level scan caching is ignored.
 	 */
 	int scanCaching() default -1;
 
@@ -59,7 +55,7 @@ public @interface HBaseSchema {
 	SettableBoolean inMemory() default SettableBoolean.UNSET;
 
 	/**
-	 * Changes value for {@link Store#isForceTimeToLiveSeconds()} for a particular persisting class or column family.
+	 * Changes value for {@link Store#isForceTimeToLive()} for a particular persisting class or column family.
 	 * WARNING: to be used with great care in case of use in multiprocess context.
 	 */
 	SettableBoolean forceTimeToLive() default SettableBoolean.UNSET;

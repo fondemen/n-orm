@@ -1,7 +1,6 @@
 package com.googlecode.n_orm.console;
 
 import java.io.IOException;
-import java.util.Date;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.console.shell.Shell;
 import com.googlecode.n_orm.console.util.PackageExplorer;

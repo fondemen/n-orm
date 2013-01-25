@@ -9,7 +9,6 @@
 	<modelVersion>4.0.0</modelVersion>
 	<artifactId>storage</artifactId>
 	<name>n-orm core</name>
-	<version>${project.parent.version}</version>
 	<packaging>jar</packaging>
 
 	<description>n-orm is neither an object-database mapping, nor it addresses specifically relational databases. Its name was chosen as a reference to the No-SQL movement. 

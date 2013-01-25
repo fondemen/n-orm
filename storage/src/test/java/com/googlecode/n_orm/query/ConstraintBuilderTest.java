@@ -147,6 +147,7 @@ public class ConstraintBuilderTest {
 	
 	@Persisting
 	public static class AnElementWithEnumKey {
+		private static final long serialVersionUID = -6188603495123606070L;
 		@Key public AnEnum key;
 	}
 	

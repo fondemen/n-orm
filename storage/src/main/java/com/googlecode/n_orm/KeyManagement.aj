@@ -10,11 +10,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.WeakHashMap;
-
-import org.aspectj.lang.reflect.FieldSignature;
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
@@ -22,10 +17,8 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cache.perthread.Cache;
-import com.googlecode.n_orm.conversion.ArrayConverter;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.conversion.UnreversibleTypeException;
-
 
 
 /**
@@ -63,6 +56,8 @@ public aspect KeyManagement {
 	declare error: set(@Key final * *.*) : "A key should not be final";
 	
 	declare error: set(@Key(reverted=true) (!java.util.Date && !boolean && !Boolean && !byte && !Byte && !short && !Short &&!int && !Integer && !long && !Long) *.*) : "Can only revert boolean, natural or java.util.Date keys";
+	
+	//declare @field: * *.* : @java.lang.SuppressWarnings(value={"unused"}) ;
 	
 	private static class DecomposableString {
 		private static final String keySeparator;
@@ -267,7 +262,6 @@ public aspect KeyManagement {
 		}
 	}
 	
-	@SuppressWarnings("unchecked")
 	<T> T createElement(Class<T> type, Object [] keyValues) {
 		
 		if(!canCreateFromKeys(type))

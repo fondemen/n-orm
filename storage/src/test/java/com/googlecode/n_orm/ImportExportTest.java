@@ -28,9 +28,8 @@ public class ImportExportTest {
 
 	private static final String BOOKS_SER_FILE = "books.ser";
 
-
 	private BookStore bssut = new BookStore("testbookstore");
-	
+
 	@After
 	public void deleteSerialization() {
 		File ser = new File(BOOKS_SER_FILE);
@@ -38,176 +37,211 @@ public class ImportExportTest {
 			ser.delete();
 	}
 
-	 
-	 @Test public void importExport() throws IOException, ClassNotFoundException, DatabaseNotReachedException {
-		 //Reusable query
-		SearchableClassConstraintBuilder<Book> query = StorageManagement.findElements().ofClass(Book.class).andActivateAllFamilies().withAtMost(1000).elements();
+	@Test
+	public void importExport() throws IOException, ClassNotFoundException,
+			DatabaseNotReachedException, InterruptedException {
+		// Reusable query
+		SearchableClassConstraintBuilder<Book> query = StorageManagement
+				.findElements().ofClass(Book.class).andActivateAllFamilies()
+				.withAtMost(1000).elements();
 
-
-		 Book b2 = new Book(bssut, new Date(12121212), new Date());
+		Book b2 = new Book(bssut, new Date(12121212), new Date());
 		b2.setNumber((short) 100);
-		 b2.store();
-		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
-		 b3.store();
-		 
-		//Original collection
+		b2.store();
+		Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789),
+				new Date());
+		b3.store();
+
+		// Original collection
 		Set<Book> knownBooks = query.go();
 		assertFalse(knownBooks.isEmpty());
 		assertEquals(knownBooks.size(), query.count());
 
-		//Exporting collection directly from store
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		query.exportTo(new ObjectOutputStream(out));
-		
-		//Deleting collection from base
+		// Exporting collection directly from store
+		ByteArrayOutputStream bout = new ByteArrayOutputStream();
+		ObjectOutputStream oout = new ObjectOutputStream(bout);
+		query.exportTo(oout);
+		oout.close();
+
+		// Deleting collection from base
 		for (Book book : knownBooks) {
 			book.delete();
 		}
 		assertEquals(0, query.count());
-		//Simulating new session by emptying the cache
+		// Simulating new session by emptying the cache
 		KeyManagement.getInstance().cleanupKnownPersistingElements();
-		
-		//Importing stored elements
-		ImportExport.importPersistingElements(new ByteArrayInputStream(out.toByteArray()));
+
+		// Importing stored elements
+		ByteArrayInputStream fis = new ByteArrayInputStream(bout.toByteArray());
+		ImportExport.importPersistingElements(fis);
+		fis.close();
+		Thread.sleep(100);
 		assertEquals(knownBooks.size(), query.count());
-		
-		//Checking database
-		Set<Book> newKnownBooks = query.go(); //Caches found elements
+
+		// Checking database
+		Set<Book> newKnownBooks = query.go(); // Caches found elements
 		assertEquals(knownBooks, newKnownBooks);
 		for (Book knownBook : knownBooks) {
-			Book newKnownBook = StorageManagement.getElementUsingCache(knownBook); //The element activated by the last query.go()
+			Book newKnownBook = StorageManagement
+					.getElementUsingCache(knownBook); // The element activated
+														// by the last
+														// query.go()
 			assertNotSame(knownBook, newKnownBook);
 			assertEquals(knownBook, newKnownBook);
 			assertEquals(knownBook.getBookStore(), newKnownBook.getBookStore());
 			assertEquals(knownBook.getNumber(), newKnownBook.getNumber());
 		}
-	 }
-	
-	 @Test public void checkSerializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
-		 Book current;
-		 Iterator<Book> it;
+	}
 
-		 Book b2 = new Book(bssut, new Date(12121212), new Date());
-		 b2.store();
-		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
-		 b3.store();
-		 
-		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
-		 
-		 File f = new File(BOOKS_SER_FILE);
-		 f.delete();
-		 assertFalse(f.exists());
-		 
-		 // Serialize in a file
-		 FileOutputStream fos = new FileOutputStream(f);
-		 ObjectOutputStream oos = new ObjectOutputStream(fos);
-		 searchQuery.exportTo(oos);
-		 oos.close();
-		 
-		 // Test if the file has been created
-		 assertTrue(f.exists());
-		 
-		 NavigableSet<Book> originalBooks = searchQuery.go();
-		 it = originalBooks.iterator();
-		 while(it.hasNext())
-		 {
-			 current = it.next();
-			 current.delete();
-		 }
-		 
-		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+	@Test
+	public void checkSerializeBook() throws DatabaseNotReachedException,
+			IOException, ClassNotFoundException, InterruptedException {
+		Book current;
+		Iterator<Book> it;
 
-		 ImportExport.importPersistingElements(new FileInputStream(f));
-		 NavigableSet<Book> unserializedBooks = searchQuery.go();
-		 
-		 assertEquals(originalBooks, unserializedBooks);
-	 }
-	 
-	 @Test public void checkUnserializeBook() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
-		 Book current;
-		 Iterator<Book> it;
+		Book b2 = new Book(bssut, new Date(12121212), new Date());
+		b2.store();
+		Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789),
+				new Date());
+		b3.store();
 
-		 Book b2 = new Book(bssut, new Date(12121212), new Date());
-		 b2.store();
-		 Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789), new Date());
-		 b3.store();
-		 
-		 SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
-		 
-		 File f = new File(BOOKS_SER_FILE);
-		 
-		 // Serialize in a file
-		 FileOutputStream fos = new FileOutputStream(f);
-		 ObjectOutputStream oos = new ObjectOutputStream(fos);
-		 long exported = searchQuery.exportTo(oos);
-		 oos.close();
-		 assertEquals(searchQuery.count(), exported);
-		 
-		 // Test if the file has been created
-		 assertTrue(f.exists());
-		 NavigableSet<Book> originalBooks = searchQuery.go();
-		 long originalCount = searchQuery.count();
+		SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement
+				.findElements().ofClass(Book.class).withAtMost(1000).elements();
 
-		 it = originalBooks.iterator();
-		 while(it.hasNext())
-		 {
-			 current = it.next();
-			 current.delete();
-		 }
-		 assertEquals(0, searchQuery.count());
-		 
-		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+		File f = new File(BOOKS_SER_FILE);
+		f.delete();
+		assertFalse(f.exists());
 
-		 long imported = ImportExport.importPersistingElements(new FileInputStream(f));
-		 
-		 assertEquals(exported, imported);
-		 assertEquals(originalCount, searchQuery.count());
-	 }
-	 
-	 @Test public void checkUnserializeBookAndBookStore() throws DatabaseNotReachedException, IOException, ClassNotFoundException {
-		 PersistingElement current;
-		 Iterator<PersistingElement> it;
+		// Serialize in a file
+		FileOutputStream fos = new FileOutputStream(f);
+		ObjectOutputStream oos = new ObjectOutputStream(fos);
+		searchQuery.exportTo(oos);
+		oos.close();
 
-		 Book b2 = new Book(bssut, new Date(12121212), new Date());
-		 b2.store();
-		 BookStore bs2 = new BookStore("rfgbuhfgj");
-		 bs2.store();
+		// Test if the file has been created
+		assertTrue(f.exists());
+
+		NavigableSet<Book> originalBooks = searchQuery.go();
+		it = originalBooks.iterator();
+		while (it.hasNext()) {
+			current = it.next();
+			current.delete();
+		}
+
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		FileInputStream fis = new FileInputStream(f);
+		ImportExport.importPersistingElements(fis);
+		fis.close();
+		Thread.sleep(100);
+		NavigableSet<Book> unserializedBooks = searchQuery.go();
+
+		assertEquals(originalBooks, unserializedBooks);
+	}
+
+	@Test
+	public void checkUnserializeBook() throws DatabaseNotReachedException,
+			IOException, ClassNotFoundException, InterruptedException {
+		Book current;
+		Iterator<Book> it;
+
+		Book b2 = new Book(bssut, new Date(12121212), new Date());
+		b2.store();
+		Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789),
+				new Date());
+		b3.store();
+
+		SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement
+				.findElements().ofClass(Book.class).withAtMost(1000).elements();
+
+		File f = new File(BOOKS_SER_FILE);
+
+		// Serialize in a file
+		FileOutputStream fos = new FileOutputStream(f);
+		ObjectOutputStream oos = new ObjectOutputStream(fos);
+		long exported = searchQuery.exportTo(oos);
+		oos.close();
+		assertEquals(searchQuery.count(), exported);
+
+		// Test if the file has been created
+		assertTrue(f.exists());
+		NavigableSet<Book> originalBooks = searchQuery.go();
+		long originalCount = searchQuery.count();
+
+		it = originalBooks.iterator();
+		while (it.hasNext()) {
+			current = it.next();
+			current.delete();
+		}
+		assertEquals(0, searchQuery.count());
+
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		FileInputStream fis = new FileInputStream(f);
+		long imported = ImportExport
+				.importPersistingElements(fis);
+		Thread.sleep(100);
+		fis.close();
+
+		assertEquals(exported, imported);
+		assertEquals(originalCount, searchQuery.count());
+	}
+
+	@Test
+	public void checkUnserializeBookAndBookStore()
+			throws DatabaseNotReachedException, IOException,
+			ClassNotFoundException, InterruptedException {
+		PersistingElement current;
+		Iterator<PersistingElement> it;
+
+		Book b2 = new Book(bssut, new Date(12121212), new Date());
+		b2.store();
+		BookStore bs2 = new BookStore("rfgbuhfgj");
+		bs2.store();
 		Book b3 = new Book(bs2, new Date(123456789), new Date());
-		 b3.store();
+		b3.store();
+		
+		Thread.sleep(100);
 
-		 SearchableClassConstraintBuilder<BookStore> searchQuery1 = StorageManagement.findElements().ofClass(BookStore.class).withAtMost(1000).elements();
-		 SearchableClassConstraintBuilder<Book> searchQuery2 = StorageManagement.findElements().ofClass(Book.class).withAtMost(1000).elements();
-		 
-		 File f = new File(BOOKS_SER_FILE);
-		 
-		 // Serialize in a file
-		 ObjectOutputStream fos = new ObjectOutputStream( new FileOutputStream(f) );
-		 long exported = searchQuery1.exportTo(fos) + searchQuery2.exportTo(fos);
-		 fos.close();
-		 assertEquals(searchQuery1.count()+searchQuery2.count(), exported);
-		 
-		 // Test if the file has been created
-		 assertTrue(f.exists());
-		 
-		 TreeSet<PersistingElement> original = new TreeSet<PersistingElement>();
-		 original.addAll(searchQuery1.go());
-		 original.addAll(searchQuery2.go());
-		 long originalCount = searchQuery1.count()+searchQuery2.count();
+		SearchableClassConstraintBuilder<BookStore> searchQuery1 = StorageManagement
+				.findElements().ofClass(BookStore.class).withAtMost(1000)
+				.elements();
+		SearchableClassConstraintBuilder<Book> searchQuery2 = StorageManagement
+				.findElements().ofClass(Book.class).withAtMost(1000).elements();
 
-		 it = original.iterator();
-		 while(it.hasNext())
-		 {
-			 current = it.next();
-			 current.delete();
-		 }
-		 assertEquals(0, searchQuery1.count()+searchQuery2.count());
-		 
-		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+		File f = new File(BOOKS_SER_FILE);
 
-		 long imported = ImportExport.importPersistingElements(new FileInputStream(f));
-		 
-		 assertEquals(exported, imported);
-		 assertEquals(originalCount, searchQuery1.count()+searchQuery2.count());
-	 }
+		// Serialize in a file
+		ObjectOutputStream fos = new ObjectOutputStream(new FileOutputStream(f));
+		long exported = searchQuery1.exportTo(fos) + searchQuery2.exportTo(fos);
+		fos.close();
+		assertEquals(searchQuery1.count() + searchQuery2.count(), exported);
+
+		// Test if the file has been created
+		assertTrue(f.exists());
+
+		TreeSet<PersistingElement> original = new TreeSet<PersistingElement>();
+		original.addAll(searchQuery1.go());
+		original.addAll(searchQuery2.go());
+		long originalCount = searchQuery1.count() + searchQuery2.count();
+
+		it = original.iterator();
+		while (it.hasNext()) {
+			current = it.next();
+			current.delete();
+		}
+		assertEquals(0, searchQuery1.count() + searchQuery2.count());
+
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		FileInputStream fis = new FileInputStream(f);
+		long imported = ImportExport
+				.importPersistingElements(fis);
+		Thread.sleep(100);
+		fis.close();
+
+		assertEquals(exported, imported);
+		assertEquals(originalCount, searchQuery1.count() + searchQuery2.count());
+	}
 
 }

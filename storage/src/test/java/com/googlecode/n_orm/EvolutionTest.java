@@ -5,7 +5,6 @@ import static org.junit.Assert.*;
 import java.util.Date;
 import java.util.Set;
 
-import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -21,11 +20,14 @@ public class EvolutionTest {
 
 	@Persisting(table="evoltest")
 	public static class V0 {
+		private static final long serialVersionUID = -3935844859436754814L;
 		@Key public String key;
 	}
 
 	@Persisting(table="evoltest")
 	public static class V0NewProps {
+		private static final long serialVersionUID = 5854170758073427430L;
+
 		@Key public String key;
 		
 		public String sval;
@@ -60,6 +62,8 @@ public class EvolutionTest {
 
 	@Persisting(table="evoltest")
 	public static class V0NewCf {
+		private static final long serialVersionUID = -5243459256047265278L;
+
 		@Key public String key;
 		
 		public String aProp;
@@ -96,6 +100,7 @@ public class EvolutionTest {
 	
 	@Persisting
 	public static class AnotherClass {
+		private static final long serialVersionUID = 8140828656667038076L;
 		@Key public String key;
 		public String prop;
 		protected Set<String> cf = null;

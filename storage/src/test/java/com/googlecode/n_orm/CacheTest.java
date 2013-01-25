@@ -2,14 +2,16 @@ package com.googlecode.n_orm;
 
 import static org.junit.Assert.*;
 
-import org.aspectj.lang.annotation.Before;
 import org.junit.Test;
 
 public class CacheTest {
 
 	@Persisting
 	public static class Element {
+		private static final long serialVersionUID = -4948490781262917447L;
+		@SuppressWarnings("unused")
 		@Key private int key1;
+		@SuppressWarnings("unused")
 		@Key(order=2) private String key2;
 		public Element(int key1, String key2) {
 			super();

@@ -4,7 +4,7 @@ import java.util.ConcurrentModificationException;
 
 public aspect ConcurentAccessOnColumnFamily {
 
-	void around(ColumnFamily self, Object pojo): (call(void ColumnFamily.updateFromPOJO(Object)) || call(void ColumnFamily.storeToPOJO(Object))) && target(self) && args(pojo) {
+	void around(@SuppressWarnings("rawtypes") ColumnFamily self, Object pojo): (call(void ColumnFamily.updateFromPOJO(Object)) || call(void ColumnFamily.storeToPOJO(Object))) && target(self) && args(pojo) {
 		int maxRetries = 10;
 		ConcurrentModificationException cme = null;
 		do {

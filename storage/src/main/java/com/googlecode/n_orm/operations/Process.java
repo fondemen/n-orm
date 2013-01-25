@@ -5,13 +5,10 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -179,13 +176,11 @@ public class Process {
 			exceptions.add(t);
 		} finally {
 			keys.close();
-			if (executor != null) {
-				if (ownsExecutor) {
-					executor.shutdown();
-					long to = cancel instanceof TimeoutCanceller ? ((TimeoutCanceller)cancel).getDuration() : 60000;
-					if (!executor.awaitTermination(to, TimeUnit.MILLISECONDS)) {
-						exceptions.add(new InterruptedException("Timeout while expecting termination for process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start)));
-					}
+			if (executor != null && ownsExecutor) {
+				executor.shutdown();
+				long to = cancel instanceof TimeoutCanceller ? ((TimeoutCanceller)cancel).getDuration() : 60000;
+				if (!executor.awaitTermination(to, TimeUnit.MILLISECONDS)) {
+					exceptions.add(new InterruptedException("Timeout while expecting termination for process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start)));
 				}
 			}
 			if (!problems.isEmpty() || !exceptions.isEmpty()) {

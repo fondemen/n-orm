@@ -414,46 +414,43 @@ public class ShellProcessor
 	{
 		String[] args = getTokens(textToTreat.replaceFirst(this.showCommand + " ", ""));
 		
-		if (args.length > 0)
+		if (args.length > 0 && mapShellVariables.containsKey(args[0]))
 		{
-			if (mapShellVariables.containsKey(args[0]))
+			Object localContext = mapShellVariables.get(args[0]);
+			ArrayList<String> values = new ArrayList<String>();
+			
+			// List all properties of the context and add them as Continuators
+			if (localContext instanceof Collection)
 			{
-				Object localContext = mapShellVariables.get(args[0]);
-				ArrayList<String> values = new ArrayList<String>();
-				
-				// List all properties of the context and add them as Continuators
-				if (localContext instanceof Collection)
+				Collection c = (Collection)localContext;
+				Iterator it = c.iterator();
+				while (it.hasNext())
 				{
-					Collection c = (Collection)localContext;
-					Iterator it = c.iterator();
-					while (it.hasNext())
+					Object o = it.next();
+					if (o.getClass().getAnnotation(Persisting.class) != null)
 					{
-						Object o = it.next();
-						if (o.getClass().getAnnotation(Persisting.class) != null)
+						values.add("Variable type: " + o.getClass().getName());
+						for (Field p : o.getClass().getDeclaredFields())
 						{
-							values.add("Variable type: " + o.getClass().getName());
-							for (Field p : o.getClass().getDeclaredFields())
+							try
 							{
-								try
+								Method m = PropertyUtils.getReadMethod(PropertyUtils.getPropertyDescriptor(o, p.getName()));
+								if (m != null)
 								{
-									Method m = PropertyUtils.getReadMethod(PropertyUtils.getPropertyDescriptor(o, p.getName()));
-									if (m != null)
-									{
-										Object result = m.invoke(ConvertUtils.convert(o, o.getClass()));
-										values.add(p.getName() + ": " + (result == null ? "null" : result.toString()));
-									}
+									Object result = m.invoke(ConvertUtils.convert(o, o.getClass()));
+									values.add(p.getName() + ": " + (result == null ? "null" : result.toString()));
 								}
-								catch (Exception e) { }
 							}
-							values.add("");
+							catch (Exception e) { }
 						}
+						values.add("");
 					}
 				}
-				
-				// Print on the shell
-				for (String s : values)
-					shell.println(s);
 			}
+			
+			// Print on the shell
+			for (String s : values)
+				shell.println(s);
 		}
 	}
 	
@@ -465,10 +462,9 @@ public class ShellProcessor
 		if (args.length > 0)
 		{
 			int offset = 0;
-			if (args.length > 2)
+			if (args.length > 2 && args[args.length - 2].equals(this.affectationCommand))
 			{
-				if (args[args.length - 2].equals(this.affectationCommand))
-					offset = 2;
+				offset = 2;
 			}
 			try
 			{

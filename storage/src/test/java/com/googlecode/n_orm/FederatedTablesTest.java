@@ -1,32 +1,19 @@
 package com.googlecode.n_orm;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
-import java.lang.reflect.Field;
-import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Properties;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import com.googlecode.n_orm.cf.MapColumnFamily;
-import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory;
-import com.googlecode.n_orm.mocked.ElementInFederatedMockedStore;
-import com.googlecode.n_orm.mocked.MockedStore;
-import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.Constraint;
-import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
-import com.googlecode.n_orm.storeapi.MetaInformation;
-import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
 import com.googlecode.n_orm.storeapi.Store;
 
@@ -39,6 +26,7 @@ public class FederatedTablesTest {
 
 	@Persisting(table = "t", federated = FederatedMode.RCONS)
 	public static class Element {
+		private static final long serialVersionUID = -6877770319760457398L;
 		@Key
 		public String key;
 		public String post;
@@ -440,6 +428,7 @@ public class FederatedTablesTest {
 
 	@Persisting(table = "t", federated = FederatedMode.PC_INCONS)
 	public static class CheckedElement {
+		private static final long serialVersionUID = 5367746075423856372L;
 		@Key
 		public String key;
 		public String post;
@@ -483,6 +472,7 @@ public class FederatedTablesTest {
 
 	@Persisting(table = "t", federated = FederatedMode.CONS)
 	public static class ConsistentElement {
+		private static final long serialVersionUID = -1514618678838564130L;
 		@Key
 		public String key;
 		public String post;
@@ -545,6 +535,7 @@ public class FederatedTablesTest {
 
 	@Persisting(table = "t", federated = FederatedMode.PC_LEG)
 	public static class LegacyableElement {
+		private static final long serialVersionUID = 1316553095510929588L;
 		@Key
 		public String key;
 		public String post;
@@ -667,6 +658,7 @@ public class FederatedTablesTest {
 
 	@Persisting(table = "t")
 	public static class SimpleElement {
+		private static final long serialVersionUID = -5742148285547881955L;
 		@Key
 		public String key;
 		public String arg;

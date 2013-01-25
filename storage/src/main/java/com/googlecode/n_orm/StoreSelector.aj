@@ -28,7 +28,7 @@ import com.googlecode.n_orm.StoreSelector;
 
 public aspect StoreSelector {
 	private static StoreSelector INSTANCE;
-	
+
 	public static StoreSelector getInstance() {
 		if (INSTANCE == null)
 			INSTANCE = aspectOf();
