@@ -1,17 +1,17 @@
 package com.googlecode.n_orm.cf;
 
 import java.util.Iterator;
-import java.util.Set;
 
 import org.apache.commons.collections.iterators.AbstractTestIterator;
-import org.apache.commons.collections.set.AbstractTestSet;
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 
+@SuppressWarnings("rawtypes")
 public abstract class MapIteratorTest extends AbstractTestIterator {
 	@Persisting
 	public static class Element {
+		private static final long serialVersionUID = 5940954039477912163L;
 		@Key
 		public String key;
 		public MapColumnFamily<String, String> elements = new MapColumnFamily<String, String>();

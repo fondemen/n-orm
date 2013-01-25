@@ -311,6 +311,7 @@ public class WriteRetentionTest {
 	
 	@Persisting(writeRetentionMs=100)
 	public static class Element {
+		private static final long serialVersionUID = 6304132311755611785L;
 		@Key public String key;
 		public String value;
 	}

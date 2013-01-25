@@ -1,13 +1,11 @@
 package com.googlecode.n_orm.utils;
 
-import static org.junit.Assert.*;
-
 import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.collections.map.AbstractTestMap;
-import org.junit.Test;
 
+@SuppressWarnings("rawtypes")
 public class UnmodifiableOverridingMapTest extends AbstractTestMap {
 
 	public UnmodifiableOverridingMapTest() {
@@ -49,6 +47,7 @@ public class UnmodifiableOverridingMapTest extends AbstractTestMap {
 		return false;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public Map makeFullMap() {
 		Map res = new HashMap();

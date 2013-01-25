@@ -33,8 +33,8 @@ import com.googlecode.n_orm.storeapi.Store;
  * Full consistency, be it for read or write, consists in checking existence of
  * the element's identifier in alternative tables. All alternative tables are
  * queried for the existence of the identifier (using
- * {@link Store#exists(PersistingElement, String, String)}). Tables are queried
- * in sequence in probability order:
+ * {@link Store#exists(com.googlecode.n_orm.storeapi.MetaInformation, String, String)}).
+ * Tables are queried in sequence in probability order:
  * <ol>
  * <li>table with computed postfix
  * <li>table with no postfix (a.k.a. original table, i.e. the table in which the
@@ -223,44 +223,10 @@ public enum FederatedMode {
 	 */
 	PC_CONS(true, Consistency.CONSISTENT, Consistency.CONSISTENT), ;
 
-	public static enum ReadWrite {
-		READ(true, false), WRITE(false, true), READ_OR_WRITE(true, true);
-		private final boolean read;
-		private final boolean write;
-		private ReadWrite(boolean read, boolean write) {
-			this.read = read;
-			this.write = write;
-		}
-		public boolean isRead() {
-			return read;
-		}
-		public boolean isWrite() {
-			return write;
-		}
-	};
-
-	public static enum Consistency {
-		// Values should be kept in importance order (a value implies
-		// previous values)
-		NONE, CONSISTENT_WITH_LEGACY, CONSISTENT;
-		public static Consistency fromInt(byte number) {
-			switch (number) {
-			case 0:
-				return NONE;
-			case 1:
-				return CONSISTENT_WITH_LEGACY;
-			case 2:
-				return CONSISTENT;
-			default:
-				throw new IllegalArgumentException();
-			}
-		}
-	};
-
 	private final boolean federated;
 	private final boolean checkForChangingPostfix;
-	private final FederatedMode.Consistency readConsistency;
-	private final FederatedMode.Consistency writeConsistency;
+	private final Consistency readConsistency;
+	private final Consistency writeConsistency;
 
 	// Not federated
 	FederatedMode() {
@@ -272,8 +238,8 @@ public enum FederatedMode {
 
 	// Federated
 	FederatedMode(boolean checkForChangingPostfix,
-			FederatedMode.Consistency readConsistency,
-			FederatedMode.Consistency writeConsistency) {
+			Consistency readConsistency,
+			Consistency writeConsistency) {
 		this.federated = true;
 		this.checkForChangingPostfix = checkForChangingPostfix;
 		this.readConsistency = readConsistency;
@@ -296,7 +262,7 @@ public enum FederatedMode {
 		return checkForChangingPostfix;
 	}
 
-	public FederatedMode.Consistency getConsistency(FederatedMode.ReadWrite mode) {
+	public Consistency getConsistency(ReadWrite mode) {
 		switch (mode) {
 		case READ:
 			return this.readConsistency;

@@ -301,7 +301,7 @@ public class ShellProcessorTest
 	
 	@Test
 	public void stackTest() {
-		String command = "getBean", command2 = "getVal", command3 = "getClone";
+		String command = "getBean", command3 = "getClone";
 		String args = "avalue";
 		
 		shell.updateProcessorCommands();

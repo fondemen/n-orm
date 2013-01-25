@@ -202,6 +202,7 @@ public class ConversionTools {
 				"Cannot create a reverted string representation for " + o);
 	}
 	
+	@SuppressWarnings("unchecked")
 	public static <T> T getDefaultValue(Class<T> expected) {
 		return (T) convertInternal(null, expected, ConversionKind.Default, null);
 	}

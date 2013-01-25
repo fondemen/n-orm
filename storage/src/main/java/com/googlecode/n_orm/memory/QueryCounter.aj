@@ -1,7 +1,6 @@
 package com.googlecode.n_orm.memory;
 
 import java.lang.reflect.Method;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.aspectj.lang.reflect.MethodSignature;
 

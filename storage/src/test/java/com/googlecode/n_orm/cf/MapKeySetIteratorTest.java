@@ -2,6 +2,7 @@ package com.googlecode.n_orm.cf;
 
 import java.util.Iterator;
 
+@SuppressWarnings("rawtypes")
 public class MapKeySetIteratorTest extends MapIteratorTest {
 
 	public MapKeySetIteratorTest(String name) {
