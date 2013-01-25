@@ -144,7 +144,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	void store() throws DatabaseNotReachedException;
 	
 	/**
-	 * Store this persisting element as {@link #store()} but ignoring any {@link WriteRetentionStore write cache}.
+	 * Store this persisting element as {@link #store()} but ignoring any {@link com.googlecode.n_orm.cache.write.WriteRetentionStore write cache}.
 	 * Actually, in case this element has a write cache, request is still sent to the cache, but then flushed immediately so that previous requests regarding this element are merged and sent.
 	 * @throws DatabaseNotReachedException
 	 */
