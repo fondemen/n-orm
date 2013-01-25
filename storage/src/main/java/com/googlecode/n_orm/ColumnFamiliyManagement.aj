@@ -8,17 +8,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 
 import org.aspectj.lang.reflect.FieldSignature;
 
 import com.googlecode.n_orm.ColumnFamiliyManagement;
-import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cf.ColumnFamily;
@@ -159,71 +156,6 @@ public aspect ColumnFamiliyManagement {
 		return ret;
 	}
 	
-	//@Transient private boolean PersistingElement.inPOJOMode = false; //Must be @Transient and not transient: in case the persisting element was serialized in pojo mode, it must be deserialized in pojo mode
-	
-	/**
-	 * @deprecated already working in POJO mode ; this method is just useless
-	 * Sets this object in POJO mode or not. POJO mode makes all non final static or transient fields
-	 * simple elements, i.e. with no reference to ColumnFamily or one of its subclass. This is performed
-	 * a transitive way, which means that all referenced persisting elements will also be set to the
-	 * requested POJO mode. The main interest of this method is for serializing Persisting elements:
-	 * a persisting element should be set into POJO mode before being serialized, and into normal mode
-	 * once deserialized.
-	 * @param pojo
-	 */
-	@Deprecated
-	public void PersistingElement.setPOJO(boolean pojo) {
-//		if (this.inPOJOMode == pojo)
-//			return;
-//		PropertyManagement pm = PropertyManagement.getInstance();
-//		Map<PersistingElement, Map<Field, Object>> toBeSet = new HashMap<PersistingElement, Map<Field,Object>>();
-//		this.grabSetPOJOAtts(pojo, toBeSet);
-//		for (Entry<PersistingElement, Map<Field, Object>> pe : toBeSet.entrySet()) {
-//			synchronized (pe.getKey()) {
-//				for (Entry<Field, Object> prop : pe.getValue().entrySet()) {
-//					if (pojo == false) {
-//						this.getColumnFamily(prop.getKey().getName()).updateFromPOJO();
-//					}
-//					pm .candideSetValue(pe.getKey(), prop.getKey(), prop.getValue());
-//				}
-//				pe.getKey().inPOJOMode = true;
-//			}
-//		}
-	}
-		
-//	private void PersistingElement.grabSetPOJOAtts(boolean pojo, Map<PersistingElement, Map<Field, Object>> toBeSet) {
-//		if (this.inPOJOMode == pojo)
-//			return;
-//		Map<Field, Object> thisToBeSet = new HashMap<Field, Object>();
-//		PropertyManagement pm = PropertyManagement.getInstance();
-//		for (Field f : pm.getProperties(this.getClass())) {
-//			if (PersistingElement.class.isAssignableFrom(f.getType()))
-//				((PersistingElement)pm.candideReadValue(this, f)).grabSetPOJOAtts(pojo, toBeSet);
-//		}
-//		ColumnFamiliyManagement cfm = ColumnFamiliyManagement.getInstance();
-//		for (Field f : cfm.detectColumnFamilies(this.getClass())) {
-//			ColumnFamily<?> cf = this.getColumnFamiliesInt().get(f.getName());
-//			if (cf == null) {
-//				cf = cfm.createColumnFamily(this, f, pm.candideReadValue(this, f));
-//			}
-//			if (cf.getClazz().isAssignableFrom(PersistingElement.class) || PersistingElement.class.isAssignableFrom(cf.getClazz())) {
-//				for (String k : cf.getKeys()) {
-//					Object o = cf.getElement(k);
-//					if (o instanceof PersistingElement) {
-//						((PersistingElement)o).grabSetPOJOAtts(pojo, toBeSet);
-//					}
-//				}
-//			}
-//			Object val = pojo ? cf.getSerializableVersion() : cf;
-//			if (f.getType().isInstance(val)) {
-//				thisToBeSet.put(f, val);
-//			} else {
-//				throw new ClassCastException("Cannot set " + f + " to " + val + " in " + this);
-//			}
-//		}
-//		toBeSet.put(this, thisToBeSet);
-//	}
-	
 	public void PersistingElement.updateFromPOJO() {
 		for (ColumnFamily<?> cf : this.getColumnFamiliesInt().values()) {
 			cf.updateFromPOJO();
@@ -247,7 +179,6 @@ public aspect ColumnFamiliyManagement {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private ColumnFamily<?> createColumnFamily(PersistingElement self, Field field, Object oldCf) {
-		PropertyManagement pm = PropertyManagement.getInstance();
 		ColumnFamily<?> acf;
 		ParameterizedType collType = (ParameterizedType) field.getGenericType();
 		if (Map.class.isAssignableFrom(field.getType())) {
@@ -274,12 +205,8 @@ public aspect ColumnFamiliyManagement {
 		return acf;
 	}
 	
-	after(ColumnFamily cf) returning : execution(ColumnFamily.new(..)) && target(cf) {
+	after(@SuppressWarnings("rawtypes") ColumnFamily cf) returning : execution(ColumnFamily.new(..)) && target(cf) {
 		if (cf.getOwner() != null)
 			cf.getOwner().addColumnFamily(cf);
 	}
-	
-	//before(ColumnFamily cf) : execution(public * ColumnFamily+.*(..) && target(cf)) {
-	//	assert cf.owner != null;
-	//}
 }

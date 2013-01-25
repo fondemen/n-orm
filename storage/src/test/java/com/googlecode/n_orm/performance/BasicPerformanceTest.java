@@ -2,36 +2,21 @@ package com.googlecode.n_orm.performance;
 
 import static org.junit.Assert.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Iterator;
-import java.util.NavigableSet;
 import java.util.NoSuchElementException;
 import java.util.Properties;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.easymock.Capture;
-import org.easymock.EasyMock;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.googlecode.n_orm.Book;
@@ -42,14 +27,10 @@ import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.Novel;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
-import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.RealBook;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
-import com.googlecode.n_orm.ProcessTest.InrementNovel;
 import com.googlecode.n_orm.StoreTestLauncher;
-import com.googlecode.n_orm.cf.ColumnFamily;
-import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class BasicPerformanceTest {
 
@@ -202,6 +183,7 @@ public class BasicPerformanceTest {
 			 final int index = i;
 			 exec.submit(new Runnable() {
 
+				@SuppressWarnings("deprecation")
 				@Override
 				public void run() {
 					RealBook b = new RealBook(bssut, new Date(2012, 1, index % 30), new Date(2042, index % 12, 12), "Hello"+index, index);
@@ -215,7 +197,8 @@ public class BasicPerformanceTest {
 		 }
 	 }
 	 
-	 @Test public void searchAmong1kBooks() throws DatabaseNotReachedException {
+	 @SuppressWarnings("deprecation")
+	@Test public void searchAmong1kBooks() throws DatabaseNotReachedException {
 		 this.insertAnddelete1kBWithBS();
 		 CloseableIterator<RealBook> storeBooks = StorageManagement.findElements().ofClass(RealBook.class)
 					.withKey("bookStore").setTo(bssut)
@@ -244,6 +227,7 @@ public class BasicPerformanceTest {
 			 final int index = i;
 			 futures.add(exec.submit(new Runnable() {
 
+				@SuppressWarnings("deprecation")
 				@Override
 				public void run() {
 					RealBook b = new RealBook(bssut, new Date(2012, 1, index % 30), new Date(2042, index % 12, 12), "Hello"+index, index);
@@ -254,6 +238,7 @@ public class BasicPerformanceTest {
 			 }));
 			 futures.add(exec.submit(new Runnable() {
 
+				@SuppressWarnings("deprecation")
 				@Override
 				public void run() {
 					RealBook b = new RealBook(bssut, new Date(2012, 1, index % 30), new Date(2042, index % 12, 12), "Hello"+index, index);
@@ -264,6 +249,7 @@ public class BasicPerformanceTest {
 			 if (i%2 == 0)
 				 futures.add(exec.submit(new Runnable() {
 	
+					@SuppressWarnings("deprecation")
 					@Override
 					public void run() {
 						 final int [] count = {0};
@@ -273,7 +259,8 @@ public class BasicPerformanceTest {
 										.withKey("bookStore").setTo(bssut)
 										.withKey("sellerDate").lessOrEqualsThan(new Date(2014, 1, 1))
 										.withAtMost(1000).elements().forEach(new Process<RealBook>() {
-											
+										private static final long serialVersionUID = 8646643213678l;
+
 											@Override
 											public void process(RealBook element) throws Throwable {
 												count[0]++;

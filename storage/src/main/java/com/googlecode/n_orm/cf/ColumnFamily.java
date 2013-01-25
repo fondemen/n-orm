@@ -106,7 +106,6 @@ public abstract class ColumnFamily<T> implements Comparable<ColumnFamily<T>> {
 	/**
 	 * Whether this column family was activated during the last <code>timeout</code> period.
 	 * @param timeout negative value means at any time ; {@link Long#MAX_VALUE} bypasses clock read
-	 * @return
 	 */
 	public boolean isActivated(long timeout) {
 		return this.lastActivation > 0 && (timeout < 0 ? true : (timeout == Long.MAX_VALUE || System.currentTimeMillis() - timeout < this.lastActivation));

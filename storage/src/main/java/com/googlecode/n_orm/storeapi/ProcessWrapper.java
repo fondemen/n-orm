@@ -26,7 +26,7 @@ public class ProcessWrapper<AE extends PersistingElement, E extends AE> implemen
 
 	@Override
 	public void process(Row row) throws Throwable {
-		process.process((AE)StorageManagement.getFromRawData(this.clazz, row));
+		process.process((AE)StorageManagement.getFromRawData(this.clazz, row, this.toBeActivated));
 	}
 	
 }

@@ -28,9 +28,13 @@ public class IDGeneratorTest {
 	private static enum ExampleEnum {e1, e2};
 	@Persisting private static class Nominal {
 		private static final long serialVersionUID = 3133936807735279330L;
+		@SuppressWarnings("unused")
 		@Key(order=3) public String k1;
+		@SuppressWarnings("unused")
 		@Key(order=2) public int k2;
+		@SuppressWarnings("unused")
 		@Key(order=1) public ExampleEnum k3;
+		@SuppressWarnings("unused")
 		public String anotherProperty;
 		public Nominal(String k1, int k2, ExampleEnum k3) {
 			super();
@@ -64,6 +68,8 @@ public class IDGeneratorTest {
 	}
 	
 	private static class InheritingNominalWithOneMoreKey extends Nominal {
+		private static final long serialVersionUID = 4446836409951297910L;
+		@SuppressWarnings("unused")
 		@Key(order=4) public String k4;
 		public InheritingNominalWithOneMoreKey(String k1, int k2, ExampleEnum k3, String k4) {
 			super(k1, k2, k3);
@@ -78,6 +84,8 @@ public class IDGeneratorTest {
 	}
 	
 	private static class InheritingNominalWithMissingKey extends Nominal {
+		private static final long serialVersionUID = -5508875053224558403L;
+		@SuppressWarnings("unused")
 		@Key(order=5) public String k4;
 		public InheritingNominalWithMissingKey(String k1, int k2, ExampleEnum k3, String k4) {
 			super(k1, k2, k3);
@@ -91,6 +99,8 @@ public class IDGeneratorTest {
 	}
 	
 	private static class InheritingNominalWithOverloadedKey extends Nominal {
+		private static final long serialVersionUID = -769247804305123217L;
+		@SuppressWarnings("unused")
 		@Key(order=2) public String k4;
 		public InheritingNominalWithOverloadedKey(String k1, int k2, ExampleEnum k3, String k4) {
 			super(k1, k2, k3);
@@ -104,6 +114,8 @@ public class IDGeneratorTest {
 	}
 	
 	@Persisting	private static class KeWith0Index extends Nominal {
+		private static final long serialVersionUID = 1956031906155256421L;
+		@SuppressWarnings("unused")
 		@Key(order=0) public String k4;
 		public KeWith0Index(String k1, int k2, ExampleEnum k3, String k4) {
 			super(k1, k2, k3);
@@ -117,6 +129,8 @@ public class IDGeneratorTest {
 	}
 	
 	@Persisting	private static class PersitingWithObjectKey {
+		private static final long serialVersionUID = -5929336241472054568L;
+		@SuppressWarnings("unused")
 		@Key(order=1) public Object k4;
 		public PersitingWithObjectKey(Object k4) {
 			this.k4 = k4;
@@ -129,6 +143,7 @@ public class IDGeneratorTest {
 	}
 	
 	@Persisting	private static class NoKey {
+		private static final long serialVersionUID = 4474406760340711095L;
 	}
 	
 	@Test(expected=IllegalStateException.class) public void noKey() {
@@ -137,6 +152,7 @@ public class IDGeneratorTest {
 	
 	@Test(expected=IllegalStateException.class) public void notPersistingWhileImplementingPersistinElement() {
 		new PersistingElement() {
+			private static final long serialVersionUID = 1L;
 			@SuppressWarnings("unused")
 			@Key(order=1) public final int key = 1;
 			
@@ -153,6 +169,8 @@ public class IDGeneratorTest {
 	}
 	
 	@Persisting	private static class PersitingOwingPersisting {
+		private static final long serialVersionUID = -5981472567541087145L;
+		@SuppressWarnings("unused")
 		@Key(order=1) public Nominal el;
 		public PersitingOwingPersisting(String k1, int k2, ExampleEnum k3) {
 			this.el = new Nominal(k1, k2, k3);

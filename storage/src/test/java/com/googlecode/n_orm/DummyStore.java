@@ -1,6 +1,5 @@
 package com.googlecode.n_orm;
 
-import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
 

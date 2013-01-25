@@ -28,6 +28,7 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
@@ -351,10 +352,8 @@ public class SharedExclusiveLock {
         @Override
         public void process(WatchedEvent event) {
             synchronized (mutex) {
-                switch (event.getType()) {
-                case NodeDeleted:
+            	if (EventType.NodeDeleted.equals(event.getType())) {
                     mutex.notify();
-                    break;
                 }
             }
         }

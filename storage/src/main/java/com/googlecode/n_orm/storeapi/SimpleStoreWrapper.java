@@ -1,12 +1,10 @@
 package com.googlecode.n_orm.storeapi;
 
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 public class SimpleStoreWrapper implements Store {

@@ -55,7 +55,7 @@ import com.googlecode.n_orm.utils.LongAdder;
  * As an example, if a persisting element is stored at time t1, changed and stored again at time t2
  * such that t2-t1 is less than the {@link #getWriteRetentionMs() retention time}, only one store request
  * is issued to the {@link #getActualStore() actual store}, after t1+{@link #getWriteRetentionMs() retention time}.</p>
- * <p>Reads (as {@link #get(MetaInformation, String, String, Set)}, {@link PersistingElement#activate(Object[])})
+ * <p>Reads (as {@link #get(MetaInformation, String, String, Set)}, {@link PersistingElement#activate(String...)})
  * do not explore data "retended" here. As a example, activating, changing, storing, and then
  * activating again a persisting element using this kind of store can re-activate it as it was before the change.
  * Same remark holds for testing an element of existence, counting element, or getting a list of elements
@@ -608,12 +608,9 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * Merging meta information
 		 */
 		private void addMeta(MetaInformation meta) {
-			if (meta != null) {
-				// Setting meta in case null
-				if (!this.meta.compareAndSet(null, meta)) {
-					// Or integrate it if it already exists
-					this.meta.get().integrate(meta);
-				}
+			if (meta != null && !this.meta.compareAndSet(null, meta)) {
+				// Or integrate it if it already exists
+				this.meta.get().integrate(meta);
 			}
 		}
 
@@ -673,13 +670,6 @@ public class WriteRetentionStore extends DelegatingStore {
 		public long getDelay(TimeUnit unit) {
 			return unit.convert(this.outDateMs.get() - System.currentTimeMillis(),
 					TimeUnit.MILLISECONDS);
-		}
-		
-		/**
-		 * Tells this request that is is out of the planning queue
-		 */
-		private void dequeued() {
-			
 		}
 
 		/**

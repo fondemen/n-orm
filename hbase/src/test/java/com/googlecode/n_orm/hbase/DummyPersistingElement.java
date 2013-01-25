@@ -3,7 +3,6 @@ package com.googlecode.n_orm.hbase;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -17,6 +16,8 @@ import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 
 public class DummyPersistingElement implements PersistingElement {
+
+	private static final long serialVersionUID = 4609077141875049590L;
 
 	@Override
 	public void activate(Object[] arg0) throws DatabaseNotReachedException {
@@ -231,12 +232,6 @@ public class DummyPersistingElement implements PersistingElement {
 	@Override
 	public void removePersistingElementListener(
 			PersistingElementListener listener) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void setPOJO(boolean arg0) {
 		// TODO Auto-generated method stub
 
 	}

@@ -1,10 +1,8 @@
 package com.googlecode.n_orm.cf;
 
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.commons.collections.map.AbstractTestMap;
-import org.apache.commons.collections.set.AbstractTestSet;
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
@@ -12,6 +10,7 @@ import com.googlecode.n_orm.Persisting;
 public class MapIntTest extends AbstractTestMap {
 	@Persisting
 	public static class Element {
+		private static final long serialVersionUID = -3694069781114314267L;
 		@Key
 		public String key;
 		public MapColumnFamily<Integer, Integer> elements = new MapColumnFamily<Integer, Integer>();

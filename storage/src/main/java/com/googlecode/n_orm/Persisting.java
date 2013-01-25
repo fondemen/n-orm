@@ -5,17 +5,7 @@ import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.Map;
-import java.util.Set;
 
-import com.googlecode.n_orm.Key;
-import com.googlecode.n_orm.PersistingElement;
-import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.StorageManagement;
-import com.googlecode.n_orm.cache.write.WriteRetentionStore;
-import com.googlecode.n_orm.cf.ColumnFamily;
-import com.googlecode.n_orm.cf.MapColumnFamily;
-import com.googlecode.n_orm.cf.SetColumnFamily;
 import com.googlecode.n_orm.storeapi.SimpleStore;
 
 /**
@@ -40,10 +30,10 @@ import com.googlecode.n_orm.storeapi.SimpleStore;
  * <li>an array of such types (even though its usage is discouraged)
  * </ul>
  * Moreover, persisting classes may define (non final non static non transient)
- * {@link Map} or {@link Set} elements. Such elements are called <i>column
+ * {@link java.util.Map} or {@link java.util.Set} elements. Such elements are called <i>column
  * families</i> that can be assigned to null (only). Those column families will
- * be transformed to instances of {@link ColumnFamily} ({@link SetColumnFamily}
- * for {@link Set}s or {@link MapColumnFamily} for {@link Map}s).
+ * be transformed to instances of {@link com.googlecode.n_orm.cf.ColumnFamily} ({@link com.googlecode.n_orm.cf.SetColumnFamily}
+ * for {@link java.util.Set}s or {@link com.googlecode.n_orm.cf.MapColumnFamily} for {@link java.util.Map}s).
  * </p>
  * <p>
  * Keys are essential to search persisting elements. Indeed, one can efficiently
@@ -70,7 +60,7 @@ import com.googlecode.n_orm.storeapi.SimpleStore;
  * in a column family named "props" (as defined in
  * {@link PropertyManagement#PROPERTY_COLUMNFAMILY_NAME}). Keys are also stored
  * there if the annotation defined {@link #storeKeys()} as true. Column families
- * ({@link Set} and {@link Map} attributes) are merely stored in column families
+ * ({@link java.util.Set} and {@link java.util.Map} attributes) are merely stored in column families
  * of the data store.
  * </p>
  * <p>
@@ -115,10 +105,10 @@ public @interface Persisting {
 	 * sent. In case this number is 0 or below, no retention is applied. This
 	 * parameter is helpful when a row is quite often updated. Note that
 	 * activations are not aware of non-sent updates, (e.g. an
-	 * {@link PersistingElement#activate(Object[])} will not see new values for
+	 * {@link PersistingElement#activate(String...)} will not see new values for
 	 * at least duration indicated by this parameter).
 	 * 
-	 * @see WriteRetentionStore
+	 * @see com.googlecode.n_orm.cache.write.WriteRetentionStore
 	 */
 	long writeRetentionMs() default 0;
 

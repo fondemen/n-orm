@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class FixedThreadPool implements ExecutorService {
-	private final int threadNumber;
 	private final AtomicInteger remainingSubmittableThreads;
 	private final ConcurrentHashMap<Thread, Future<?>> threads = new ConcurrentHashMap<Thread, Future<?>>();
 	private volatile boolean done = false;
@@ -24,7 +23,6 @@ public class FixedThreadPool implements ExecutorService {
 	
 	public FixedThreadPool(int threadNumber) {
 		super();
-		this.threadNumber = threadNumber;
 		this.remainingSubmittableThreads = new AtomicInteger(threadNumber);
 		starterLatch = new CountDownLatch(threadNumber);
 	}

@@ -199,7 +199,7 @@ public class Memory implements SimpleStore {
 	/**
 	 * An map to store rows within tables.
 	 * Rows are indexed according to their keys.
-	 * Rows are sorted within a table according to their key value so that rage search can be fast (see {@link #toMap(String, String)}.
+	 * Rows are sorted within a table according to their key value so that range search can be fast.
 	 */
 	public class Table extends LazyMap<Table.Row> {
 		
@@ -274,10 +274,14 @@ public class Memory implements SimpleStore {
 				}
 				return ret;
 			}
+			
+			public long createTransaction() {
+				return this.nextTransactionId.incrementAndGet();
+			}
 
 			/**
 			 * A column family owning values.
-			 * Values are sorted according to their qualifier so that rage search can be fast (see {@link #toMap(String, String)}.
+			 * Values are sorted according to their qualifier so that rage search can be fast.
 			 */
 			public class ColumnFamily extends LazyMap<ColumnFamily.Value<?>> {
 				/**
@@ -346,8 +350,6 @@ public class Memory implements SimpleStore {
 					
 					/**
 					 * Creates a value that cannot be incremented
-					 * @param qualifier
-					 * @param value
 					 */
 					public Value(String qualifier) {
 						this.qualifier = qualifier;
@@ -561,7 +563,7 @@ public class Memory implements SimpleStore {
 		IllegalArgumentException x = null;
 		
 		Row r = this.getRow(table, id, true);
-		long transaction = r.nextTransactionId.incrementAndGet();
+		long transaction = r.createTransaction();
 		
 		if (changed != null)
 			for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
