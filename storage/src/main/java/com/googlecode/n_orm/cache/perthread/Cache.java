@@ -62,14 +62,14 @@ public class Cache {
 							}
 						} else {
 							cache = perThreadCaches.get(t);
-							if (cache == null) {
-								//Nothing to do ; cache is gone
-							} else if (cache.cache != null && cache.stopped == -1) {
-								cache.shouldCleanup = true;
-							} else {
-								assert false;
-								synchronized(perThreadCaches) {
-									perThreadCaches.remove(t);
+							if (cache != null) {
+								if (cache.cache != null && cache.stopped == -1) {
+									cache.shouldCleanup = true;
+								} else {
+									assert false;
+									synchronized(perThreadCaches) {
+										perThreadCaches.remove(t);
+									}
 								}
 							}
 						}
@@ -426,7 +426,7 @@ availableCachesCheck:while (ai.hasNext()) {
 	 * Only thread for this cache has access to this method.<br>
 	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).<br>
 	 * @param identifier the full identifier of the element to be cached; null if not found
-	 * @param clazz the class that the element instantiates (see {@link Object#getClass())}; null if not found
+	 * @param clazz the class that the element instantiates (see {@link Object#getClass()}; null if not found
 	 * @throws IllegalStateException in case this thread is not the thread for this cache
 	 * @see PersistingElement#getIdentifier()
 	 */
@@ -437,7 +437,6 @@ availableCachesCheck:while (ai.hasNext()) {
 	/**
 	 * The size of the cache.
 	 * This method checks elements for their time to live regardless the cache is marked for that or not.
-	 * @return
 	 */
 	public int size() {
 		this.cleanInvalidElements();

@@ -13,12 +13,8 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import com.googlecode.n_orm.Book;
-import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.hbase.Store;
-
 
 public class CompressionTest {
 	

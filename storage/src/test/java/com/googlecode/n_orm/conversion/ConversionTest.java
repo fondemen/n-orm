@@ -170,6 +170,7 @@ public class ConversionTest {
 	
 	@Persisting
 	public static class Persistable {
+		private static final long serialVersionUID = 5280458165632205912L;
 		@Key public  String key;
 		public String value;
 		
@@ -195,33 +196,35 @@ public class ConversionTest {
 	@Test
 	public void emptyArray() {
 		int[] array = new int[0];
-		byte [] rep = ConversionTools.convert(array, int[].class);
+		byte [] rep = ConversionTools.convert(array);
 		assertEquals(0, ConversionTools.convert(int[].class, rep).length);
 	}
 	
 	@Test
 	public void notEmptyArray() {
 		int[] array = {1, 2, 9, -12, 0};
-		byte [] rep = ConversionTools.convert(array, int[].class);
+		byte [] rep = ConversionTools.convert(array);
 		assertArrayEquals(array, ConversionTools.convert(int[].class, rep));
 	}
 	
 	@Test
 	public void nullArray() {
 		int[] array = null;
-		byte [] rep = ConversionTools.convert(array, int[].class);
+		byte [] rep = ConversionTools.convert(array);
 		assertNull(ConversionTools.convert(int[].class, rep));
 	}
 	
 	@Test
 	public void bytesArray() {
 		byte[] array = new byte[] {1,2,-3};
+		byte [] rep = ConversionTools.convert(array);
+		assertArrayEquals(array, ConversionTools.convert(byte[].class, rep));
 	}
 	
 	@Test
 	public void multidimensionalIntArray() {
 		int[][] array = new int[][] {{1,2,-3}, {}, {4,5}};
-		byte[] res = ConversionTools.convert(array, array.getClass());
+		byte[] res = ConversionTools.convert(array);
 		assertArrayEquals(array, ConversionTools.convert(array.getClass(), res));
 	}
 	

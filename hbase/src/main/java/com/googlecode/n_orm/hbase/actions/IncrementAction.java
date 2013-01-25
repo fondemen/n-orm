@@ -1,10 +1,8 @@
 package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
-import java.util.List;
 
 import org.apache.hadoop.hbase.client.Increment;
-import org.apache.hadoop.hbase.client.Row;
 
 public class IncrementAction extends Action<Void> {
 	

@@ -10,7 +10,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.Map.Entry;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
@@ -20,7 +19,7 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> {
 	protected final Class<K> keyClazz;
 	protected final boolean keyIsString;
-	private Set<Entry<K, T>> entries = null;
+	private Set<Map.Entry<K, T>> entries = null;
 	private Set<K> keys = null;
 
 	public MapColumnFamily() {
@@ -38,7 +37,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 	@Override
 	public Serializable getSerializableVersion() {
 		HashMap<K, T> ret = new HashMap<K, T>();
-		for (java.util.Map.Entry<K, T> kv : this.entrySet()) {
+		for (Map.Entry<K, T> kv : this.entrySet()) {
 			ret.put(kv.getKey(), kv.getValue());
 		}
 		return ret;
@@ -65,7 +64,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 	@Override
 	public int hashCode() {
 		int h = 0;
-		Iterator<Entry<K,T>> i = entrySet().iterator();
+		Iterator<Map.Entry<K,T>> i = entrySet().iterator();
 		while (i.hasNext())
 			h += i.next().hashCode();
 		return h;
@@ -233,20 +232,20 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 	}
 
 	@Override
-	public Set<java.util.Map.Entry<K, T>> entrySet() {
+	public Set<Map.Entry<K, T>> entrySet() {
 		if (this.entries == null) {
-			this.entries = new Set<Entry<K, T>>() {
+			this.entries = new Set<Map.Entry<K, T>>() {
 
 				@Override
-				public boolean add(java.util.Map.Entry<K, T> e) {
+				public boolean add(Map.Entry<K, T> e) {
 					return ! e.getValue().equals(put(e.getKey(), e.getValue()));
 				}
 
 				@Override
 				public boolean addAll(
-						Collection<? extends java.util.Map.Entry<K, T>> es) {
+						Collection<? extends Map.Entry<K, T>> es) {
 					boolean ret = false;
-					for (Entry<K, T> entry : es) {
+					for (Map.Entry<K, T> entry : es) {
 						if (this.add(entry))
 							ret = true;
 					}
@@ -260,10 +259,10 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 
 				@Override
 				public boolean contains(Object rhs) {
-					if (rhs == null || !(rhs instanceof Entry))
+					if (rhs == null || !(rhs instanceof Map.Entry))
 						return false;
-					Object key = ((Entry) rhs).getKey();
-					Object val = ((Entry) rhs).getValue();
+					Object key = ((Map.Entry<?,?>) rhs).getKey();
+					Object val = ((Map.Entry<?,?>) rhs).getValue();
 					T elt = MapColumnFamily.this.get(key);
 					return elt != null && val != null && elt.equals(val);
 				}
@@ -283,8 +282,8 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 				}
 
 				@Override
-				public Iterator<java.util.Map.Entry<K, T>> iterator() {
-					final Iterator<Entry<String, T>> it = MapColumnFamily.this.collection
+				public Iterator<Map.Entry<K, T>> iterator() {
+					final Iterator<Map.Entry<String, T>> it = MapColumnFamily.this.collection
 							.entrySet().iterator();
 					return new Iterator<Map.Entry<K, T>>() {
 
@@ -294,9 +293,9 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 						}
 
 						@Override
-						public java.util.Map.Entry<K, T> next() {
-							final Entry<String, T> entry = it.next();
-							return new Entry<K, T>() {
+						public Map.Entry<K, T> next() {
+							final Map.Entry<String, T> entry = it.next();
+							return new Map.Entry<K, T>() {
 
 								@Override
 								public K getKey() {
@@ -357,7 +356,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 				@Override
 				public boolean remove(Object elt) {
 					if (this.contains(elt)) {
-						MapColumnFamily.this.remove(((Entry) elt).getKey());
+						MapColumnFamily.this.remove(((Map.Entry<?,?>) elt).getKey());
 						return true;
 					}
 					return false;
@@ -394,7 +393,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 					if (ret.length < this.size())
 						ret = (U[]) Array.newInstance(ret.getClass().getComponentType(), this.size());
 					int i = 0;
-					Iterator<java.util.Map.Entry<K, T>> it = this.iterator();
+					Iterator<Map.Entry<K, T>> it = this.iterator();
 					while (it.hasNext()) {
 						ret[i] = (U) it.next();
 						i++;
@@ -416,9 +415,9 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 				@Override
 				public int hashCode() {
 					int h = 0;
-					Iterator<Entry<K, T>> i = iterator();
+					Iterator<Map.Entry<K, T>> i = iterator();
 					while (i.hasNext()) {
-						Entry<K, T> obj = i.next();
+						Map.Entry<K, T> obj = i.next();
 						if (obj != null)
 							h += obj.hashCode();
 					}
@@ -430,7 +429,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 					StringBuffer ret = new StringBuffer();
 					ret.append('[');
 					boolean fst = true;
-					for (Entry<K, T> e : this) {
+					for (Map.Entry<K, T> e : this) {
 						if (fst)
 							fst = false;
 						else
@@ -468,7 +467,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 
 	@Override
 	public void putAll(Map<? extends K, ? extends T> m) {
-		for (java.util.Map.Entry<? extends K, ? extends T> element : m
+		for (Map.Entry<? extends K, ? extends T> element : m
 				.entrySet()) {
 			this.put(element.getKey(), element.getValue());
 		}
@@ -508,7 +507,7 @@ public class MapColumnFamily<K, T> extends ColumnFamily<T> implements Map<K, T> 
 
 		@SuppressWarnings("unchecked")
 		Map<K, T> pojoM = (Map<K, T>) pojo;
-		for (java.util.Map.Entry<K, T> element : pojoM.entrySet()) {
+		for (Map.Entry<K, T> element : pojoM.entrySet()) {
 			String key = this.toKey(element.getKey());
 			if (keys.remove(key)) {
 				T known = this.getElement(key);

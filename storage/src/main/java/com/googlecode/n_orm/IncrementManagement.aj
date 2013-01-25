@@ -12,22 +12,19 @@ import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.Incrementing.Mode;
-import com.googlecode.n_orm.PropertyManagement.Property;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.MapColumnFamily;
 
 
 public aspect IncrementManagement {
 	private static IncrementManagement INSTANCE;
-	
+
 	public static IncrementManagement getInstance() {
 		if (INSTANCE == null)
 			INSTANCE = aspectOf();
 		return INSTANCE;
 	}
 	
-	private final PropertyManagement propertyManager = PropertyManagement.getInstance();
-
 	declare error: set(@Incrementing (!long && !int && !short && !byte
 										&& !MapColumnFamily && !Map) *.*)
 			: "Only naturals or maps of naturals may be incremented";
@@ -112,12 +109,6 @@ public aspect IncrementManagement {
 		else
 			return l;
 	}
-	
-//	public void checkIncrementable(Class<?> clazz) {
-//		if (! (long.class.equals(clazz) || int.class.equals(clazz) || short.class.equals(clazz) || byte.class.equals(clazz) 
-//			|| Long.class.equals(clazz) || Integer.class.equals(clazz) || Short.class.equals(clazz) || Byte.class.equals(clazz)))
-//			throw new IllegalArgumentException(clazz + " is not a natural type such as int.");
-//	}
 	
 	//@Override
 	public void PropertyFamily.clearChanges() {

@@ -5,7 +5,6 @@ import static org.junit.Assert.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -16,10 +15,6 @@ import com.googlecode.n_orm.IncrementException;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
-import com.googlecode.n_orm.cf.MapColumnFamily;
-
-
-
 
 public class IncrementsTest {
 
@@ -59,6 +54,7 @@ public class IncrementsTest {
 
 	@Persisting
 	public static class Element {
+		private static final long serialVersionUID = -6012974588766722423L;
 		@Key public long key;
 		public int notIncrmenting;
 		@Incrementing(mode=Incrementing.Mode.Free) public int free;

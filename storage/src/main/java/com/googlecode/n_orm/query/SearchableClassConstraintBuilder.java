@@ -64,6 +64,11 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 		return this.limit == null || this.limit < 1;
 	}
 
+	private void checkHasLimits() {
+		if (hasNoLimit())
+			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
+	}
+
 	public String getTablePostfix() {
 		return this.tablePostfix;
 	}
@@ -184,8 +189,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 */
 	@Continuator
 	public NavigableSet<T> go() throws DatabaseNotReachedException {
-		if (hasNoLimit())
-			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
+		checkHasLimits();
 		return StorageManagement.findElementsToSet(this.getClazz(), this.getConstraint(), this.limit, this.toBeActivated);
 	}
 	
@@ -197,8 +201,7 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 */
 	@Continuator
 	public CloseableIterator<T> iterate() throws DatabaseNotReachedException {
-		if (hasNoLimit())
-			throw new IllegalStateException("No limit set ; please use withAtMost expression.");
+		checkHasLimits();
 		return StorageManagement.findElement(this.getClazz(), this.getConstraint(), this.limit, this.toBeActivated);
 	}
 
@@ -278,12 +281,12 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(String...)} elements stored in the process to see changes.
 	 * @param action the action to be performed over each element of the query.
 	 * @param threadNumber the maximum number of concurrent threads
-	 * @param canceller a canceller object regularly observed while performing request ; in case this object responds <code>false</code> after invoked {@link com.googlecode.n_orm.ProcessCanceller#isCancelled()}, this methods returns a {@link ProcessException} with message found by {@link com.googlecode.n_orm.ProcessCanceller#getErrorMessage(com.googlecode.n_orm.operations.Process)}
+	 * @param canceller a canceller object regularly observed while performing request ; in case this object responds <code>false</code> after invoked {@link ProcessCanceller#isCancelled()}, this methods returns a {@link ProcessException} with message found by {@link ProcessCanceller#getErrorMessage(Process)}
 	 * @throws DatabaseNotReachedException
-	 * @throws InterruptedException in case threads are interrupted or canceler responds <code>false</code> to {@link com.googlecode.n_orm.ProcessCanceller#isCancelled()}
+	 * @throws InterruptedException in case threads are interrupted or canceler responds <code>false</code> to {@link ProcessCanceller#isCancelled()}
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
-	public ProcessReport<T> forEach(Process<T> action, int threadNumber, com.googlecode.n_orm.ProcessCanceller canceller) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+	public ProcessReport<T> forEach(Process<T> action, int threadNumber, ProcessCanceller canceller) throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		return this.forEach(action, threadNumber, canceller, null);
 	}
 	
@@ -301,10 +304,8 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
 	public ProcessReport<T> forEach(Process<T> action, int threadNumber, long timeoutMs, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
-		if (hasNoLimit())
-			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
-		return com.googlecode.n_orm.operations.Process.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, new com.googlecode.n_orm.TimeoutCanceller(timeoutMs), executor);
+		this.checkHasLimits();
+		return com.googlecode.n_orm.operations.Process.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, new TimeoutCanceller(timeoutMs), executor);
 	}
 	
 	/**
@@ -314,16 +315,14 @@ public class SearchableClassConstraintBuilder<T extends PersistingElement>
 	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(String...)} elements stored in the process to see changes.
 	 * @param action the action to be performed over each element of the query.
 	 * @param threadNumber the maximum number of concurrent threads
-	 * @param canceller a canceller object regularly observed while performing request ; in case this object responds <code>false</code> after invoked {@link com.googlecode.n_orm.ProcessCanceller#isCancelled()}, this methods returns a {@link ProcessException} with message found by {@link com.googlecode.n_orm.ProcessCanceller#getErrorMessage(com.googlecode.n_orm.operations.Process)}
+	 * @param canceller a canceller object regularly observed while performing request ; in case this object responds <code>false</code> after invoked {@link ProcessCanceller#isCancelled()}, this methods returns a {@link ProcessException} with message found by {@link ProcessCanceller#getErrorMessage(Process)}
 	 * @param executor the executor to run process ; you need to call {@link ExecutorService#awaitTermination(long, java.util.concurrent.TimeUnit)} to be sure that all elements are processed ; if null, this method is equivalent to {@link #forEach(Process, int, long)}
 	 * @throws DatabaseNotReachedException
-	 * @throws InterruptedException in case threads are interrupted or canceler responds <code>false</code> to {@link com.googlecode.n_orm.ProcessCanceller#isCancelled()}
+	 * @throws InterruptedException in case threads are interrupted or canceler responds <code>false</code> to {@link ProcessCanceller#isCancelled()}
 	 * @throws ProcessException in case some process sent an exception while running
 	 */
-	public ProcessReport<T> forEach(Process<T> action, int threadNumber, com.googlecode.n_orm.ProcessCanceller canceller, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
-		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());
-		if (hasNoLimit())
-			throw new IllegalStateException("No limit set while store " + s + " for " + this.getClazz().getName() + " is not implementing " + ActionnableStore.class.getName() + " ; please use withAtMost expression.");
+	public ProcessReport<T> forEach(Process<T> action, int threadNumber, ProcessCanceller canceller, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		this.checkHasLimits();
 		return com.googlecode.n_orm.operations.Process.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, canceller, executor);
 	}
 	
