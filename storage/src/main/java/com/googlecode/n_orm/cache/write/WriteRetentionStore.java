@@ -3,6 +3,7 @@ package com.googlecode.n_orm.cache.write;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
@@ -1013,8 +1014,7 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * live. A shutdown hook sends all pending requests.
 	 */
 	private static class EvictionThread extends Thread {
-		private final ExecutorService sender = new ThreadPoolExecutor(1, MAX_SENDER_THREADS,
-                0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(), new ThreadFactory() {
+		private final ExecutorService sender = Executors.newCachedThreadPool(new ThreadFactory() {
 			
 			@Override
 			public Thread newThread(Runnable r) {
@@ -1106,6 +1106,9 @@ public class WriteRetentionStore extends DelegatingStore {
 					// Requests in preparation of sending are marked twice so that a "0" is
 					// a bit less likely to be a false 0
 					requestsBeingSending.incrementAndGet();
+					// Avoid using to much sending threads
+					while (requestsBeingSending.get() > MAX_SENDER_THREADS)
+						Thread.sleep(10);
 					r.send(this.sender, requestsBeingSending, false);
 					requestsBeingSending.decrementAndGet();
 				} catch (InterruptedException e) {
