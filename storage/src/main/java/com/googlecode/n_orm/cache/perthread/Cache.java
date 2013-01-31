@@ -303,9 +303,9 @@ availableCachesCheck:while (ai.hasNext()) {
 		}
 	}
 	
-	private Map<String, Element> cache;
-	private Thread thread;
-	private String threadId;
+	private volatile Map<String, Element> cache;
+	private volatile Thread thread;
+	private volatile String threadId;
 	private volatile boolean shouldCleanup;
 	private volatile long stopped = -1;
 
