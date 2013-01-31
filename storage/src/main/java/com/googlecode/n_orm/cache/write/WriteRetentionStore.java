@@ -20,7 +20,8 @@ import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -918,8 +919,16 @@ public class WriteRetentionStore extends DelegatingStore {
 			
 			if (sender == null)
 				action.run();
-			else
-				sender.submit(action);
+			else {
+				while (true) {
+					try {
+						sender.submit(action);
+						break;
+					} catch (RejectedExecutionException x) {
+						Thread.yield();
+					}
+				}
+			}
 		}
 		
 		/**
@@ -1014,12 +1023,39 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * live. A shutdown hook sends all pending requests.
 	 */
 	private static class EvictionThread extends Thread {
-		private final ExecutorService sender = Executors.newCachedThreadPool(new ThreadFactory() {
+		private final ExecutorService sender = new ThreadPoolExecutor(1, getMaxSenderThreads(),
+                5L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), new ThreadFactory() {
+			
+			private Set<Thread> created;
+			
+			private long createdStillRunning() {
+				if (created == null)
+					created =  new HashSet<Thread>();
+				
+				Iterator<Thread> it = created.iterator();
+				long count = 1; // 1 is the newly created thread
+				while(it.hasNext()) {
+					Thread t = it.next();
+					
+					if (State.TERMINATED.equals(t.getState()))
+						it.remove();
+					else
+						count ++;
+				}
+				
+				return count;
+			}
 			
 			@Override
 			public Thread newThread(Runnable r) {
+				long count;
+				assert (count = createdStillRunning()) <= WriteRetentionStore.getMaxSenderThreads() :
+					"Too many sender threads running (found " + count + " instead of " + WriteRetentionStore.getMaxSenderThreads() + ')';
+				
 				Thread ret = new Thread(r, "n-orm write cache sender");
 				ret.setDaemon(false);
+				assert created.add(ret);	
+				
 				return ret;
 			}
 		});
@@ -1106,9 +1142,6 @@ public class WriteRetentionStore extends DelegatingStore {
 					// Requests in preparation of sending are marked twice so that a "0" is
 					// a bit less likely to be a false 0
 					requestsBeingSending.incrementAndGet();
-					// Avoid using to much sending threads
-					while (requestsBeingSending.get() > MAX_SENDER_THREADS)
-						Thread.sleep(10);
 					r.send(this.sender, requestsBeingSending, false);
 					requestsBeingSending.decrementAndGet();
 				} catch (InterruptedException e) {
