@@ -13,7 +13,8 @@
 
 	<properties>
 		<hbase.version>0.92.1-cdh4.1.2</hbase.version>
-		<hadoop.version>2.0.0-mr1-cdh4.1.2</hadoop.version>
+		<hadoop.version>2.0.0-cdh4.1.2</hadoop.version>
+		<hadoop.version.mr1>2.0.0-mr1-cdh4.1.2</hadoop.version.mr1>
 	</properties>
 
 	<dependencies>
@@ -34,21 +35,19 @@
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-test</artifactId>
-			<version>${hadoop.version}</version>
+			<version>${hadoop.version.mr1}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-client</artifactId>
-			<version>${hadoop.version}</version>
+			<version>${hadoop.version.mr1}</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.hbase</groupId>
 			<artifactId>hbase</artifactId>
 			<version>${hbase.version}</version>
-			<type>jar</type>
-			<scope>compile</scope>
 			<exclusions>
 				<exclusion>
 					<artifactId>slf4j-log4j12</artifactId>
@@ -59,11 +58,16 @@
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-jdk14</artifactId>
-			<version>1.4.3</version>
+			<version>1.6.4</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-minicluster</artifactId>
+			<version>${hadoop.version.mr1}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-auth</artifactId>
 			<version>${hadoop.version}</version>
 		</dependency>
 	</dependencies>
