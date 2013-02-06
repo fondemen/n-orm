@@ -35,6 +35,8 @@ import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.TableExistsException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownScannerException;
+import org.apache.hadoop.hbase.catalog.CatalogTracker;
+import org.apache.hadoop.hbase.catalog.MetaReader;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
@@ -296,6 +298,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	private final Object restartMutex = new Object();
 	private Configuration config;
 	private HBaseAdmin admin;
+	private CatalogTracker catalogTracker;
 	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
 	public HTablePool tablesC;
 	
@@ -380,7 +383,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		this.tablesC = new HTablePool(this.getConf(), Integer.MAX_VALUE);
 		
-		//Wait fo Zookeeper availability
+		//Wait for Zookeeper availability
 		int maxRetries = 100;
 		RecoverableZooKeeper zk = null;
 		do {
@@ -395,6 +398,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		} while (zk == null && maxRetries-- > 0);
 		if (zk == null) {
 			logger.log(Level.SEVERE, "Cannot reach Zookeeper");
+		}
+		
+		try {
+			this.catalogTracker = new CatalogTracker(this.admin.getConnection().getZooKeeperWatcher(), this.config, null);
+			this.catalogTracker.start();
+		} catch (Exception e1) {
+			throw new DatabaseNotReachedException(e1);
 		}
 		
 		try {
@@ -952,8 +962,15 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * Overloads any other configuration setting already set by {@link #getStore(String)}, {@link #getStore(String, int)}, {@link #getStore(String, int, Integer)}, or {@link #getAdmin()}.
 	 * Ignored in case of a subsequent {@link #setAdmin(HBaseAdmin)}.
 	 * Changed when invoked {@link #start()} or {@link #restart()}.
+	 * @throws IllegalStateException if this store was started already
 	 */
 	public void setConf(Configuration configuration) {
+		if (this.wasStarted)
+			synchronized(this) {
+				if (this.wasStarted)
+					throw new IllegalStateException("Cannot set new admin object on already started store " + this);
+			}
+		
 		this.config = configuration;
 		String prop = this.config.get(CONF_HOST_KEY);
 		if (prop != null)
@@ -980,7 +997,17 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		return this.admin;
 	}
 
+	/**
+	 * Sets the HBase admin object.
+	 * Only valid before the store is started.
+	 * @throws IllegalStateException in case this store is already started
+	 */
 	public void setAdmin(HBaseAdmin admin) {
+		if (this.wasStarted)
+			synchronized(this) {
+				if (this.wasStarted)
+					throw new IllegalStateException("Cannot set new admin object on already started store " + this);
+			}
 		this.admin = admin;
 		this.setConf(admin.getConfiguration());
 	}
@@ -1036,6 +1063,12 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			this.restarting = true;
 		}
 		try {
+			if (this.catalogTracker != null)
+				try {
+					this.catalogTracker.stop();
+				} catch (Exception x) {
+					logger.log(Level.WARNING, "Exception while restarting store " + this + ": error while stopping catalog watcher", x);
+				}
 			synchronized(this.tablesD) {
 				this.tablesD.clear();
 			}
@@ -1321,7 +1354,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			boolean ret = false;
 			//synchronized(this.sharedLockTable(name)) {
 			try {
-				ret = this.admin.tableExists(name);
+				ret = MetaReader.tableExists(this.catalogTracker, name);
 			} catch (IOException x) {
 				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " while checking for '" + name + "' table availability ; restarting store", x);
 				this.restart();
