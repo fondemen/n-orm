@@ -19,7 +19,7 @@ import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -221,6 +221,7 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * Maximum global number of threads used for sending requests to store ; default is 40.
 	 */
 	public static int getMaxSenderThreads() {
+		assert MAX_SENDER_THREADS > 0;
 		return MAX_SENDER_THREADS;
 	}
 
@@ -228,9 +229,20 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * Maximum global number of threads used for sending requests to store
 	 */
 	public static void setMaxSenderThreads(int maxSenderThreads) {
+		if (maxSenderThreads <= 0)
+			throw new IllegalArgumentException();
 		MAX_SENDER_THREADS = maxSenderThreads;
 	}
 
+	// For test purpose
+	/**
+	 * The approximate number of sending threads.
+	 * This number can be above {@link #getMaxSenderThreads()} in case it was recently set to a lower value.
+	 * @see ThreadPoolExecutor#getActiveCount()
+	 */
+	public static int getActiveSenderThreads() {
+		return evictionThread.sender.getActiveCount();
+	}
 
 	/**
 	 * The approximate number of pending write requests.
@@ -684,8 +696,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * @param flushing
 		 *            whether this send is a normal operation of a flush operation
 		 */
-		public void send(ExecutorService sender,
-				final AtomicLong counter, final boolean flushing) {
+		public void send(ExecutorService sender, final boolean flushing) {
 			// Not sending this request before delay is expired unless we flush
 			assert flushing || this.outDateMs.get() <= System.currentTimeMillis();
 			long lastTransactionTmp;
@@ -742,7 +753,7 @@ public class WriteRetentionStore extends DelegatingStore {
 				deletions = this.deletions;
 				this.deletions = new ConcurrentSkipListSet<Long>();
 				metaTmp = this.meta.getAndSet(null);
-				counter.incrementAndGet();
+				requestsBeingSending.incrementAndGet();
 				
 			} finally {
 				this.sendLock.writeLock().unlock();
@@ -877,7 +888,6 @@ public class WriteRetentionStore extends DelegatingStore {
 								logger.log(Level.WARNING, "Catched problem while updating " + StoreRequest.this + " ; some data might have been lost: " + x.getMessage(), x);
 								throw x;
 							} finally {
-								counter.decrementAndGet();
 								requestSent(flushing, lastTransaction);
 							}
 						}
@@ -903,7 +913,6 @@ public class WriteRetentionStore extends DelegatingStore {
 								logger.log(Level.WARNING, "Catched problem while deleting " + StoreRequest.this + " ; some data might have been be lost: " + x.getMessage(), x);
 								throw x;
 							} finally {
-								counter.decrementAndGet();
 								requestSent(flushing, lastTransaction);
 							}
 						}
@@ -911,14 +920,15 @@ public class WriteRetentionStore extends DelegatingStore {
 				}
 			
 			} catch (Throwable r) {
-				counter.decrementAndGet();
+				requestsBeingSending.decrementAndGet();
 				throw r instanceof RuntimeException ? (RuntimeException)r : new RuntimeException(r);
 			}
 			
 			if (sender == null)
 				action.run();
-			else
+			else {
 				sender.submit(action);
+			}
 		}
 		
 		/**
@@ -927,6 +937,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * @param expectedOutDate time at which request was planned ; null in case of a flush
 		 */
 		private void requestSent(boolean afterFlush, long lastTransactionBeforeSending) {
+			long rbs = requestsBeingSending.decrementAndGet();
 			if (captureHitRatio)
 				requestsOut.increment();
 			assert this.lastSentTransaction == lastTransactionBeforeSending;
@@ -958,6 +969,11 @@ public class WriteRetentionStore extends DelegatingStore {
 				
 			} finally {
 				this.sendLock.writeLock().unlock();
+				if (evictionThread.waiting && rbs < getMaxSenderThreads())
+					synchronized(evictionThread) {
+						if (evictionThread.waiting && rbs < getMaxSenderThreads())
+							evictionThread.notify();
+					}
 			}
 		}
 		
@@ -1013,19 +1029,25 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * live. A shutdown hook sends all pending requests.
 	 */
 	private static class EvictionThread extends Thread {
-		private final ExecutorService sender = new ThreadPoolExecutor(1, MAX_SENDER_THREADS,
-                0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(), new ThreadFactory() {
+		private final ThreadPoolExecutor sender = new ThreadPoolExecutor(1, Integer.MAX_VALUE,
+                5L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), new ThreadFactory() {
 			
 			@Override
 			public Thread newThread(Runnable r) {
-				Thread ret = new Thread(r, "n-orm write cache sender");
+				int cps = sender.getCorePoolSize();
+				assert cps <= WriteRetentionStore.getMaxSenderThreads() :
+					"Too many sender threads running (found " + cps + " instead of " + WriteRetentionStore.getMaxSenderThreads() + ')';
+				
+				Thread ret = new Thread(r, "n-orm write cache sender #" + cps);
 				ret.setDaemon(false);
+				
 				return ret;
 			}
 		});
 
 		private volatile boolean alreadyStarted = false;
 		private volatile boolean running = true;
+		private volatile boolean waiting = true;
 		
 		private EvictionThread() {
 			super("n-orm write cache eviction thread");
@@ -1070,10 +1092,7 @@ public class WriteRetentionStore extends DelegatingStore {
 							Iterator<StoreRequest> it = writeQueue.iterator();
 							removed = it.hasNext();
 							while (it.hasNext()) {
-								it.next()
-										.send(	sender,
-												requestsBeingSending,
-												true);
+								it.next().send(sender, true);
 								it.remove();
 							}
 						} while (removed);
@@ -1102,11 +1121,20 @@ public class WriteRetentionStore extends DelegatingStore {
 			while (this.running) {
 				StoreRequest r = null;
 				try {
+					while (requestsBeingSending.get() >= getMaxSenderThreads()) {
+						synchronized(this) {
+							if (requestsBeingSending.get() >= getMaxSenderThreads()) {
+								this.waiting = true;
+								this.wait(100);
+								this.waiting = false;
+							}
+						}
+					}
 					r = writeQueue.take();
 					// Requests in preparation of sending are marked twice so that a "0" is
 					// a bit less likely to be a false 0
 					requestsBeingSending.incrementAndGet();
-					r.send(this.sender, requestsBeingSending, false);
+					r.send(this.sender, false);
 					requestsBeingSending.decrementAndGet();
 				} catch (InterruptedException e) {
 				} catch (Throwable e) {
@@ -1202,7 +1230,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		RowInTable row = new RowInTable(table, identifier);
 		StoreRequest req = this.writesByRows.get(row);
 		if (req != null) {
-			req.send(null, requestsBeingSending, true);
+			req.send(null, true);
 			return true;
 		} else
 			return false;
