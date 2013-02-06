@@ -1069,6 +1069,11 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				} catch (Exception x) {
 					logger.log(Level.WARNING, "Exception while restarting store " + this + ": error while stopping catalog watcher", x);
 				}
+				try {
+					this.admin.close();
+				} catch (Exception x) {
+					logger.log(Level.WARNING, "Exception while restarting store " + this + ": error while stopping admin", x);
+				}
 			synchronized(this.tablesD) {
 				this.tablesD.clear();
 			}
@@ -1114,14 +1119,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			table = this.mangleTableName(table);
 			
 			try {
-				if (this.admin.tableExists(table) && this.admin.isTableDisabled(table)) { //First detect the error
+				if (this.hasTableInt(table) && this.admin.isTableDisabled(table)) { //First detect the error
 					errorLogger.log(Level.INFO, "It seems that table " + table + " was disabled ; enabling", e);
 					synchronized (this.sharedLockTable(table)) {
 						try {
-							if (this.admin.tableExists(table) && this.admin.isTableDisabled(table)) { //Double check once the lock is acquired
+							if (this.hasTableInt(table) && this.admin.isTableDisabled(table)) { //Double check once the lock is acquired
 								synchronized(this.exclusiveLockTable(table)) {
 									try {
-										if (this.admin.tableExists(table) && this.admin.isTableDisabled(table))
+										if (this.hasTableInt(table) && this.admin.isTableDisabled(table))
 											this.admin.enableTable(table);
 									} finally {
 										this.exclusiveUnlockTable(table);
@@ -1354,7 +1359,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			boolean ret = false;
 			//synchronized(this.sharedLockTable(name)) {
 			try {
-				ret = MetaReader.tableExists(this.catalogTracker, name);
+				ret = this.hasTableInt(name);
 			} catch (IOException x) {
 				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " while checking for '" + name + "' table availability ; restarting store", x);
 				this.restart();
@@ -1373,6 +1378,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 	}
 	
+	private boolean hasTableInt(String name) throws IOException {
+		return MetaReader.tableExists(this.catalogTracker, name);
+	}
+	
 	protected HTableDescriptor getTableDescriptor(Class<? extends PersistingElement> clazz, String name, String tablePostfix, Map<String, Field> expectedFamilies) throws Exception {
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
@@ -1383,7 +1392,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					synchronized(this.sharedLockTable(name)) {
 						try {
 							logger.fine("Unknown table " + name + " for store " + this.hashCode());
-							if (!this.admin.tableExists(name)) {
+							if (!this.hasTableInt(name)) {
 								logger.info("Table " + name + " not found ; creating" + (expectedFamilies == null ? "" : " with column families " + expectedFamilies.keySet().toString()));
 								td = new HTableDescriptor(name);
 								if (expectedFamilies != null) {
