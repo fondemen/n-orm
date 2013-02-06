@@ -170,8 +170,10 @@ public class WriteRetentionTest {
 	@After
 	public void waitForPendingRequests() {
 		try {
-			int maxTurns = 1000;
+			int maxTurns = 3000;
 			while(WriteRetentionStore.getPendingRequests() != 0) {
+				if (maxTurns % 10 == 0)
+					assertTrue(WriteRetentionStore.getActiveSenderThreads() <= WriteRetentionStore.getMaxSenderThreads());
 				Thread.sleep(10);
 				maxTurns--;
 				if (maxTurns <= 0)
@@ -179,6 +181,8 @@ public class WriteRetentionTest {
 			}
 			Thread.sleep(10);
 			while(WriteRetentionStore.getPendingRequests() != 0) {
+				if (maxTurns % 10 == 0)
+					assertTrue(WriteRetentionStore.getActiveSenderThreads() <= WriteRetentionStore.getMaxSenderThreads());
 				Thread.sleep(10);
 				maxTurns--;
 				if (maxTurns <= 0)
@@ -865,8 +869,11 @@ public class WriteRetentionTest {
 	
 	@Test(timeout=10000)
 	public void continuousWriteMultiThreadedOnDifferentKeysOnSlowDataStore() throws InterruptedException, ExecutionException {
+		this.continuousWriteMultiThreadedOnDifferentKeysOnSlowDataStore(200);
+	}
+
+	public void continuousWriteMultiThreadedOnDifferentKeysOnSlowDataStore(int parallelWrites) throws InterruptedException, ExecutionException {
 		final WriteRetentionStore sut = sutSlowDS;
-		int parallelWrites = 200;
 
 		Collection<Future<?>> results = new LinkedList<Future<?>>();
 		ExecutorService es = new FixedThreadPool(parallelWrites);
@@ -904,5 +911,28 @@ public class WriteRetentionTest {
 		}
 		assertFalse(Memory.INSTANCE.exists(table, rowId+parallelWrites));
 		assertFalse(Memory.INSTANCE.exists(table, rowId+(parallelWrites+1)));
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void zeroMaxThreadsSetAttempt() {
+		WriteRetentionStore.setMaxSenderThreads(0);
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void negativeMaxThreadsSetAttempt() {
+		WriteRetentionStore.setMaxSenderThreads(-1);
+	}
+	
+	@Test(timeout=20000)
+	public void continuousWriteMultiThreadedOnDifferentKeysOnSlowDataStoreAndLowParrallelSenderThreads() throws InterruptedException, ExecutionException {
+		int originalMaxThreads = WriteRetentionStore.getMaxSenderThreads();
+		
+		WriteRetentionStore.setMaxSenderThreads(5);
+		
+		try {
+			this.continuousWriteMultiThreadedOnDifferentKeysOnSlowDataStore(50);
+		} finally {
+			WriteRetentionStore.setMaxSenderThreads(originalMaxThreads);
+		}
 	}
 }
