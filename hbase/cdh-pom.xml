@@ -19,7 +19,8 @@
 	
 	<properties>
 		<hbase.version>0.92.1-cdh4.1.2</hbase.version>
-		<hadoop.version>2.0.0-mr1-cdh4.1.2</hadoop.version>
+		<hadoop.version>2.0.0-cdh4.1.2</hadoop.version>
+		<hadoop.version.mr1>2.0.0-mr1-cdh4.1.2</hadoop.version.mr1>
 	</properties>
 
 	<dependencies>
@@ -104,8 +105,6 @@
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
 			<version>${project.parent.version}</version>
-			<type>jar</type>
-			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
@@ -118,8 +117,8 @@
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>hbase-test-deps</artifactId>
 			<version>hbase-${hbase.version}-SNAPSHOT</version>
-			<type>pom</type>
 			<scope>test</scope>
+			<type>pom</type>
 			<exclusions>
 				<exclusion>
 					<artifactId>slf4j-log4j12</artifactId>
@@ -131,25 +130,22 @@
 			<groupId>org.codehaus.plexus</groupId>
 			<artifactId>plexus-utils</artifactId>
 			<version>2.1</version>
-			<type>jar</type>
-			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
 			<version>1.9.0</version>
-			<type>pom</type>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-jdk14</artifactId>
-			<version>1.4.3</version>
+			<version>1.6.4</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-client</artifactId>
-			<version>${hadoop.version}</version>
+			<version>${hadoop.version.mr1}</version>
 			<scope>provided</scope>
 		</dependency>
 	</dependencies>

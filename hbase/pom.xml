@@ -151,6 +151,14 @@
 			<artifactId>hadoop-core</artifactId>
 			<version>${hadoop.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.zookeeper</groupId>
+			<artifactId>zookeeper</artifactId>
+			<version>3.4.3</version>
+			<type>test-jar</type>
+			<classifier>tests</classifier>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<description>HBase driver for n-orm.</description>
