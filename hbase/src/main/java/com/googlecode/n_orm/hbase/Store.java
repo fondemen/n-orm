@@ -295,7 +295,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	private final Object restartMutex = new Object();
 	private Configuration config;
 	private HBaseAdmin admin;
-	public Map<String, HTableDescriptor> tablesD = new TreeMap<String, HTableDescriptor>();
+	public ConcurrentMap<String, HTableDescriptor> tablesD = new ConcurrentHashMap<String, HTableDescriptor>();
 	public HTablePool tablesC;
 	
 	private Integer clientTimeout = null;
@@ -999,22 +999,17 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 	
 	private void cache(String tableName, HTableDescriptor descr) {
+		assert Thread.holdsLock(this.getLock(tableName));
 		HTableDescriptor knownDescr = this.tablesD.get(tableName);
 		if (knownDescr == null || !knownDescr.equals(descr))
-			synchronized(this.tablesD) {
-				knownDescr = this.tablesD.get(tableName);
-				if (knownDescr == null || !knownDescr.equals(descr)) {
-					this.uncache(tableName);
-					this.tablesD.put(tableName, descr);
-				}
-			}
+			this.uncache(tableName);
+			this.tablesD.put(tableName, descr);
 	}
 
 	private void uncache(String tableName) {
+		assert Thread.holdsLock(this.getLock(tableName));
 		//tableName = this.mangleTableName(tableName);
-		synchronized (this.tablesD) {
-			this.tablesD.remove(tableName);
-		}
+		this.tablesD.remove(tableName);
 	}
 
 	/**
@@ -1035,12 +1030,16 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			this.restarting = true;
 		}
 		try {
-			synchronized(this.tablesD) {
-				this.tablesD.clear();
+			this.tablesD.clear();
+			try {
+				HConnectionManager.deleteConnection(this.config, true);
+			} catch (Exception x) {
+				logger.log(Level.WARNING, "Problem while closing connection during store restart: " + x.getMessage(), x);
 			}
 			this.config = HBaseConfiguration.create(this.config);
 			this.admin = null;
 			this.wasStarted = false;
+			this.tablesD.clear();
 			this.start();
 		} finally {
 			synchronized (this.restartMutex) {
@@ -1064,60 +1063,60 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		if ((e instanceof TableNotFoundException) || msg.contains(TableNotFoundException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
-			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; restarting store", e);
-			HTableDescriptor td = this.tablesD.get(table);
-			if (td != null) {
-				this.uncache(table);
+			synchronized(this.getLock(table)) {
+				boolean tableExists;
 				try {
-					this.getTableDescriptor(clazz, td.getNameAsString(), tablePostfix, expectedFamilies);
+					tableExists = this.admin.tableExists(table);
 				} catch (Exception x) {
-					throw new DatabaseNotReachedException(x);
+					tableExists = false;
 				}
-			} else
-				throw new DatabaseNotReachedException(e);
+				if (! tableExists) {
+					errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; recreating", e);
+					this.uncache(table);
+					try {
+						this.getTableDescriptor(clazz, table, tablePostfix, expectedFamilies);
+					} catch (Exception x) {
+						throw new DatabaseNotReachedException(x);
+					}
+				}
+			}
 		} else if ((e instanceof NotServingRegionException) || msg.contains(NotServingRegionException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			
 			try {
-				if (this.admin.tableExists(table) && this.admin.isTableDisabled(table)) { //First detect the error
-					errorLogger.log(Level.INFO, "It seems that table " + table + " was disabled ; enabling", e);
-					synchronized (this.sharedLockTable(table)) {
-						try {
-							if (this.admin.tableExists(table) && this.admin.isTableDisabled(table)) { //Double check once the lock is acquired
-								synchronized(this.exclusiveLockTable(table)) {
-									try {
-										if (this.admin.tableExists(table) && this.admin.isTableDisabled(table))
-											this.admin.enableTable(table);
-									} finally {
-										this.exclusiveUnlockTable(table);
-									}
+				synchronized (this.sharedLockTable(table)) {
+					try {
+						if (this.admin.tableExists(table) && this.admin.isTableDisabled(table)) {
+							errorLogger.log(Level.INFO, "It seems that table " + table + " was disabled ; enabling", e);
+							synchronized(this.exclusiveLockTable(table)) {
+								try {
+									if (this.admin.tableExists(table) && this.admin.isTableDisabled(table))
+										this.admin.enableTable(table);
+								} finally {
+									this.exclusiveUnlockTable(table);
 								}
 							}
-						} finally {
-							this.sharedUnlockTable(table);
 						}
+					} finally {
+						this.sharedUnlockTable(table);
 					}
-				} else
-					throw new DatabaseNotReachedException(e);
+				}
 			} catch (IOException f) {
 				throw new DatabaseNotReachedException(f);
 			}
 		} else if ((e instanceof NoSuchColumnFamilyException) || msg.contains(NoSuchColumnFamilyException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
-			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; restarting store", e);
-			HTableDescriptor td = this.tablesD.get(table);
-			if (td != null) {
+			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; recreating", e);
+			synchronized(this.getLock(table)) {
 				this.uncache(table);
 				try {
-					this.getTableDescriptor(clazz, td.getNameAsString(), tablePostfix, expectedFamilies);
+					this.getTableDescriptor(clazz, table, tablePostfix, expectedFamilies);
 				} catch (Exception x) {
 					throw new DatabaseNotReachedException(x);
 				}
-			} else
-				throw new DatabaseNotReachedException(e);
+			}
 		} else if ((e instanceof ConnectException) || msg.contains(ConnectException.class.getSimpleName())) {
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
-			HConnectionManager.deleteConnection(this.config, true);
 			restart();
 		} else if ((e instanceof SocketTimeoutException) || (e instanceof TimeoutException)) {
 			errorLogger.log(Level.INFO, "Timeout while requesting " + table + " (max duration is set to " + this.config.get(HConstants.HBASE_RPC_TIMEOUT_KEY, Integer.toString(HConstants.DEFAULT_HBASE_RPC_TIMEOUT)) + "ms)", e);
@@ -1327,18 +1326,17 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	private boolean hasTableNoCache(String name) {
 		name = this.mangleTableName(name);
 		try {
-			boolean ret;
-			//synchronized(this.sharedLockTable(name)) {
-			//	try {
-					ret = this.admin.tableExists(name);
-			//	} finally {
-			//		this.sharedUnlockTable(name);
-			//	}
-			//}
-			if (!ret &&this.tablesD.containsKey(name)) {
-				this.uncache(name);
+			synchronized(this.sharedLockTable(name)) {
+				try {
+					boolean ret = this.admin.tableExists(name);
+					if (!ret && this.tablesD.containsKey(name)) {
+						this.uncache(name);
+					}
+					return ret;
+				} finally {
+					this.sharedUnlockTable(name);
+				}
 			}
-			return ret;
 		} catch (Exception e) {
 			throw new DatabaseNotReachedException(e);
 		}
@@ -1348,8 +1346,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
 		boolean created = false;
-		synchronized (this.tablesD) {
-			if (!this.tablesD.containsKey(name)) {
+		synchronized (this.getLock(name)) {
+			td = this.tablesD.get(name);
+			if (td == null) {
 				try {
 					synchronized(this.sharedLockTable(name)) {
 						try {
@@ -1393,8 +1392,6 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				} catch (Exception x) {
 					throw x;
 				}
-			} else {
-				td = this.tablesD.get(name);
 			}
 		}
 
@@ -1432,26 +1429,23 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	protected boolean hasColumnFamily(String table, String family)
 			throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
+		
 		if (!this.hasTable(table))
 			return false;
 
-		HTableDescriptor td;
-		synchronized (this.tablesD) {
-			td = this.tablesD.get(table);
-		}
+		HTableDescriptor td = this.tablesD.get(table);
 		if (td != null && td.hasFamily(Bytes.toBytes(family)))
 			return true;
-		synchronized (this.tablesD) {
-			synchronized (this.sharedLockTable(table)) {
-				try {
-					td = this.admin.getTableDescriptor(Bytes.toBytes(table));
-				} catch (Exception e) {
-					throw new DatabaseNotReachedException(e);
-				} finally {
-					this.sharedUnlockTable(table);
-				}
+		
+		synchronized (this.sharedLockTable(table)) {
+			try {
+				td = this.admin.getTableDescriptor(Bytes.toBytes(table));
+				this.cache(table, td);
+			} catch (Exception e) {
+				throw new DatabaseNotReachedException(e);
+			} finally {
+				this.sharedUnlockTable(table);
 			}
-			this.cache(table, td);
 		}
 		return td.hasFamily(Bytes.toBytes(family));
 	}
