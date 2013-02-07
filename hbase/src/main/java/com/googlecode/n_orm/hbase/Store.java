@@ -19,6 +19,8 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -281,7 +283,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	
 	//For inter-processes synchronization:
 	//avoids different processes to alter schema concurrently
-	private Map<String /*tableName*/ , SharedExclusiveLock /*lock*/> locks = new TreeMap<String, SharedExclusiveLock>();
+	private ConcurrentMap<String /*tableName*/ , SharedExclusiveLock /*lock*/> locks = new ConcurrentHashMap<String, SharedExclusiveLock>();
 	//Those tables that are locked in exclusive mode and should be back to shared mode
 	private Set<String /*tableName*/> sharedExclusiveLockedTables = new TreeSet<String>();
 	
@@ -1169,31 +1171,42 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 	}
 	
+	private ZooKeeper getZooKeeper() throws DatabaseNotReachedException {
+		ZooKeeper zk;
+		try {
+			try {
+				zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+			} catch (NullPointerException x) { //Lost zookeeper ?
+				this.restart();
+				zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+			}
+			if (!zk.getState().isAlive()) {
+				errorLogger.log(Level.WARNING, "Zookeeper connection lost ; restarting...");
+				this.restart();
+				zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
+			}
+			return zk;
+		} catch (Exception e1) {
+			throw new DatabaseNotReachedException(e1);
+		}
+		
+	}
+	
 	protected SharedExclusiveLock getLock(String table) throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
-		synchronized (this.locks) {
-			SharedExclusiveLock ret = this.locks.get(table);
-			ZooKeeper zk;
-			try {
-				try {
-					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
-				} catch (NullPointerException x) { //Lost zookeeper ?
-					this.restart();
-					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
-				}
-				if (!zk.getState().isAlive()) {
-					errorLogger.log(Level.WARNING, "Zookeeper connection lost ; restarting...");
-					this.restart();
-					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
-				}
-			} catch (Exception e1) {
-				throw new DatabaseNotReachedException(e1);
-			}
+
+		SharedExclusiveLock ret = this.locks.get(table);
+		
+		if (ret == null) {
+			String dir = "/n-orm/schemalock/" + table;
+			ret = new SharedExclusiveLock(null, dir);
 			
-			if (ret == null) {
+			SharedExclusiveLock actualRet = this.locks.putIfAbsent(table, ret);
+			if(actualRet != null) {
+				ret = actualRet;
+			} else
 				try {
-					zk = this.admin.getConnection().getZooKeeperWatcher().getZooKeeper();
-					String dir = "/n-orm/schemalock/" + table;
+					ZooKeeper zk = this.getZooKeeper();
 					if (zk.exists("/n-orm", false) == null)  {
 						try {
 							zk.create("/n-orm", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -1210,18 +1223,20 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 							logger.info("Created lock node " + node);
 						} catch (NodeExistsException x){}
 					}
-					ret = new SharedExclusiveLock(zk, dir);
-					this.locks.put(table, ret);
+					ret.setZookeeper(zk);
 				} catch (Exception e) {
 					throw new DatabaseNotReachedException(e);
 				}
-			}
-			
-			if (ret.getZookeeper() != zk) {
-				ret.setZookeeper(zk);
-			}
-			
-			return ret;
+		}
+		
+		return ret;
+	}
+	
+	protected void checkZooKeeper(SharedExclusiveLock lock) {
+		ZooKeeper zk = this.getZooKeeper();
+		
+		if (lock.getZookeeper() != zk) {
+			lock.setZookeeper(zk);
 		}
 	}
 	
@@ -1238,6 +1253,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		synchronized (lock) {
 			assert lock.getCurrentExclusiveLock() == null;
 			try {
+				this.checkZooKeeper(lock);
 				lock.getSharedLock(lockTimeout);
 				return lock;
 			} catch (Exception e) {
@@ -1271,6 +1287,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				this.sharedExclusiveLockedTables.add(table);
 			}
 			try {
+				this.checkZooKeeper(lock);
 				lock.getExclusiveLock(lockTimeout);
 				assert lock.getCurrentThread() == Thread.currentThread();
 				return lock;
@@ -1464,7 +1481,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.size());
 		List<HColumnDescriptor> toBeAltered = new ArrayList<HColumnDescriptor>(columnFamilies.size());
 		String tableName = tableD.getNameAsString();
-		synchronized (tableD) {
+		synchronized (this.getLock(tableName)) {
 			boolean recreated = false; //Whether table descriptor was just retrieved from HBase admin
 			for (Entry<String, Field> cf : columnFamilies.entrySet()) {
 				byte[] cfname = Bytes.toBytes(cf.getKey());
