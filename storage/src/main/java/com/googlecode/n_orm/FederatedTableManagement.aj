@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -118,7 +120,7 @@ public aspect FederatedTableManagement {
 		 * When alternatives for {@link #mainTable} was last updated (epoch in
 		 * seconds)
 		 */
-		private long lastUpdate = -TableAlternativeCacheTTLInS;
+		private volatile long lastUpdate = -TableAlternativeCacheTTLInS;
 
 		/**
 		 * Known table postfixes for {@link #mainTable}
@@ -253,19 +255,16 @@ public aspect FederatedTableManagement {
 	}
 
 	// Cache for storing table variants (no TTL)
-	private static final Map<String /* main table */, TableAlternatives> tablesAlternatives = new TreeMap<String, TableAlternatives>();
+	private static final ConcurrentMap<String /* main table */, TableAlternatives> tablesAlternatives = new ConcurrentHashMap<String, TableAlternatives>();
 
 	/**
 	 * The known alternatives for the given original table. Creates the
 	 * alternative in cache.
 	 */
 	private static TableAlternatives getAlternatives(String mainTable) {
-		TableAlternatives alts = tablesAlternatives.get(mainTable);
-		if (alts == null) {
-			alts = new TableAlternatives(mainTable);
-			tablesAlternatives.put(mainTable, alts);
-		}
-		return alts;
+		TableAlternatives nw = new TableAlternatives(mainTable);
+		TableAlternatives od = tablesAlternatives.putIfAbsent(mainTable, nw);
+		return od == null ? nw : od;
 	}
 
 	// For test purpose
