@@ -286,7 +286,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	//avoids different processes to alter schema concurrently
 	private ConcurrentMap<String /*tableName*/ , SharedExclusiveLock /*lock*/> locks = new ConcurrentHashMap<String, SharedExclusiveLock>();
 	//Those tables that are locked in exclusive mode and should be back to shared mode
-	private Set<String /*tableName*/> sharedExclusiveLockedTables = new TreeSet<String>();
+	private ConcurrentMap<String /*tableName*/, Object /* dummy */> sharedExclusiveLockedTables = new ConcurrentHashMap<String, Object>();
 	
 	private String host = localHostName;
 	private int port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
@@ -1196,18 +1196,32 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		table = this.mangleTableName(table);
 
 		String dir = "/n-orm/schemalock/" + table;
-		SharedExclusiveLock ret = new SharedExclusiveLock(null, dir);
+		SharedExclusiveLock ret = new SharedExclusiveLock(this.getZooKeeper(), dir);
 		
 		SharedExclusiveLock actualRet = this.locks.putIfAbsent(table, ret);
 		if(actualRet != null) {
 			ret = actualRet;
 		}
-		
+
+		return ret;
+	}
+	
+	protected void checkZooKeeper(SharedExclusiveLock lock) {
 		ZooKeeper zk = this.getZooKeeper();
-		ret.setZookeeper(zk);
+		
+		if (lock.getZookeeper() != zk) {
+			lock.setZookeeper(zk);
+		}
+	}
+	
+	protected void checkIsZKLockable(SharedExclusiveLock lock) {
+		this.checkZooKeeper(lock);
+		ZooKeeper zk = lock.getZookeeper();
 
 		try {
-			while (zk.exists(dir, false) == null) {
+			assert lock.getPath() != null && lock.getPath().startsWith("/n-orm/schemalock");
+			
+			while (zk.exists(lock.getPath(), false) == null) {
 				while (zk.exists("/n-orm/schemalock", false) == null)  {
 					while (zk.exists("/n-orm", false) == null)  {
 						try {
@@ -1219,22 +1233,12 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					} catch (NodeExistsException x){}
 				}
 				try {
-					String node = zk.create(dir, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+					String node = zk.create(lock.getPath(), null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 					logger.info("Created lock node " + node);
 				} catch (NodeExistsException x){}
 			}
 		} catch (Exception e) {
 			throw new DatabaseNotReachedException(e);
-		}
-
-		return ret;
-	}
-	
-	protected void checkZooKeeper(SharedExclusiveLock lock) {
-		ZooKeeper zk = this.getZooKeeper();
-		
-		if (lock.getZookeeper() != zk) {
-			lock.setZookeeper(zk);
 		}
 	}
 	
@@ -1251,7 +1255,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		synchronized (lock) {
 			assert lock.getCurrentExclusiveLock() == null;
 			try {
-				this.checkZooKeeper(lock);
+				this.checkIsZKLockable(lock);
 				lock.getSharedLock(lockTimeout);
 				return lock;
 			} catch (Exception e) {
@@ -1266,6 +1270,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		synchronized (lock) {
 			if (lock.getCurrentSharedLock() != null) {
 				try {
+					this.checkZooKeeper(lock);
 					lock.releaseSharedLock();
 					this.sharedExclusiveLockedTables.remove(table);
 					assert lock.getCurrentExclusiveLock() == null;
@@ -1282,10 +1287,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		synchronized (lock) {
 			if (lock.getCurrentSharedLock() != null) {
 				this.sharedUnlockTable(table);
-				this.sharedExclusiveLockedTables.add(table);
+				this.sharedExclusiveLockedTables.put(table, lock);
 			}
 			try {
-				this.checkZooKeeper(lock);
+				this.checkIsZKLockable(lock);
 				lock.getExclusiveLock(lockTimeout);
 				assert lock.getCurrentThread() == Thread.currentThread();
 				return lock;
@@ -1300,13 +1305,16 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		SharedExclusiveLock lock = this.getLock(table);
 		synchronized (lock) {
 			try {
-				if (lock.getCurrentExclusiveLock() != null)
+				if (lock.getCurrentExclusiveLock() != null) {
+					this.checkZooKeeper(lock);
 					lock.releaseExclusiveLock();
+				}
 			} catch (Exception e) {
 				errorLogger.log(Level.SEVERE, "Error unlocking table " + table + " locked in exclusion", e);
 			} finally {
-				if (this.sharedExclusiveLockedTables.contains(table)) {
-					this.sharedExclusiveLockedTables.remove(table);
+				Object old = this.sharedExclusiveLockedTables.remove(table);
+				if (old != null) {
+					assert old == lock;
 					this.sharedLockTable(table);
 				}
 			}
