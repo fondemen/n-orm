@@ -62,6 +62,7 @@ import org.apache.hadoop.hbase.regionserver.StoreFile;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
@@ -1194,40 +1195,38 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	protected SharedExclusiveLock getLock(String table) throws DatabaseNotReachedException {
 		table = this.mangleTableName(table);
 
-		SharedExclusiveLock ret = this.locks.get(table);
+		String dir = "/n-orm/schemalock/" + table;
+		SharedExclusiveLock ret = new SharedExclusiveLock(null, dir);
 		
-		if (ret == null) {
-			String dir = "/n-orm/schemalock/" + table;
-			ret = new SharedExclusiveLock(null, dir);
-			
-			SharedExclusiveLock actualRet = this.locks.putIfAbsent(table, ret);
-			if(actualRet != null) {
-				ret = actualRet;
-			} else
-				try {
-					ZooKeeper zk = this.getZooKeeper();
-					if (zk.exists("/n-orm", false) == null)  {
+		SharedExclusiveLock actualRet = this.locks.putIfAbsent(table, ret);
+		if(actualRet != null) {
+			ret = actualRet;
+		}
+		
+		ZooKeeper zk = this.getZooKeeper();
+		ret.setZookeeper(zk);
+
+		try {
+			while (zk.exists(dir, false) == null) {
+				while (zk.exists("/n-orm/schemalock", false) == null)  {
+					while (zk.exists("/n-orm", false) == null)  {
 						try {
 							zk.create("/n-orm", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 						} catch (NodeExistsException x){}
 					}
-					if (zk.exists("/n-orm/schemalock", false) == null)  {
-						try {
-							zk.create("/n-orm/schemalock", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-						} catch (NodeExistsException x){}
-					}
-					if (zk.exists(dir, false) == null) {
-						try {
-							String node = zk.create(dir, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-							logger.info("Created lock node " + node);
-						} catch (NodeExistsException x){}
-					}
-					ret.setZookeeper(zk);
-				} catch (Exception e) {
-					throw new DatabaseNotReachedException(e);
+					try {
+						zk.create("/n-orm/schemalock", null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+					} catch (NodeExistsException x){}
 				}
+				try {
+					String node = zk.create(dir, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+					logger.info("Created lock node " + node);
+				} catch (NodeExistsException x){}
+			}
+		} catch (Exception e) {
+			throw new DatabaseNotReachedException(e);
 		}
-		
+
 		return ret;
 	}
 	
