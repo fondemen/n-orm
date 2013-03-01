@@ -398,6 +398,16 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		} catch (Exception e) {
 			errorLogger.log(Level.WARNING, "Cannot read zookeeper info... Might be a bug.", e);
 		}
+		
+		// Loading schema in cache
+		try {
+			for(HTableDescriptor td : this.admin.listTables()) {
+				this.tablesD.put(td.getNameAsString(), td);
+			}
+		} catch (IOException e) {
+			errorLogger.log(Level.SEVERE, "Cannot load existing tables in cache: " + e.getMessage(), e);
+			throw new DatabaseNotReachedException(e);
+		}
 			
 		logger.info("Started store " + this.hashCode());
 
@@ -991,7 +1001,6 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 	
 	private void cache(String tableName, HTableDescriptor descr) {
-		assert !this.getLock(tableName).isFree();
 		HTableDescriptor knownDescr = this.tablesD.get(tableName);
 		if (knownDescr == null || !knownDescr.equals(descr))
 			this.uncache(tableName);
@@ -999,7 +1008,6 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	private void uncache(String tableName) {
-		assert !this.getLock(tableName).isFree();
 		//tableName = this.mangleTableName(tableName);
 		this.tablesD.remove(tableName);
 	}
@@ -1055,22 +1063,12 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		if ((e instanceof TableNotFoundException) || msg.contains(TableNotFoundException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
-			synchronized(this.getLock(table)) {
-				boolean tableExists;
-				try {
-					tableExists = this.admin.tableExists(table);
-				} catch (Exception x) {
-					tableExists = false;
-				}
-				if (! tableExists) {
-					errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; recreating", e);
-					this.uncache(table);
-					try {
-						this.getTableDescriptor(clazz, table, tablePostfix, expectedFamilies);
-					} catch (Exception x) {
-						throw new DatabaseNotReachedException(x);
-					}
-				}
+			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; recreating", e);
+			this.uncache(table);
+			try {
+				this.getTableDescriptor(clazz, table, tablePostfix, expectedFamilies);
+			} catch (Exception x) {
+				throw new DatabaseNotReachedException(x);
 			}
 		} else if ((e instanceof NotServingRegionException) || msg.contains(NotServingRegionException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
@@ -1099,13 +1097,11 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		} else if ((e instanceof NoSuchColumnFamilyException) || msg.contains(NoSuchColumnFamilyException.class.getSimpleName())) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; recreating", e);
-			synchronized(this.getLock(table)) {
-				this.uncache(table);
-				try {
-					this.getTableDescriptor(clazz, table, tablePostfix, expectedFamilies);
-				} catch (Exception x) {
-					throw new DatabaseNotReachedException(x);
-				}
+			this.uncache(table);
+			try {
+				this.getTableDescriptor(clazz, table, tablePostfix, expectedFamilies);
+			} catch (Exception x) {
+				throw new DatabaseNotReachedException(x);
 			}
 		} else if ((e instanceof ConnectException) || msg.contains(ConnectException.class.getSimpleName())) {
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
@@ -1228,14 +1224,16 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		name = this.mangleTableName(name);
 		HTableDescriptor td;
 		boolean created = false;
-		TableLocker lock = this.getLock(name);
-		synchronized (lock) {
-			td = this.tablesD.get(name);
-			if (td == null) {
-				try {
-					lock.sharedLockTable();
+		td = this.tablesD.get(name);
+		if (td == null) {
+
+			TableLocker lock = this.getLock(name);
+			lock.sharedLockTable();
+			try {
+				logger.fine("Unknown table " + name + " for store " + this.hashCode());
+				if (!this.admin.tableExists(name)) {
+					lock.exclusiveLockTable();
 					try {
-						logger.fine("Unknown table " + name + " for store " + this.hashCode());
 						if (!this.admin.tableExists(name)) {
 							logger.info("Table " + name + " not found ; creating" + (expectedFamilies == null ? "" : " with column families " + expectedFamilies.keySet().toString()));
 							td = new HTableDescriptor(name);
@@ -1249,30 +1247,26 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 									}
 								}
 							}
-							lock.exclusiveLockTable();
-							try {
-								this.admin.createTable(td);
-								logger.info("Table " + name + " created");
-								created = true;
-							} catch (TableExistsException x) {
-								//Already done by another process...
-								td = this.admin.getTableDescriptor(Bytes.toBytes(name));
-								logger.fine("Got descriptor for table " + name);
-							} finally {
-								lock.exclusiveUnlockTable();
-								assert this.getLock(name).isShareLocked();
-							}
-						} else {
-							td = this.admin.getTableDescriptor(Bytes.toBytes(name));
-							logger.fine("Got descriptor for table " + name);
+							this.admin.createTable(td);
+							logger.info("Table " + name + " created");
+							created = true;
 						}
-						this.cache(name, td);
+					} catch (TableExistsException x) {
+						//Already done by another process...
+						td = this.admin.getTableDescriptor(Bytes.toBytes(name));
+						logger.fine("Got descriptor for table " + name);
 					} finally {
-						lock.sharedUnlockTable();
+						lock.exclusiveUnlockTable();
+						assert this.getLock(name).isShareLocked();
 					}
-				} catch (Exception x) {
-					throw x;
 				}
+				if (td == null) {
+					td = this.admin.getTableDescriptor(Bytes.toBytes(name));
+					logger.fine("Got descriptor for table " + name);
+				}
+				this.cache(name, td);
+			} finally {
+				lock.sharedUnlockTable();
 			}
 		}
 
@@ -1356,134 +1350,135 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		List<HColumnDescriptor> toBeAdded = new ArrayList<HColumnDescriptor>(columnFamilies.size());
 		List<HColumnDescriptor> toBeAltered = new ArrayList<HColumnDescriptor>(columnFamilies.size());
 		String tableName = tableD.getNameAsString();
-		TableLocker lock = this.getLock(tableName);
-		synchronized (lock) {
-			boolean recreated = false; //Whether table descriptor was just retrieved from HBase admin
-			for (Entry<String, Field> cf : columnFamilies.entrySet()) {
-				byte[] cfname = Bytes.toBytes(cf.getKey());
-				HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
-				boolean asExpected = this.asExpected(family, clazz, cf.getValue(), tablePostfix);
-				if (!recreated && !asExpected) {
-					logger.fine("Table " + tableName + " is not known to have family " + cf.getKey() + " properly configured: checking from HBase");
-					lock.sharedLockTable();
-					try {
-						tableD = this.admin.getTableDescriptor(tableD.getName());
-					} catch (Exception e) {
-						errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
-						this.handleProblem(e, clazz, tableName, tablePostfix, null);
-						try {
-							this.getTableDescriptor(clazz, tableName, tablePostfix, columnFamilies);
-						} catch (Exception x) {
-							throw new DatabaseNotReachedException(x);
-						}
-						return;
-					} finally {
-						lock.sharedUnlockTable();
-					}
-					family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
-					asExpected = this.asExpected(family, clazz, cf.getValue(), tablePostfix);
-					this.cache(tableName, tableD);
-					recreated = true;
-				}
-				if (family == null) {
-					HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
-					this.setValues(newFamily, clazz, cf.getValue(), tablePostfix);
-					toBeAdded.add(newFamily);
-				} else if (!asExpected) {
-					this.setValues(family, clazz, cf.getValue(), tablePostfix);
-					toBeAltered.add(family);
-				}
-			}
-			if (!toBeAdded.isEmpty() || !toBeAltered.isEmpty()) {
+		TableLocker lock = null;
+		boolean recreated = false; //Whether table descriptor was just retrieved from HBase admin
+		for (Entry<String, Field> cf : columnFamilies.entrySet()) {
+			byte[] cfname = Bytes.toBytes(cf.getKey());
+			HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
+			boolean asExpected = this.asExpected(family, clazz, cf.getValue(), tablePostfix);
+			if (!recreated && !asExpected) {
+				logger.fine("Table " + tableName + " is not known to have family " + cf.getKey() + " properly configured: checking from HBase");
+				lock = this.getLock(tableName);
+				lock.sharedLockTable();
 				try {
-					if (!toBeAdded.isEmpty())
-						logger.info("Table " + tableD.getNameAsString() + " is missing families " + toBeAdded.toString() + ": altering");
-					if (!toBeAltered.isEmpty())
-						logger.info("Table " + tableD.getNameAsString() + " has wrong properties for families " + toBeAltered.toString() + ": altering");
-					lock.exclusiveLockTable();
+					tableD = this.admin.getTableDescriptor(tableD.getName());
+				} catch (Exception e) {
+					errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
+					this.handleProblem(e, clazz, tableName, tablePostfix, null);
 					try {
+						this.getTableDescriptor(clazz, tableName, tablePostfix, columnFamilies);
+					} catch (Exception x) {
+						throw new DatabaseNotReachedException(x);
+					}
+					return;
+				} finally {
+					lock.sharedUnlockTable();
+				}
+				family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;
+				asExpected = this.asExpected(family, clazz, cf.getValue(), tablePostfix);
+				this.cache(tableName, tableD);
+				recreated = true;
+			}
+			if (family == null) {
+				HColumnDescriptor newFamily = new HColumnDescriptor(cfname);
+				this.setValues(newFamily, clazz, cf.getValue(), tablePostfix);
+				toBeAdded.add(newFamily);
+			} else if (!asExpected) {
+				this.setValues(family, clazz, cf.getValue(), tablePostfix);
+				toBeAltered.add(family);
+			}
+		}
+		if (!toBeAdded.isEmpty() || !toBeAltered.isEmpty()) {
+			try {
+				if (!toBeAdded.isEmpty())
+					logger.info("Table " + tableD.getNameAsString() + " is missing families " + toBeAdded.toString() + ": altering");
+				if (!toBeAltered.isEmpty())
+					logger.info("Table " + tableD.getNameAsString() + " has wrong properties for families " + toBeAltered.toString() + ": altering");
+				if (lock == null)
+					lock = getLock(tableName);
+				lock.exclusiveLockTable();
+				try {
+					try {
+						this.admin.disableTable(tableD.getName());
+					} catch (TableNotFoundException x) {
+						this.handleProblem(x, clazz, tableName, tablePostfix, null);
+						this.admin.disableTable(tableD.getName());
+					}
+					if (! this.admin.isTableDisabled(tableD.getName()))
+						throw new IOException("Not able to disable table " + tableName);
+					logger.info("Table " + tableD.getNameAsString() + " disabled");
+					for (HColumnDescriptor hColumnDescriptor : toBeAdded) {
 						try {
-							this.admin.disableTable(tableD.getName());
+							this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 						} catch (TableNotFoundException x) {
 							this.handleProblem(x, clazz, tableName, tablePostfix, null);
-							this.admin.disableTable(tableD.getName());
+							this.admin.addColumn(tableD.getName(),hColumnDescriptor);
 						}
-						if (! this.admin.isTableDisabled(tableD.getName()))
-							throw new IOException("Not able to disable table " + tableName);
-						logger.info("Table " + tableD.getNameAsString() + " disabled");
-						for (HColumnDescriptor hColumnDescriptor : toBeAdded) {
-							try {
-								this.admin.addColumn(tableD.getName(),hColumnDescriptor);
-							} catch (TableNotFoundException x) {
-								this.handleProblem(x, clazz, tableName, tablePostfix, null);
-								this.admin.addColumn(tableD.getName(),hColumnDescriptor);
-							}
-						}
-						for (HColumnDescriptor hColumnDescriptor : toBeAltered) {
-							try {
-								this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
-							} catch (TableNotFoundException x) {
-								this.handleProblem(x, clazz, tableName, tablePostfix, null);
-								this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
-							}
-						}
-						boolean done = true;
-						do {
-							Thread.sleep(10);
-							tableD = this.admin.getTableDescriptor(tableD.getName());
-							for (int i = 0; done && i < toBeAdded.size(); i++) {
-								done = done && tableD.hasFamily(toBeAdded.get(i).getName());
-							}
-							for (int i = 0; done && i < toBeAltered.size(); ++i) {
-								HColumnDescriptor expectedFamily = toBeAltered.get(i);
-								HColumnDescriptor actualFamily = tableD.getFamily(expectedFamily.getName());
-								done = done && actualFamily != null;
-								if (done) {
-									for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
-										done = done && hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix);
-									}
-								}
-							}
-						} while (!done);
+					}
+					for (HColumnDescriptor hColumnDescriptor : toBeAltered) {
 						try {
-							this.admin.enableTable(tableD.getName());
-							if (!this.admin.isTableEnabled(tableD.getName()))
-								throw new IOException();
-						} catch (Exception x) {
+							this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
+						} catch (TableNotFoundException x) {
 							this.handleProblem(x, clazz, tableName, tablePostfix, null);
-							this.admin.enableTable(tableD.getName());
-							if (!this.admin.isTableEnabled(tableD.getName()))
-								throw new IOException("SEVERE: cannot enable table " + tableName);
+							this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);
 						}
-						logger.info("Table " + tableD.getNameAsString() + " enabled");
-						
-						//Checking post-condition
+					}
+					boolean done = true;
+					do {
+						Thread.sleep(10);
+						tableD = this.admin.getTableDescriptor(tableD.getName());
 						for (int i = 0; done && i < toBeAdded.size(); i++) {
-							if (!tableD.hasFamily(toBeAdded.get(i).getName()))
-								throw new IOException("Table " + tableName + " is still lacking familiy " + toBeAdded.get(i).getNameAsString());
+							done = done && tableD.hasFamily(toBeAdded.get(i).getName());
 						}
 						for (int i = 0; done && i < toBeAltered.size(); ++i) {
 							HColumnDescriptor expectedFamily = toBeAltered.get(i);
 							HColumnDescriptor actualFamily = tableD.getFamily(expectedFamily.getName());
-							if (actualFamily == null)
-								throw new IOException("Table " + tableName + " is now lacking familiy " + expectedFamily.getNameAsString());
-							for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
-								if (!hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix)) {
-									throw new IOException("Table " + tableName + " still has family " + expectedFamily.getNameAsString() + " with property " + hprop + " not set to " + hprop.getValue(this, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix));
+							done = done && actualFamily != null;
+							if (done) {
+								for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
+									done = done && hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix);
 								}
 							}
 						}
-						this.cache(tableName, tableD);
-						logger.info("Table " + tableD.getNameAsString() + " altered");
-					} finally {
-						lock.exclusiveUnlockTable();
+					} while (!done);
+					try {
+						this.admin.enableTable(tableD.getName());
+						if (!this.admin.isTableEnabled(tableD.getName()))
+							throw new IOException();
+					} catch (Exception x) {
+						this.handleProblem(x, clazz, tableName, tablePostfix, null);
+						this.admin.enableTable(tableD.getName());
+						if (!this.admin.isTableEnabled(tableD.getName()))
+							throw new IOException("SEVERE: cannot enable table " + tableName);
 					}
-				} catch (Exception e) {
-					errorLogger.log(Level.SEVERE, "Could not create on table " + tableD.getNameAsString() + " families " + toBeAdded.toString(), e);
-					throw new DatabaseNotReachedException(e);
+					logger.info("Table " + tableD.getNameAsString() + " enabled");
+					
+					//Checking post-condition
+					for (int i = 0; done && i < toBeAdded.size(); i++) {
+						if (!tableD.hasFamily(toBeAdded.get(i).getName()))
+							throw new IOException("Table " + tableName + " is still lacking familiy " + toBeAdded.get(i).getNameAsString());
+					}
+					for (int i = 0; done && i < toBeAltered.size(); ++i) {
+						HColumnDescriptor expectedFamily = toBeAltered.get(i);
+						HColumnDescriptor actualFamily = tableD.getFamily(expectedFamily.getName());
+						if (actualFamily == null)
+							throw new IOException("Table " + tableName + " is now lacking familiy " + expectedFamily.getNameAsString());
+						for (HColumnFamilyProperty<?> hprop : PropertyUtils.properties) {
+							if (!hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix)) {
+								throw new IOException("Table " + tableName + " still has family " + expectedFamily.getNameAsString() + " with property " + hprop + " not set to " + hprop.getValue(this, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix));
+							}
+						}
+					}
+					this.cache(tableName, tableD);
+					logger.info("Table " + tableD.getNameAsString() + " altered");
+				} finally {
+					lock.exclusiveUnlockTable();
 				}
-
+			} catch (Exception e) {
+				errorLogger.log(Level.SEVERE, "Could not create on table " + tableD.getNameAsString() + " families " + toBeAdded.toString(), e);
+				throw new DatabaseNotReachedException(e);
 			}
+
 		}
 	}
 	
