@@ -10,8 +10,10 @@ import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -288,7 +290,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	private final Object restartMutex = new Object();
 	private Configuration config;
 	private HBaseAdmin admin;
+	private long cacheTTLMs = 10*60*1000; //10 min
 	public ConcurrentMap<String, HTableDescriptor> tablesD = new ConcurrentHashMap<String, HTableDescriptor>();
+	public ConcurrentHashMap<String, Object> notExistingTables = new ConcurrentHashMap<String, Object>();
 	public HTablePool tablesC;
 	
 	private Integer clientTimeout = null;
@@ -332,6 +336,24 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		} catch (Exception x) {
 			errorLogger.log(Level.WARNING, "Cannot get local host name", x);
 		}
+		
+		Thread cacheReloader = new Thread("n-orm hbase cache reloader") {
+
+			@Override
+			public void run() {
+				while(true) {
+					try {
+						Thread.sleep(getCacheTTLMs());
+					} catch (InterruptedException e) {
+						return;
+					}
+					loadCache();
+				}
+			}
+			
+		};
+		cacheReloader.setDaemon(true);
+		cacheReloader.start();
 	}
 
 	public synchronized void start() throws DatabaseNotReachedException {
@@ -401,14 +423,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 		
 		// Loading schema in cache
-		try {
-			for(HTableDescriptor td : this.admin.listTables()) {
-				this.tablesD.put(td.getNameAsString(), td);
-			}
-		} catch (IOException e) {
-			errorLogger.log(Level.SEVERE, "Cannot load existing tables in cache: " + e.getMessage(), e);
-			throw new DatabaseNotReachedException(e);
-		}
+		this.loadCache();
 			
 		logger.info("Started store " + this.hashCode());
 
@@ -446,6 +461,24 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 */
 	public void setPort(int port) {
 		this.port = port;
+	}
+
+	/**
+	 * Schema for table are cached ; indicates time (in ms) when cache is reloaded (default is 10min)
+	 */
+	public long getCacheTTLMs() {
+		return cacheTTLMs;
+	}
+
+
+	/**
+	 * Schema for table are cached ; indicates time (in ms) when cache is reloaded (default is 10min).
+	 * New value will be considered after next reload.
+	 */
+	public void setCacheTTLMs(long cacheTTLMs) {
+		if (cacheTTLMs <= 0)
+			throw new IllegalArgumentException("Cannot reload cache each " + cacheTTLMs + "ms");
+		this.cacheTTLMs = cacheTTLMs;
 	}
 
 	/**
@@ -1000,6 +1033,33 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		return table;
 	}
+
+	private void loadCache() {
+		if (! this.wasStarted)
+			return;
+		this.notExistingTables.clear();
+		try {
+			
+			List<HTableDescriptor> tables = Arrays.asList(this.admin.listTables());
+			for(HTableDescriptor td : tables) {
+				this.tablesD.put(td.getNameAsString(), td);
+			}
+			Iterator<Entry<String, HTableDescriptor>> it = this.tablesD.entrySet().iterator();
+			while (it.hasNext()) {
+				Entry<String, HTableDescriptor> cur = it.next();
+				if (! tables.contains(cur.getValue()))
+					it.remove();
+			}
+		} catch (IOException e) {
+			errorLogger.log(Level.SEVERE, "Cannot load existing tables in cache: " + e.getMessage(), e);
+			throw new DatabaseNotReachedException(e);
+		}
+	}
+	
+	// For test purpose
+	void clearCache() {
+		this.tablesD.clear();
+	}
 	
 	private void cache(String tableName, HTableDescriptor descr) {
 		HTableDescriptor knownDescr = this.tablesD.get(tableName);
@@ -1214,6 +1274,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		name = this.mangleTableName(name);
 		if (this.tablesD.containsKey(name))
 			return true;
+		
+		if (this.notExistingTables.containsKey(name))
+			return false;
 
 		return hasTableNoCache(name);
 	}
@@ -1227,6 +1290,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				boolean ret = this.admin.tableExists(name);
 				if (!ret) {
 					this.uncache(name);
+					this.notExistingTables.put(name, name);
 				}
 				return ret;
 			} finally {
