@@ -123,7 +123,7 @@ public class ConcurrentTest {
 		assertTrue(store1.exists(null, "t1", "idt1"));
 	}
 	
-	@Test//(timeout=60000)
+	@Test(timeout=60000)
 	public void creatingNewTableFrom2Threads() throws Throwable {
 		final int [] done = new int[] {2};
 		this.deleteTable("t1");

@@ -45,6 +45,7 @@ import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.ScannerTimeoutException;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
@@ -1049,6 +1050,26 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 	}
 	
+	private boolean hasProblem(Throwable t, Class<? extends Throwable> problem) {
+		Set<Throwable> explored = new HashSet<Throwable>(); 
+		while (t != null && explored.add(t)) {
+			if (problem.isInstance(t)) {
+				return true;
+			}
+			if (t.getMessage().contains(problem.getName())) {
+				return true;
+			}
+			if (t instanceof RetriesExhaustedWithDetailsException) {
+				for (Throwable e : ((RetriesExhaustedWithDetailsException)t).getCauses()) {
+					if (explored.add(e) && hasProblem(e, problem))
+						return true;
+				}
+			}
+			t = t.getCause();
+		}
+		return false;
+	}
+	
 	protected void handleProblem(Throwable e, Class<? extends PersistingElement> clazz, String table, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {		
 		while (e instanceof UndeclaredThrowableException)
 			e = ((UndeclaredThrowableException)e).getCause();
@@ -1061,7 +1082,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		//System.err.println("====================== handling " + e + " with message " + msg);
 		
-		if ((e instanceof TableNotFoundException) || msg.contains(TableNotFoundException.class.getSimpleName())) {
+		if (this.hasProblem(e, TableNotFoundException.class)) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; recreating", e);
 			this.uncache(table);
@@ -1070,7 +1091,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			} catch (Exception x) {
 				throw new DatabaseNotReachedException(x);
 			}
-		} else if ((e instanceof NotServingRegionException) || msg.contains(NotServingRegionException.class.getSimpleName())) {
+		} else if (this.hasProblem(e, NotServingRegionException.class)) {
 			table = this.mangleTableName(table);
 			
 			try {
@@ -1094,7 +1115,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			} catch (IOException f) {
 				throw new DatabaseNotReachedException(f);
 			}
-		} else if ((e instanceof NoSuchColumnFamilyException) || msg.contains(NoSuchColumnFamilyException.class.getSimpleName())) {
+		} else if (this.hasProblem(e, NoSuchColumnFamilyException.class)) {
 			table = this.mangleTableName(table);
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that table " + table + " was dropped a column family ; recreating", e);
 			this.uncache(table);
@@ -1103,18 +1124,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			} catch (Exception x) {
 				throw new DatabaseNotReachedException(x);
 			}
-		} else if ((e instanceof ConnectException) || msg.contains(ConnectException.class.getSimpleName())) {
+		} else if (this.hasProblem(e, ConnectException.class) || msg.contains("closed") || this.hasProblem(e, ScannerTimeoutException.class) || msg.contains("timeout") || this.hasProblem(e, UnknownScannerException.class)) {
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that connection was lost ; restarting store", e);
 			restart();
-		} else if ((e instanceof SocketTimeoutException) || (e instanceof TimeoutException)) {
+		} else if (this.hasProblem(e, SocketTimeoutException.class) || this.hasProblem(e, TimeoutException.class)) {
 			errorLogger.log(Level.INFO, "Timeout while requesting " + table + " (max duration is set to " + this.config.get(HConstants.HBASE_RPC_TIMEOUT_KEY, Integer.toString(HConstants.DEFAULT_HBASE_RPC_TIMEOUT)) + "ms)", e);
-		} else if (e instanceof IOException) {
-			if (msg.contains("closed") || (e instanceof ScannerTimeoutException) || msg.contains("timeout") || (e instanceof UnknownScannerException)) {
-				errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " ; restarting store", e);
-				restart();
-			} else {
-				throw new DatabaseNotReachedException(e);
-			}
+		} else if (this.hasProblem(e, IOException.class)) {
+			errorLogger.log(Level.INFO, "Trying to recover from IO exception for store " + this.hashCode() + " ; restarting store", e);
+			restart();
 		} else {
 			throw new DatabaseNotReachedException(e);
 		}
