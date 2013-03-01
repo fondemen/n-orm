@@ -154,20 +154,20 @@ public class TableLocker {
 		
 		// Getting local lock
 		this.intraLock.readLock().lock();
+		
+		assert ! this.isExclusiveLocked() : "Acquiring a shared lock on table " + this.table + " while an exclusive lock is already set !";
 		// Handling sharedLockThreads and zookeeper lock in mutual exclusion
-		if (!this.isShareLocked()) {
-			synchronized (this) {
-				// One should acquire zookeeper shared lock if and only if it's the first to ask for the lock
-				if (!this.isShareLocked()) {
-					assert ! this.isExclusiveLocked() : "Can't acquire shared lock on table " + this.table + " while it's already exclusively locked";
-					try {
-						// Checking zookeeper connection and directories
-						this.checkIsZKLockable();
-						// Acquiring zookeeper shared lock
-						lock.getSharedLock(lockTimeout);
-					} catch (Exception e) {
-						throw new DatabaseNotReachedException(e);
-					}
+		synchronized (this) {
+			// One should acquire zookeeper shared lock if and only if it's the first to ask for the lock
+			if (!this.isShareLocked()) {
+				assert ! this.isExclusiveLocked() : "Can't acquire shared lock on table " + this.table + " while it's already exclusively locked";
+				try {
+					// Checking zookeeper connection and directories
+					this.checkIsZKLockable();
+					// Acquiring zookeeper shared lock
+					lock.getSharedLock(lockTimeout);
+				} catch (Exception e) {
+					throw new DatabaseNotReachedException(e);
 				}
 			}
 		}
@@ -176,7 +176,6 @@ public class TableLocker {
 		locks.addFirst(LockKind.SHARED);
 		this.acquiredLocks.put(Thread.currentThread(), locks);
 		
-		assert ! this.isExclusiveLocked() : "Acquired a shared lock on table " + this.table + " while an exclusive lock is already set !";
 		assert this.isShareLocked() : "Acquired a shared lock on table " + this.table + " but not referenced by zookeeper !";
 		assert this.acquiredLocks.containsKey(Thread.currentThread()) : "Acquired a shared lock on table " + this.table + " but thread is not referenced as having one";
 		assert LockKind.SHARED.equals(this.acquiredLocks.get(Thread.currentThread()).peek());
@@ -204,10 +203,8 @@ public class TableLocker {
 		else
 			return;
 		
-		// We are the last process to hold a shared lock
-		if (sl == 0) {
-			synchronized (this) {
-				assert isShareLocked();
+		synchronized (this) {
+			if (isShareLocked() && this.sharedLocks.get() == 0) {
 				try {
 					this.checkZooKeeper();
 					lock.releaseSharedLock();
