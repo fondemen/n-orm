@@ -2,6 +2,7 @@ package com.googlecode.n_orm.hbase;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -87,14 +88,14 @@ public class PropertyUtils {
 
 	// A class to be used as the value for properties cache
 	private static class PropertyCacheValue {
-		private final Map<HBaseProperty<?>, Object> values = new TreeMap<HBaseProperty<?>, Object>(
+		private final Map<HBaseProperty<?>, Object> values = Collections.synchronizedMap(new TreeMap<HBaseProperty<?>, Object>(
 				new Comparator<HBaseProperty<?>>() {
 
 					@Override
 					public int compare(HBaseProperty<?> o1, HBaseProperty<?> o2) {
 						return o2.hashCode() - o1.hashCode();
 					}
-				});
+				}));
 
 		public Object getValue(HBaseProperty<?> property, Store store,
 				Class<? extends PersistingElement> clazz, Field field,
