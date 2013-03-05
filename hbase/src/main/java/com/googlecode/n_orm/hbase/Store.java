@@ -1116,7 +1116,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			if (problem.isInstance(t)) {
 				return true;
 			}
-			if (t.getMessage().contains(problem.getName())) {
+			if (t.getMessage()  != null && t.getMessage().contains(problem.getName())) {
 				return true;
 			}
 			if (t instanceof RetriesExhaustedWithDetailsException) {
