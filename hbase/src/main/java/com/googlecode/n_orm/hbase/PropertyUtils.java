@@ -109,7 +109,6 @@ public class PropertyUtils {
 				String tablePostfix) {
 			// First checking cache (should not return null, but NULL_VALUE)
 			Object ret = this.values.get(property);
-			assert ret != null : "Chached value other than NULL_VALUE";
 			if (ret == null) {
 				// Value does not exists
 				// Getting it and caching it
@@ -125,7 +124,7 @@ public class PropertyUtils {
 							ret = NULL_VALUE;
 						// Copy of cache
 						SortedMap<HBaseProperty<?>, Object> newValues = new TreeMap<HBaseProperty<?>, Object>(values);
-						// Adding valuue to cache
+						// Adding value to cache
 						newValues.put(property, ret);
 						// Copy-on-write
 						this.values = newValues;
