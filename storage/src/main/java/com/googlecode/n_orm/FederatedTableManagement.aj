@@ -126,7 +126,10 @@ public aspect FederatedTableManagement {
 		 * Known table postfixes for {@link #mainTable}
 		 */
 		private Set<String> postfixes = new TreeSet<String>();
-
+		
+		private Boolean hasLegacy = null;
+		private volatile long legacyUpdate = 0;
+		
 		public TableAlternatives(String mainTable) {
 			this.mainTable = mainTable;
 		}
@@ -136,6 +139,18 @@ public aspect FederatedTableManagement {
 		 */
 		private Store getActualStore(Store store) {
 			return store instanceof DelegatingStore ? ((DelegatingStore)store).getActualStore() : store;
+		}
+		
+		/**
+		 * Whether we believe legacy table (main table) exists
+		 */
+		public boolean legacyExists(Store store) {
+			long now = System.currentTimeMillis();
+			if (hasLegacy == null || (legacyUpdate + TableAlternativeCacheTTLInS) < now) {
+				this.hasLegacy = store.hasTable(this.mainTable);
+				this.legacyUpdate = now;
+			}
+			return this.hasLegacy;
 		}
 
 		/**
@@ -201,13 +216,22 @@ public aspect FederatedTableManagement {
 				// assert newAlternatives.containsAll(this.alternatives);
 
 				// Checking for legacy table
-				if (ckeckForLegacyTable && store.hasTable(mainTable)) {
-					this.addPostfix("", store);
-					newPosts.add("");
+				if (ckeckForLegacyTable) {
+					if (store.hasTable(mainTable)) {
+						this.addPostfix("", store);
+						newPosts.add("");
+						this.hasLegacy = Boolean.TRUE;
+					} else {
+						this.hasLegacy = Boolean.FALSE;
+					}
+				} else {
+					this.hasLegacy = Boolean.TRUE;
 				}
+				this.legacyUpdate = now;
 
 				// Recording last state
 				this.postfixes = newPosts;
+				
 				return diff;
 			} else
 				// No alternative found as it was last updated too soon
@@ -397,7 +421,9 @@ public aspect FederatedTableManagement {
 		possibilities.remove(computedPostfix);
 
 		// Otherwise, let's see main table
-		ret.add("");
+		if(possibilities.remove("")) {
+			ret.add("");
+		}
 
 		// And then all other known tables
 		ret.addAll(possibilities);
@@ -481,9 +507,10 @@ public aspect FederatedTableManagement {
 					testedPostfixes, store))
 				return true;
 
-			// Then trying with legacy table
-			if (this.testTableLocation(mainTable, "", id, testedPostfixes,
-					store))
+			// Then trying with legacy table (if different)
+			if (!"".equals(computedPostfix)
+				&& FederatedTableManagement.getAlternatives(this.getTable()).legacyExists(store)
+				&& this.testTableLocation(mainTable, "", id, testedPostfixes, store))
 				return true;
 
 			// In case of heavy consistency mode, test all possible tables
@@ -556,10 +583,11 @@ public aspect FederatedTableManagement {
 	}
 
 	// Activate
-	ColumnFamilyData around(MetaInformation meta, String table):
+	ColumnFamilyData around(MetaInformation meta, String table, String id, Set<String> families, Store store):
 		call(ColumnFamilyData Store.get(MetaInformation,String,String,Set<String>))
 		&& inNOrm()
-		&& args(meta, table, ..)
+		&& args(meta, table, id, families)
+		&& target(store)
 		&& if(meta != null && meta.getElement() instanceof PersistingElementOverFederatedTable) {
 		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta
 				.getElement();
@@ -567,8 +595,17 @@ public aspect FederatedTableManagement {
 				&& !self.findTableLocation(ReadWrite.READ))
 			// We've just found that this element does not exist
 			return null;
-		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table
-				+ self.tablePostfix);
+		ColumnFamilyData ret = proceed(meta.withPostfixedTable(table, self.tablePostfix),
+				table + self.tablePostfix, id, families, store);
+		if (ret == null) {
+			// Not found ; checking other tables, depending on read consistency
+			self.setTablePostfix(null, null);
+			if (self.findTableLocation(ReadWrite.READ)) {
+				// Found element in another table
+				ret = store.get(meta.withPostfixedTable(table, self.tablePostfix), table, id, families);
+			}
+		}
+		return ret;
 	}
 
 	// Exists
@@ -583,22 +620,37 @@ public aspect FederatedTableManagement {
 				&& !self.findTableLocation(ReadWrite.READ))
 			// We've just found that this element does not exist
 			return false;
-		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table
+		boolean ret = proceed(meta.withPostfixedTable(table, self.tablePostfix), table
 				+ self.tablePostfix);
+		if (!ret) {
+			// Not found ; checking other tables, depending on read consistency
+			self.setTablePostfix(null, null);
+			ret = self.findTableLocation(ReadWrite.READ);
+		}
+		return ret;
 	}
 
 	// Delete
-	void around(MetaInformation meta, String table):
+	void around(MetaInformation meta, String table, String id, Store store):
 		call(void Store+.delete(..))
 		&& inNOrm()
-		&& args(meta, table, ..)
+		&& target(store)
+		&& args(meta, table, id)
 		&& if(meta != null && meta.getElement() instanceof PersistingElementOverFederatedTable) {
 		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta
 				.getElement();
 		self.findTableLocation(ReadWrite.READ_OR_WRITE);
 		proceed(meta.withPostfixedTable(table, self.tablePostfix), table
-				+ self.tablePostfix);
+				+ self.tablePostfix, id, store);
 		self.setTablePostfix(null, null);
+
+		// Checking other tables, depending on consistency level
+		while(self.findTableLocation(ReadWrite.READ_OR_WRITE)) {
+			// Found element in yet another table ; deleting 
+			store.delete(meta.withPostfixedTable(table, self.tablePostfix),
+					self.getActualTable(), id);
+			self.setTablePostfix(null, null);
+		}
 	}
 
 	// ===================================
@@ -860,6 +912,11 @@ public aspect FederatedTableManagement {
 		public void remove() {
 			iterator.remove();
 		}
+		
+		@Override
+		public String toString() {
+			return "iterator on table '" + this.getMainTable() + "' with postfix '" + this.getTablePostfix() +'\'';
+		}
 
 	}
 
@@ -873,7 +930,7 @@ public aspect FederatedTableManagement {
 		&& inNOrm()
 		&& target(store)
 		&& args(meta, table, c, limit, families) {
-		Class<? extends PersistingElement> clazz = meta == null ? null : meta
+		final Class<? extends PersistingElement> clazz = meta == null ? null : meta
 				.getClazzNoCheck();
 		if (!isFederated(clazz)) {
 			return proceed(meta, table, c, limit, families, store);
@@ -896,7 +953,110 @@ public aspect FederatedTableManagement {
 				if (lhs == null)
 					return rhs;
 				if (!(lhs instanceof AggregatingIterator)) {
-					AggregatingIterator ret = new AggregatingIterator();
+					
+					AggregatingIterator ret =
+							PersistingElementOverFederatedTableWithMerge.class.isAssignableFrom(clazz) ?
+									// Aggregating iterator able to repair inconsistencies
+								new AggregatingIterator() {
+									@Override
+									public Row merge(Row r1, CloseableKeyIterator it1, Row r2, CloseableKeyIterator it2) throws Exception {
+										// Inconsistency detected, trying to repair
+										assert r1 instanceof RowWithTable;
+										assert r2 instanceof RowWithTable;
+										assert table.equals(((RowWithTable)r1).getMainTable());
+										assert table.equals(((RowWithTable)r2).getMainTable());
+										KeyManagement km = KeyManagement.getInstance();
+										
+										// Creating elements from r1 and r2
+										PersistingElementOverFederatedTableWithMerge elt1 = (PersistingElementOverFederatedTableWithMerge)km.createElement(clazz, r1.getKey());
+										// Not keeping element in cache
+										km.unregister(elt1);
+										if (families != null) {
+											// In case the get gave us some information
+											elt1.activateFromRawData(families, r1.getValues());
+										}
+										// Table postfix for 1
+										String post1 = ((CloseableKeyIteratorWithTable)it1).getTablePostfix();
+										elt1.setTablePostfix(post1, store);
+										// Same stuff with 2
+										PersistingElementOverFederatedTableWithMerge elt2 = (PersistingElementOverFederatedTableWithMerge)km.createElement(clazz, r2.getKey());
+										km.unregister(elt2);
+										if (families != null)
+											elt2.activateFromRawData(families, r2.getValues());
+										String post2 = ((CloseableKeyIteratorWithTable)it2).getTablePostfix();
+										elt2.setTablePostfix(post2, store);
+										km.unregister(elt1);
+										km.unregister(elt2);
+										
+										// Checking hoped location from 1
+										String expectedTablePostFix = elt1.getTablePostfix();
+										if (post2.equals(expectedTablePostFix)) {
+											// Swapping 1 and 2 as 2 is on the right place, even in 1's belief
+											PersistingElementOverFederatedTableWithMerge ptmp = elt2;
+											elt2 = elt1;
+											elt1 = ptmp;
+											Row rtmp = r2;
+											r2 = r1;
+											r1 = rtmp;
+											String stmp = post2;
+											post2 = post1;
+											post1 = stmp;
+										}
+										
+										// Trying to repair by merging
+										try {
+											elt1.mergeWith(elt2);
+										} catch (Exception x) {
+											// Couldn't merge :(
+											throw new IllegalStateException("Found unmergeable duplicate data with id " + r1.getKey() + " in tables '" + table+post1 + "' and '" + table+post2 + '\'', x);
+										}
+										
+										// Immediately storing 1 and deleting 2 once 2 merged into 1
+										elt1.store();
+										// Can't delete using elt2.delete(): elt1 exists and makes elt2 believe that it still exists after delete (assertion fails)
+										store.delete(meta, table+post2, r2.getKey());
+										// Consistency issue repaired :)
+										
+										// Caching 1 as it's the "official" copy for this id now
+										km.register(elt1);
+										
+										// Preparing row to be returned (could eventually be activated to elt1)
+										String post = post1;
+										final String id = r1.getKey();
+										// Expected data ; empty if no family expected, otherwise to be grabbed from the (actual) store
+										final ColumnFamilyData data = families == null ? new DefaultColumnFamilyData() : store.get(meta, table+post, id, families);
+										return new RowWithTable(table, post,
+												new Row() {
+													
+													@Override
+													public ColumnFamilyData getValues() {
+														return data;
+													}
+													
+													@Override
+													public String getKey() {
+														return id;
+													}
+												});
+									}
+								}
+						: new AggregatingIterator() {
+									@Override
+									public Row merge(Row r1, CloseableKeyIterator it1, Row r2, CloseableKeyIterator it2) throws Exception {
+										try {
+											// Should throw an exception with a nice message
+											return super.merge(r1, it1, r2, it2);
+										} catch (Exception x) {
+											// Asking for an PersistingElementOverFederatedTableWithMerge implementation
+											throw new DatabaseNotReachedException(
+													"Inconsistency detected on row " + r1.getKey()
+													+ " ; make " + clazz.getName()
+													+ " implement " + PersistingElementOverFederatedTableWithMerge.class.getName()
+													+ " to repair it", x);
+										}
+									}
+									
+								};
 					ret.addIterator(lhs);
 					lhs = ret;
 				}
