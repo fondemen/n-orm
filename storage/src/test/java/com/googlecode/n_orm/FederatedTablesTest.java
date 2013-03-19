@@ -57,6 +57,14 @@ public class FederatedTablesTest {
 		// this test case
 		FederatedTableManagement.clearAlternativesCache();
 	}
+	
+	@Before
+	public void cleanupElement() {
+		Element e = new Element();
+		e.key = key;
+		if (e.existsInStore())
+			e.delete();
+	}
 
 	@Before
 	public void cleanupLists() {
@@ -170,10 +178,10 @@ public class FederatedTablesTest {
 		elt2.activate();
 
 		// 1: testing table tpostHGHJKNHJKHJK
-		// 2: testing table t
+		// 2: testing table t -> NO: we already know from before whether table t exists
 		// Not updating tables from base
 		// No more table to test, does not exists, no activation
-		assertEquals(2, Memory.INSTANCE.getQueriesAndReset());
+		assertEquals(1, Memory.INSTANCE.getQueriesAndReset());
 	}
 
 	@Test
@@ -569,10 +577,8 @@ public class FederatedTablesTest {
 		celt.key = elt.key;
 		assertTrue(celt.existsInStore());
 
-		try {
-			elt.delete();
-		} catch (AssertionError x) {
-		}
+		elt.getStore().delete(null, "tpost1", elt.getIdentifier());
+			
 		assertTrue(elt.existsInStore()); // Found back from tpost2
 		assertTrue(celt.existsInStore());
 		assertTrue(elt2.existsInStore());
@@ -1236,5 +1242,162 @@ public class FederatedTablesTest {
 		StorageManagement.findElements()
 				.ofClass(Element.class).withAtMost(1000).elements()
 				.inTableWithPostfix("post1").inTableWithPostfix("post2");
+	}
+	
+	@Test
+	public void elementInTwoDifferentFederatedTables() throws Exception {
+		Element e1 = new Element();
+		e1.key = key;
+		e1.post = "post";
+		e1.arg = "element in table 1";
+		e1.store();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		Element e2 = new Element();
+		e2.key = key;
+		e2.post = "post2";
+		e2.arg = "element in table 2";
+		e2.store();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		Element e = StorageManagement.findElements()
+				.ofClass(Element.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix("post")
+				.andActivate()
+				.any();
+		assertEquals("element in table 1", e.arg);
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		e = StorageManagement.findElements()
+				.ofClass(Element.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix("post2")
+				.andActivate()
+				.any();
+		assertEquals("element in table 2", e.arg);
+	}
+	
+	@Test(expected=DatabaseNotReachedException.class)
+	public void readInconsistencyDetected() throws Exception {
+		this.elementInTwoDifferentFederatedTables();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		StorageManagement.findElements()
+				.ofClass(Element.class)
+				.withKey("key").setTo(key)
+				.withAtMost(10).elements()
+				.go();
+		// Element is read consistent
+		// Data is both in table with postfixes post and post2
+		// We should end up in read consistency issue
+	}
+	
+	@Persisting(table = "t", federated = FederatedMode.RCONS)
+	public static class MergableElement implements PersistingElementOverFederatedTableWithMerge {
+		private static final long serialVersionUID = -6877770319760457398L;
+		@Key
+		public String key;
+		public String post;
+		public String arg;
+
+		public String getTablePostfix() {
+			return this.post;
+		}
+		
+		public void mergeWith(PersistingElementOverFederatedTable elt) {
+			MergableElement melt = (MergableElement)elt; 
+			this.activateIfNotAlready();
+			elt.activateIfNotAlready();
+			if (this.arg == null || (melt.arg != null && melt.arg.compareTo(this.arg)>0))
+				this.arg = melt.arg;
+		}
+	}
+	
+	@Test
+	public void deleteInconsistentElement() throws Exception {
+		this.elementInTwoDifferentFederatedTables();
+		
+		this.cleanupElement();
+		
+		assertEquals(0, StorageManagement.findElements()
+				.ofClass(Element.class)
+				.count());
+	}
+	
+	@Test
+	public void readInconsistencyDetectedAndRepaired() throws Exception {
+		this.elementInTwoDifferentFederatedTables();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		NavigableSet<MergableElement> elts = StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.withAtMost(10).elements()
+				.go();
+		assertEquals(1, elts.size());
+		MergableElement elt = elts.first();
+		elt.activate();
+
+		// Longest arg wins
+		assertEquals("element in table 2", elt.arg);
+		assertEquals("post2", elt.post);
+		
+		// Element in table with other postfix is removed
+		assertEquals(0, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix("post")
+				.andActivate()
+				.count());
+		
+		KeyManagement.getInstance().unregister(elt);
+		assertEquals(elt, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix("post2")
+				.andActivate()
+				.any());
+	}
+	
+	@Test
+	public void readInconsistencyDetectedAndRepairedWithActivation() throws Exception {
+		this.elementInTwoDifferentFederatedTables();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		NavigableSet<MergableElement> elts = StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.andActivate()
+				.withAtMost(10).elements()
+				.go();
+		assertEquals(1, elts.size());
+		MergableElement elt = elts.first();
+		
+		// Longest arg wins
+		assertEquals("element in table 2", elt.arg);
+		assertEquals("post2", elt.post);
+		
+		// Element in table with other postfix is removed
+		assertEquals(0, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix("post")
+				.andActivate()
+				.count());
+		
+		KeyManagement.getInstance().unregister(elt);
+		assertEquals(elt, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix("post2")
+				.andActivate()
+				.any());
 	}
 }

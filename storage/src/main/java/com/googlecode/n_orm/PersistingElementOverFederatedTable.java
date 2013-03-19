@@ -9,6 +9,9 @@ package com.googlecode.n_orm;
  * with a qualifier. In case this qualifier is not known,
  * {@link #getTablePostfix()} is called so that it is determined ; as such this
  * method must be implemented by such annotated classes.
+ * In case an inconsistency is found, an exception is thrown ; implement
+ * {@link PersistingElementOverFederatedTableWithMerge} inorder for those
+ * inconsistencies to be repaired.
  */
 public interface PersistingElementOverFederatedTable extends PersistingElement {
 
