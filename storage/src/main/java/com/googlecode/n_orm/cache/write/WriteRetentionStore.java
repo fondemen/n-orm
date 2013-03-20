@@ -135,7 +135,7 @@ public class WriteRetentionStore extends DelegatingStore {
 	/**
 	 * Maximum global number of threads used for sending requests to store
 	 */
-	private static volatile int MAX_SENDER_THREADS = 40;
+	private static volatile int MAX_SENDER_THREADS = 10;
 	
 	/**
 	 * Known stores
