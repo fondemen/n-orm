@@ -1498,7 +1498,6 @@ public class FederatedTablesTest {
 				.andActivate()
 				.count());
 		
-		KeyManagement.getInstance().unregister(elt);
 		assertTrue(StorageManagement.findElements()
 				.ofClass(MergableElement.class)
 				.withKey("key").setTo(key)
@@ -1506,5 +1505,7 @@ public class FederatedTablesTest {
 				.withAtMost(1000).elements()
 				.go()
 				.contains(elt));
+		
+		KeyManagement.getInstance().unregister(elt);
 	}
 }
