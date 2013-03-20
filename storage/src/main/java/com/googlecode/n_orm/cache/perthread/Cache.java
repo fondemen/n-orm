@@ -9,6 +9,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingMixin;
 
 /**
  * A cache for temporarily storing {@link PersistingElement}s.<br>
@@ -398,6 +399,21 @@ availableCachesCheck:while (ai.hasNext()) {
 		
 		if (this.cache.remove(element.getFullIdentifier()) != null) {
 			logger.finer("Unregistered element with " + element + " for thread " + this.thread + " with id " + threadId);
+		}
+	}
+	
+	/**
+	 * Removes an element in the cache given by its full identifier.<br>
+	 * Only thread for this cache has access to this method.<br>
+	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).<br>
+	 * @param fullIdentifier the full id of the element to be uncached
+	 * @throws IllegalStateException in case this thread is not the thread for this cache
+	 */
+	public void unregister(String fullIdentifier) throws IllegalStateException {
+		this.checkState();
+		
+		if (this.cache.remove(fullIdentifier) != null) {
+			logger.finer("Unregistered element with " + PersistingMixin.getInstance().identifierToString(fullIdentifier) + " for thread " + this.thread + " with id " + threadId);
 		}
 	}
 	
