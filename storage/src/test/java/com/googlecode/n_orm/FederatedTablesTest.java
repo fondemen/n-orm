@@ -1498,13 +1498,12 @@ public class FederatedTablesTest {
 				.andActivate()
 				.count());
 		
-		assertTrue(StorageManagement.findElements()
+		assertSame(elt, StorageManagement.findElements()
 				.ofClass(MergableElement.class)
 				.withKey("key").setTo(key)
 				.andActivate()
 				.withAtMost(1000).elements()
-				.go()
-				.contains(elt));
+				.any());
 		
 		KeyManagement.getInstance().unregister(elt);
 	}
