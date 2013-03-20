@@ -172,7 +172,7 @@ public class ElementWithWriteRetensionTest {
 		assertEquals(incrNr*parallelThreads, e.incr);
 	}
 	
-	@Test(timeout=20000)
+	@Test(timeout=30000)
 	public final void parallelIncrementsOn2Elements() throws InterruptedException, ExecutionException {
 		final int incrNr = 1000;
 		final int parallelThreads = 10;
@@ -225,7 +225,7 @@ public class ElementWithWriteRetensionTest {
 		assertEquals(incrNr*parallelThreads, e2.incr);
 	}
 	
-	@Test(timeout=10000)
+	@Test(timeout=20000)
 	public void parallelMapIncrements() throws InterruptedException, ExecutionException {
 		final int incrNr = 1000;
 		final int parallelThreads = 10;
