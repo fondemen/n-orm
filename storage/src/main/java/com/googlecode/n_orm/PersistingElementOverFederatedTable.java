@@ -13,7 +13,7 @@ package com.googlecode.n_orm;
  * {@link PersistingElementOverFederatedTableWithMerge} inorder for those
  * inconsistencies to be repaired.
  */
-public interface PersistingElementOverFederatedTable extends PersistingElement {
+public interface PersistingElementOverFederatedTable {
 
 	/**
 	 * Can be called at any time to determine the postfix for the storage table.

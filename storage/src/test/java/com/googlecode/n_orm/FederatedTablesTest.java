@@ -66,6 +66,10 @@ public class FederatedTablesTest {
 			e = new MergableElement();
 			e.key = key;
 		} while (e.existsInStore());
+
+		// Mandatory as we are using different data stores for the same class in
+		// this test case
+		FederatedTableManagement.clearAlternativesCache();
 	}
 
 	@Before
@@ -680,6 +684,9 @@ public class FederatedTablesTest {
 
 		elt.store();
 
+		// Forces cache update
+		FederatedTableManagement.clearAlternativesCache();
+
 		Element elt2 = new Element();
 		elt2.key = key;
 		elt2.post = "post";
@@ -696,6 +703,9 @@ public class FederatedTablesTest {
 
 		elt.store();
 
+		// Forces cache update
+		FederatedTableManagement.clearAlternativesCache();
+
 		Element elt2 = new Element();
 		elt2.key = key;
 		elt2.post = "post";
@@ -710,6 +720,9 @@ public class FederatedTablesTest {
 		elt.arg = "etrcauzjy";
 
 		elt.delete();
+
+		// Forces cache update
+		FederatedTableManagement.clearAlternativesCache();
 
 		Element elt2 = new Element();
 		elt2.key = key;
@@ -726,6 +739,9 @@ public class FederatedTablesTest {
 		elt.arg = "etrcauzjy";
 
 		elt.store();
+
+		// Forces cache update
+		FederatedTableManagement.clearAlternativesCache();
 
 		Element elt2 = new Element();
 		elt2.key = key;
@@ -1311,10 +1327,10 @@ public class FederatedTablesTest {
 			return this.post;
 		}
 		
-		public void mergeWith(PersistingElementOverFederatedTable elt) {
+		public void mergeWith(PersistingElementOverFederatedTableWithMerge elt) {
 			MergableElement melt = (MergableElement)elt; 
 			this.activateIfNotAlready();
-			elt.activateIfNotAlready();
+			((PersistingElement)elt).activateIfNotAlready();
 			if (this.arg == null || (melt.arg != null && melt.arg.compareTo(this.arg)>0))
 				this.arg = melt.arg;
 		}

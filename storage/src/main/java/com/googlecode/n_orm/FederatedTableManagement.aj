@@ -14,8 +14,6 @@ import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -50,7 +48,9 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
  * @see Persisting.FederatedMode
  */
 public aspect FederatedTableManagement {
-
+	
+	declare precedence: PersistingMixin, FederatedTableManagement;
+	
 	/**
 	 * Table where alternative tables (for a given table) will be stored. The
 	 * key is the name of the original table, and columns (in the
@@ -115,7 +115,7 @@ public aspect FederatedTableManagement {
 
 	// REM: a federated element can only inherit federated elements with similar
 	// configuration
-	declare parents: (@Persisting(federated!=FederatedMode.NONE) *) implements PersistingElement, PersistingElementOverFederatedTable;
+	declare parents: (@Persisting(federated!=FederatedMode.NONE) *) implements PersistingElementOverFederatedTable;
 
 	/**
 	 * A place where to register alternatives for an original table. Alternative
@@ -600,12 +600,12 @@ public aspect FederatedTableManagement {
 		this.checkTablePostfixHasNotChanged();
 		if (oldPostfix != null && !oldPostfix.equals(this.tablePostfix)) {
 			throw new IllegalStateException("Found " + this + " from table "
-					+ this.getTable() + this.tablePostfix + " with postfix "
+					+ ((PersistingElement)this).getTable() + this.tablePostfix + " with postfix "
 					+ this.tablePostfix + " while another postfix "
 					+ oldPostfix + " was registered");
 		}
 		if (store != null)
-			registerPostfix(this.getTable(), this.tablePostfix, store);
+			registerPostfix(((PersistingElement)this).getTable(), this.tablePostfix, store);
 	}
 
 	// jut to be sure
@@ -614,7 +614,7 @@ public aspect FederatedTableManagement {
 	public String PersistingElementOverFederatedTable.getActualTable() {
 		if (this.tablePostfix == null)
 			return null;
-		return this.getTable() + this.tablePostfix;
+		return ((PersistingElement)this).getTable() + this.tablePostfix;
 	}
 
 	private transient FederatedMode PersistingElementOverFederatedTable.federatedMode = null;
@@ -660,7 +660,7 @@ public aspect FederatedTableManagement {
 			return ret;
 		}
 
-		String mainTable = this.getTable();
+		String mainTable = ((PersistingElement)this).getTable();
 		TableAlternatives alternatives = getAlternatives(mainTable);
 		Set<String> possibilities = new TreeSet<String>(
 				alternatives.getPostfixes());
@@ -692,7 +692,7 @@ public aspect FederatedTableManagement {
 	 */
 	private Collection<String> PersistingElementOverFederatedTable.getPossiblePostfixesWithAnUpdate(
 			Store store) {
-		TableAlternatives ta = getAlternatives(this.getTable());
+		TableAlternatives ta = getAlternatives(((PersistingElement)this).getTable());
 		ta.updateAlternatives(store);
 		return ta.getPostfixes(); 
 	}
@@ -718,7 +718,7 @@ public aspect FederatedTableManagement {
 				// Could still be forgiven in legacy mode
 				if (this.tablePostfix.length() != 0)
 					throw new IllegalStateException(this
-							+ " already registered in table " + this.getTable()
+							+ " already registered in table " + ((PersistingElement)this).getTable()
 							+ " with postfix " + this.tablePostfix
 							+ " while computed postfix states now "
 							+ computedPostfix);
@@ -735,19 +735,19 @@ public aspect FederatedTableManagement {
 			Store store, String id, String postfix, Set<String> families, ColumnFamilyData values) {
 		KeyManagement km = KeyManagement.getInstance();
 		// Removing any cached element so that created one is really new
-		km.unregister(clazz, id);
+		km.unregister(clazz.asSubclass(PersistingElement.class), id);
 		
 		// Creating element
 		PersistingElementOverFederatedTableWithMerge elt =
 				(PersistingElementOverFederatedTableWithMerge)km.createElement(clazz, id);
 		// Not keeping element in cache (it's temporary)
-		km.unregister(elt);
+		km.unregister((PersistingElement)elt);
 		if (families != null) {
 			// In case we already know some information
-			elt.activateFromRawData(families, values);
+			((PersistingElement)elt).activateFromRawData(families, values);
 		}
 		// Table postfix
-		elt.setTablePostfix(postfix, store);
+		((PersistingElementOverFederatedTable)elt).setTablePostfix(postfix, store);
 		
 		return elt;
 	}
@@ -760,13 +760,13 @@ public aspect FederatedTableManagement {
 			PersistingElementOverFederatedTableWithMerge elt) {
 		assert this != elt;
 		assert this.getClass().equals(elt.getClass());
-		assert this.tablePostfix != null;
-		assert elt.tablePostfix != null;
-		assert !this.tablePostfix.equals(elt.tablePostfix);
+		assert ((PersistingElementOverFederatedTable)this).tablePostfix != null;
+		assert ((PersistingElementOverFederatedTable)elt).tablePostfix != null;
+		assert !((PersistingElementOverFederatedTable)this).tablePostfix.equals(((PersistingElementOverFederatedTable)elt).tablePostfix);
 
 		KeyManagement km = KeyManagement.getInstance();
 		// There is no official element for this id yet (as there is an inconsistency)
-		km.unregister(this);
+		km.unregister((PersistingElement)this);
 		
 		// Trying to repair by merging
 		try {
@@ -774,23 +774,23 @@ public aspect FederatedTableManagement {
 		} catch (Exception x) {
 			// Couldn't merge :(
 			throw new IllegalStateException(
-					"Found unmergeable duplicate data with id " + this.getIdentifier()
-					+ " in tables '" + this.getTable()
-					+ " with postfixes " + this.tablePostfix
-					+ "' and '" + elt.tablePostfix + '\'', x);
+					"Found unmergeable duplicate data with id " + ((PersistingElement)this).getIdentifier()
+					+ " in tables '" + ((PersistingElement)this).getTable()
+					+ " with postfixes " + ((PersistingElementOverFederatedTable)this).tablePostfix
+					+ "' and '" + ((PersistingElementOverFederatedTable)elt).tablePostfix + '\'', x);
 		}
 		
 		// Immediately storing this and deleting other element once merged
-		this.store();
+		((PersistingElement)this).store();
 		// Can't delete using elt.delete()
 		// "this" exists and makes elt believe that it still exists after delete (assertion fails)
-		this.getStore().delete(
-				new MetaInformation().forElement(elt).withPostfixedTable(elt.getTable(), elt.tablePostfix),
-				elt.getActualTable(), elt.getIdentifier());
+		((PersistingElement)this).getStore().delete(
+				new MetaInformation().forElement((PersistingElement)elt).withPostfixedTable(((PersistingElement)elt).getTable(), ((PersistingElementOverFederatedTable)elt).tablePostfix),
+				((PersistingElementOverFederatedTable)elt).getActualTable(), ((PersistingElement)elt).getIdentifier());
 		// Consistency issue repaired :)
 		
 		// this is now the officiel version for this id
-		km.register(this);
+		km.register((PersistingElement)this);
 	}
 
 	/**
@@ -812,10 +812,10 @@ public aspect FederatedTableManagement {
 		String computedPostfix = this.getTablePostfix();
 		Consistency consistencyLevel = this.getFederatedMode().getConsistency(mode);
 
-		final Store store = this.getStore();
+		final Store store = ((PersistingElement)this).getStore();
 
-		final String mainTable = this.getTable();
-		final String id = this.getIdentifier();
+		final String mainTable = ((PersistingElement)this).getTable();
+		final String id = ((PersistingElement)this).getIdentifier();
 		switch (consistencyLevel) {
 		case NONE:
 			// Trusting computed value
@@ -831,7 +831,7 @@ public aspect FederatedTableManagement {
 
 			// Then trying with legacy table (if different)
 			if (!"".equals(computedPostfix)
-				&& FederatedTableManagement.getAlternatives(this.getTable()).legacyExists(store)
+				&& FederatedTableManagement.getAlternatives(((PersistingElement)this).getTable()).legacyExists(store)
 				&& this.testTableLocation(mainTable, "", id, store))
 				return true;
 			
@@ -940,7 +940,7 @@ public aspect FederatedTableManagement {
 
 	private boolean PersistingElementOverFederatedTable.testTableLocation(
 		String mainTable, String postfix, String id, Store store) {
-		if (store.exists(new MetaInformation().forElement(this)
+		if (store.exists(new MetaInformation().forElement((PersistingElement)this)
 				.withPostfixedTable(mainTable, postfix), mainTable
 				+ postfix, id)) {
 			this.setTablePostfix(postfix, store);
@@ -1348,11 +1348,11 @@ public aspect FederatedTableManagement {
 														clazz.asSubclass(PersistingElementOverFederatedTableWithMerge.class),
 														store, r2.getKey(), post2,
 														families, r2.getValues());
-										km.unregister(elt1);
-										km.unregister(elt2);
+										km.unregister((PersistingElement)elt1);
+										km.unregister((PersistingElement)elt2);
 										
 										// Checking hoped location from 1
-										String expectedTablePostFix = elt1.getTablePostfix();
+										String expectedTablePostFix = ((PersistingElementOverFederatedTable)elt1).getTablePostfix();
 										if (post2.equals(expectedTablePostFix)) {
 											// Swapping 1 and 2 as 2 is on the right place, even in 1's belief
 											PersistingElementOverFederatedTableWithMerge ptmp = elt2;
@@ -1421,7 +1421,7 @@ public aspect FederatedTableManagement {
 		execution(PersistingElement createElementFromRow(Class, Map<String, Field>, Row)) 
 		&& args(.., row){
 		if (self != null) {
-			self.setTablePostfix(row.getTablePostfix(), self.getStore());
+			self.setTablePostfix(row.getTablePostfix(), ((PersistingElement)self).getStore());
 		}
 	}
 
