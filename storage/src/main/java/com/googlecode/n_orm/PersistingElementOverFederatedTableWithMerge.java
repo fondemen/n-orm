@@ -5,7 +5,7 @@ package com.googlecode.n_orm;
  * {@link Persisting#federated() federated tables}
  * in order to repair any detected inconsistency.
  */
-public interface PersistingElementOverFederatedTableWithMerge extends PersistingElementOverFederatedTable {
+public interface PersistingElementOverFederatedTableWithMerge {// extends PersistingElementOverFederatedTable {
 	
 	/**
 	 * In case an inconsistency is detected, that is when an element
@@ -17,6 +17,6 @@ public interface PersistingElementOverFederatedTableWithMerge extends Persisting
 	 * so any important information from elt should be saved into this element.
 	 * Throws an exception in case merge is impossible.
 	 */
-	void mergeWith(PersistingElementOverFederatedTable elt) throws Exception;
+	void mergeWith(PersistingElementOverFederatedTableWithMerge elt) throws Exception;
 
 }
