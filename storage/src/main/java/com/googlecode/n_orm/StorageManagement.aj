@@ -1,10 +1,7 @@
 package com.googlecode.n_orm;
 
-import java.io.FileInputStream;
 import java.lang.reflect.Field;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
@@ -14,8 +11,6 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.Callable;
-
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.ImplicitActivation;
@@ -58,6 +53,38 @@ public aspect StorageManagement {
 	}
 
 	@Continuator
+	public void PersistingElement.flush() {
+		Store s = this.getStore();
+		while (s instanceof DelegatingStore) {
+			if (s instanceof WriteRetentionStore) {
+				WriteRetentionStore writeCache = (WriteRetentionStore)s;
+				// There should have only one write cache in the stack
+				writeCache.flush(this.getTable(), this.getIdentifier());
+				// Handling superclasses
+				Collection<Class<? extends PersistingElement>> persistingSuperClasses = this.getPersistingSuperClasses();
+				if (!persistingSuperClasses.isEmpty()) {
+					PersistingMixin px = PersistingMixin.getInstance();
+					String ident = this.getFullIdentifier();
+					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
+						writeCache.flush(px.getTable(sc), ident);
+					}
+				}
+				return;
+			}
+			s = ((DelegatingStore)s).getActualStore();
+		}
+	}
+	
+	@Continuator
+	public void PersistingElement.deleteNoCache() throws DatabaseNotReachedException {
+		// Performing delete request
+		this.delete();
+		
+		// Flushing write cache in case it exists
+		this.flush();
+	}
+
+	@Continuator
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
 		Store s = this.getStore();
 		s.delete(new MetaInformation().forElement(this), this.getTable(), this.getIdentifier());
@@ -75,34 +102,11 @@ public aspect StorageManagement {
 	
 	@Continuator
 	public void PersistingElement.storeNoCache() throws DatabaseNotReachedException {
-		// Checking for a write cache
-		Store s = this.getStore();
-		WriteRetentionStore writeCache = null;
-		while (s instanceof DelegatingStore) {
-			if (s instanceof WriteRetentionStore) {
-				writeCache = (WriteRetentionStore)s;
-				// There should have only one write cache in the stack
-				break;
-			}
-			s = ((DelegatingStore)s).getActualStore();
-		}
-		
 		// Performing store request
 		this.store();
 		
 		// Flushing write cache in case it exists
-		if (writeCache != null) {
-			writeCache.flush(this.getTable(), this.getIdentifier());
-			// Handling superclasses
-			Collection<Class<? extends PersistingElement>> persistingSuperClasses = this.getPersistingSuperClasses();
-			if (!persistingSuperClasses.isEmpty()) {
-				PersistingMixin px = PersistingMixin.getInstance();
-				String ident = this.getFullIdentifier();
-				for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
-					writeCache.flush(px.getTable(sc), ident);
-				}
-			}
-		}
+		this.flush();
 	}
 	
 	@Continuator
@@ -348,7 +352,7 @@ public aspect StorageManagement {
 		Map<String, Field> toBeActivated = getActualFamiliesToBeActivated(timeout, families);
 		
 		if (! toBeActivated.isEmpty()) {
-			ColumnFamilyData rawData = this.getStore().get(new MetaInformation().forElement(this).withColumnFamilies(toBeActivated), this.getTable(), this.getIdentifier(), toBeActivated == null ? null : toBeActivated.keySet());
+			ColumnFamilyData rawData = this.getStore().get(new MetaInformation().forElement(this).withColumnFamilies(toBeActivated), this.getTable(), this.getIdentifier(), toBeActivated.keySet());
 			activateFromRawData(toBeActivated.keySet(), rawData);
 		}
 	}
@@ -384,9 +388,9 @@ public aspect StorageManagement {
 		}
 	}
 	
-	public static <E extends PersistingElement> E getFromRawData(Class<E> type, Row row) {
+	public static <E extends PersistingElement> E getFromRawData(Class<E> type, Row row, Set<String> toBeActivated) {
 		E element = StorageManagement.getElement(type, row.getKey());
-		element.activateFromRawData(row.getValues().keySet(), row.getValues());
+		element.activateFromRawData(toBeActivated, row.getValues());
 		return element;
 	}
 

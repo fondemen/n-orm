@@ -23,7 +23,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
@@ -44,7 +43,7 @@ public class MapRedTest {
 			td.addFamily(new HColumnDescriptor(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 			store.getAdmin().createTable(td);
 		}
-		if (!store.getAdmin().isTableDisabled(tableName)) {
+		if (store.getAdmin().isTableDisabled(tableName)) {
 			store.getAdmin().enableTable(tableName);
 		}
 		table = new HTable(store.getConf(), tableName);

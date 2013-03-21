@@ -5,20 +5,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.apache.commons.beanutils.ConvertUtils;
-
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.conversion.ConversionTools;
-import com.googlecode.n_orm.storeapi.Constraint;
 
 /**
  * A restriction to a {@link SimpleStore} search.
- * In case this restriction applies to a table (as in {@link SimpleStore#get(String, Constraint, int, Set)}, returned rows should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
+ * In case this restriction applies to a table (as in {@link SimpleStore#get(String, Constraint, int, java.util.Set)}, returned rows should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
  * In case this restrictions applies to a column family (as in {@link SimpleStore#get(String, String, String, Constraint)}, returned columns should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
  */
 public class Constraint {

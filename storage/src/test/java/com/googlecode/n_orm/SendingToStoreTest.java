@@ -11,15 +11,12 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
-import org.mockito.verification.VerificationMode;
 
 import com.googlecode.n_orm.Incrementing.Mode;
 import com.googlecode.n_orm.cf.SetColumnFamily;
@@ -111,7 +108,6 @@ public class SendingToStoreTest {
 					if (argument == null)
 						return false;
 					
-					@SuppressWarnings("unchecked")
 					ColumnFamilyData map = (ColumnFamilyData)argument;
 					
 					int expectedSize = 0;
@@ -185,6 +181,7 @@ public class SendingToStoreTest {
 
 				@Override
 				public boolean matches(Object argument) {
+					@SuppressWarnings("unchecked")
 					Map<String, Map<String, Number>> map = (Map<String, Map<String, Number>>)argument;
 					if (map == null || map.size() != 1)
 						return false;

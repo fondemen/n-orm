@@ -3,34 +3,19 @@ package com.googlecode.n_orm;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Collection;
-import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
-
-import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.ImplicitActivation;
-import com.googlecode.n_orm.Key;
-import com.googlecode.n_orm.KeyManagement;
-import com.googlecode.n_orm.Persisting;
-import com.googlecode.n_orm.PersistingElement;
-import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
-import com.googlecode.n_orm.cache.write.WriteRetentionStore;
 import com.googlecode.n_orm.cf.ColumnFamily;
-import com.googlecode.n_orm.storeapi.SimpleStore;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.storeapi.Store;
 
 /**
- * Persisting elements are elements that can be stored and retrieved from a {@link SimpleStore}.
+ * Persisting elements are elements that can be stored and retrieved from a {@link com.googlecode.n_orm.storeapi.SimpleStore}.
  * To make a class persisting, do not implement this interface, but rather declare the annotation {@link Persisting}.
  * @see Persisting
  */
-@SuppressWarnings("unused")
 public interface PersistingElement extends Comparable<PersistingElement>, Serializable {
 	/**
 	 * The list of possible types for simple properties (including keys).
@@ -81,11 +66,11 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	/**
 	 * The list of all {@link ColumnFamily} held by this persisting element.
 	 */
-	Collection<ColumnFamily<?>> getColumnFamilies(); //Can't be a Set as CFs are either Sets or Maps whose equals or hashCode must compare collection contents only 
+	Collection<ColumnFamily<?>> getColumnFamilies(); //Can't be a java.util.Set as CFs are either Sets or Maps whose equals or hashCode must compare collection contents only 
 	
 	/**
 	 * The the {@link ColumnFamily} held by this persisting element with the given name.
-	 * The name is the name of the property for the column family, i.e. the non static, non final , non transient {@link Map} or {@link Set} field.
+	 * The name is the name of the property for the column family, i.e. the non static, non final , non transient {@link java.util.Map} or {@link java.util.Set} field.
 	 * @see ColumnFamily#getName()
 	 */
 	ColumnFamily<?> getColumnFamily(String columnFamilyName) throws UnknownColumnFamily;
@@ -125,10 +110,9 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * All keys have to be set before invoking this operation
 	 * <p>This object is stored as a row in table designated by {@link #getTable()} using the key computed from {@link #getIdentifier()}.
 	 * Properties are stored in a column family whose name is given by {@link PropertyManagement#PROPERTY_COLUMNFAMILY_NAME}.
-	 * Column families are stored using their own name (see {@link #getColumnFamily(String)}), that is the name of the {@link Map} or {@link Set} fields.
+	 * Column families are stored using their own name (see {@link #getColumnFamily(String)}), that is the name of the {@link java.util.Map} or {@link java.util.Set} fields.
 	 * Properties and column families which have not changed since last activation of this element are not sent to the store as they are supposed to be already stored.
 	 * </p><p>In case this persisting element inherits another persisting element class, a row with the full identifier is created in the tables for the ancestor class (see {@link Persisting#table()}).
-	 * Moreover, a column named {@link StorageManagement#CLASS_COLUMN} within a column family named {@link StorageManagement#CLASS_COLUMN_FAMILY} stores the name of the actual class of this persisting element in those tables for superclasses.
 	 * Properties and column families are not stored in those rows unless stated by the {@link Persisting#storeAlsoInSuperClasses()} annotation in the actual class of this persisting element.
 	 * </p><p>To choose a store, you need to supply in the classpath a properties file depending on the nature of the data store you want to use.
 	 * This property file is to be found in the class path. For a persisting element of a class in package foo.bar, the property file is searched as foo/bar/store.propetries in the complete classpath (in the declared order), then as foo/store.properties, and then directly store.properties.
@@ -140,7 +124,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * Simplest solution is to search this element in each thread using {@link StorageManagement#getElement(Class, String)}.<br>
 	 * A cleaner mean to solve this issue store calls should be performed within a synchronized section on this or on changed column family:<br>
 	 * <code>
-	 * synchronized(element.myFamily) { <i>//or merely synchronized(element)<br>
+	 * synchronized(element.myFamily) { <i>//or merely synchronized(element)</i><br>
 	 * &nbsp;&nbsp;&nbsp;&nbsp;element.myFamily.add(something);<br>
 	 * }
 	 * </code><br>
@@ -148,19 +132,19 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * <code>
 	 * &#64;Persisting class Foo {<br>
 	 * &nbsp;&nbsp;&nbsp;&nbsp;...<br>
-	 * &nbsp;&nbsp;&nbsp;&nbsp;public Map<BarK,BarV> element = new MapColumnFamily();<br>
+	 * &nbsp;&nbsp;&nbsp;&nbsp;public java.util.Map<BarK,BarV> element = new MapColumnFamily();<br>
 	 * }
 	 * </code>
 	 * </p>
 	 * @throws DatabaseNotReachedException in case the store cannot store this persisting object (e.g. cannot connect to database)
 	 * @see #getIdentifier()
-	 * @see SimpleStore
+	 * @see com.googlecode.n_orm.storeapi.SimpleStore
 	 */
 	@Continuator
 	void store() throws DatabaseNotReachedException;
 	
 	/**
-	 * Store this persisting element as {@link #store()} but ignoring any {@link WriteRetentionStore write cache}.
+	 * Store this persisting element as {@link #store()} but ignoring any {@link com.googlecode.n_orm.cache.write.WriteRetentionStore write cache}.
 	 * Actually, in case this element has a write cache, request is still sent to the cache, but then flushed immediately so that previous requests regarding this element are merged and sent.
 	 * @throws DatabaseNotReachedException
 	 */
@@ -173,6 +157,14 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 */
 	@Continuator
 	void delete() throws DatabaseNotReachedException;
+	
+	/**
+	 * Deletes rows representing this persisting element in the store.
+	 * Actually, in case this element has a write cache, request is still sent to the cache, but then flushed immediately so that previous requests regarding this element are merged and sent.
+	 * @see #store()
+	 */
+	@Continuator
+	void deleteNoCache() throws DatabaseNotReachedException;
 	
 	/**
 	 * If an element with the same id as this element exists in the cache, returns the element from the cache, otherwise returns this element which will be placed in the cache.
@@ -254,8 +246,8 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	/**
 	 * Activates a given column family (does not activate included persisting elements).
 	 * @param name name of the column family
-	 * @param from the minimal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
-	 * @param to the maximal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
+	 * @param from the minimal (inclusive) value for the activation (a key for a {@link java.util.Map} column family or a value for a {@link java.util.Set} column family)
+	 * @param to the maximal (inclusive) value for the activation (a key for a {@link java.util.Map} column family or a value for a {@link java.util.Set} column family)
 	 * @throws UnknownColumnFamily in case this column family does not exist
 	 * @throws DatabaseNotReachedException
 	 * @see #getColumnFamily(String)
@@ -290,8 +282,8 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * Activates a given column family (does not activate included persisting elements) in case it was not done before (with any possible activation method).
 	 * The column family won't be loaded if a previous activation was done, even if a constraint was given by {@link #activateColumnFamily(String, Object, Object)} or {@link #activateColumnFamilyIfNotAlready(String, Object, Object)}.
 	 * @param name name of the column family
-	 * @param from the minimal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
-	 * @param to the maximal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
+	 * @param from the minimal (inclusive) value for the activation (a key for a {@link java.util.Map} column family or a value for a {@link java.util.Set} column family)
+	 * @param to the maximal (inclusive) value for the activation (a key for a {@link java.util.Map} column family or a value for a {@link java.util.Set} column family)
 	 * @throws UnknownColumnFamily in case this column family does not exist
 	 * @throws DatabaseNotReachedException
 	 * @see #getColumnFamily(String)
@@ -304,14 +296,20 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * The column family won't be loaded if a previous activation was done, even if a constraint was given by {@link #activateColumnFamily(String, Object, Object)} or {@link #activateColumnFamilyIfNotAlready(String, Object, Object)}.
 	 * @param lastActivationTimeoutMs the maximum duration (in ms) at which last actual activation was performed. E.g. if last activation happened at 12:00 and method is called at 12:10 while this parameter is set to 3600000 (1 min), activation will happen anyway ; if parameter is set to 40000000, activation will not be performed
 	 * @param name name of the column family
-	 * @param from the minimal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
-	 * @param to the maximal (inclusive) value for the activation (a key for a {@link Map} column family or a value for a {@link Set} column family)
+	 * @param from the minimal (inclusive) value for the activation (a key for a {@link java.util.Map} column family or a value for a {@link java.util.Set} column family)
+	 * @param to the maximal (inclusive) value for the activation (a key for a {@link java.util.Map} column family or a value for a {@link java.util.Set} column family)
 	 * @throws UnknownColumnFamily in case this column family does not exist
 	 * @throws DatabaseNotReachedException
 	 * @see #getColumnFamily(String)
 	 * @see #getCachedVersion()
 	 */
 	void activateColumnFamilyIfNotAlready(String name, long lastActivationTimeoutMs, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
+	
+	/**
+	 * Flushes any outgoing request pending on a {@link com.googlecode.n_orm.cache.write.WriteRetentionStore write-retention store}.
+	 */
+	@Continuator
+	void flush();
 	
 	/**
 	 * To be equal, two persisting elements must implement the same class and have the same identifier, no matter they have same values for properties and column families.

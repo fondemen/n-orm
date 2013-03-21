@@ -3,7 +3,6 @@ package com.googlecode.n_orm.hbase;
 import java.lang.reflect.Field;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.hadoop.hbase.UnknownScannerException;
 import org.apache.hadoop.hbase.client.Result;

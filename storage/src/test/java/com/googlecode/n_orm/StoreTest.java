@@ -77,6 +77,7 @@ public class StoreTest {
 	
 	@Persisting(writeRetentionMs=2)
 	public static class WriteRetendedPE {
+		private static final long serialVersionUID = 3512576141445247136L;
 		@Key public String key;
 	}
 	@Test public void testWriteRetensionStore() {

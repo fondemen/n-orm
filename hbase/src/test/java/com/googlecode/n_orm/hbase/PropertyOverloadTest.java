@@ -8,12 +8,10 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.StoreFile;
-import org.apache.hadoop.hbase.regionserver.StoreFile.BloomType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -57,6 +55,11 @@ public class PropertyOverloadTest {
 	public static void prepareStore() {
 		HBaseLauncher.prepareHBase();
 		store = HBaseLauncher.hbaseStore;
+	}
+	
+	@Before
+	public void resetStoreCache() {
+		store.clearCache();
 	}
 	
 	//Just a dummy class so that we've got something to give as parameter...

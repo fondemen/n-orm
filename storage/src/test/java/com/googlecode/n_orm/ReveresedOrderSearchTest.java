@@ -1,8 +1,6 @@
 package com.googlecode.n_orm;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.lang.reflect.Field;
 import java.util.Date;
@@ -11,24 +9,28 @@ import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.googlecode.n_orm.conversion.UnreversibleTypeException;
-
-
 public class ReveresedOrderSearchTest {
+	
+	public ReveresedOrderSearchTest() throws Exception {
+		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
+	}
 
 	
 	@Persisting(table="ReveresedOrderSearchTest")
 	public static class FooStd {
+		private static final long serialVersionUID = -4422829353876718397L;
 		@Key public long bar;
 	}
 	
 	@Persisting(table="ReveresedOrderSearchTest")
 	public static class FooRevDate {
+		private static final long serialVersionUID = -6255332472339355078L;
 		@Key(reverted=true) public Date bar;
 	}
 	
 	@Persisting(table="ReveresedOrderSearchTest")
 	public static class FooRevString {
+		private static final long serialVersionUID = 7020782950284603285L;
 		@Key(reverted=true) public String bar;
 	}
 	
@@ -99,6 +101,7 @@ public class ReveresedOrderSearchTest {
 	
 	@Persisting(table="ReveresedOrderSearchTest")
 	public static class FooRevBool {
+		private static final long serialVersionUID = -8161506031563020093L;
 		@Key(reverted=true) public Boolean bar;
 	}
 	@Test
@@ -109,6 +112,7 @@ public class ReveresedOrderSearchTest {
 	
 	@Persisting(table="ReveresedOrderSearchTest")
 	public static class FooRevInt {
+		private static final long serialVersionUID = -3277636999586287079L;
 		@Key(reverted=true) public Integer bar;
 	}
 	@Test
@@ -127,6 +131,7 @@ public class ReveresedOrderSearchTest {
 	
 	@Persisting(table="ReveresedOrderSearchTest")
 	public static class FooRevPInt {
+		private static final long serialVersionUID = -7319454788789724765L;
 		@Key(reverted=true) public int bar;
 	}
 	@Test
@@ -144,6 +149,7 @@ public class ReveresedOrderSearchTest {
 	
 	@Persisting(table="ReveresedOrderSearchTest")
 	public static class FooRevByte {
+		private static final long serialVersionUID = -3920675695988699567L;
 		@Key(reverted=true) public byte bar;
 	}
 	@Test
@@ -153,6 +159,7 @@ public class ReveresedOrderSearchTest {
 	
 	@Persisting(table="ReveresedOrderSearchTest")
 	public static class FooRevShort {
+		private static final long serialVersionUID = 8575670428412442926L;
 		@Key(reverted=true) public short bar;
 	}
 	@Test

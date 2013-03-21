@@ -19,7 +19,9 @@ import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -55,7 +57,7 @@ import com.googlecode.n_orm.utils.LongAdder;
  * As an example, if a persisting element is stored at time t1, changed and stored again at time t2
  * such that t2-t1 is less than the {@link #getWriteRetentionMs() retention time}, only one store request
  * is issued to the {@link #getActualStore() actual store}, after t1+{@link #getWriteRetentionMs() retention time}.</p>
- * <p>Reads (as {@link #get(MetaInformation, String, String, Set)}, {@link PersistingElement#activate(Object[])})
+ * <p>Reads (as {@link #get(MetaInformation, String, String, Set)}, {@link PersistingElement#activate(String...)})
  * do not explore data "retended" here. As a example, activating, changing, storing, and then
  * activating again a persisting element using this kind of store can re-activate it as it was before the change.
  * Same remark holds for testing an element of existence, counting element, or getting a list of elements
@@ -93,7 +95,7 @@ public class WriteRetentionStore extends DelegatingStore {
 	/**
 	 * Number of requests currently being sending
 	 */
-	private static final LongAdder requestsBeingSending = new LongAdder();
+	private static final AtomicLong requestsBeingSending = new AtomicLong();
 	
 	/**
 	 * Whether or not hit ratio should be captured
@@ -129,6 +131,11 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * Thread responsible for dequeue
 	 */
 	private static final EvictionThread evictionThread;
+	
+	/**
+	 * Maximum global number of threads used for sending requests to store
+	 */
+	private static volatile int MAX_SENDER_THREADS = 20;
 	
 	/**
 	 * Known stores
@@ -208,6 +215,33 @@ public class WriteRetentionStore extends DelegatingStore {
 	 */
 	public static void setEnabledForCurrentThread(boolean enabled) {
 		WriteRetentionStore.enabled.set(enabled);
+	}
+
+	/**
+	 * Maximum global number of threads used for sending requests to store ; default is 40.
+	 */
+	public static int getMaxSenderThreads() {
+		assert MAX_SENDER_THREADS > 0;
+		return MAX_SENDER_THREADS;
+	}
+
+	/**
+	 * Maximum global number of threads used for sending requests to store
+	 */
+	public static void setMaxSenderThreads(int maxSenderThreads) {
+		if (maxSenderThreads <= 0)
+			throw new IllegalArgumentException();
+		MAX_SENDER_THREADS = maxSenderThreads;
+	}
+
+	// For test purpose
+	/**
+	 * The approximate number of sending threads.
+	 * This number can be above {@link #getMaxSenderThreads()} in case it was recently set to a lower value.
+	 * @see ThreadPoolExecutor#getActiveCount()
+	 */
+	public static int getActiveSenderThreads() {
+		return evictionThread.sender.getActiveCount();
 	}
 
 	/**
@@ -349,7 +383,10 @@ public class WriteRetentionStore extends DelegatingStore {
 				return 1;
 			if (this == o)
 				return 0;
-			return this.h - o.h;
+			int ret = this.h - o.h;
+			if (ret != 0)
+				return ret;
+			return this.table.compareTo(o.table) + this.id.compareTo(o.id);
 		}
 		
 		@Override
@@ -374,6 +411,11 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * Last transaction that was sent, be it completed or not ; negative if not sent yet
 		 */
 		private volatile Long lastSentTransaction = null;
+		
+		/**
+		 * Whether this element is being sending
+		 */
+		private volatile boolean sending = false;
 
 		/**
 		 * Whether this request was sent and this request object must not be used anymore
@@ -424,11 +466,6 @@ public class WriteRetentionStore extends DelegatingStore {
 		 */
 		@Transient private volatile ConcurrentSkipListSet<Long> deletions = new ConcurrentSkipListSet<Long>();
 		
-		/**
-		 * The time at which transaction was planned to be released
-		 */
-		@Transient private final ConcurrentNavigableMap<Long /* transaction */, Long /* out date */> outDates = new ConcurrentSkipListMap<Long, Long>();
-
 		private StoreRequest(RowInTable row) {
 			super();
 			this.row = row;
@@ -455,14 +492,9 @@ public class WriteRetentionStore extends DelegatingStore {
 			}
 
 			long ret = this.transactionDistributor.incrementAndGet();
-
-			if (captureHitRatio && this.outDateMs.get() != -1) {
-				Entry<Long, Long> old = outDates.floorEntry(ret);
-				assert old == null || old.getValue() != -1;
-				if (old == null || old.getValue() != this.outDateMs.get())
-					outDates.put(ret, this.outDateMs.get());
-			}
 			
+			assert this.lastSentTransaction == null || ret > this.lastSentTransaction;
+
 			return ret;
 		}
 
@@ -471,7 +503,9 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * 
 		 * @throws RequestIsOutException
 		 */
-		private void doneUpdate() throws RequestIsOutException {
+		private void doneUpdate(long transaction) throws RequestIsOutException {
+			assert this.lastSentTransaction == null || transaction > this.lastSentTransaction;
+			
 			this.sendLock.readLock().unlock();
 		}
 
@@ -496,7 +530,7 @@ public class WriteRetentionStore extends DelegatingStore {
 					}
 				}
 			} finally {
-				this.doneUpdate();
+				this.doneUpdate(transaction);
 			}
 		}
 
@@ -580,7 +614,7 @@ public class WriteRetentionStore extends DelegatingStore {
 					}
 				}
 			} finally {
-				this.doneUpdate();
+				this.doneUpdate(transactionId);
 			}
 		}
 
@@ -588,12 +622,9 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * Merging meta information
 		 */
 		private void addMeta(MetaInformation meta) {
-			if (meta != null) {
-				// Setting meta in case null
-				if (!this.meta.compareAndSet(null, meta)) {
-					// Or integrate it if it already exists
-					this.meta.get().integrate(meta);
-				}
+			if (meta != null && !this.meta.compareAndSet(null, meta)) {
+				// Or integrate it if it already exists
+				this.meta.get().integrate(meta);
 			}
 		}
 
@@ -665,56 +696,74 @@ public class WriteRetentionStore extends DelegatingStore {
 		 * @param flushing
 		 *            whether this send is a normal operation of a flush operation
 		 */
-		public void send(ExecutorService sender,
-				final LongAdder counter, final boolean flushing) {
-			// Can be sent by the eviction thread after a flush
-			if (this.dead) {
-				// No new transaction is ignored
-				assert transactionDistributor.get() <= (this.lastSentTransaction == null ? Long.MIN_VALUE : this.lastSentTransaction);
-				return;
-			}
+		public void send(ExecutorService sender, final boolean flushing) {
 			// Not sending this request before delay is expired unless we flush
 			assert flushing || this.outDateMs.get() <= System.currentTimeMillis();
 			long lastTransactionTmp;
 			Long lastSentTransaction;
+			long outDateTmp;
 			// A copy of the elements, deletes and meta to be sent now
 			ConcurrentMap<String, ConcurrentMap<String, ConcurrentNavigableMap<Long, Object>>> elements;
 			ConcurrentSkipListSet<Long> deletions;
 			MetaInformation metaTmp;
 			this.sendLock.writeLock().lock();
 			try {
-				// This code cannot be executed concurrently with an update
+				// This code cannot be executed concurrently with an update or another send start/stop
 				
+				outDateTmp = this.outDateMs.get();
+				if (!flushing)
+					this.outDateMs.set(-1);
+
 				lastTransactionTmp = transactionDistributor.get();
-				// Is it really necessary to send those elements ?
-				// Might not be the case if the element was flushed
-				if (this.lastSentTransaction != null && lastTransactionTmp <= this.lastSentTransaction) {
+				boolean shouldLeave = false;
+				if (this.sending) {
+					// Already sending ? (e.g. long flush just before) => giving up
+					shouldLeave = true;
+				
+				} else {
+					// Newer transaction was sent, giving up
+					if (this.lastSentTransaction != null && lastTransactionTmp <= this.lastSentTransaction) {
+						shouldLeave = true;
+					}
+				}
+				
+				if (shouldLeave) {
+					if (! flushing) {
+						// Replanning
+						try {
+							this.plan();
+						} catch (RequestIsOutException x) {
+							assert this.lastSentTransaction == null ? this.transactionDistributor.get() == Long.MIN_VALUE : this.lastSentTransaction == this.transactionDistributor.get();
+						}
+					}
 					return;
 				}
+				
+				// As from this line, there MUST be a send request
+				this.sending = true;
+				
 				lastSentTransaction = this.lastSentTransaction;
 				this.lastSentTransaction = lastTransactionTmp;
-				
+
+				// This request should be the one for this row
+				assert this == writesByRows.get(this.row);
 				// Preparing this request to be used while current status is being sent by resetting all
 				elements = this.elements;
 				this.elements = new ConcurrentHashMap<String, ConcurrentMap<String,ConcurrentNavigableMap<Long,Object>>>();
 				deletions = this.deletions;
 				this.deletions = new ConcurrentSkipListSet<Long>();
 				metaTmp = this.meta.getAndSet(null);
+				requestsBeingSending.incrementAndGet();
 				
-				// As from this line, there MUST be a send request
-				this.outDateMs.set(-1);
 			} finally {
 				this.sendLock.writeLock().unlock();
 			}
 			final MetaInformation meta = metaTmp;
 			final long lastTransaction = lastTransactionTmp;
-			
-			// This request should be the one for this row
-			assert this == writesByRows.get(this.row);
+			final long outDate = outDateTmp;
 
 			// The action to be ran for sending this request
 			Runnable action;				
-			counter.increment();
 			try {
 				
 				// As from this line, we are not considering transactions later than lastTransaction
@@ -805,12 +854,6 @@ public class WriteRetentionStore extends DelegatingStore {
 				assert lastDeletion == null || lastTransaction >= lastDeletion;
 				assert lastTransaction >= lastStore;
 				
-				// Capturing planned out date in case of hit ratio computation
-				boolean captureHitRatio = WriteRetentionStore.captureHitRatio;
-				final Long plannedMs = captureHitRatio ? this.outDates.get(lastTransaction) : null;
-				if (captureHitRatio)
-					this.outDates.headMap(lastTransaction, true).clear();
-	
 				// Sending using the executor
 				// Checking whether it's a store or a delete
 				if (lastDeletion == null || lastDeletion < lastStore) {
@@ -824,25 +867,28 @@ public class WriteRetentionStore extends DelegatingStore {
 						@Override
 						public void run() {
 							try {
-								if (!flushing && plannedMs != null && plannedMs > 0) {
-									requestsLatencySamples.increment();
-									long delay = System.currentTimeMillis()-plannedMs;
-									requestsCumulativeLatency.add(delay);
+								try {
+									if (!flushing && outDate != -1) {
+										requestsLatencySamples.increment();
+										long delay = System.currentTimeMillis()-outDate;
+										assert delay > 0;
+										requestsCumulativeLatency.add(delay);
+									}
+								} finally {
+								
+									// Deleting all cells if necessary
+									if (shouldDelete)
+										getActualStore().delete(meta, row.table, row.id);
+									
+									getActualStore().storeChanges(meta, row.table, row.id,
+											changes, removed, increments);
 								}
-								
-								// Deleting all cells if necessary
-								if (shouldDelete)
-									getActualStore().delete(meta, row.table, row.id);
-								
-								getActualStore().storeChanges(meta, row.table, row.id,
-										changes, removed, increments);
 								
 							} catch (RuntimeException x) {
 								logger.log(Level.WARNING, "Catched problem while updating " + StoreRequest.this + " ; some data might have been lost: " + x.getMessage(), x);
 								throw x;
 							} finally {
-								counter.decrement();
-								requestSent(lastTransaction);
+								requestSent(flushing, lastTransaction);
 							}
 						}
 					};
@@ -852,82 +898,111 @@ public class WriteRetentionStore extends DelegatingStore {
 						@Override
 						public void run() {
 							try {
-								if (!flushing && plannedMs != null && plannedMs > 0) {
-									requestsLatencySamples.increment();
-									long delay = System.currentTimeMillis()-plannedMs;
-									requestsCumulativeLatency.add(delay);
-								}
+								try {
+									if (!flushing && outDate != -1) {
+										requestsLatencySamples.increment();
+										long delay = System.currentTimeMillis()-outDate;
+										assert delay > 0;
+										requestsCumulativeLatency.add(delay);
+									}
+								} finally {
 								
-								getActualStore().delete(meta, row.table, row.id);
+									getActualStore().delete(meta, row.table, row.id);
+								}
 							} catch (RuntimeException x) {
 								logger.log(Level.WARNING, "Catched problem while deleting " + StoreRequest.this + " ; some data might have been be lost: " + x.getMessage(), x);
 								throw x;
 							} finally {
-								counter.decrement();
-								requestSent(lastTransaction);
+								requestSent(flushing, lastTransaction);
 							}
 						}
 					};
 				}
 			
 			} catch (Throwable r) {
-				counter.decrement();
+				requestsBeingSending.decrementAndGet();
 				throw r instanceof RuntimeException ? (RuntimeException)r : new RuntimeException(r);
 			}
 			
 			if (sender == null)
 				action.run();
-			else
+			else {
 				sender.submit(action);
+			}
 		}
 		
 		/**
 		 * Called once request was actually sent
-		 * @param lastTransactionBeforeSending 
+		 * @param lastTransactionBeforeSending the sent transaction
+		 * @param expectedOutDate time at which request was planned ; null in case of a flush
 		 */
-		private void requestSent(long lastTransactionBeforeSending) {
+		private void requestSent(boolean afterFlush, long lastTransactionBeforeSending) {
+			long rbs = requestsBeingSending.decrementAndGet();
 			if (captureHitRatio)
 				requestsOut.increment();
-			long delay = System.currentTimeMillis() - this.outDateMs.get();
-			assert this.lastSentTransaction >= lastTransactionBeforeSending;
+			assert this.lastSentTransaction == lastTransactionBeforeSending;
+			assert this.sending;
 			this.sendLock.writeLock().lock();
 			try {
-				// It's last sent transaction that should check whether this element should be back in the queue
-				if (lastTransactionBeforeSending < this.lastSentTransaction) {
-					return;
-				}
+				this.sending = false;
+
 				// No update can happen when executing this section
 				if (this.transactionDistributor.get() > this.lastSentTransaction) {
 					// This request is THE only request for its row
 					assert this == writesByRows.get(this.row);
-					// A transaction happened while sending ; re-planning
-					this.plan();
-					logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " after a delay of " + delay + "ms replanned for " + new Date(this.outDateMs.get()));
+					
+					if (!afterFlush) {
+						// A transaction happened while sending ; re-planning
+						try {
+							this.plan();
+							logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " replanned for " + new Date(this.outDateMs.get()));
+						} catch (RequestIsOutException x) {
+							// We are the only process authorized to try to plan at this point
+							// (indeed, this store request is still indexed by writesByRows)
+							assert false;
+						}
+					}
 				} else {
 					// No transaction happened ; killing this object and releasing memory
-					this.dead = true;
-					StoreRequest s = writesByRows.remove(this.row);
-					// This request was THE only request for its row
-					assert this == s;
-					logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " after a delay of " + delay + "ms");
+					this.close();
 				}
 				
 			} finally {
 				this.sendLock.writeLock().unlock();
+				if (evictionThread.waiting && rbs < getMaxSenderThreads())
+					synchronized(evictionThread) {
+						if (evictionThread.waiting && rbs < getMaxSenderThreads())
+							evictionThread.notify();
+					}
 			}
+		}
+		
+		/**
+		 * Closing request definitively ; MUST be invoked within a write lock
+		 */
+		private void close() {
+			assert this.sendLock.writeLock().isHeldByCurrentThread();
+			this.dead = true;
+			StoreRequest s = writesByRows.remove(this.row);
+			// This request was THE only request for its row
+			assert this == s;
+			logger.fine(this.toString() + " sent on " + new Date(System.currentTimeMillis()) + " and not replanned");
 		}
 
 		/**
 		 * Computing next update and registering in the delay queue
 		 */
-		public void plan() {
-			// Cannot plan if this request is out
-			assert !this.dead;
+		private void plan() throws RequestIsOutException {
+			// Cannot plan if this request is out of indexed requests
+			if (this.dead)
+				throw new RequestIsOutException();
 
 			long nextExecutionDate = WriteRetentionStore.this.writeRetentionMs + System.currentTimeMillis();
 			if (this.outDateMs.compareAndSet(-1, nextExecutionDate)) {
 				writeQueue.put(this);
 			} else {
+				// Request should already be planned
+				// Checking this only in case of assertion as it's costly
 				assert writeQueue.contains(this);
 			}
 		}
@@ -954,18 +1029,25 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * live. A shutdown hook sends all pending requests.
 	 */
 	private static class EvictionThread extends Thread {
-		private final ExecutorService sender = Executors.newCachedThreadPool(new ThreadFactory() {
+		private final ThreadPoolExecutor sender = new ThreadPoolExecutor(1, Integer.MAX_VALUE,
+                5L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(), new ThreadFactory() {
 			
 			@Override
 			public Thread newThread(Runnable r) {
-				Thread ret = new Thread(r, "n-orm write cache sender");
+				int cps = sender.getCorePoolSize();
+				assert cps <= WriteRetentionStore.getMaxSenderThreads() :
+					"Too many sender threads running (found " + cps + " instead of " + WriteRetentionStore.getMaxSenderThreads() + ')';
+				
+				Thread ret = new Thread(r, "n-orm write cache sender #" + cps);
 				ret.setDaemon(false);
+				
 				return ret;
 			}
 		});
 
 		private volatile boolean alreadyStarted = false;
 		private volatile boolean running = true;
+		private volatile boolean waiting = true;
 		
 		private EvictionThread() {
 			super("n-orm write cache eviction thread");
@@ -1010,10 +1092,7 @@ public class WriteRetentionStore extends DelegatingStore {
 							Iterator<StoreRequest> it = writeQueue.iterator();
 							removed = it.hasNext();
 							while (it.hasNext()) {
-								it.next()
-										.send(	sender,
-												requestsBeingSending,
-												true);
+								it.next().send(sender, true);
 								it.remove();
 							}
 						} while (removed);
@@ -1042,12 +1121,21 @@ public class WriteRetentionStore extends DelegatingStore {
 			while (this.running) {
 				StoreRequest r = null;
 				try {
+					while (requestsBeingSending.get() >= getMaxSenderThreads()) {
+						synchronized(this) {
+							if (requestsBeingSending.get() >= getMaxSenderThreads()) {
+								this.waiting = true;
+								this.wait(100);
+								this.waiting = false;
+							}
+						}
+					}
 					r = writeQueue.take();
 					// Requests in preparation of sending are marked twice so that a "0" is
 					// a bit less likely to be a false 0
-					requestsBeingSending.increment();
-					r.send(this.sender, requestsBeingSending, false);
-					requestsBeingSending.decrement();
+					requestsBeingSending.incrementAndGet();
+					r.send(this.sender, false);
+					requestsBeingSending.decrementAndGet();
 				} catch (InterruptedException e) {
 				} catch (Throwable e) {
 					if (r == null) {
@@ -1142,7 +1230,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		RowInTable row = new RowInTable(table, identifier);
 		StoreRequest req = this.writesByRows.get(row);
 		if (req != null) {
-			req.send(null, requestsBeingSending, true);
+			req.send(null, true);
 			return true;
 		} else
 			return false;
@@ -1214,15 +1302,15 @@ public class WriteRetentionStore extends DelegatingStore {
 		while(true) {
 			StoreRequest req = new StoreRequest(element);
 			StoreRequest tmp = writesByRows.putIfAbsent(element, req);
-			if (tmp == null) {
-				// req was added ; should also be put in the delay queue
-				req.plan();
-				logger.fine("Request planned for " + table + ':' + id + " on " + System.currentTimeMillis() + " by " + req);
-			} else {
-				// Another thread added request for this element before us
-				req = tmp;
-			}
 			try {
+				if (tmp == null) {
+					// req was added ; should also be put in the delay queue
+					req.plan();
+					logger.fine("Request planned for " + table + ':' + id + " on " + System.currentTimeMillis() + " by " + req);
+				} else {
+					// Another thread added request for this element before us
+					req = tmp;
+				}
 				r.run(req);
 				// Request is planned and merged ; leaving the infinite loop
 				break;

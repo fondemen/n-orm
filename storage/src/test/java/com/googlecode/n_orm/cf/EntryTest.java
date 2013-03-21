@@ -5,15 +5,18 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.collections.keyvalue.AbstractTestMapEntry;
-import org.apache.commons.collections.set.AbstractTestSet;
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
-import com.googlecode.n_orm.cf.MapTest.Element;
 
+@SuppressWarnings("rawtypes")
 public class EntryTest extends AbstractTestMapEntry {
 	@Persisting
 	public static class Element {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -2337859385628053298L;
 		@Key
 		public String key;
 		public MapColumnFamily<String, String> elements = new MapColumnFamily<String, String>();
@@ -60,6 +63,7 @@ public class EntryTest extends AbstractTestMapEntry {
         return makeKnownMapEntry("key", "value");
     }
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public void testAccessorsAndMutators() {
         Map.Entry entry = makeMapEntry(key, value);
@@ -70,6 +74,7 @@ public class EntryTest extends AbstractTestMapEntry {
         assertTrue(entry.getValue() == value);
     }
 	
+	@SuppressWarnings("unchecked")
 	@Override
     public void testSelfReferenceHandling() {
         // test that #setValue does not permit

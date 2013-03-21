@@ -7,7 +7,7 @@ import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 import com.googlecode.n_orm.storeapi.Row;
 
 /**
- * Sent while performing {@link StorageManagement#processElements(Class, com.googlecode.n_orm.storeapi.Constraint, Process, int, String[], int, long)} or {@link SearchableClassConstraintBuilder#forEach(Process, int, long)}
+ * Sent while performing {@link com.googlecode.n_orm.operations.Process#processElements(Class, com.googlecode.n_orm.storeapi.Constraint, Process, int, String[], int, ProcessCanceller, java.util.concurrent.ExecutorService)} or {@link SearchableClassConstraintBuilder#forEach(Process)}
  * in case process sent an exception.<br>
  * Message reports the first encountered exception.
  *
@@ -89,10 +89,16 @@ public class ProcessException extends Exception {
 		this.problems = problems;
 		this.otherExceptions = otherExceptions;
 	}
+	
+	/**
+	 * The report to which this exception belongs
+	 */
+	public ProcessReport<? extends PersistingElement> getRetport() {
+		return this.report;
+	}
 
 	/**
 	 * The list of exception sent and their corresponding element, that is the element that was under processing while running the process.
-	 * @return
 	 */
 	public List<Problem> getProblems() {
 		return problems;
@@ -100,7 +106,6 @@ public class ProcessException extends Exception {
 
 	/**
 	 * The process in which the problem(s) appeared.
-	 * @return
 	 */
 	public Process<? extends PersistingElement> getProcess() {
 		return process;
@@ -108,7 +113,6 @@ public class ProcessException extends Exception {
 
 	/**
 	 * The list of exceptions not linked to a particular element.
-	 * @return
 	 */
 	public List<Throwable> getOtherExceptions() {
 		return otherExceptions;

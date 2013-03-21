@@ -33,7 +33,7 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 
 public aspect PropertyManagement {
 	private static PropertyManagement INSTANCE;
-	
+
 	public static PropertyManagement getInstance() {
 		if (INSTANCE == null)
 			INSTANCE = aspectOf();

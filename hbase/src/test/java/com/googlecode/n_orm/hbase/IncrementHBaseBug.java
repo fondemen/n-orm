@@ -4,25 +4,15 @@ import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.Properties;
 import java.util.TreeMap;
 import java.util.UUID;
 
-import org.apache.hadoop.hbase.HBaseTestingUtility;
-import org.apache.hadoop.hbase.HConstants;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import com.googlecode.n_orm.BookStore;
-import com.googlecode.n_orm.Key;
-import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.SimpleStorageTest;
-import com.googlecode.n_orm.StorageManagement;
-import com.googlecode.n_orm.StoreSelector;
-import com.googlecode.n_orm.StoreTestLauncher;
 import com.googlecode.n_orm.conversion.ConversionTools;
 
 public class IncrementHBaseBug {
@@ -32,7 +22,6 @@ public class IncrementHBaseBug {
 	private static String testKey;
 	private static String testIncrCF = "icf";
 	private static String testIncrC = "ic";
-	private static HBaseTestingUtility hBaseServer;
 
 	@BeforeClass
 	public static void startCluster() throws Exception {
@@ -130,7 +119,7 @@ public class IncrementHBaseBug {
 	
 	@Test
 	public void testWithElement() {
-		SimpleStorageTest.IncrementingElement elt = new SimpleStorageTest.IncrementingElement(this.testKey);
+		SimpleStorageTest.IncrementingElement elt = new SimpleStorageTest.IncrementingElement(testKey);
 		elt.setStore(store);
 		
 		elt.ival++;
@@ -138,13 +127,13 @@ public class IncrementHBaseBug {
 		
 		elt.delete();
 
-		elt = new SimpleStorageTest.IncrementingElement(this.testKey);
+		elt = new SimpleStorageTest.IncrementingElement(testKey);
 		elt.setStore(store);
 		
 		elt.ival++;
 		elt.store();
 
-		elt = new SimpleStorageTest.IncrementingElement(this.testKey);
+		elt = new SimpleStorageTest.IncrementingElement(testKey);
 		elt.setStore(store);
 		elt.activate();
 		assertEquals(1, elt.ival);
@@ -153,7 +142,7 @@ public class IncrementHBaseBug {
 	@Ignore
 	@Test
 	public void testWithElementWithFlush() throws IOException, InterruptedException {
-		SimpleStorageTest.IncrementingElement elt = new SimpleStorageTest.IncrementingElement(this.testKey);
+		SimpleStorageTest.IncrementingElement elt = new SimpleStorageTest.IncrementingElement(testKey);
 		elt.setStore(store);
 		
 		elt.ival++;
@@ -162,13 +151,13 @@ public class IncrementHBaseBug {
 		store.getAdmin().flush(elt.getTable());
 		elt.delete();
 
-		elt = new SimpleStorageTest.IncrementingElement(this.testKey);
+		elt = new SimpleStorageTest.IncrementingElement(testKey);
 		elt.setStore(store);
 		
 		elt.ival++;
 		elt.store();
 
-		elt = new SimpleStorageTest.IncrementingElement(this.testKey);
+		elt = new SimpleStorageTest.IncrementingElement(testKey);
 		elt.setStore(store);
 		elt.activate();
 		assertEquals(1, elt.ival);
@@ -176,19 +165,19 @@ public class IncrementHBaseBug {
 	
 	@Test
 	public void testWithElementWithRestart() throws IOException, InterruptedException {
-		this.testKey = "testflush";
-		SimpleStorageTest.IncrementingElement elt = new SimpleStorageTest.IncrementingElement(this.testKey);
+		testKey = "testflush";
+		SimpleStorageTest.IncrementingElement elt = new SimpleStorageTest.IncrementingElement(testKey);
 		elt.setStore(store);
 		
 		elt.ival++;
 		elt.store();
 
-		elt = new SimpleStorageTest.IncrementingElement(this.testKey);
+		elt = new SimpleStorageTest.IncrementingElement(testKey);
 		elt.setStore(store);
 		elt.activate();
 		assertEquals(1, elt.ival);
 
-		elt = new SimpleStorageTest.IncrementingElement(this.testKey);
+		elt = new SimpleStorageTest.IncrementingElement(testKey);
 		elt.setStore(store);
 		elt.delete();
 	}

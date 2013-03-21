@@ -9,6 +9,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingMixin;
 
 /**
  * A cache for temporarily storing {@link PersistingElement}s.<br>
@@ -62,14 +63,14 @@ public class Cache {
 							}
 						} else {
 							cache = perThreadCaches.get(t);
-							if (cache == null) {
-								//Nothing to do ; cache is gone
-							} else if (cache.cache != null && cache.stopped == -1) {
-								cache.shouldCleanup = true;
-							} else {
-								assert false;
-								synchronized(perThreadCaches) {
-									perThreadCaches.remove(t);
+							if (cache != null) {
+								if (cache.cache != null && cache.stopped == -1) {
+									cache.shouldCleanup = true;
+								} else {
+									assert false;
+									synchronized(perThreadCaches) {
+										perThreadCaches.remove(t);
+									}
 								}
 							}
 						}
@@ -303,9 +304,9 @@ availableCachesCheck:while (ai.hasNext()) {
 		}
 	}
 	
-	private Map<String, Element> cache;
-	private Thread thread;
-	private String threadId;
+	private volatile Map<String, Element> cache;
+	private volatile Thread thread;
+	private volatile String threadId;
 	private volatile boolean shouldCleanup;
 	private volatile long stopped = -1;
 
@@ -402,6 +403,21 @@ availableCachesCheck:while (ai.hasNext()) {
 	}
 	
 	/**
+	 * Removes an element in the cache given by its full identifier.<br>
+	 * Only thread for this cache has access to this method.<br>
+	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).<br>
+	 * @param fullIdentifier the full id of the element to be uncached
+	 * @throws IllegalStateException in case this thread is not the thread for this cache
+	 */
+	public void unregister(String fullIdentifier) throws IllegalStateException {
+		this.checkState();
+		
+		if (this.cache.remove(fullIdentifier) != null) {
+			logger.finer("Unregistered element with " + PersistingMixin.getInstance().identifierToString(fullIdentifier) + " for thread " + this.thread + " with id " + threadId);
+		}
+	}
+	
+	/**
 	 * Finds an element in the cache according to its full identifier.<br>
 	 * Only thread for this cache has access to this method.<br>
 	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).<br>
@@ -426,7 +442,7 @@ availableCachesCheck:while (ai.hasNext()) {
 	 * Only thread for this cache has access to this method.<br>
 	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).<br>
 	 * @param identifier the full identifier of the element to be cached; null if not found
-	 * @param clazz the class that the element instantiates (see {@link Object#getClass())}; null if not found
+	 * @param clazz the class that the element instantiates (see {@link Object#getClass()}; null if not found
 	 * @throws IllegalStateException in case this thread is not the thread for this cache
 	 * @see PersistingElement#getIdentifier()
 	 */
@@ -437,7 +453,6 @@ availableCachesCheck:while (ai.hasNext()) {
 	/**
 	 * The size of the cache.
 	 * This method checks elements for their time to live regardless the cache is marked for that or not.
-	 * @return
 	 */
 	public int size() {
 		this.cleanInvalidElements();
