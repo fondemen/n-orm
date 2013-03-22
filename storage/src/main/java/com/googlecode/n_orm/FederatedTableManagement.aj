@@ -1373,7 +1373,9 @@ public aspect FederatedTableManagement {
 										String post = post1;
 										final String id = r1.getKey();
 										// Expected data ; empty if no family expected, otherwise to be grabbed from the (actual) store
-										final ColumnFamilyData data = families == null ? new DefaultColumnFamilyData() : store.get(meta, table+post, id, families);
+										final ColumnFamilyData data =
+											families == null ? new DefaultColumnFamilyData()
+											: store.get(meta.withPostfixedTable(table, post), table+post, id, families);
 										return new RowWithTable(table, post,
 												new Row() {
 													
