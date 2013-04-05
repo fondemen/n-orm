@@ -6,6 +6,7 @@ import java.util.Set;
 
 import com.googlecode.n_orm.CloseableIterator;
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Row;
 
@@ -14,13 +15,17 @@ import com.googlecode.n_orm.storeapi.Row;
  * {@link CloseableIterator}s. Elements are selected from composed iterators
  * so that they are iterated
  * {@link PersistingElement#compareTo(PersistingElement) in an ordered way}.
+ * In case an element with same id is found from different iterators, an
+ * {@link IllegaleStateException exception} is thrown, unless
+ * {@link #merge(Row, CloseableKeyIterator, Row, CloseableKeyIterator)}
+ * is overridden.
  */
 public class AggregatingIterator implements CloseableKeyIterator {
 
 	/**
 	 * A pointer on a composed iterator..
 	 */
-	private static class IteratorStatus {
+	private class IteratorStatus {
 		/**
 		 * The result of an iterated element. The iterated element is
 		 * considered as iterated over only when
@@ -51,6 +56,14 @@ public class AggregatingIterator implements CloseableKeyIterator {
 			 */
 			private String getKey() {
 				return IteratorStatus.this.next.getKey();
+			}
+			
+			/**
+			 * The {@link IteratorStatus} to which this result belongs
+			 * @return
+			 */
+			private IteratorStatus getIteratorStatus() {
+				return IteratorStatus.this;
 			}
 		}
 
@@ -121,10 +134,25 @@ public class AggregatingIterator implements CloseableKeyIterator {
 
 			assert this.next != null;
 
-			if (r == null || this.next.getKey().compareTo(r.getKey()) < 0) {
+			if (r == null) {
 				return new ResultReadyToGo();
 			} else {
-				return r;
+				int cmp = this.next.getKey().compareTo(r.getKey());
+				if (cmp == 0) {
+					try {
+						this.next = AggregatingIterator.this.merge(this.next, this.it, r.getResult(), r.getIteratorStatus().it);
+					} catch (RuntimeException x) {
+						throw x;
+					} catch (Exception x) {
+						throw new RuntimeException(x);
+					}
+					r.getIteratorStatus().next = null;
+					return new ResultReadyToGo();
+				} else if (cmp < 0) {
+					return new ResultReadyToGo();
+				} else /*if (cmp > 0)*/ {
+					return r;
+				}
 			}
 		}
 
@@ -197,5 +225,12 @@ public class AggregatingIterator implements CloseableKeyIterator {
 	public void remove() {
 		throw new UnsupportedOperationException();
 	}
-
+	
+	public Row merge(Row r1, CloseableKeyIterator it1, Row r2, CloseableKeyIterator it2) throws Exception {
+		throw new IllegalStateException("Found element with same key "
+				+ PersistingMixin.getInstance().identifierToString(r1.getKey())
+				+ " from different iterators: "
+				+ it1.toString()
+				+ " and " + it2.toString());
+	}
 }

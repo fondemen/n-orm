@@ -15,4 +15,8 @@ public class DatabaseNotReachedException extends RuntimeException {
 		super("Could not reach database: " + cause);
 	}
 
+	public DatabaseNotReachedException(final String cause, final Throwable throwable) {
+		super("Could not reach database: " + cause, throwable);
+	}
+
 }

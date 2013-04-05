@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
@@ -44,7 +43,7 @@ public class SharedExclusiveLock {
      */
     private String EXLOCK = "exlock-";
 
-    private RecoverableZooKeeper zooKeeper;
+    private ZooKeeper zooKeeper;
     private String lockPath;
     private String writeLockPrefix;
     private String readLockPrefix;
@@ -59,8 +58,8 @@ public class SharedExclusiveLock {
     
     private Thread currentThread;
 
-    public SharedExclusiveLock(RecoverableZooKeeper zk, String lockPath) {
-        this.zooKeeper = zk;
+    public SharedExclusiveLock(ZooKeeper zooKeeper, String lockPath) {
+        this.zooKeeper = zooKeeper;
         this.lockPath = lockPath;
         this.writeLockPrefix = lockPath + "/" + EXLOCK;
         this.readLockPrefix = lockPath + "/" + SHLOCK;
@@ -95,13 +94,13 @@ public class SharedExclusiveLock {
     }
     
     /* ADDED by F.Fondement */
-    public RecoverableZooKeeper getZookeeper() {
+    public ZooKeeper getZookeeper() {
     	return this.zooKeeper;
     }
 
     
     /* ADDED by F.Fondement */
-    public void setZookeeper(RecoverableZooKeeper zk) {
+    public void setZookeeper(ZooKeeper zk) {
     	this.zooKeeper = zk;
     }
 

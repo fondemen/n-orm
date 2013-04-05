@@ -20,6 +20,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.hbase.HBaseLauncher;
 import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
@@ -435,6 +436,16 @@ public class ConcurrentTest {
 	@Test(expected=Test.None.class)
 	public void connectionClosedAfterRestart() throws SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
 
+		String datum = "fyukg,huom,jio,";
+		String key = "aprop";
+		ColumnFamilyData change = new DefaultColumnFamilyData();
+		Map<String, byte[]> propChange = new TreeMap<String, byte[]>();
+		propChange.put(key, ConversionTools.convert(datum));
+		change.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, propChange );
+		store1.storeChanges(null, "t1", "row", change , null, null);
+		assertTrue(store1.exists(null, "t1", "row"));
+		Map<String, byte[]> out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		assertEquals(datum, ConversionTools.convert(String.class, out.get(key)));
 		store1.restart();
 		
 		HConnection cm = store1.getAdmin().getConnection();
@@ -442,7 +453,32 @@ public class ConcurrentTest {
 		closeM.setAccessible(true);
 		closeM.invoke(cm, true);
 		
-		store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		assertEquals(datum, ConversionTools.convert(String.class, out.get(key)));
+		
+		assertTrue(store1.exists(null, "t1", "row"));
+	}
+	
+	@Test(expected=Test.None.class)
+	public void connectionClosedBeforeRestart() throws SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+
+		store1.restart();
+		String datum = "fyukg,huom,jio,";
+		String key = "aprop";
+		ColumnFamilyData change = new DefaultColumnFamilyData();
+		Map<String, byte[]> propChange = new TreeMap<String, byte[]>();
+		propChange.put(key, ConversionTools.convert(datum));
+		change.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, propChange );
+		store1.storeChanges(null, "t1", "row", change , null, null);
+		assertTrue(store1.exists(null, "t1", "row"));
+		
+		HConnection cm = store1.getAdmin().getConnection();
+		Method closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
+		closeM.setAccessible(true);
+		closeM.invoke(cm, true);
+		
+		Map<String, byte[]> out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		assertEquals(datum, ConversionTools.convert(String.class, out.get(key)));
 		
 		assertTrue(store1.exists(null, "t1", "row"));
 	}

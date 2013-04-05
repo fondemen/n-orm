@@ -1,10 +1,6 @@
 package com.googlecode.n_orm;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.util.NavigableSet;
 
@@ -18,7 +14,7 @@ import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
 import com.googlecode.n_orm.storeapi.Store;
 
 public class FederatedTablesTest {
-	public static final String key = "akey";
+	public static final String key = "keym";
 	
 	public FederatedTablesTest() throws Exception {
 		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
@@ -49,9 +45,27 @@ public class FederatedTablesTest {
 				elt.delete();
 				ok = !elt.existsInStore();
 			} catch (AssertionError x) { // Is element still exists
+				x.printStackTrace();
 				ok = false;
 			}
 		} while (!ok);
+
+		// Mandatory as we are using different data stores for the same class in
+		// this test case
+		FederatedTableManagement.clearAlternativesCache();
+	}
+	
+	@Before
+	public void cleanupElement() {
+		MergableElement e = new MergableElement();
+		e.key = key;
+		do {
+			try {
+				e.delete();
+			} catch (AssertionError x) {}
+			e = new MergableElement();
+			e.key = key;
+		} while (e.existsInStore());
 
 		// Mandatory as we are using different data stores for the same class in
 		// this test case
@@ -138,9 +152,9 @@ public class FederatedTablesTest {
 		elt2.activate();
 
 		assertEquals(elt.arg, elt2.arg);
-		// One query to register the alternative table
-		// Another to find where the element is
-		// And a last one to actually store the element
+		// 1: checking for tpost existence
+		// 2: updating alternatives table
+		// 3: activating
 		assertEquals(3, Memory.INSTANCE.getQueriesAndReset());
 		assertEquals("tpost", elt2.getActualTable());
 	}
@@ -156,12 +170,11 @@ public class FederatedTablesTest {
 		elt.post = "post";
 		elt.arg = "a value";
 		elt.activate();
-		// 1: testing table tpost
-		// 2: testing table t
-		// 3: updating alternative tables from base
-		// 4: checking for legacy table
+		// 1: checking in tpost (not found)
+		// 2: updating alternative tables from base
+		// 3: testing table t existence (not found)
 		// No more table to test, does not exists, no activation
-		assertEquals(4, Memory.INSTANCE.getQueriesAndReset());
+		assertEquals(3, Memory.INSTANCE.getQueriesAndReset());
 
 		Element elt2 = new Element();
 		elt2.setStore(SimpleStoreWrapper.getWrapper(Memory.INSTANCE));
@@ -169,11 +182,11 @@ public class FederatedTablesTest {
 		elt2.post = "postHGHJKNHJKHJK";
 		elt2.activate();
 
-		// 1: testing table tpostHGHJKNHJKHJK
-		// 2: testing table t
+		// 1: testing for table tpostHGHJKNHJKHJK existence
+		// 2: testing table t -> NO: we already know from before whether table t exists
 		// Not updating tables from base
 		// No more table to test, does not exists, no activation
-		assertEquals(2, Memory.INSTANCE.getQueriesAndReset());
+		assertEquals(1, Memory.INSTANCE.getQueriesAndReset());
 	}
 
 	@Test
@@ -189,11 +202,10 @@ public class FederatedTablesTest {
 		elt.arg = "a value";
 		elt.activate();
 		// 1: testing table tpost
-		// 2: testing table t
-		// 3: updating alternative tables from base
-		// 4: checking for legacy table
+		// 2: updating alternative tables from base
+		// 3: checking for legacy table
 		// No more table to test, does not exists, no activation
-		assertEquals(4, Memory.INSTANCE.getQueriesAndReset());
+		assertEquals(3, Memory.INSTANCE.getQueriesAndReset());
 
 		long initialTTL = FederatedTableManagement
 				.getTableAlternativeCacheTTLInS();
@@ -210,11 +222,10 @@ public class FederatedTablesTest {
 
 			assertEquals(elt.arg, elt2.arg);
 			// 1: testing table tljs,dcfzklfzk
-			// 2: testing table t
-			// 3: updating alternative tables from store
-			// 4: checking for legacy table
+			// 2: updating alternative tables from store
+			// 3: checking for legacy table
 			// Not found, giving up
-			assertEquals(4, Memory.INSTANCE.getQueriesAndReset());
+			assertEquals(3, Memory.INSTANCE.getQueriesAndReset());
 		} finally {
 			FederatedTableManagement.setTableAlternativeCacheTTLInS(initialTTL);
 		}
@@ -289,7 +300,7 @@ public class FederatedTablesTest {
 
 	@Test
 	public void gettingFromKnownTable() {
-		Memory.INSTANCE.resetQueries();
+		Memory.INSTANCE.reset();
 		FederatedTableManagement.clearAlternativesCache();
 
 		Element elt = new Element();
@@ -569,11 +580,12 @@ public class FederatedTablesTest {
 		celt.key = elt.key;
 		assertTrue(celt.existsInStore());
 
+		elt.getStore().delete(null, "tpost1", elt.getIdentifier());
+			
 		try {
-			elt.delete();
-		} catch (AssertionError x) {
-		}
-		assertTrue(elt.existsInStore()); // Found back from tpost2
+			assertFalse(elt.existsInStore()); // Deleted but found back from tpost2 ; can't change postfix
+			//fail("Changed postfix");
+		} catch (Exception x) {}
 		assertTrue(celt.existsInStore());
 		assertTrue(elt2.existsInStore());
 
@@ -672,6 +684,9 @@ public class FederatedTablesTest {
 
 		elt.store();
 
+		// Forces cache update
+		FederatedTableManagement.clearAlternativesCache();
+
 		Element elt2 = new Element();
 		elt2.key = key;
 		elt2.post = "post";
@@ -688,6 +703,9 @@ public class FederatedTablesTest {
 
 		elt.store();
 
+		// Forces cache update
+		FederatedTableManagement.clearAlternativesCache();
+
 		Element elt2 = new Element();
 		elt2.key = key;
 		elt2.post = "post";
@@ -702,6 +720,9 @@ public class FederatedTablesTest {
 		elt.arg = "etrcauzjy";
 
 		elt.delete();
+
+		// Forces cache update
+		FederatedTableManagement.clearAlternativesCache();
 
 		Element elt2 = new Element();
 		elt2.key = key;
@@ -718,6 +739,9 @@ public class FederatedTablesTest {
 		elt.arg = "etrcauzjy";
 
 		elt.store();
+
+		// Forces cache update
+		FederatedTableManagement.clearAlternativesCache();
 
 		Element elt2 = new Element();
 		elt2.key = key;
@@ -1236,5 +1260,267 @@ public class FederatedTablesTest {
 		StorageManagement.findElements()
 				.ofClass(Element.class).withAtMost(1000).elements()
 				.inTableWithPostfix("post1").inTableWithPostfix("post2");
+	}
+	
+	@Test
+	public void elementInTwoDifferentFederatedTables() throws Exception {
+		Element e1 = new Element();
+		e1.key = key;
+		e1.post = "post";
+		e1.arg = "element in table 1";
+		e1.store();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		Element e2 = new Element();
+		e2.key = key;
+		e2.post = "post2";
+		e2.arg = "element in table 2";
+		e2.store();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		Element e = StorageManagement.findElements()
+				.ofClass(Element.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix("post")
+				.andActivate()
+				.any();
+		assertEquals("element in table 1", e.arg);
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		e = StorageManagement.findElements()
+				.ofClass(Element.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix("post2")
+				.andActivate()
+				.any();
+		assertEquals("element in table 2", e.arg);
+	}
+	
+	@Test(expected=DatabaseNotReachedException.class)
+	public void readInconsistencyDetected() throws Exception {
+		this.elementInTwoDifferentFederatedTables();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		StorageManagement.findElements()
+				.ofClass(Element.class)
+				.withKey("key").setTo(key)
+				.withAtMost(10).elements()
+				.go();
+		// Element is read consistent
+		// Data is both in table with postfixes post and post2
+		// We should end up in read consistency issue
+	}
+	
+	@Persisting(table = "t", federated = FederatedMode.RCONS)
+	public static class MergableElement implements PersistingElementOverFederatedTableWithMerge {
+		private static final long serialVersionUID = -6877770319760457398L;
+		@Key
+		public String key;
+		public String post;
+		public String arg;
+
+		public String getTablePostfix() {
+			return this.post;
+		}
+		
+		public void mergeWith(PersistingElementOverFederatedTableWithMerge elt) {
+			MergableElement melt = (MergableElement)elt; 
+			this.activateIfNotAlready();
+			((PersistingElement)elt).activateIfNotAlready();
+			if (this.arg == null || (melt.arg != null && melt.arg.compareTo(this.arg)>0))
+				this.arg = melt.arg;
+		}
+	}
+	
+	@Test
+	public void deleteInconsistentElement() throws Exception {
+		this.elementInTwoDifferentFederatedTables();
+		
+		this.cleanupElement();
+		
+		assertEquals(0, StorageManagement.findElements()
+				.ofClass(Element.class)
+				.count());
+	}
+	
+	@Test
+	public void readInconsistencyDetectedAndRepaired() throws Exception {
+		this.elementInTwoDifferentFederatedTables();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		NavigableSet<MergableElement> elts = StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.withAtMost(10).elements()
+				.go();
+		assertEquals(1, elts.size());
+		MergableElement elt = elts.first();
+		elt.activate();
+
+		// Longest arg wins
+		assertEquals("element in table 2", elt.arg);
+
+		//Can't be sure of the element that is to be selected
+		String selectedPost = elt.post;
+		String otherPost = selectedPost.equals("post") ? "post2" : "post";
+		
+		// Element in table with other postfix is removed
+		assertEquals(0, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix(otherPost)
+				.andActivate()
+				.count());
+		
+		KeyManagement.getInstance().unregister(elt);
+		assertEquals(elt, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix(selectedPost)
+				.andActivate()
+				.any());
+	}
+	
+	@Test
+	public void readInconsistencyDetectedAndRepairedWithActivation() throws Exception {
+		this.elementInTwoDifferentFederatedTables();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		NavigableSet<MergableElement> elts = StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.andActivate()
+				.withAtMost(10).elements()
+				.go();
+		assertEquals(1, elts.size());
+		MergableElement elt = elts.first();
+		
+		// Longest arg wins
+		assertEquals("element in table 2", elt.arg);
+
+		//Can't be sure of the element that is to be selected
+		String selectedPost = elt.post;
+		String otherPost = selectedPost.equals("post") ? "post2" : "post";
+		
+		// Element in table with other postfix is removed
+		assertEquals(0, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix(otherPost)
+				.andActivate()
+				.count());
+		
+		KeyManagement.getInstance().unregister(elt);
+		assertEquals(elt, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix(selectedPost)
+				.andActivate()
+				.any());
+	}
+	
+	@Test
+	public void readInconsistencyDetectedAndRepairedWithActivationInLargerList() throws Exception {
+		int inPost = 0;
+		int inPost2 = 0;
+		
+		for (char c = 'a' ; c < 'g' ; c++) {
+			Element e = new Element();
+			e.key = "key" + c;
+			if (((int)c) % 2 == 0) {
+				inPost++;
+				e.post = "post";
+			} else {
+				inPost2++;
+				e.post = "post2";
+			}
+			e.arg = Character.toString(c);
+			e.store();
+		}
+		
+		this.elementInTwoDifferentFederatedTables();
+		
+		for (char c = 'q' ; c < 'z' ; c++) {
+			Element e = new Element();
+			e.key = "key" + c;
+			if (((int)c) % 2 == 0) {
+				inPost++;
+				e.post = "post";
+			} else {
+				inPost2++;
+				e.post = "post2";
+			}
+			e.arg = Character.toString(c);
+			e.store();
+		}
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		NavigableSet<MergableElement> elts = StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.andActivate()
+				.withAtMost(10).elements()
+				.go();
+		assertEquals(1, elts.size());
+		MergableElement elt = elts.first();
+		
+		// Longest arg wins
+		assertEquals("element in table 2", elt.arg);
+
+		//Can't be sure of the element that is to be selected
+		String selectedPost = elt.post;
+		String otherPost = selectedPost.equals("post") ? "post2" : "post";
+		if (selectedPost.equals("post")) {
+			inPost++;
+		} else {
+			inPost2++;
+		}
+		
+		assertEquals(inPost, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.inTableWithPostfix("post")
+				.andActivate()
+				.count());
+		
+		assertEquals(inPost2, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.inTableWithPostfix("post2")
+				.andActivate()
+				.count());
+		
+		assertEquals(1, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix(selectedPost)
+				.andActivate()
+				.count());
+		
+		assertEquals(0, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.inTableWithPostfix(otherPost)
+				.andActivate()
+				.count());
+		
+		assertEquals(inPost + inPost2, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.andActivate()
+				.count());
+		
+		assertSame(elt, StorageManagement.findElements()
+				.ofClass(MergableElement.class)
+				.withKey("key").setTo(key)
+				.andActivate()
+				.withAtMost(1000).elements()
+				.any());
+		
+		KeyManagement.getInstance().unregister(elt);
 	}
 }
