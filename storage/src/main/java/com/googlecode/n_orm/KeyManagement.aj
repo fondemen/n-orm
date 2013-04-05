@@ -232,6 +232,16 @@ public aspect KeyManagement {
 		Cache.getCache().unregister(element);
 	}
 	
+	public void unregister(Class<? extends PersistingElement> clazz, String id) {
+		if (! id.endsWith(clazz.getName())) {
+			id = id + clazz.getName();
+		}
+		if (! id.endsWith("" + KEY_END_SEPARATOR + clazz.getName())) {
+			throw new IllegalArgumentException(id + " is not a valid identifier");
+		}
+		Cache.getCache().unregister(id);
+	}
+	
 	public PersistingElement getKnownPersistingElement(String fullIdentifier) {
 		return Cache.getCache().getKnownPersistingElement(fullIdentifier);
 	}

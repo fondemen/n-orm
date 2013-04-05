@@ -57,6 +57,11 @@ public class PropertyOverloadTest {
 		store = HBaseLauncher.hbaseStore;
 	}
 	
+	@Before
+	public void resetStoreCache() {
+		store.clearCache();
+	}
+	
 	//Just a dummy class so that we've got something to give as parameter...
 	@Persisting(table="PropertyOverloadTest", federated=FederatedMode.CONS)
 	@HBaseSchema(compression="gz", forceInMemory=SettableBoolean.TRUE, inMemory=SettableBoolean.TRUE, scanCaching=1)

@@ -163,17 +163,9 @@
 	<repositories>
 
 		<repository>
-			<id>cdh.releases.repo</id>
+			<id>cdh.repo</id>
 			<url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
 			<name>CDH Releases Repository</name>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-		</repository>
-		<repository>
-			<id>cdh.snapshots.repo</id>
-			<url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
-			<name>CDH Snapshots Repository</name>
 			<snapshots>
 				<enabled>true</enabled>
 			</snapshots>
