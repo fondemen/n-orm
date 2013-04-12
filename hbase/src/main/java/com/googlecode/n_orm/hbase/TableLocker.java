@@ -57,7 +57,7 @@ public class TableLocker {
 	/**
 	 * The table for which this lock is made for
 	 */
-	private final String table;
+	private final String tableName;
 	
 	/**
 	 * The actual zookeeper lock.
@@ -84,12 +84,12 @@ public class TableLocker {
 	 * @param store the store to which this lock is to belong
 	 * @param table the table to be shared/exclusive locked
 	 */
-	public TableLocker(Store store, String table) {
+	public TableLocker(Store store, MangledTableName table) {
 		super();
 		this.store = store;
-		this.table = store.mangleTableName(table);
+		this.tableName = table.getName();
 		
-		this.lock = new SharedExclusiveLock(store.getZooKeeper(), "/n-orm/schemalock/" + table);
+		this.lock = new SharedExclusiveLock(store.getZooKeeper(), "/n-orm/schemalock/" + table.getName());
 	}
 	
 	/**
@@ -155,12 +155,12 @@ public class TableLocker {
 		// Getting local lock
 		this.intraLock.readLock().lock();
 		
-		assert ! this.isExclusiveLocked() : "Acquiring a shared lock on table " + this.table + " while an exclusive lock is already set !";
+		assert ! this.isExclusiveLocked() : "Acquiring a shared lock on table " + this.tableName + " while an exclusive lock is already set !";
 		// Handling sharedLockThreads and zookeeper lock in mutual exclusion
 		synchronized (this) {
 			// One should acquire zookeeper shared lock if and only if it's the first to ask for the lock
 			if (!this.isShareLocked()) {
-				assert ! this.isExclusiveLocked() : "Can't acquire shared lock on table " + this.table + " while it's already exclusively locked";
+				assert ! this.isExclusiveLocked() : "Can't acquire shared lock on table " + this.tableName + " while it's already exclusively locked";
 				try {
 					// Checking zookeeper connection and directories
 					this.checkIsZKLockable();
@@ -176,8 +176,8 @@ public class TableLocker {
 		locks.addFirst(LockKind.SHARED);
 		this.acquiredLocks.put(Thread.currentThread(), locks);
 		
-		assert this.isShareLocked() : "Acquired a shared lock on table " + this.table + " but not referenced by zookeeper !";
-		assert this.acquiredLocks.containsKey(Thread.currentThread()) : "Acquired a shared lock on table " + this.table + " but thread is not referenced as having one";
+		assert this.isShareLocked() : "Acquired a shared lock on table " + this.tableName + " but not referenced by zookeeper !";
+		assert this.acquiredLocks.containsKey(Thread.currentThread()) : "Acquired a shared lock on table " + this.tableName + " but thread is not referenced as having one";
 		assert LockKind.SHARED.equals(this.acquiredLocks.get(Thread.currentThread()).peek());
 	}
 	
@@ -186,7 +186,7 @@ public class TableLocker {
 		// Checking that last acquired lock is a shared lock
 		LockKind last = locks.peek();
 		if (!LockKind.SHARED.equals(last)) {
-			throw new IllegalMonitorStateException("Last lock for table " + this.table + " for this thread is not a shared lock");
+			throw new IllegalMonitorStateException("Last lock for table " + this.tableName + " for this thread is not a shared lock");
 		}
 
 		int sl = this.sharedLocks.decrementAndGet();
@@ -213,7 +213,7 @@ public class TableLocker {
 						this.checkZooKeeper();
 						lock.releaseSharedLock();
 					} catch (Exception f) {
-						Store.errorLogger.log(Level.SEVERE, "Error unlocking table " + table, e);
+						Store.errorLogger.log(Level.SEVERE, "Error unlocking table " + tableName, e);
 					}
 				}
 			}
@@ -288,7 +288,7 @@ public class TableLocker {
 	
 	public void exclusiveUnlockTable() {
 		if (!this.intraLock.isWriteLockedByCurrentThread())
-			throw new IllegalMonitorStateException("Thread " + Thread.currentThread() + " does not hold exclusive lock for table " + this.table + "; can't release");
+			throw new IllegalMonitorStateException("Thread " + Thread.currentThread() + " does not hold exclusive lock for table " + this.tableName + "; can't release");
 
 		assert isExclusiveLocked();
 		assert !this.isShareLocked();
@@ -298,7 +298,7 @@ public class TableLocker {
 		LockKind last = locks.peek();
 		assert last != null;
 		if (!LockKind.EXCLUSIVE.equals(last)) {
-			throw new IllegalMonitorStateException("Last lock for table " + this.table + " for this thread is not an exclusive lock");
+			throw new IllegalMonitorStateException("Last lock for table " + this.tableName + " for this thread is not an exclusive lock");
 		}
 		// Removing the last shared lock
 		locks.poll();
@@ -326,7 +326,7 @@ public class TableLocker {
 					this.checkZooKeeper();
 					lock.releaseExclusiveLock();
 				} catch (Exception f) {
-					Store.errorLogger.log(Level.SEVERE, "Error unlocking table " + table + " locked in exclusion", e);
+					Store.errorLogger.log(Level.SEVERE, "Error unlocking table " + tableName + " locked in exclusion", e);
 				}
 			} finally {
 				if (this.sharedLocks.get() > 0) {

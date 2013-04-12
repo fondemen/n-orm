@@ -21,7 +21,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 	private Iterator<Result> iterator;
 	private final boolean sendValues;
 	private final Class<? extends PersistingElement> clazz;
-	private final String table;
+	private final MangledTableName table;
 	private final String tablePostfix;
 	private Constraint constraint;
 	private int limit;
@@ -31,7 +31,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 	
 	private byte[] currentKey = null;
 
-	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, String table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, ResultScanner res, boolean sendValues) {
+	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, ResultScanner res, boolean sendValues) {
 		this.store = store;
 		this.sendValues = sendValues;
 		this.clazz = clazz;
