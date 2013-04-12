@@ -18,7 +18,7 @@
 	</scm>
 	
 	<properties>
-		<hbase.version>0.92.1</hbase.version>
+		<hbase.version>0.94.2</hbase.version>
 		<hadoop.version>1.0.0</hadoop.version>
 	</properties>
 

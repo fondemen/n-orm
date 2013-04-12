@@ -1201,14 +1201,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		//System.err.println("====================== handling " + e + " with message " + msg);
 		
-		if (this.hasProblem(e, TableNotEnabledException.class)) {
-			try {
-				this.enableTable(clazz, table, tablePostfix);
-			} catch (IOException e1) {
-				if (!this.hasProblem(e1, TableNotEnabledException.class))
-					this.handleProblem(e1, clazz, table, tablePostfix, expectedFamilies);
-			}
-		} else if (this.hasProblem(e, TableNotFoundException.class)) {
+		if (this.hasProblem(e, TableNotFoundException.class)) {
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; recreating", e);
 			this.uncache(table);
 			try {
@@ -1216,7 +1209,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			} catch (Exception x) {
 				throw new DatabaseNotReachedException(x);
 			}
-		} else if (this.hasProblem(e, NotServingRegionException.class)) {
+		} else if (this.hasProblem(e, NotServingRegionException.class)
+				|| this.hasProblem(e, TableNotEnabledException.class)
+				|| (e.getMessage() != null && e.getMessage().contains("disabled"))) {
 			try {
 				TableLocker lock = this.getLock(table);
 				lock.sharedLockTable();
