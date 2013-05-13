@@ -35,7 +35,7 @@ public class DelegatingStore implements Store {
 			else if (clazz.isInstance(ret))
 				return clazz.cast(ret);
 			else if (ret instanceof DelegatingStore)
-				ret = ((DelegatingStore)ret).getActualStore();
+				ret = ((DelegatingStore)ret).getActualStore(clazz);
 			else
 				return null;
 		}
