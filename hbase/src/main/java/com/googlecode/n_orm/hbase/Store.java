@@ -1719,14 +1719,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * each time they are updated.
 	 * @return timestamp to be used within next {@link #tagUpdate(MetaInformation, long)}
 	 */
-	private long waitForNewUpdate(MetaInformation meta) {
+	private void waitForNewUpdate(MetaInformation meta, String table, String row) {
 		if (meta == null)
-			return System.currentTimeMillis();
+			return;
 		PersistingElement pe = meta.getElement();
 		assert pe != null;
-		Long npu = (Long)pe.getAdditionalProperty("HBaseNextPossibleUpdate");
+		Long npu = (Long)pe.getAdditionalProperty("HBaseNextPossibleUpdateInTable"+table);
 		if (npu == null)
-			return System.currentTimeMillis();
+			return;
 		long now;
 		while ((now = System.currentTimeMillis()) < npu) {
 			try {
@@ -1734,14 +1734,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			} catch (InterruptedException e) {
 			}
 		}
-		return now;
 	}
 	
 	/**
 	 * Marks necessary additional information
 	 * to use {@link #waitForNewUpdate(MetaInformation)}.
 	 */
-	private void tagUpdate(MetaInformation meta, long timestamp) {
+	private void tagUpdate(MetaInformation meta, String table, String row) {
 		if (meta == null)
 			return;
 		PersistingElement pe = meta.getElement();
@@ -1750,7 +1749,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		// We rely here on meta as it is important to preserve sequentiality for a given
 		// persisting element, but not for different one (even if targeting the same row)
 		// as they are certainly not in the same threads
-		pe.addAdditionalProperty("HBaseNextPossibleUpdate", timestamp+1);
+		pe.addAdditionalProperty("HBaseNextPossibleUpdateInTable"+table, System.currentTimeMillis()+1);
 	}
 
 	@Override
@@ -1778,7 +1777,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			
 			List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2); //At most one put and one delete
 			
-			long ts = this.waitForNewUpdate(meta);
+			this.waitForNewUpdate(meta, table, id);
 	
 			//Transforming changes into a big Put (if necessary)
 			//and registering it as an action to be performed
@@ -1802,7 +1801,6 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			Delete rowDel = null;
 			if (removed != null && !removed.isEmpty()) {
 				rowDel = new Delete(row);
-				rowDel.setTimestamp(ts);
 				for (Entry<String, Set<String>> family : removed.entrySet()) {
 					byte[] cf = Bytes.toBytes(family.getKey());
 					for (String key : family.getValue()) {
@@ -1835,7 +1833,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			//An empty object is to be stored...
 			//Adding a dummy value into properties family
 			if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
-				rowPut = new Put(row, ts);
+				rowPut = new Put(row);
 				rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
 				actions.add(rowPut);
 			}
@@ -1855,7 +1853,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				t = act.getTable();
 			}
 			
-			this.tagUpdate(meta, ts);
+			this.tagUpdate(meta, table, id);
 		} finally {
 			if (t != null)
 				this.returnTable(t);
@@ -1867,11 +1865,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
 			return;
-		long ts = this.waitForNewUpdate(meta);
+		this.waitForNewUpdate(meta, table, id);
 		Delete d = new Delete(Bytes.toBytes(id));
-		d.setTimestamp(ts);
 		this.tryPerform(new DeleteAction(d), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
-		this.tagUpdate(meta, ts);
+		this.tagUpdate(meta, table, id);
 	}
 
 	@Override
