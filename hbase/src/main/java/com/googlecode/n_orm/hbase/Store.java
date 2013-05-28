@@ -1783,7 +1783,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			//and registering it as an action to be performed
 			Put rowPut = null;
 			if (changed != null && !changed.isEmpty()) {
-				rowPut = new Put(row, ts);
+				rowPut = new Put(row);
 				for (Entry<String, Map<String, byte[]>> family : changed.entrySet()) {
 					byte[] cf = Bytes.toBytes(family.getKey());
 					for (Entry<String, byte[]> col : family.getValue().entrySet()) {
