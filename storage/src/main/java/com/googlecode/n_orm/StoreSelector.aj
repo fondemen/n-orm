@@ -19,6 +19,8 @@ import org.apache.commons.beanutils.PropertyUtils;
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.cache.write.WriteRetentionStore;
+import com.googlecode.n_orm.storeapi.DelegatingStore;
 import com.googlecode.n_orm.storeapi.SimpleStore;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
@@ -26,7 +28,7 @@ import com.googlecode.n_orm.StoreSelector;
 
 public aspect StoreSelector {
 	private static StoreSelector INSTANCE;
-	
+
 	public static StoreSelector getInstance() {
 		if (INSTANCE == null)
 			INSTANCE = aspectOf();
@@ -54,6 +56,7 @@ public aspect StoreSelector {
 	public static final String STORE_DRIVERCLASS_SINGLETON_PROPERTY = "singleton";
 	public static final String STORE_DRIVERCLASS_STATIC_ACCESSOR = "static-accessor";
 	public static final String STORE_REFERENCE = "as-for-package";
+	public static final String STORE_WRITE_RETENTION = "with-write-retention";
 
 	private Map<String, Object> locks = new TreeMap<String, Object>();
 	private Map<String, StoreProperties> classStores = new TreeMap<String, StoreProperties>();
@@ -197,7 +200,7 @@ public aspect StoreSelector {
     	}
     }
 	
-	public synchronized Store getStoreFor(Class<? extends PersistingElement> clazz) throws DatabaseNotReachedException {
+	public Store getStoreFor(Class<? extends PersistingElement> clazz) throws DatabaseNotReachedException {
 		synchronized (this.getLock(clazz)) {
 			StoreProperties ret;
 			
@@ -210,6 +213,7 @@ public aspect StoreSelector {
 					ret = packageStores.get(clazz.getPackage().getName());
 				}
 				if (ret != null && ret.store != null) {
+					ret = checkForRetention(ret, clazz);
 					classStores.put(clazz.getName(), ret);
 					return ret.store;
 				}
@@ -219,6 +223,7 @@ public aspect StoreSelector {
 				if (ret == null) {
 					ret = findPropertiesInt(clazz);
 					if (ret.store != null) {
+						ret = checkForRetention(ret, clazz);
 						classStores.put(clazz.getName(), ret);
 						return ret.store;
 					}
@@ -275,7 +280,21 @@ public aspect StoreSelector {
 					ret.store = SimpleStoreWrapper.getWrapper((SimpleStore)store);
 				else
 					throw new IllegalArgumentException("Error while getting store for class " + clazz.getName() + ": found store " + store.toString() + " of class " + store.getClass().getName() + " which is not compatible with " + Store.class.getName() + " or " + SimpleStore.class.getName());
-	
+
+				if (ret.properties.containsKey(STORE_WRITE_RETENTION)) {
+					String wrStr = ret.properties.getProperty(STORE_WRITE_RETENTION);
+					boolean disabled = wrStr.endsWith("-disabled");
+					if (disabled) {
+						wrStr = wrStr.substring(0, wrStr.length() - "-disabled".length());
+					}
+					WriteRetentionStore wrs = WriteRetentionStore.getWriteRetentionStore(Long.parseLong(wrStr), ret.store);
+					if(disabled)
+						wrs.setEnabledByDefault(false);
+					ret.store = wrs;
+				}
+
+				ret = checkForRetention(ret, clazz);
+				
 				ret.store.start();
 				classStores.put(clazz.getName(), ret);
 				return ret.store;
@@ -283,5 +302,25 @@ public aspect StoreSelector {
 				throw new DatabaseNotReachedException(x);
 			}
 		}
+	}
+
+	/**
+	 * Get store for given class bypassing any {@link com.googlecode.n_orm.storeapi.DelegatingStore}
+	 */
+	public Store getActualStoreFor(Class<? extends PersistingElement> clazz) throws DatabaseNotReachedException {
+		Store ret = this.getStoreFor(clazz);
+		return ret instanceof DelegatingStore ? ((DelegatingStore)ret).getDeepActualStore() : ret;
+	}
+	
+	private StoreProperties checkForRetention(StoreProperties sp,
+			Class<? extends PersistingElement> clazz) {
+		assert sp.store != null;
+		Persisting pa = clazz.getAnnotation(Persisting.class);
+		if (pa.writeRetentionMs() > 0) {
+			StoreProperties ret = new StoreProperties(sp.properties, sp.pack);
+			ret.store = WriteRetentionStore.getWriteRetentionStore(pa.writeRetentionMs(), sp.store);
+			return ret;
+		} else
+			return sp;
 	}
 }

@@ -1,10 +1,6 @@
 package com.googlecode.n_orm;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.*;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -18,7 +14,6 @@ import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.SimpleStorageTest.SimpleElement;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory;
 
@@ -28,7 +23,6 @@ public class SimpleStorageTest {
 	@Persisting(table = "SimpleElement")
 	public static class SimpleElement {
 		private static final long serialVersionUID = 583478722942646042L;
-		@SuppressWarnings("unused")
 		@Key(order = 1)
 		protected  String key1;
 		@Key(order = 2)
@@ -41,6 +35,7 @@ public class SimpleStorageTest {
 		public int[] intsProp; 
 		public transient String tProp1;
 		@Transient public String tProp2;
+		public Long LongProp;
 
 		public SimpleElement(String key1, String[] key2) {
 			super();
@@ -69,6 +64,7 @@ public class SimpleStorageTest {
 	
 	@Persisting(storeKeys=true, storeAlsoInSuperClasses=true)
 	public static class InheritingElement extends SimpleElement {
+		private static final long serialVersionUID = -5746803297802512714L;
 
 		public InheritingElement(String key1, String[] key2) {
 			super(key1, key2);
@@ -344,6 +340,7 @@ public class SimpleStorageTest {
 
 	@Persisting
 	public static class DummyPersister {
+		private static final long serialVersionUID = 4046221136189162976L;
 		@Key
 		public  String key = "singleton";
 		public Object property;
@@ -357,6 +354,7 @@ public class SimpleStorageTest {
 	
 	@Persisting
 	public static class IncrementingElement {
+		private static final long serialVersionUID = -8744781901448399093L;
 		@Key public  String key;
 		@Incrementing public long lval;
 		@Incrementing public int ival;
@@ -443,6 +441,7 @@ public class SimpleStorageTest {
 
 	@Persisting
 	public static class SimpleElementSubclass extends SimpleElement {
+		private static final long serialVersionUID = -4046221136189162976L;
 		public SimpleElementSubclass(String key1, String[] key2) {
 			super(key1, key2);
 		}
@@ -487,5 +486,31 @@ public class SimpleStorageTest {
 	public void activationAfterStore() {
 		sut1.activateIfNotAlready();
 		hadNoQuery();
+	}
+	
+	@Test
+	public void activateLongNullValue() {
+		SimpleElement sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.delete();
+		sut.activate();
+		assertNull(sut.LongProp);
+	}
+	
+	@Test
+	public void storeLongNonNUllAndThenNullValue() {
+		SimpleElement sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		sut.LongProp = 1L;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		assertEquals(Long.valueOf(1L), sut.LongProp);
+		sut.LongProp = null;
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		assertNull(sut.LongProp);
 	}
 }

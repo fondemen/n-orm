@@ -14,7 +14,7 @@ class EnumConverter extends SimpleConverter<Object> {
 	}
 
 	@Override
-	public Object getDefaultValue() {
+	public Object getDefaultValue(Class<?> type) {
 		return null;
 	}
 

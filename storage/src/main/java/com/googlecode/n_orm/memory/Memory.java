@@ -6,12 +6,17 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.EmptyCloseableIterator;
+import com.googlecode.n_orm.Transient;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.memory.Memory.Table.Row;
 import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily;
@@ -68,7 +73,24 @@ public class Memory implements SimpleStore {
 		/**
 		 * The actual map owning elements.
 		 */
-		protected ConcurrentNavigableMap<String, T> map = new ConcurrentSkipListMap<String,T>();
+		@Transient //Only here to avoid AspectJ weaving
+		protected ConcurrentMap<String, T> map;
+		
+		/**
+		 * @param sorted whether this map needs to be sorted according to keys natural order
+		 */
+		protected LazyMap(boolean sorted) {
+			this.map = sorted ?  new ConcurrentSkipListMap<String,T>() : new ConcurrentHashMap<String, T>();
+		}
+		
+		/**
+		 * The actual map casted to NavigableMap.
+		 * Can throw an exception if this map was not declared as sorted.
+		 */
+		@SuppressWarnings("unchecked")
+		protected NavigableMap<String, T> getNavigableMap() {
+			return (NavigableMap<String, T>)this.map;
+		}
 		
 		/**
 		 * Called by {@link #get(String)} when no value is found
@@ -163,9 +185,21 @@ public class Memory implements SimpleStore {
 	}
 
 	/**
+	 * A value to state that a {@link ByteValue} is deleted
+	 */
+	private static final byte[] DELETED_VALUE = new byte[0];
+	
+	/**
+	 * A value to state that a {@link ByteValue} is null
+	 */
+	private static final byte[] NULL_VALUE = new byte[0];
+	
+	private static final ExecutorService ColumnRemover = Executors.newSingleThreadExecutor();
+	
+	/**
 	 * An map to store rows within tables.
 	 * Rows are indexed according to their keys.
-	 * Rows are sorted within a table according to their key value so that rage search can be fast (see {@link #toMap(String, String)}.
+	 * Rows are sorted within a table according to their key value so that range search can be fast.
 	 */
 	public class Table extends LazyMap<Table.Row> {
 		
@@ -175,6 +209,7 @@ public class Memory implements SimpleStore {
 		public final String name;
 		
 		public Table(String name) {
+			super(true);
 			this.name = name;
 		}
 
@@ -191,7 +226,7 @@ public class Memory implements SimpleStore {
 		 * @see Memory#subMap(NavigableMap, String, String)
 		 */
 		public Iterator<Row> getRowIterator(String fromKeyIncl) {
-			return subMap(this.map, fromKeyIncl, null).values().iterator();
+			return subMap(this.getNavigableMap(), fromKeyIncl, null).values().iterator();
 		}
 		
 		/**
@@ -204,7 +239,14 @@ public class Memory implements SimpleStore {
 			 */
 			public final String key;
 			
+			/**
+			 * The next transaction number.
+			 * Should increment over time.
+			 */
+			private AtomicLong nextTransactionId = new AtomicLong(Long.MIN_VALUE);
+			
 			public Row(String key) {
+				super(false);
 				this.key = key;
 			}
 
@@ -232,10 +274,14 @@ public class Memory implements SimpleStore {
 				}
 				return ret;
 			}
+			
+			public long createTransaction() {
+				return this.nextTransactionId.incrementAndGet();
+			}
 
 			/**
 			 * A column family owning values.
-			 * Values are sorted according to their qualifier so that rage search can be fast (see {@link #toMap(String, String)}.
+			 * Values are sorted according to their qualifier so that rage search can be fast.
 			 */
 			public class ColumnFamily extends LazyMap<ColumnFamily.Value<?>> {
 				/**
@@ -244,6 +290,7 @@ public class Memory implements SimpleStore {
 				public final String name;
 				
 				public ColumnFamily(String name) {
+					super(true);
 					this.name = name;
 				}
 
@@ -252,7 +299,7 @@ public class Memory implements SimpleStore {
 				 */
 				@Override
 				protected Value<?> newElement(String qualifier) {
-					return new ByteValue(qualifier, new byte [0]);
+					return new ByteValue(qualifier);
 				}
 
 				/**
@@ -277,12 +324,24 @@ public class Memory implements SimpleStore {
 				 */
 				public Map<String, byte[]> getValues(String fromQualifierIncl, String toQualifierIcl) {
 					Map<String, byte[]> ret = new TreeMap<String,byte[]>();
-					for (Entry<String, Value<?>> element : subMap(map, fromQualifierIncl, toQualifierIcl).entrySet()) {
-						ret.put(element.getKey(), element.getValue().getBytes());
+					for (Entry<String, Value<?>> element : subMap(this.getNavigableMap(), fromQualifierIncl, toQualifierIcl).entrySet()) {
+						byte[] val = element.getValue().getBytes();
+						if (val != DELETED_VALUE)
+							ret.put(element.getKey(), val);
 					}
 					return ret;
 				}
 				
+				@Override
+				public final Value<?> remove(String key) {
+					throw new IllegalStateException("Cannot remove a column without a transaction number");
+				}
+
+				@Override
+				public final void removeAll(Set<String> keys) {
+					throw new IllegalStateException("Cannot remove a column without a transaction number");
+				}
+
 				public abstract class Value<T> {
 					/**
 					 * The qualifier for this value
@@ -291,8 +350,6 @@ public class Memory implements SimpleStore {
 					
 					/**
 					 * Creates a value that cannot be incremented
-					 * @param qualifier
-					 * @param value
 					 */
 					public Value(String qualifier) {
 						this.qualifier = qualifier;
@@ -307,26 +364,76 @@ public class Memory implements SimpleStore {
 				public class ByteValue extends Value<byte[]> {
 					
 					/**
-					 * The actual value for this value
+					 * The actual value for this value.
+					 * Stored in a map according to transaction ids.
+					 * Last entry holds the actual value.
 					 */
-					protected byte[] value;
+					protected NavigableMap<Long /* last change */, byte[]> value = new ConcurrentSkipListMap<Long, byte[]>();
+					
+					protected ReentrantReadWriteLock deletionLock = new ReentrantReadWriteLock();
 
-					public ByteValue(String qualifier, byte[] value) {
+					public ByteValue(String qualifier) {
 						super(qualifier);
-						this.value = value;
+						this.value.put(Long.MIN_VALUE, DELETED_VALUE);
 					}
 					
 					public byte[] getValue() {
-						return this.value;
+						Entry<Long, byte[]> lastEntry = this.value.lastEntry();
+						if (lastEntry == null)
+							return DELETED_VALUE;
+						byte[] ret = lastEntry.getValue();
+						return ret == null ? NULL_VALUE : ret;
 					}
 					
-					public void setValue(byte[] value) {
-						this.value = value;
+					public void setValue(byte[] value, long transaction) {
+						if (value == null) value = NULL_VALUE;
+						deletionLock.readLock().lock();
+						try {
+							if (this.value.isEmpty()) {
+								// We've been deleted by a checkRemove ; retrying operation
+								ByteValue newVal = (ByteValue)ColumnFamily.this.get(this.qualifier);
+								assert newVal != this;
+								newVal.setValue(value, transaction);
+							} else {
+								this.value.put(transaction, value);
+							}
+						} finally {
+							deletionLock.readLock().unlock();
+						}
+						this.value.pollFirstEntry();
+						
+						if (this.getValue() == DELETED_VALUE) {
+							// Deleting this column ASAP
+							ColumnRemover.submit(new Runnable() {
+
+								@Override
+								public void run() {
+									checkRemove();
+								}
+								
+							});
+						}
+					}
+
+					private void checkRemove() {
+						// Should we remove this column ?
+						if (this.getValue() == DELETED_VALUE) {
+							// Value is a delete so it deserves to be lock-checked
+							deletionLock.writeLock().lock();
+							try {
+								if (this.getValue() == DELETED_VALUE) {
+									ColumnFamily.this.map.remove(this.qualifier);
+									this.value.clear();
+								}
+							} finally {
+								deletionLock.writeLock().unlock();
+							}
+						}
 					}
 
 					@Override
 					public byte[] getBytes() {
-						return this.value;
+						return this.getValue();
 					}
 				}
 				
@@ -368,7 +475,7 @@ public class Memory implements SimpleStore {
 	/**
 	 * The set of tables in this store
 	 */
-	private LazyMap<Table> tables = new LazyMap<Table>() {
+	private LazyMap<Table> tables = new LazyMap<Table>(false) {
 
 		/**
 		 * Creates a table according to its name
@@ -422,10 +529,16 @@ public class Memory implements SimpleStore {
 	}
 
 	@Override
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException {
+		return this.tables.contains(tableName);
+	}
+
+	@Override
 	public byte[] get(String table, String id, String family, String qualifer) {
 		ColumnFamily fam = this.getFamily(table, id, family, false);
 		Value<?> val = fam == null ? null : fam.getNoCreate(qualifer);
-		return val == null ? null : val.getBytes();
+		byte[] ret = val == null ? null : val.getBytes();
+		return ret == null || ret == DELETED_VALUE ? null : ret;
 	}
 
 	@Override
@@ -446,39 +559,57 @@ public class Memory implements SimpleStore {
 			ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> incremented) {
+		
 		IllegalArgumentException x = null;
 		
 		Row r = this.getRow(table, id, true);
+		long transaction = r.createTransaction();
 		
-		for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
-			ColumnFamily f = r.get(change.getKey());
-			for (Entry<String, byte[]> value : change.getValue().entrySet()) {
-				Value<?> val = f.get(value.getKey());
-				if (val instanceof ByteValue) {
-					((ByteValue)val).setValue(value.getValue());
-				} else {
-					x = new IllegalArgumentException("Cannot set an incrementing value " + value.getKey() + " in family " + change.getKey() + " for row " + id + " in table " + table);
+		if (changed != null)
+			for (Entry<String, Map<String, byte[]>> change : changed.entrySet()) {
+				ColumnFamily f = r.get(change.getKey());
+				for (Entry<String, byte[]> value : change.getValue().entrySet()) {
+					Value<?> val = f.get(value.getKey());
+					if (val instanceof ByteValue) {
+						((ByteValue)val).setValue(value.getValue(), transaction);
+					} else {
+						x = new IllegalArgumentException("Cannot set an incrementing value " + value.getKey() + " in family " + change.getKey() + " for row " + id + " in table " + table);
+					}
 				}
 			}
-		}
 		
-		for (Entry<String, Set<String>> remove : removed.entrySet()) {
-			r.get(remove.getKey()).removeAll(remove.getValue());
-		}
-		
-		for (Entry<String, Map<String, Number>> incr : incremented.entrySet()) {
-			ColumnFamily f = r.get(incr.getKey());
-			for (Entry<String, Number> entry : incr.getValue().entrySet()) {
-				f.incr(entry.getKey(), entry.getValue());
+		if (removed != null)
+			for (Entry<String, Set<String>> remove : removed.entrySet()) {
+				ColumnFamily f = r.getNoCreate(remove.getKey());
+				if (f != null) {
+					for (String qual : remove.getValue()) {
+						Value<?> val = f.getNoCreate(qual);
+						if (val instanceof ByteValue) {
+							((ByteValue)val).setValue(DELETED_VALUE, transaction);
+						} else {
+							x = new IllegalArgumentException("Cannot remove an incrementing value " + qual + " in family " + remove.getKey() + " for row " + id + " in table " + table);
+						}
+					}
+				}
 			}
-		}
+		
+		if (incremented != null)
+			for (Entry<String, Map<String, Number>> incr : incremented.entrySet()) {
+				ColumnFamily f = r.get(incr.getKey());
+				for (Entry<String, Number> entry : incr.getValue().entrySet()) {
+					f.incr(entry.getKey(), entry.getValue());
+				}
+			}
+		
+		if (x != null)
+			throw x;
 	}
 
 	@Override
 	public long count(String table, Constraint c)
 			throws DatabaseNotReachedException {
 		Table t = this.getTable(table, false);
-		return t == null ? 0 : subMap(t.map, c == null ? null : c.getStartKey(), c == null ? null : c.getEndKey()).size();
+		return t == null ? 0 : subMap(t.getNavigableMap(), c == null ? null : c.getStartKey(), c == null ? null : c.getEndKey()).size();
 	}
 	
 	public void reset() {
@@ -495,7 +626,8 @@ public class Memory implements SimpleStore {
 	@Override
 	public boolean exists(String table, String row, String family)
 			throws DatabaseNotReachedException {
-		return this.getFamily(table, row, family, false) != null;
+		ColumnFamily fam = this.getFamily(table, row, family, false);
+		return fam != null && !fam.getValues(null, null).isEmpty();
 	}
 
 	@Override

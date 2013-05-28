@@ -3,7 +3,6 @@ package com.googlecode.n_orm.hbase;
 import java.lang.reflect.Field;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.hadoop.hbase.UnknownScannerException;
 import org.apache.hadoop.hbase.client.Result;
@@ -14,6 +13,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row;
 
 final class CloseableIterator implements CloseableKeyIterator {
@@ -22,6 +22,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 	private final boolean sendValues;
 	private final Class<? extends PersistingElement> clazz;
 	private final String table;
+	private final String tablePostfix;
 	private Constraint constraint;
 	private int limit;
 	private final Map<String, Field> families;
@@ -30,11 +31,12 @@ final class CloseableIterator implements CloseableKeyIterator {
 	
 	private byte[] currentKey = null;
 
-	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, String table, Constraint constraint, int limit, Map<String, Field> families, ResultScanner res, boolean sendValues) {
+	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, String table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, ResultScanner res, boolean sendValues) {
 		this.store = store;
 		this.sendValues = sendValues;
 		this.clazz = clazz;
 		this.table = table;
+		this.tablePostfix = tablePostfix;
 		this.constraint = constraint;
 		this.limit = limit;
 		this.families = families;
@@ -70,9 +72,9 @@ final class CloseableIterator implements CloseableKeyIterator {
 				|| (x.getCause() instanceof UnknownScannerException) || x.getMessage().contains(UnknownScannerException.class.getSimpleName())) {
 			Store.logger.warning("Got exception " + x.getMessage() + " ; consider lowering scanCahing or improve scanner timeout at the HBase level");
 		} else {
-			store.handleProblem(x, this.clazz, table, this.families);
+			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);
 		}
-		CloseableIterator newResult = (CloseableIterator) store.get(clazz, table, constraint, limit, families);
+		CloseableIterator newResult = (CloseableIterator) store.get(new MetaInformation().forClass(clazz).withColumnFamilies(families), table, constraint, limit, families == null ? null : families.keySet());
 		this.setResult(newResult.result);
 	}
 
@@ -124,7 +126,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 		try {
 			result.close();
 		} catch (RuntimeException x) {
-			store.handleProblem(x, this.clazz, table, this.families);
+			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);
 		}
 	}
 }

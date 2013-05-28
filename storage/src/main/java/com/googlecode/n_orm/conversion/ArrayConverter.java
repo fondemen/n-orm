@@ -20,7 +20,7 @@ public class ArrayConverter extends Converter<Object> {
 	}
 
 	@Override
-	public Object getDefaultValue() {
+	public Object getDefaultValue(Class<?> type) {
 		return null;
 	}
 

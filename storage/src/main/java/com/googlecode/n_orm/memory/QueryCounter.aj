@@ -4,23 +4,27 @@ import java.lang.reflect.Method;
 
 import org.aspectj.lang.reflect.MethodSignature;
 
+import com.googlecode.n_orm.utils.LongAdder;
+
 public aspect QueryCounter {
-	private int Memory.queries = 0;
+	private LongAdder Memory.queries = new LongAdder();
 	
 	public void Memory.resetQueries() {
-		this.queries = 0;
+		this.queries.reset();
+	}
+	
+	public int Memory.getQueriesAndReset() {
+		int ret = queries.intValue();
+		queries.reset();
+		return ret;
 	}
 	
 	public boolean Memory.hadAQuery() {
-		boolean ret = this.queries == 1;
-		this.resetQueries();
-		return ret;
+		return this.getQueriesAndReset() == 1;
 	}
 	
 	public boolean Memory.hadNoQuery() {
-		boolean ret = this.queries == 0;
-		this.resetQueries();
-		return ret;
+		return this.getQueriesAndReset() == 0;
 	}
 	
 	private transient volatile Method Memory.running = null;
@@ -29,7 +33,7 @@ public aspect QueryCounter {
 	
 	before(Memory self): runningQuery(self) && if(self.running == null) {
 		self.running = ((MethodSignature)thisJoinPointStaticPart.getSignature()).getMethod();
-		self.queries++;
+		self.queries.increment();
 	}
 	
 	after(Memory self): runningQuery(self) {

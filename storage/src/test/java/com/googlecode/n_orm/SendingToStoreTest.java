@@ -11,19 +11,18 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import org.hamcrest.Matcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import com.googlecode.n_orm.Incrementing.Mode;
 import com.googlecode.n_orm.cf.SetColumnFamily;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 
@@ -109,7 +108,6 @@ public class SendingToStoreTest {
 					if (argument == null)
 						return false;
 					
-					@SuppressWarnings("unchecked")
 					ColumnFamilyData map = (ColumnFamilyData)argument;
 					
 					int expectedSize = 0;
@@ -183,6 +181,7 @@ public class SendingToStoreTest {
 
 				@Override
 				public boolean matches(Object argument) {
+					@SuppressWarnings("unchecked")
 					Map<String, Map<String, Number>> map = (Map<String, Map<String, Number>>)argument;
 					if (map == null || map.size() != 1)
 						return false;
@@ -213,87 +212,93 @@ public class SendingToStoreTest {
 	@Test
 	public void count() {
 		StorageManagement.countElements(Element.class, null);
-		verify(this.store).count(Element.class, table, null);
+		verify(this.store).count(new MetaInformation().forClass(Element.class), table, null);
 	}
 	
 	@Test
 	public void search() {
 		Constraint c = mock(Constraint.class);
 		StorageManagement.findElement(Element.class, c, 10);
-		verify(this.store).get(Element.class, table, c, 10, this.getMap(true, false, false, false));
+		Map<String, Field> cf = this.getMap(true, false, false, false);
+		verify(this.store).get(new MetaInformation().forClass(Element.class).withColumnFamilies(cf), table, c, 10, cf.keySet());
 	}
 	
 	@Test
 	public void searchWithCf() {
 		Constraint c = mock(Constraint.class);
 		StorageManagement.findElement(Element.class, c, 10, cfField.getName());
-		verify(this.store).get(Element.class, table, c, 10, this.getMap(true, false, false, true));
+		Map<String, Field> cf = this.getMap(true, false, false, true);
+		verify(this.store).get(new MetaInformation().forClass(Element.class).withColumnFamilies(cf), table, c, 10, cf.keySet());
 	}
 	
 	@Test
 	public void delete() {
 		this.element.delete();
-		verify(this.store).delete(this.element, table, id);
+		verify(this.store).delete(new MetaInformation().forElement(this.element), table, id);
+		//Assertion checks whether element still exists after deletion
+		verify(this.store, atMost(1)).exists(new MetaInformation().forElement(this.element), table, id);
 	}
 	
 	@Test
 	public void exists() {
 		this.element.existsInStore();
-		verify(this.store).exists(this.element, table, id);
+		verify(this.store).exists(new MetaInformation().forElement(this.element), table, id);
 	}
 	
 	@Test
 	public void isEmptyCf() {
 		((SetColumnFamily<?>)this.element.getColumnFamily(cfField.getName())).isEmptyInStore();
-		verify(this.store).exists(this.element, cfField, table, id, cfField.getName());
+		verify(this.store).exists(new MetaInformation().forElement(this.element).forProperty(cfField), table, id, cfField.getName());
 	}
 	
 	@Test
 	public void containsCf() {
 		((SetColumnFamily<?>)this.element.getColumnFamily(cfField.getName())).containsInStore("DummyKey");
-		verify(this.store).get(this.element, cfField, table, id, cfField.getName(), "DummyKey");
+		verify(this.store).get(new MetaInformation().forElement(this.element).forProperty(cfField), table, id, cfField.getName(), "DummyKey");
 	}
 	
 	@Test
 	public void activateSimple() {
 		this.element.activate();
-		verify(this.store).get(this.element, table, id, getMap(true, false, false, false));
+		Map<String, Field> cf = getMap(true, false, false, false);
+		verify(this.store).get(new MetaInformation().forElement(this.element).withColumnFamilies(cf), table, id, cf.keySet());
 	}
 	
 	@Test
 	public void activateCf() {
 		this.element.getColumnFamily(cfField.getName()).activate();
-		verify(this.store).get(this.element, cfField, table, id, cfField.getName());
+		verify(this.store).get(new MetaInformation().forElement(this.element).forProperty(cfField), table, id, cfField.getName());
 	}
 	
 	@Test
 	public void activateWithCf() {
 		this.element.activate(cfField.getName());
-		verify(this.store).get(this.element, table, id, getMap(true, false, false, true));
+		Map<String, Field> cf = getMap(true, false, false, true);
+		verify(this.store).get(new MetaInformation().forElement(this.element).withColumnFamilies(cf), table, id, cf.keySet());
 	}
 	
 	@Test
 	public void storeSimple() {
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, false, false)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(new MetaInformation().forElement(this.element).withColumnFamilies(this.getMap(false, false, false, false))), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false), getExpectedIncr(null));
 	}
 	
 	@Test
 	public void storeWithPropAndDelete() {
 		this.element.prop = "1234856453";
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, false, false)), eq(table), eq(id), this.getExpectedChange(this.element.prop), this.getExpectedDelete(false), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(new MetaInformation().forElement(this.element).withColumnFamilies(this.getMap(false, true, false, false))), eq(table), eq(id), this.getExpectedChange(this.element.prop), this.getExpectedDelete(false), getExpectedIncr(null));
 		
 		this.element.prop = null;
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, false, false)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(true), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(new MetaInformation().forElement(this.element).withColumnFamilies(this.getMap(false, true, false, false))), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(true), getExpectedIncr(null));
 	}
 	
 	@Test
 	public void storeWithIncr() {
 		this.element.incr += 12;
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, true, false)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false), getExpectedIncr(12));
+		verify(this.store).storeChanges(eq(new MetaInformation().forElement(this.element).withColumnFamilies(this.getMap(false, false, true, false))), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false), getExpectedIncr(12));
 	}
 	
 	@Test
@@ -301,11 +306,11 @@ public class SendingToStoreTest {
 		this.element.cf.add("DummyKey1");
 		this.element.cf.add("DummyKey2");
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, false, true)), eq(table), eq(id), this.getExpectedChange(null, "DummyKey2", "DummyKey1"), this.getExpectedDelete(false), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(new MetaInformation().forElement(this.element).withColumnFamilies(this.getMap(false, false, false, true))), eq(table), eq(id), this.getExpectedChange(null, "DummyKey2", "DummyKey1"), this.getExpectedDelete(false), getExpectedIncr(null));
 		
 		this.element.cf.remove("DummyKey2");
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, false, false, true)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false, "DummyKey2"), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(new MetaInformation().forElement(this.element).withColumnFamilies(this.getMap(false, false, false, true))), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(false, "DummyKey2"), getExpectedIncr(null));
 	}
 	
 	@Test
@@ -315,12 +320,12 @@ public class SendingToStoreTest {
 		this.element.cf.add("DummyKey1");
 		this.element.cf.add("DummyKey2");
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, true, true)), eq(table), eq(id), this.getExpectedChange(this.element.prop, "DummyKey2", "DummyKey1"), this.getExpectedDelete(false), getExpectedIncr(12));
+		verify(this.store).storeChanges(eq(new MetaInformation().forElement(this.element).withColumnFamilies(this.getMap(false, true, true, true))), eq(table), eq(id), this.getExpectedChange(this.element.prop, "DummyKey2", "DummyKey1"), this.getExpectedDelete(false), getExpectedIncr(12));
 
 		this.element.prop = null;
 		this.element.cf.remove("DummyKey2");
 		this.element.store();
-		verify(this.store).storeChanges(eq(this.element), eq(this.getMap(false, true, false, true)), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(true, "DummyKey2"), getExpectedIncr(null));
+		verify(this.store).storeChanges(eq(new MetaInformation().forElement(this.element).withColumnFamilies(this.getMap(false, true, false, true))), eq(table), eq(id), this.getExpectedChange(null), this.getExpectedDelete(true, "DummyKey2"), getExpectedIncr(null));
 	}
 	
 }

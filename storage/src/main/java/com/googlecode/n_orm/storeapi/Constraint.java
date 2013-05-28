@@ -5,20 +5,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.apache.commons.beanutils.ConvertUtils;
-
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.conversion.ConversionTools;
-import com.googlecode.n_orm.storeapi.Constraint;
 
 /**
  * A restriction to a {@link SimpleStore} search.
- * In case this restriction applies to a table (as in {@link SimpleStore#get(String, Constraint, int, Set)}, returned rows should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
+ * In case this restriction applies to a table (as in {@link SimpleStore#get(String, Constraint, int, java.util.Set)}, returned rows should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
  * In case this restrictions applies to a column family (as in {@link SimpleStore#get(String, String, String, Constraint)}, returned columns should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
  */
 public class Constraint {
@@ -43,7 +40,9 @@ public class Constraint {
 	private final String startKey, endKey;
 	
 	public Constraint(String startKey, String endKey) {
-		if (startKey == null && endKey == null)
+		// In case we are restricting to one sigle table, this is a constraint that might be violated
+		// See FederatedTableManagement.ConstraintWithTable
+		if (this.getClass() == Constraint.class && startKey == null && endKey == null)
 			throw new IllegalArgumentException("A search requires at least a start or an end value.");
 		this.startKey = startKey;
 		this.endKey = endKey;
@@ -134,7 +133,17 @@ public class Constraint {
 				Object actualVal = values.get(keys.get(i));
 				Class<?> type = f.getType();
 				if ((actualVal instanceof String) && (! type.isInstance(actualVal))) {
-					actualVal = ConvertUtils.convert((String)actualVal, type);
+					if (type.isEnum()) {
+						for (Object ec : type.getEnumConstants()) {
+							if (((Enum<?>)ec).name().equals(actualVal)) {
+								actualVal = ec;
+								break;
+							}
+						}
+						if (! type.isInstance(actualVal)) // Enum value not found
+							throw new IllegalArgumentException(actualVal + " is not a possible enum value for key " + f);
+					} else
+						actualVal = ConvertUtils.convert((String)actualVal, type);
 				}
 				String rep = f.getAnnotation(Key.class).reverted() ?
 							ConversionTools.convertToStringReverted(actualVal, type)

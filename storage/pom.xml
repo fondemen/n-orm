@@ -7,10 +7,8 @@
 		<relativePath>../parent-aspect/pom.xml</relativePath>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>storage</artifactId>
 	<name>n-orm core</name>
-	<version>${project.parent.version}</version>
 	<packaging>jar</packaging>
 
 	<description>n-orm is neither an object-database mapping, nor it addresses specifically relational databases. Its name was chosen as a reference to the No-SQL movement. 
@@ -52,58 +50,6 @@ Different data stores are possible, especially column-oriented data stores such 
 			<url>file://${basedir}/../../n-orm.wiki/storage</url>
 		</site>
 	</distributionManagement>
-	<profiles>
-
-		<profile>
-			<id>coverage</id>
-
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.codehaus.mojo</groupId>
-						<artifactId>cobertura-maven-plugin</artifactId>
-						<version>2.4</version>
-						<configuration>
-							<check>
-								<lineRate>80</lineRate>
-							</check>
-							<formats>
-								<format>xml</format>
-								<format>html</format>
-							</formats>
-						</configuration>
-						<executions>
-							<execution>
-								<goals>
-									<goal>clean</goal>
-								</goals>
-							</execution>
-							<execution>
-								<id>report</id>
-								<phase>pre-site</phase>
-								<goals>
-									<goal>cobertura</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-			<reporting>
-				<plugins>
-					<plugin>
-						<groupId>org.codehaus.mojo</groupId>
-						<artifactId>cobertura-maven-plugin</artifactId>
-						<version>2.4</version>
-						<configuration>
-							<formats>
-								<format>html</format>
-								<format>xml</format>
-							</formats>
-						</configuration>
-					</plugin>
-				</plugins>
-			</reporting>
-		</profile>
-	</profiles>
+	<build>
+	</build>
 </project>

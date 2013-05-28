@@ -29,6 +29,7 @@ public class PersistableSearchTest {
 	
 	@Persisting(table="PersistableSearch")
 	public static class SUTClass {
+		private static final long serialVersionUID = 6738932109377089556L;
 		@Key public int key1;
 		@Key(order=2) public int key2;
 		
@@ -171,6 +172,7 @@ public class PersistableSearchTest {
 	
 	@Persisting(table="PersistableSearchComposite")
 	public static class CompositeSUT {
+		private static final long serialVersionUID = -6766762589164805353L;
 		@Key(order=1) SUTClass sut1;
 		@Key(order=2) SUTClass sut2;
 	}

@@ -9,7 +9,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
-import com.googlecode.n_orm.InheritanceTest.Ancestor;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.StorageManagement;
@@ -32,6 +31,8 @@ public class InheritanceTest {
 
 	@Persisting
 	public static class Ancestor {
+		private static final long serialVersionUID = 2464862546739203250L;
+
 		@Key(order = 1)
 		public String key;
 
@@ -45,6 +46,7 @@ public class InheritanceTest {
 
 	@Persisting
 	public static class Child1 extends Ancestor {
+		private static final long serialVersionUID = -1954724530133184371L;
 		@Key(order = 2)
 		public String key2;
 
@@ -56,6 +58,7 @@ public class InheritanceTest {
 
 	@Persisting
 	public static class Child2 extends Ancestor {
+		private static final long serialVersionUID = -4733096808356588798L;
 		@Key(order = 2)
 		public String key2;
 
@@ -147,6 +150,7 @@ public class InheritanceTest {
 
 	@Persisting
 	public static class AncestorContainer {
+		private static final long serialVersionUID = -8369858076117963106L;
 		@Key
 		public Ancestor[] aak;
 		public Ancestor[] aap;

@@ -5,13 +5,10 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -30,6 +27,7 @@ import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Store;
 
@@ -146,7 +144,7 @@ public class Process {
 		final Map<String, Field> toBeActivated = families == null ? null : StorageManagement.getAutoActivatedFamilies(clazz, families);
 		ret.toBeActivated = toBeActivated;
 		ret.clazz = clazz;
-		final CloseableKeyIterator keys = store.get(clazz, PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
+		final CloseableKeyIterator keys = store.get(new MetaInformation().forClass(clazz).withColumnFamilies(toBeActivated), PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated == null ? null : toBeActivated.keySet());
 		boolean ownsExecutor = executor == null;
 		if (ownsExecutor) {
 			executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
@@ -178,13 +176,11 @@ public class Process {
 			exceptions.add(t);
 		} finally {
 			keys.close();
-			if (executor != null) {
-				if (ownsExecutor) {
-					executor.shutdown();
-					long to = cancel instanceof TimeoutCanceller ? ((TimeoutCanceller)cancel).getDuration() : 60000;
-					if (!executor.awaitTermination(to, TimeUnit.MILLISECONDS)) {
-						exceptions.add(new InterruptedException("Timeout while expecting termination for process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start)));
-					}
+			if (executor != null && ownsExecutor) {
+				executor.shutdown();
+				long to = cancel instanceof TimeoutCanceller ? ((TimeoutCanceller)cancel).getDuration() : 60000;
+				if (!executor.awaitTermination(to, TimeUnit.MILLISECONDS)) {
+					exceptions.add(new InterruptedException("Timeout while expecting termination for process " + processAction.getClass().getName() + ' ' + processAction + " started at " + new Date(start)));
 				}
 			}
 			if (!problems.isEmpty() || !exceptions.isEmpty()) {
@@ -197,10 +193,10 @@ public class Process {
 
 	public static <AE extends PersistingElement, E extends AE> void processElementsRemotely(final Class<E> clazz, final Constraint c, final com.googlecode.n_orm.Process<AE> process, final Callback callback, final int limit, final String[] families, final int threadNumber, final long timeout) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
 		
-		Store store = StoreSelector.getInstance().getStoreFor(clazz);
+		Store store = StoreSelector.getInstance().getActualStoreFor(clazz);
 		if (store instanceof ActionnableStore) {
 			Map<String, Field> autoActivatedFamilies = StorageManagement.getAutoActivatedFamilies(clazz, families);
-			((ActionnableStore)store).process(PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies, clazz, process, callback);
+			((ActionnableStore)store).process(new MetaInformation().forClass(clazz).withColumnFamilies(autoActivatedFamilies), PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies == null ? null : autoActivatedFamilies.keySet(), clazz, process, callback);
 		} else {
 			new Thread() {
 				public void run() {

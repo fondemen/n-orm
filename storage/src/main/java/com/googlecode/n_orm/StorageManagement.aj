@@ -1,20 +1,19 @@
 package com.googlecode.n_orm;
 
-import java.io.FileInputStream;
 import java.lang.reflect.Field;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.Callable;
-
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.ImplicitActivation;
@@ -25,10 +24,13 @@ import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.DelegatingStore;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.cache.write.WriteRetentionStore;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.consoleannotations.Trigger;
@@ -45,6 +47,12 @@ public aspect StorageManagement {
 	private transient boolean PersistingElement.isStoring = false;
 	private transient Collection<Class<? extends PersistingElement>> PersistingElement.persistingSuperClasses = null;
 	
+	/**
+	 * General-purpose properties.
+	 * First intent is to help data stores.
+	 */
+	private transient AtomicReference<Map<String, Object>> PersistingElement.additionalProperties = null;
+	
 	public boolean PersistingElement.isKnownAsExistingInStore() {
 		return this.exists == Boolean.TRUE;
 	}
@@ -52,18 +60,103 @@ public aspect StorageManagement {
 	public boolean PersistingElement.isKnownAsNotExistingInStore() {
 		return this.exists == Boolean.FALSE;
 	}
+	
+	private AtomicReference<Map<String, Object>> PersistingElement.getAdditionalProperties() {
+		if (this.additionalProperties == null) {
+			synchronized(this) {
+				if (this.additionalProperties == null) {
+					this.additionalProperties = new AtomicReference<Map<String, Object>>();
+				}
+			}
+		}
+		return this.additionalProperties;
+	}
+	
+	/**
+	 * A general purpose property attached to this persisting element.
+	 * Primarily designed to help building data store drivers.
+	 * Thread-safe using copy-on-write.
+	 */
+	public void PersistingElement.addAdditionalProperty(String key, Object o) {
+		AtomicReference<Map<String, Object>> ap = this.getAdditionalProperties();
+		while (true) {
+			Map<String, Object> props = ap.get();
+			Map<String, Object> newProps =
+					props == null ? new HashMap<String, Object>() : new HashMap<String, Object>(props);
+			newProps.put(key, o);
+			if (ap.compareAndSet(props, Collections.unmodifiableMap(newProps))) {
+				break;
+			}
+		}
+		
+	}
+	
+	/**
+	 * A general purpose property attached to this persisting element.
+	 * Primarily designed to help building data store drivers.
+	 */
+	public Object PersistingElement.getAdditionalProperty(String name) {
+		if (this.additionalProperties == null)
+			return null;
+		Map<String, Object> props = this.additionalProperties.get();
+		return props == null ? null : props.get(name);
+	}
+
+	@Continuator
+	public void PersistingElement.flush() {
+		Store s = this.getStore();
+		while (s instanceof DelegatingStore) {
+			if (s instanceof WriteRetentionStore) {
+				WriteRetentionStore writeCache = (WriteRetentionStore)s;
+				// There should have only one write cache in the stack
+				writeCache.flush(this.getTable(), this.getIdentifier());
+				// Handling superclasses
+				Collection<Class<? extends PersistingElement>> persistingSuperClasses = this.getPersistingSuperClasses();
+				if (!persistingSuperClasses.isEmpty()) {
+					PersistingMixin px = PersistingMixin.getInstance();
+					String ident = this.getFullIdentifier();
+					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
+						writeCache.flush(px.getTable(sc), ident);
+					}
+				}
+				return;
+			}
+			s = ((DelegatingStore)s).getActualStore();
+		}
+	}
+	
+	@Continuator
+	public void PersistingElement.deleteNoCache() throws DatabaseNotReachedException {
+		// Performing delete request
+		this.delete();
+		
+		// Flushing write cache in case it exists
+		this.flush();
+	}
 
 	@Continuator
 	public void PersistingElement.delete() throws DatabaseNotReachedException {
-		this.getStore().delete(this, this.getTable(), this.getIdentifier());
+		Store s = this.getStore();
+		s.delete(new MetaInformation().forElement(this), this.getTable(), this.getIdentifier());
 		Collection<Class<? extends PersistingElement>> psc = this.getPersistingSuperClasses();
 		if (!psc.isEmpty()) {
 			PersistingMixin px = PersistingMixin.getInstance();
 			for (Class<? extends PersistingElement> cls : psc) {
-				this.getStore().delete(this, px.getTable(cls), this.getFullIdentifier());
+				this.getStore().delete(new MetaInformation().forElement(this).forClass(cls), px.getTable(cls), this.getFullIdentifier());
 			}
 		}
 		this.exists= Boolean.FALSE;
+		assert ((s instanceof DelegatingStore) && ((DelegatingStore)s).getActualStore(WriteRetentionStore.class) != null)
+			|| !this.existsInStore() : "delete for " + this + " failed: still found in data store";
+	}
+	
+	@Continuator
+	public void PersistingElement.storeNoCache() throws DatabaseNotReachedException {
+		// Performing store request
+		this.store();
+		
+		// Flushing write cache in case it exists
+		this.flush();
 	}
 	
 	@Continuator
@@ -183,7 +276,7 @@ public aspect StorageManagement {
 			
 			if (!(this.exists == Boolean.TRUE && changed.isEmpty() && deleted.isEmpty() && increments.isEmpty())) {
 				
-				this.getStore().storeChanges(this, changedFields, this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
+				this.getStore().storeChanges(new MetaInformation().forElement(this).withColumnFamilies(changedFields), this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
 	
 				propsIncrs.clear();
 				for(ColumnFamily<?> family : families) {
@@ -205,7 +298,7 @@ public aspect StorageManagement {
 //					changed.put(CLASS_COLUMN_FAMILY, classColumn);
 					String ident = this.getFullIdentifier();
 					for (Class<? extends PersistingElement> sc : persistingSuperClasses) {
-						this.getStore().storeChanges(this, changedFields, px.getTable(sc), ident, changed, deleted, increments);
+						this.getStore().storeChanges(new MetaInformation().forElement(this).withColumnFamilies(changedFields), px.getTable(sc), ident, changed, deleted, increments);
 					}
 				}
 			}
@@ -309,7 +402,7 @@ public aspect StorageManagement {
 		Map<String, Field> toBeActivated = getActualFamiliesToBeActivated(timeout, families);
 		
 		if (! toBeActivated.isEmpty()) {
-			ColumnFamilyData rawData = this.getStore().get(this, this.getTable(), this.getIdentifier(), toBeActivated);
+			ColumnFamilyData rawData = this.getStore().get(new MetaInformation().forElement(this).withColumnFamilies(toBeActivated), this.getTable(), this.getIdentifier(), toBeActivated.keySet());
 			activateFromRawData(toBeActivated.keySet(), rawData);
 		}
 	}
@@ -345,9 +438,9 @@ public aspect StorageManagement {
 		}
 	}
 	
-	public static <E extends PersistingElement> E getFromRawData(Class<E> type, Row row) {
+	public static <E extends PersistingElement> E getFromRawData(Class<E> type, Row row, Set<String> toBeActivated) {
 		E element = StorageManagement.getElement(type, row.getKey());
-		element.activateFromRawData(row.getValues().keySet(), row.getValues());
+		element.activateFromRawData(toBeActivated, row.getValues());
 		return element;
 	}
 
@@ -410,7 +503,7 @@ public aspect StorageManagement {
 
 	@Continuator
 	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {
-		boolean ret = this.getStore().exists(this, this.getTable(), this.getIdentifier());
+		boolean ret = this.getStore().exists(new MetaInformation().forElement(this), this.getTable(), this.getIdentifier());
 		this.exists = ret ? Boolean.TRUE : Boolean.FALSE;
 		return ret;
 	}
@@ -523,7 +616,7 @@ public aspect StorageManagement {
 	public static <T extends PersistingElement> CloseableIterator<T> findElement(Class<T> clazz, Constraint c, int limit, String... families) throws DatabaseNotReachedException {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
 		final Map<String, Field> toBeActivated = families == null ? null : getAutoActivatedFamilies(clazz, families);
-		final CloseableKeyIterator keys = store.get(clazz, PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated);
+		final CloseableKeyIterator keys = store.get(new MetaInformation().forClass(clazz).withColumnFamilies(toBeActivated), PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated == null ? null : toBeActivated.keySet());
 		try {
 			CloseableIterator<T> ret = new SearchResultIterator<T>(clazz, limit, toBeActivated, keys);
 			return ret;
@@ -536,7 +629,7 @@ public aspect StorageManagement {
 	
 	public static <T extends PersistingElement> long countElements(Class<T> clazz, Constraint c) {
 		Store store = StoreSelector.getInstance().getStoreFor(clazz);
-		return store.count(clazz, PersistingMixin.getInstance().getTable(clazz), c);
+		return store.count(new MetaInformation().forClass(clazz), PersistingMixin.getInstance().getTable(clazz), c);
 	}
 	
 //	/**

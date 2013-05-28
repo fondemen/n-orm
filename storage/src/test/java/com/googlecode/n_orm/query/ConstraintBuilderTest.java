@@ -140,4 +140,25 @@ public class ConstraintBuilderTest {
 		assertEquals(ConversionTools.convertToString(1) + KeyManagement.KEY_SEPARATOR + ConversionTools.convertToString(2), subcstr.getStartKey());
 		assertEquals(ConversionTools.convertToString(1) + KeyManagement.KEY_SEPARATOR + ConversionTools.convertToString(4), subcstr.getEndKey());
 	}
+	
+	public static enum AnEnum {
+		EV1,EV2
+	}
+	
+	@Persisting
+	public static class AnElementWithEnumKey {
+		private static final long serialVersionUID = -6188603495123606070L;
+		@Key public AnEnum key;
+	}
+	
+	@Test
+	public void findElementWithEnumKeyGivenAsString() {
+		Constraint c = StorageManagement.findElements().ofClass(AnElementWithEnumKey.class).withKey("key").setTo("EV2").getConstraint();
+		assertEquals(c.getStartKey(), AnEnum.EV2.name()+KeyManagement.KEY_END_SEPARATOR);
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void findElementWithBadEnumKeyGivenAsString() {
+		StorageManagement.findElements().ofClass(AnElementWithEnumKey.class).withKey("key").setTo("XXXEV2").getConstraint();
+	}
 }
