@@ -2,11 +2,14 @@ package com.googlecode.n_orm;
 
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
@@ -44,12 +47,45 @@ public aspect StorageManagement {
 	private transient boolean PersistingElement.isStoring = false;
 	private transient Collection<Class<? extends PersistingElement>> PersistingElement.persistingSuperClasses = null;
 	
+	/**
+	 * General-purpose properties.
+	 * First intent is to help data stores.
+	 */
+	private transient AtomicReference<Map<String, Object>> PersistingElement.additionalProperties = new AtomicReference<Map<String, Object>>();
+	
 	public boolean PersistingElement.isKnownAsExistingInStore() {
 		return this.exists == Boolean.TRUE;
 	}
 	
 	public boolean PersistingElement.isKnownAsNotExistingInStore() {
 		return this.exists == Boolean.FALSE;
+	}
+	
+	/**
+	 * A general purpose property attached to this persisting element.
+	 * Primarily designed to help building data store drivers.
+	 * Thread-safe using copy-on-write.
+	 */
+	public void PersistingElement.addAdditionalProperty(String key, Object o) {
+		while (true) {
+			Map<String, Object> props = this.additionalProperties.get();
+			Map<String, Object> newProps =
+					props == null ? new HashMap<String, Object>() : new HashMap<String, Object>(props);
+			newProps.put(key, o);
+			if (this.additionalProperties.compareAndSet(props, Collections.unmodifiableMap(newProps))) {
+				break;
+			}
+		}
+		
+	}
+	
+	/**
+	 * A general purpose property attached to this persisting element.
+	 * Primarily designed to help building data store drivers.
+	 */
+	public Object PersistingElement.getAdditionalProperty(String name) {
+		Map<String, Object> props = this.additionalProperties.get();
+		return props == null ? null : props.get(name);
 	}
 
 	@Continuator
