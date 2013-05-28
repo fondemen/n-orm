@@ -31,6 +31,7 @@ public class CollectionStorageTest {
 	
 	public CollectionStorageTest() throws Exception {
 		StoreTestLauncher stl = StoreTestLauncher.INSTANCE;
+		stl.prepare(this.getClass());
 		if (stl instanceof MemoryStoreTestLauncher)
 			this.mstl = (MemoryStoreTestLauncher)stl;
 		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());

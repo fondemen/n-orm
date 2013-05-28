@@ -3,11 +3,9 @@ package com.googlecode.n_orm.cf;
 import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -15,7 +13,6 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.IncrementException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
-import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.conversion.ConversionTools;
 
@@ -212,7 +209,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 		for (T t : c) {
 			if (this.add(t))
 				ret = true;
-		};
+		}
 		return ret;
 	}
 
@@ -227,7 +224,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 		for (Object t : c) {
 			if (this.remove(t))
 				ret = true;
-		};
+		}
 		return ret;
 	}
 
@@ -298,6 +295,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 		return a;
 	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
 	public boolean equals(Object obj) {
 		return obj != null && obj instanceof Set && this.containsAll((Set)obj) && ((Set)obj).containsAll(this);
@@ -355,6 +353,8 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	protected void storeToPOJO(Object pojo) {
 		@SuppressWarnings("unchecked")
 		Set<T> pojoS = (Set<T>)pojo;
+		
+		pojoS.clear();
 		pojoS.addAll(this);
 	}
 

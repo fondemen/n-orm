@@ -75,7 +75,7 @@ public class ConversionTools {
 		case ToStringReverted:
 			return conv.toStringReverted((T) o, (Class<? extends T>) type);
 		case Default:
-			return conv.getDefaultValue();
+			return conv.getDefaultValue((Class<? extends T>) type);
 		default:
 			throw new IllegalArgumentException("Unknown conversion kind: "
 					+ kind.name());
@@ -177,7 +177,7 @@ public class ConversionTools {
 			return null;
 		
 		return (byte[]) convertInternal(o, expected, ConversionKind.ToBytes,
-				"Cannot create a binary representation for " + o);
+				"Cannot create a binary representation for " + o + " of class " + o.getClass() + " while expecting " + expected.getName());
 	}
 	
 	public static String convertToString(Object o) {
@@ -202,6 +202,7 @@ public class ConversionTools {
 				"Cannot create a reverted string representation for " + o);
 	}
 	
+	@SuppressWarnings("unchecked")
 	public static <T> T getDefaultValue(Class<T> expected) {
 		return (T) convertInternal(null, expected, ConversionKind.Default, null);
 	}

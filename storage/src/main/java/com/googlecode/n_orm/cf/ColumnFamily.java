@@ -19,16 +19,16 @@ import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.consoleannotations.Continuator;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.MetaInformation;
 
 
-public abstract class ColumnFamily<T> {
+public abstract class ColumnFamily<T> implements Comparable<ColumnFamily<T>> {
 	public static enum ChangeKind {SET, DELETE};
 	
 	protected final Class<T> clazz;
 	protected final Field property;
 	protected final String name;
 	protected final PersistingElement owner;
-	protected final String ownerTable;
 
 	protected final Map<String, T> collection = new TreeMap<String, T>();
 
@@ -44,7 +44,6 @@ public abstract class ColumnFamily<T> {
 		this.property = null;
 		this.name = null;
 		this.owner = null;
-		this.ownerTable = null;
 		this.increments = null;
 		this.addOnly = false;
 	}
@@ -55,7 +54,6 @@ public abstract class ColumnFamily<T> {
 		this.property = property;
 		this.name = name;
 		this.owner = owner;
-		this.ownerTable = this.owner.getTable();
 		this.addOnly = property != null && property.isAnnotationPresent(AddOnly.class);
 		if (property != null && property.isAnnotationPresent(Incrementing.class)) {
 			if (!Number.class.isAssignableFrom(clazz))
@@ -72,6 +70,11 @@ public abstract class ColumnFamily<T> {
 	protected abstract void updateFromPOJO(Object pojoVersion);
 	protected abstract void storeToPOJO(Object pojoVersion);
 	protected abstract void addToPOJO(Object pojoVersion, String key, T element);
+
+	@Override
+	public int compareTo(ColumnFamily<T> rhs) {
+		return this == rhs ? 0 : this.owner.compareTo(rhs.owner) + this.name.compareTo(rhs.name);
+	}
 	
 	public String getName() {
 		return name;
@@ -103,7 +106,6 @@ public abstract class ColumnFamily<T> {
 	/**
 	 * Whether this column family was activated during the last <code>timeout</code> period.
 	 * @param timeout negative value means at any time ; {@link Long#MAX_VALUE} bypasses clock read
-	 * @return
 	 */
 	public boolean isActivated(long timeout) {
 		return this.lastActivation > 0 && (timeout < 0 ? true : (timeout == Long.MAX_VALUE || System.currentTimeMillis() - timeout < this.lastActivation));
@@ -141,7 +143,9 @@ public abstract class ColumnFamily<T> {
 		this.owner.checkIsValid();
 		String id = this.owner.getIdentifier();
 		assert id != null;
-		Map<String, byte[]> elements = c == null ? this.owner.getStore().get(this.owner, this.property, this.ownerTable, id, this.name) : this.owner.getStore().get(this.owner, this.property, this.ownerTable, id, this.name, c);
+		Map<String, byte[]> elements = c == null ?
+					this.owner.getStore().get(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), id, this.name)
+				:	this.owner.getStore().get(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), id, this.name, c);
 		this.rebuild(elements);
 	}
 
@@ -150,9 +154,10 @@ public abstract class ColumnFamily<T> {
 		this.clearChanges();
 		String id = this.owner.getIdentifier();
 		assert id != null;
-		for (Entry<String, byte[]> entry : rawData.entrySet()) {
-			this.collection.put(entry.getKey(), this.preparePut(entry.getKey(), entry.getValue()));
-		}
+		if (rawData != null)
+			for (Entry<String, byte[]> entry : rawData.entrySet()) {
+				this.collection.put(entry.getKey(), this.preparePut(entry.getKey(), entry.getValue()));
+			}
 		setActivated();
 		this.storeToPOJO();
 		assert ! this.hasChanged();
@@ -190,7 +195,7 @@ public abstract class ColumnFamily<T> {
 	 * Checks whether this column family is empty in the data store.
 	 */
 	public boolean isEmptyInStore() throws DatabaseNotReachedException {
-		return !this.getOwner().getStore().exists(this.owner, this.property, this.ownerTable, this.getOwner().getIdentifier(), this.getName());
+		return !this.getOwner().getStore().exists(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), this.getOwner().getIdentifier(), this.getName());
 	}
 
 	@Continuator
@@ -291,7 +296,7 @@ public abstract class ColumnFamily<T> {
 		}
 		assert this.increments == null || !this.increments.containsKey(key);
 		
-		byte[] res = this.owner.getStore().get(this.owner, this.property, this.ownerTable, this.owner.getIdentifier(), this.name, key);
+		byte[] res = this.owner.getStore().get(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), this.owner.getIdentifier(), this.name, key);
 		if (res == null)
 			return null;
 		T element = this.preparePut(key, res);

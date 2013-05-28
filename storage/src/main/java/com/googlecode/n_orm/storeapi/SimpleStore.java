@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 /**
  * An interface that defines what a data store should implement and which is simpler than {@link Store}.
@@ -21,8 +22,10 @@ public interface SimpleStore {
 	 */
 	void start() throws DatabaseNotReachedException;
 	
-	//void add(String table, String id, String family, String key, byte[] value);
-	//void remove(String table, String id, String family, String key);
+	/**
+	 * Checks whether the given table exists in this store.
+	 */
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException;
 	
 	/**
 	 * Tests for a row.
@@ -64,15 +67,19 @@ public interface SimpleStore {
 	
 	/**
 	 * Returns all elements in families ; no side-effect.
-	 * In case one element is missing, null is returned.
+	 * In case element with the given key is missing, null is returned.
+	 * @param table the table from which to find the element
+	 * @param id the unique identifier (i.e. the key) with which the element was stored
+	 * @param families the set of column families to be activated ; should never be null or empty
+	 * @return the data stored for each family ; null if and only if the id does not exist in the table
 	 */
-	Map<String, Map<String, byte[]>> get(String table, String id, Set<String> families) throws DatabaseNotReachedException;
+	ColumnFamilyData get(String table, String id, Set<String> families) throws DatabaseNotReachedException;
 	
 	/**
 	 * Stores given piece of information.
 	 * In case an element is missing in the data store (table, row, family, ...), it is created.
 	 */
-	void storeChanges(String table, String id, Map<String, Map<String, byte[]>> changed, Map<String, Set<String>> removed, Map<String, Map<String, Number>> increments) throws DatabaseNotReachedException;
+	void storeChanges(String table, String id, ColumnFamilyData changed, Map<String, Set<String>> removed, Map<String, Map<String, Number>> increments) throws DatabaseNotReachedException;
 	
 	/**
 	 * Deletes the given row

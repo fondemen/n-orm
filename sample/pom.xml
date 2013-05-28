@@ -9,7 +9,7 @@
 	<properties>
 		<java.version>1.6</java.version>
 		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
-		<hbase.version>0.90.3</hbase.version>
+		<hbase.version>0.90.4</hbase.version>
 		<aspectj.version>1.6.12</aspectj.version>
 		<plugin.aspectj.version>1.4</plugin.aspectj.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -140,8 +140,8 @@
 		<profile>
 			<id>hbase-cdh</id>
 			<properties>
-				<hbase.version>0.90.3-cdh3u1</hbase.version>
-				<hadoop.version>0.20.2-cdh3u1</hadoop.version>
+				<hbase.version>0.90.4-cdh3u3</hbase.version>
+				<hadoop.version>0.20.2-cdh3u3</hadoop.version>
 			</properties>
 
 			<repositories>

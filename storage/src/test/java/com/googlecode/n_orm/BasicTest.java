@@ -4,9 +4,6 @@ import static org.junit.Assert.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -19,7 +16,6 @@ import java.util.TreeSet;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
-import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -31,7 +27,6 @@ import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.ProcessTest.InrementNovel;
 import com.googlecode.n_orm.cf.ColumnFamily;
-import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class BasicTest {
 
@@ -194,7 +189,6 @@ public class BasicTest {
 		 oos.writeObject(b2);
 		 
 		 ObjectInputStream bais = new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray()));
-		 @SuppressWarnings("unchecked")
 		 Book usBook = (Book) bais.readObject();
 		 usBook.store();
 	 }
@@ -358,8 +352,7 @@ public class BasicTest {
 	 @Test public void activationOKListener() {
 		 PersistingElementListener listener = EasyMock.createStrictMock(PersistingElementListener.class);
 		 listener.activateInvoked(bsut, new TreeSet<ColumnFamily<?>>());
-		 TreeSet<ColumnFamily<?>> activated = new TreeSet<ColumnFamily<?>>();
-		 activated.add(bsut.getPropertiesColumnFamily());
+		 ColumnFamily<?>[] activated = new ColumnFamily[] {bsut.getPropertiesColumnFamily()};
 		 Capture<Set<ColumnFamily<?>>> famCap = new Capture<Set<ColumnFamily<?>>>();
 		 Capture<Book> bookCap = new Capture<Book>();
 		 listener.activated(EasyMock.capture(bookCap), EasyMock.capture(famCap));
@@ -368,7 +361,7 @@ public class BasicTest {
 		 bsut.activate();
 		 EasyMock.verify(listener);
 		 assertEquals(bsut, bookCap.getValue());
-		 assertArrayEquals(activated.toArray(), famCap.getValue().toArray());
+		 assertArrayEquals(activated, famCap.getValue().toArray());
 	 }
 
 	 @Test public void storeFailedListener() {
@@ -444,6 +437,7 @@ public class BasicTest {
 		
 	@Persisting
 	public static class EmptyClass {
+		private static final long serialVersionUID = 8947335685993348699L;
 		@Key public String key;
 	}
 	
@@ -468,7 +462,7 @@ public class BasicTest {
 		assertFalse(sut2.exists());
 	}
 	 
-	 @Test(timeout=20000) public void processAsync() throws DatabaseNotReachedException, InterruptedException, InstantiationException, IllegalAccessException {
+	 @Test/*(timeout=20000)*/ public void processAsync() throws DatabaseNotReachedException, InterruptedException, InstantiationException, IllegalAccessException {
 		 Novel n1 = new Novel(bssut, new Date(123456799), new Date(0));
 		 n1.attribute = 1;
 		 n1.store();

@@ -1,5 +1,9 @@
 package com.googlecode.n_orm;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.TreeMap;
+
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingElement;
@@ -14,7 +18,7 @@ public privileged aspect PersistingMixin {
 			INSTANCE = aspectOf();
 		return INSTANCE;
 	}
-	
+
 	declare parents: (@Persisting *) implements PersistingElement;
 
 	////If set within the constructor, we can't know whether the correct value is within the database, or that one that was set within the constructor.
@@ -32,16 +36,30 @@ public privileged aspect PersistingMixin {
 		KeyManagement.getInstance().detectKeys(self.getClass());
 	}
 	
+	private transient Map<String /*class name*/, String /*table*/> tables = Collections.emptyMap();
+	
 	public String getTable(Class<? extends PersistingElement> clazz) {
-		Persisting pa = clazz.getAnnotation(Persisting.class);
-		if (pa == null)
-			throw new IllegalStateException("Persisting " + clazz + " must be annotated with " + Persisting.class);
-		String ret = pa.table();
-		return ret.length() == 0 ? clazz.getName() : ret;
+		String ret = this.tables.get(clazz.getName());
+		if (ret == null) {
+			Persisting pa = clazz.getAnnotation(Persisting.class);
+			if (pa == null)
+				throw new IllegalStateException("Persisting " + clazz + " must be annotated with " + Persisting.class);
+			ret = pa.table();
+			ret = ret.length() == 0 ? clazz.getName() : ret;
+			Map<String, String> newTablesCache = new TreeMap<String, String>(tables);
+			newTablesCache.put(clazz.getName(), ret);
+			this.tables = newTablesCache;
+		}
+		return ret;
 	}
 	
+	private transient String PersistingElement.table;
+	
 	public String PersistingElement.getTable() {
-		return PersistingMixin.getInstance().getTable(this.getClass());
+		if (this.table == null) {
+			this.table = PersistingMixin.getInstance().getTable(this.getClass());
+		}
+		return this.table;
 	}
 	
 	public boolean PersistingElement.equals(Object rhs) {
@@ -68,6 +86,17 @@ public privileged aspect PersistingMixin {
 		return this.getIdentifier().compareTo(((PersistingElement)rhs).getIdentifier());
 	}
 	
+	public String identifierToString(String ident) {
+		if (ident == null)
+			return "unset";
+
+		ident = ident.replace(KeyManagement.KEY_SEPARATOR, ":");
+		ident = ident.replace(KeyManagement.KEY_END_SEPARATOR, "}");
+		ident = ident.replace(KeyManagement.ARRAY_SEPARATOR, ";");
+		
+		return ident;
+	}
+	
 	private transient String PersistingElement.stringRep = null;
 	public String PersistingElement.toString() {
 		if (this.stringRep != null ) {
@@ -82,10 +111,7 @@ public privileged aspect PersistingMixin {
 			sb.append(" with no key yet (missing some key values)");
 			ret = sb.toString();
 		} else {
-			ident = ident.replace(KeyManagement.KEY_SEPARATOR, ":");
-			ident = ident.replace(KeyManagement.KEY_END_SEPARATOR, "}");
-			ident = ident.replace(KeyManagement.ARRAY_SEPARATOR, ";");
-			sb.append(" with key " + ident);
+			sb.append(" with key " + PersistingMixin.getInstance().identifierToString(ident));
 			ret = sb.toString();
 			this.stringRep = ret;
 		}

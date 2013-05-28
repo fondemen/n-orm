@@ -112,8 +112,9 @@ public class RelationalStorageTest {
 	}
 	
 	@Persisting(table="PC") public static class PersistingComposed {
-		@Key @ImplicitActivation public  String key;
-		public @ImplicitActivation Composed3Elements value;
+		private static final long serialVersionUID = -360840224795092386L;
+		@Key public  String key;
+		public Composed3Elements value;
 		public PersistingComposed(String key) {
 			super();
 			this.key = key;
@@ -134,6 +135,7 @@ public class RelationalStorageTest {
 	}
 	
 	@Persisting(table="Inside") public static class PersistingInside {
+		private static final long serialVersionUID = 2541212055295077508L;
 		@Key public  String key;
 		public String val;
 		public PersistingInside(String key) {
@@ -142,6 +144,7 @@ public class RelationalStorageTest {
 		}
 	}
 	@Persisting(table="Outside") public static class PersistingOutside {
+		private static final long serialVersionUID = 1095757698036575448L;
 		@Key public  String key;
 		public @ImplicitActivation PersistingInside val;
 		public PersistingOutside(String key) {
@@ -175,10 +178,11 @@ public class RelationalStorageTest {
 		out.val = in;
 		out.store(); //Should not store anything
 		assertEquals("inside" + ke, ConversionTools.convert(String.class, Memory.INSTANCE.get("Outside", "outside" + ke, PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, "val")));
-		assertFalse(Memory.INSTANCE.getTable("Inside").contains("inside" + ke)); //memory was reseted ; in was not stored for it thought it was not changed and in store
+		assertFalse(Memory.INSTANCE.getTable("Inside", true).contains("inside" + ke)); //memory was reseted ; in was not stored for it thought it was not changed and in store
 	}
 	
 	@Persisting(table="Outside") public static class PersistingOutsideExplicit {
+		private static final long serialVersionUID = 1260778893934756498L;
 		@Key public  String key;
 		public PersistingInside val;
 		public PersistingOutsideExplicit(String key) {
@@ -193,9 +197,9 @@ public class RelationalStorageTest {
 		PersistingOutsideExplicit out = new PersistingOutsideExplicit("outside");
 		out.val = in;
 		out.store();
-		assertFalse(Memory.INSTANCE.getTable("Inside").contains("inside" + ke));
+		assertFalse(Memory.INSTANCE.getTable("Inside", true).contains("inside" + ke));
 		in.store();
-		assertTrue(Memory.INSTANCE.getTable("Inside").contains("inside" + ke));
+		assertTrue(Memory.INSTANCE.getTable("Inside", false).contains("inside" + ke));
 		
 		KeyManagement.getInstance().cleanupKnownPersistingElements();
 		
@@ -209,10 +213,12 @@ public class RelationalStorageTest {
 	}
 
 	@Persisting public static class Ref1 {
+		private static final long serialVersionUID = -2057199486577019148L;
 		@Key public String k;
 		public @ImplicitActivation Ref2 ref;
 	}
 	@Persisting public static class Ref2 {
+		private static final long serialVersionUID = 2173917097412615403L;
 		@Key public String k;
 		public @ImplicitActivation Ref1 ref;
 	}

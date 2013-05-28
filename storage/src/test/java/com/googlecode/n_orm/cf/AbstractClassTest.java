@@ -23,6 +23,8 @@ public class AbstractClassTest {
 	}
 	@Persisting
 	public static class PersistingClass extends NonPersistingClass {
+
+		private static final long serialVersionUID = -2172910925015319625L;
 	}
 	
 	@Test

@@ -2,17 +2,24 @@ package com.googlecode.n_orm.console.shell;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
 import jline.ArgumentCompletor;
 import jline.Completor;
 import jline.ConsoleReader;
 import jline.MultiCompletor;
 import jline.SimpleCompletor;
+
+import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.console.util.PackageExplorer;
+import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class Shell
 {
@@ -74,7 +81,27 @@ public class Shell
 		{
 			if (m != null)
 			{
-				if (m.getParameterTypes().length > 0)
+				if (ShellProcessor.isKeyMethod(m))
+				{
+					Object ctx = this.shellProcessor.getContextElement();
+					if (ctx == null)
+						continue;
+					if (ctx instanceof SearchableClassConstraintBuilder) {
+						Class<? extends PersistingElement> clazz = ((SearchableClassConstraintBuilder<?>)ctx).getClazz();
+						if (clazz != null) { // That should be true
+							List<String> keys = new LinkedList<String>();
+							for (Field f : KeyManagement.getInstance().detectKeys(clazz)) {
+								keys.add(f.getName());
+							}
+							argCompletor = new ArgumentCompletor(
+									new SimpleCompletor[] {
+											new SimpleCompletor(new String[] {m.getName()}),
+											new SimpleCompletor(keys.toArray(EMPTY_STRING_ARRAY))
+											});
+						}
+					}
+				}
+				else if (m.getParameterTypes().length > 0)
 				{
 					for (Class<?> c : m.getParameterTypes())
 					{
@@ -83,7 +110,7 @@ public class Shell
 							argCompletor = new ArgumentCompletor(
 									new SimpleCompletor[] {
 											new SimpleCompletor(new String[] {m.getName()}),
-											new SimpleCompletor(this.mapClassNames.toArray(EMPTY_STRING_ARRAY))
+											new SimpleCompletor(Shell.mapClassNames.toArray(EMPTY_STRING_ARRAY))
 											});
 						}
 						else
@@ -112,7 +139,7 @@ public class Shell
 		ArgumentCompletor argCompletorNew = new ArgumentCompletor(
 				new SimpleCompletor[] {
 					new SimpleCompletor(new String[] {shellProcessor.getNewCommand()}),
-					new SimpleCompletor(this.mapClassNames.toArray(EMPTY_STRING_ARRAY))
+					new SimpleCompletor(Shell.mapClassNames.toArray(EMPTY_STRING_ARRAY))
 				});
 		
 		// Create the completors

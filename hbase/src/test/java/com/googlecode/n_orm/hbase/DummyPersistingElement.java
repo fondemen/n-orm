@@ -3,7 +3,6 @@ package com.googlecode.n_orm.hbase;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -12,9 +11,13 @@ import com.googlecode.n_orm.PersistingElementListener;
 import com.googlecode.n_orm.UnknownColumnFamily;
 import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
 import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Store;
 
 public class DummyPersistingElement implements PersistingElement {
+
+	private static final long serialVersionUID = 4609077141875049590L;
 
 	@Override
 	public void activate(Object[] arg0) throws DatabaseNotReachedException {
@@ -99,7 +102,7 @@ public class DummyPersistingElement implements PersistingElement {
 
 	@Override
 	public void activateFromRawData(Set<String> arg0,
-			Map<String, Map<String, byte[]>> arg1) {
+			ColumnFamilyData arg1) {
 		// TODO Auto-generated method stub
 
 	}
@@ -234,12 +237,6 @@ public class DummyPersistingElement implements PersistingElement {
 	}
 
 	@Override
-	public void setPOJO(boolean arg0) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
 	public void setStore(Store store) {
 		// TODO Auto-generated method stub
 
@@ -255,6 +252,36 @@ public class DummyPersistingElement implements PersistingElement {
 	public void updateFromPOJO() {
 		// TODO Auto-generated method stub
 
+	}
+
+	@Override
+	public void storeNoCache() throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	@Continuator
+	public void deleteNoCache() throws DatabaseNotReachedException {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	@Continuator
+	public void flush() {
+		// TODO Auto-generated method stub
+		
+	}
+	
+	@Override
+	public Object getAdditionalProperty(String key) {
+		return null;
+	}
+	
+	@Override
+	public void addAdditionalProperty(String key, Object o) {
+		
 	}
 
 }

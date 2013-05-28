@@ -63,6 +63,12 @@ public class ConstraintBuilderTest {
 	}
 	
 	@Test
+	public void stringParameter() throws DatabaseNotReachedException {
+		 Constraint c = StorageManagement.findElements().ofClass(SUTClass.class).withKey("key1").setTo("765").getConstraint();
+		 assertEquals(ConversionTools.convertToString(765) + KeyManagement.KEY_SEPARATOR, c.getStartKey());
+	}
+	
+	@Test
 	public void lacksSearchKey() throws DatabaseNotReachedException {
 		ClassConstraintBuilder<SUTClass> c = StorageManagement.findElements().ofClass(SUTClass.class).withKey("key1").setTo(1).withAtMost(4).elements();
 		assertEquals(c.getClazz(), SUTClass.class);
@@ -133,5 +139,26 @@ public class ConstraintBuilderTest {
 		Constraint subcstr = co.getConstraint();
 		assertEquals(ConversionTools.convertToString(1) + KeyManagement.KEY_SEPARATOR + ConversionTools.convertToString(2), subcstr.getStartKey());
 		assertEquals(ConversionTools.convertToString(1) + KeyManagement.KEY_SEPARATOR + ConversionTools.convertToString(4), subcstr.getEndKey());
+	}
+	
+	public static enum AnEnum {
+		EV1,EV2
+	}
+	
+	@Persisting
+	public static class AnElementWithEnumKey {
+		private static final long serialVersionUID = -6188603495123606070L;
+		@Key public AnEnum key;
+	}
+	
+	@Test
+	public void findElementWithEnumKeyGivenAsString() {
+		Constraint c = StorageManagement.findElements().ofClass(AnElementWithEnumKey.class).withKey("key").setTo("EV2").getConstraint();
+		assertEquals(c.getStartKey(), AnEnum.EV2.name()+KeyManagement.KEY_END_SEPARATOR);
+	}
+	
+	@Test(expected=IllegalArgumentException.class)
+	public void findElementWithBadEnumKeyGivenAsString() {
+		StorageManagement.findElements().ofClass(AnElementWithEnumKey.class).withKey("key").setTo("XXXEV2").getConstraint();
 	}
 }

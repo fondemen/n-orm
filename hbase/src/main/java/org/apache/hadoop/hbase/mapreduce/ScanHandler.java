@@ -13,6 +13,7 @@ public class ScanHandler {
 	private static final Log LOG = LogFactory.getLog(TableInputFormat.class);
 	
 	//Copied from org.apache.hadoop.hbase.mapreduce.TableInputFormat.setConf(Configuration)
+	@SuppressWarnings("deprecation")
 	public static Scan getScan(Configuration conf) {
 		Scan scan = new Scan();
 	    if (conf.get(TableInputFormat.SCAN) != null) {

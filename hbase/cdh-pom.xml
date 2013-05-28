@@ -6,7 +6,6 @@
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
-	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>hbase</artifactId>
 	<name>HBase driver for n-orm</name>
 	<version>hbase-${hbase.version}-n-orm-${project.parent.version}</version>
@@ -34,6 +33,10 @@
 				<exclusion>
 					<artifactId>slf4j-log4j12</artifactId>
 					<groupId>org.slf4j</groupId>
+				</exclusion>
+				<exclusion>
+					<artifactId>commons-logging</artifactId>
+					<groupId>commons-logging</groupId>
 				</exclusion>
 				<exclusion>
 					<artifactId>jetty</artifactId>
@@ -146,81 +149,19 @@
 		<site>
 			<id>wiki</id>
 			<name>n-orm Wiki pages</name>
-			<url>file://${basedir}/../../n-orm-wiki/hbase</url>
+			<url>file://${basedir}/../../n-orm.wiki/hbase</url>
 		</site>
 	</distributionManagement>
 
 	<repositories>
 
 		<repository>
-			<id>cdh.releases.repo</id>
-			<url>https://repository.cloudera.com/content/repositories/releases</url>
+			<id>cdh.repo</id>
+			<url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
 			<name>CDH Releases Repository</name>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-		</repository>
-		<repository>
-			<id>cdh.snapshots.repo</id>
-			<url>https://repository.cloudera.com/content/repositories/snapshots/</url>
-			<name>CDH Snapshots Repository</name>
 			<snapshots>
 				<enabled>true</enabled>
 			</snapshots>
 		</repository>
 	</repositories>
-
-	<profiles>
-		<profile>
-			<id>coverage</id>
-
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.codehaus.mojo</groupId>
-						<artifactId>cobertura-maven-plugin</artifactId>
-						<version>2.4</version>
-						<configuration>
-							<check>
-								<lineRate>80</lineRate>
-							</check>
-							<formats>
-								<format>xml</format>
-								<format>html</format>
-							</formats>
-						</configuration>
-						<executions>
-							<execution>
-								<goals>
-									<goal>clean</goal>
-								</goals>
-							</execution>
-							<execution>
-								<id>report</id>
-								<phase>pre-site</phase>
-								<goals>
-									<goal>cobertura</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-			<reporting>
-				<plugins>
-					<plugin>
-						<groupId>org.codehaus.mojo</groupId>
-						<artifactId>cobertura-maven-plugin</artifactId>
-						<version>2.4</version>
-						<configuration>
-							<formats>
-								<format>html</format>
-								<format>xml</format>
-							</formats>
-						</configuration>
-					</plugin>
-				</plugins>
-			</reporting>
-		</profile>
-	</profiles>
 </project>
