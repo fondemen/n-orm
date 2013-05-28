@@ -273,5 +273,15 @@ public class DummyPersistingElement implements PersistingElement {
 		// TODO Auto-generated method stub
 		
 	}
+	
+	@Override
+	public Object getAdditionalProperty(String key) {
+		return null;
+	}
+	
+	@Override
+	public void addAdditionalProperty(String key, Object o) {
+		
+	}
 
 }
