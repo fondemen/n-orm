@@ -51,7 +51,7 @@ public aspect StorageManagement {
 	 * General-purpose properties.
 	 * First intent is to help data stores.
 	 */
-	private transient AtomicReference<Map<String, Object>> PersistingElement.additionalProperties = new AtomicReference<Map<String, Object>>();
+	private transient AtomicReference<Map<String, Object>> PersistingElement.additionalProperties = null;
 	
 	public boolean PersistingElement.isKnownAsExistingInStore() {
 		return this.exists == Boolean.TRUE;
@@ -61,18 +61,30 @@ public aspect StorageManagement {
 		return this.exists == Boolean.FALSE;
 	}
 	
+	private AtomicReference<Map<String, Object>> PersistingElement.getAdditionalProperties() {
+		if (this.additionalProperties == null) {
+			synchronized(this) {
+				if (this.additionalProperties == null) {
+					this.additionalProperties = new AtomicReference<Map<String, Object>>();
+				}
+			}
+		}
+		return this.additionalProperties;
+	}
+	
 	/**
 	 * A general purpose property attached to this persisting element.
 	 * Primarily designed to help building data store drivers.
 	 * Thread-safe using copy-on-write.
 	 */
 	public void PersistingElement.addAdditionalProperty(String key, Object o) {
+		AtomicReference<Map<String, Object>> ap = this.getAdditionalProperties();
 		while (true) {
-			Map<String, Object> props = this.additionalProperties.get();
+			Map<String, Object> props = ap.get();
 			Map<String, Object> newProps =
 					props == null ? new HashMap<String, Object>() : new HashMap<String, Object>(props);
 			newProps.put(key, o);
-			if (this.additionalProperties.compareAndSet(props, Collections.unmodifiableMap(newProps))) {
+			if (ap.compareAndSet(props, Collections.unmodifiableMap(newProps))) {
 				break;
 			}
 		}
@@ -84,6 +96,8 @@ public aspect StorageManagement {
 	 * Primarily designed to help building data store drivers.
 	 */
 	public Object PersistingElement.getAdditionalProperty(String name) {
+		if (this.additionalProperties == null)
+			return null;
 		Map<String, Object> props = this.additionalProperties.get();
 		return props == null ? null : props.get(name);
 	}
