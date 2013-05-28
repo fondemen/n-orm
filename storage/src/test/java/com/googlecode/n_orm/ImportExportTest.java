@@ -18,9 +18,9 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import com.googlecode.n_orm.StoreSelector;
@@ -46,6 +46,37 @@ public class ImportExportTest {
 		File ser = new File(BOOKS_SER_FILE);
 		if (ser.exists())
 			ser.delete();
+	}
+
+	@After
+	@Before
+	public void deleteElements() throws Exception {
+		this.deleteAll(Element.class);
+	}
+
+	@After
+	@Before
+	public void deleteBooks() throws Exception {
+		this.deleteAll(Book.class);
+	}
+
+	@After
+	@Before
+	public void deleteBookStore() throws Exception {
+		this.deleteAll(BookStore.class);
+	}
+	
+	public <T extends PersistingElement> void deleteAll(Class<T> clazz) throws Exception {
+		while (StorageManagement.findElements().ofClass(clazz).any() != null) {
+			StorageManagement.findElements().ofClass(clazz)
+			.withAtMost(Integer.MAX_VALUE).elements().forEach(new Process<T>() {
+				
+				@Override
+				public void process(T element) throws Throwable {
+					element.delete();
+				}
+			});
+		}
 	}
 
 	@Test
@@ -287,8 +318,6 @@ public class ImportExportTest {
 		Element bs3 = new Element("bs3"); bs3.setName(null);
 		bs3.store();
 		
-		Thread.sleep(100);
-
 		SearchableClassConstraintBuilder<Element> searchQuery1 = StorageManagement
 				.findElements().ofClass(Element.class).withAtMost(1000)
 				.elements();
@@ -358,7 +387,7 @@ public class ImportExportTest {
 		assertEquals(new TreeSet<String>(), bs3.set);
 	}
 	
-	@Test//(timeout=60000)
+	@Test(timeout=300000)
 	public void longList() throws Exception {
 		final int iterations = 5000;
 
