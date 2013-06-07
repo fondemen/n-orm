@@ -1723,13 +1723,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			return;
 		PersistingElement pe = meta.getElement();
 		assert pe != null;
-		Long npu = (Long)pe.getAdditionalProperty("HBaseNextPossibleUpdateInTable"+table);
-		if (npu == null)
+		ThreadLocal<Long> npu = (ThreadLocal<Long>)pe.getAdditionalProperty("HBaseNextPossibleUpdateInTable"+table);
+		if (npu == null || npu.get() == null)
 			return;
 		long now;
-		while ((now = System.currentTimeMillis()) < npu) {
+		while ((now = System.currentTimeMillis()) < npu.get()) {
 			try {
-				Thread.sleep(npu-now);
+				Thread.sleep(npu.get()-now);
 			} catch (InterruptedException e) {
 			}
 		}
@@ -1748,7 +1748,16 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		// We rely here on meta as it is important to preserve sequentiality for a given
 		// persisting element, but not for different one (even if targeting the same row)
 		// as they are certainly not in the same threads
-		pe.addAdditionalProperty("HBaseNextPossibleUpdateInTable"+table, System.currentTimeMillis()+1);
+		// Corrects com.googlecode.n_orm.ImportExportTest
+		String key = "HBaseNextPossibleUpdateInTable"+table;
+		ThreadLocal<Long> npu = (ThreadLocal<Long>)pe.getAdditionalProperty(key);
+		if (npu == null) {
+			npu = (ThreadLocal<Long>)pe.addAdditionalProperty(key, new ThreadLocal<Long>(), true);
+		}
+		if (npu == null) // Ugh, looks like we are inside a test and pe was mocked
+			return;
+		assert pe.getAdditionalProperty(key) == npu;
+		npu.set(System.currentTimeMillis()+1);
 	}
 
 	@Override

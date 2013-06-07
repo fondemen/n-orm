@@ -130,7 +130,7 @@ public class WriteRetentionStore extends DelegatingStore {
 	/**
 	 * Thread responsible for dequeue
 	 */
-	private static final EvictionThread evictionThread;
+	private static final AtomicReference<EvictionThread> evictionThread = new AtomicReference<EvictionThread>();
 	
 	/**
 	 * Maximum global number of threads used for sending requests to store
@@ -241,7 +241,8 @@ public class WriteRetentionStore extends DelegatingStore {
 	 * @see ThreadPoolExecutor#getActiveCount()
 	 */
 	public static int getActiveSenderThreads() {
-		return evictionThread.sender.getActiveCount();
+		EvictionThread et = evictionThread.get();
+		return et == null ? 0 : et.sender.getActiveCount();
 	}
 
 	/**
@@ -969,10 +970,11 @@ public class WriteRetentionStore extends DelegatingStore {
 				
 			} finally {
 				this.sendLock.writeLock().unlock();
-				if (evictionThread.waiting && rbs < getMaxSenderThreads())
-					synchronized(evictionThread) {
-						if (evictionThread.waiting && rbs < getMaxSenderThreads())
-							evictionThread.notify();
+				EvictionThread et = evictionThread.get();
+				if (et != null && et.waiting && rbs < getMaxSenderThreads())
+					synchronized(et) {
+						if (et.waiting && rbs < getMaxSenderThreads())
+							et.notify();
 					}
 			}
 		}
@@ -998,13 +1000,36 @@ public class WriteRetentionStore extends DelegatingStore {
 				throw new RequestIsOutException();
 
 			long nextExecutionDate = WriteRetentionStore.this.writeRetentionMs + System.currentTimeMillis();
-			if (this.outDateMs.compareAndSet(-1, nextExecutionDate)) {
+			
+			// Placing this request in the to-do list
+			boolean shouldSubmit = this.outDateMs.compareAndSet(-1, nextExecutionDate);
+			if (shouldSubmit) {
 				writeQueue.put(this);
 			} else {
 				// Request should already be planned
 				// Checking this only in case of assertion as it's costly
 				assert writeQueue.contains(this);
 			}
+			
+			// Enforcing that an eviction thread is running
+			boolean done;
+			do {
+				EvictionThread et;
+				
+				while ((et = evictionThread.get()) == null || !et.running) {
+					// No thread found, creating one
+					EvictionThread newEt = new EvictionThread();
+					if (evictionThread.compareAndSet(null, newEt)) {
+						et = newEt;
+						et.start();
+					}
+				}
+				
+				done = et.running;
+			} while (!done && !this.dead);
+			// Not necessary to continue if this request is already out...
+			
+			assert evictionThread.get() != null || writeQueue.isEmpty();
 		}
 		
 		@Override
@@ -1051,7 +1076,7 @@ public class WriteRetentionStore extends DelegatingStore {
 		
 		private EvictionThread() {
 			super("n-orm write cache eviction thread");
-			this.setDaemon(false);
+			this.setDaemon(true);
 			this.setPriority(Thread.MAX_PRIORITY);
 		}
 
@@ -1061,64 +1086,12 @@ public class WriteRetentionStore extends DelegatingStore {
 				return;
 			this.alreadyStarted = true;
 			super.start();
-			// Registering last chance to evict all the list of elements in the
-			// store
-			Runtime.getRuntime().addShutdownHook(new Thread("n-orm write cache shutdown handler") {
-
-				@Override
-				public void run() {
-					try {
-						// Prevents new requests to be recorded
-						shutdown = true;
-						// Stops the queue dequeue
-						running = false;
-						// Stop waiting for the queue
-						EvictionThread.this.interrupt();
-
-						// Sending pending requests using one single thread
-						ExecutorService sender = Executors
-								.newSingleThreadExecutor(new ThreadFactory() {
-									
-									@Override
-									public Thread newThread(Runnable r) {
-										Thread ret = new Thread(r, "n-orm write cache flush before shutdown");
-										ret.setPriority(MAX_PRIORITY);
-										ret.setDaemon(false);
-										return ret;
-									}
-								});
-						boolean removed;
-						do {
-							Iterator<StoreRequest> it = writeQueue.iterator();
-							removed = it.hasNext();
-							while (it.hasNext()) {
-								it.next().send(sender, true);
-								it.remove();
-							}
-						} while (removed);
-
-						// Waiting for all to be sent
-						EvictionThread.this.sender.shutdown();
-						sender.shutdown();
-
-						EvictionThread.this.sender.awaitTermination(
-								Long.MAX_VALUE, TimeUnit.MILLISECONDS);
-						sender.awaitTermination(Long.MAX_VALUE,
-								TimeUnit.MILLISECONDS);
-						
-						assert writeQueue.isEmpty();
-
-					} catch (InterruptedException e) {
-						throw new RuntimeException(e);
-					}
-				}
-
-			});
 		}
 
 		@Override
 		public void run() {
-			while (this.running) {
+			// While this thread is the "official" eviction thread
+			while (evictionThread.get() == this) {
 				StoreRequest r = null;
 				try {
 					while (requestsBeingSending.get() >= getMaxSenderThreads()) {
@@ -1130,13 +1103,27 @@ public class WriteRetentionStore extends DelegatingStore {
 							}
 						}
 					}
-					r = writeQueue.take();
-					// Requests in preparation of sending are marked twice so that a "0" is
-					// a bit less likely to be a false 0
-					requestsBeingSending.incrementAndGet();
-					r.send(this.sender, false);
-					requestsBeingSending.decrementAndGet();
+					
+					r = writeQueue.poll(3, TimeUnit.SECONDS);
+					
+					if (r == null) {
+						if (writeQueue.isEmpty() && requestsBeingSending.get() == 0 && writeQueue.isEmpty()) {
+							// Preparing this thread to stop and stating a new one should be started
+							evictionThread.compareAndSet(this, null);
+							if (!writeQueue.isEmpty() || requestsBeingSending.get() != 0)
+								evictionThread.compareAndSet(null, this);
+						}
+					} else {
+					
+						// Requests in preparation of sending are marked twice so that a "0" is
+						// a bit less likely to be a false 0
+						requestsBeingSending.incrementAndGet();
+						r.send(this.sender, false);
+						requestsBeingSending.decrementAndGet();
+					}
+					
 				} catch (InterruptedException e) {
+					break;
 				} catch (Throwable e) {
 					if (r == null) {
 						logger.log(Level.WARNING, "Problem waiting for request out of write cache: " + e.getMessage(), e);
@@ -1144,6 +1131,15 @@ public class WriteRetentionStore extends DelegatingStore {
 						logger.log(Level.SEVERE, "Problem while sending request out of write cache ; request " + r + " lost: " + e.getMessage(), e);
 					}
 				}
+			}
+			
+			// Stopping
+			this.running = false;
+			this.sender.shutdown();
+			try {
+				this.sender.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+			} catch (InterruptedException e) {
+				logger.log(Level.SEVERE, "Problem while shutting down n-orm write retention cache: " + e.getMessage(), e);
 			}
 		}
 
@@ -1156,8 +1152,6 @@ public class WriteRetentionStore extends DelegatingStore {
 	static {
 		if (DELETED_VALUE == new byte[0])
 			throw new Error("JVM problem : " + WriteRetentionStore.class.getSimpleName() + " requires that new byte[0] != new byte[0]");
-		evictionThread = new EvictionThread();
-		evictionThread.start();
 	}
 	
 	/**
