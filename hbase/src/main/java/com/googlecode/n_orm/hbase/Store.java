@@ -1748,16 +1748,15 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		// We rely here on meta as it is important to preserve sequentiality for a given
 		// persisting element, but not for different one (even if targeting the same row)
 		// as they are certainly not in the same threads
-		ThreadLocal<Long> npu = (ThreadLocal<Long>)pe.getAdditionalProperty("HBaseNextPossibleUpdateInTable"+table);
+		// Corrects com.googlecode.n_orm.ImportExportTest
+		String key = "HBaseNextPossibleUpdateInTable"+table;
+		ThreadLocal<Long> npu = (ThreadLocal<Long>)pe.getAdditionalProperty(key);
 		if (npu == null) {
-			synchronized(pe) {
-				npu = (ThreadLocal<Long>)pe.getAdditionalProperty("HBaseNextPossibleUpdateInTable"+table);
-				if (npu == null) {
-					npu = new ThreadLocal<Long>();
-					pe.addAdditionalProperty("HBaseNextPossibleUpdateInTable"+table, npu);
-				}
-			}
+			npu = (ThreadLocal<Long>)pe.addAdditionalProperty(key, new ThreadLocal<Long>(), true);
 		}
+		if (npu == null) // Ugh, looks like we are inside a test and pe was mocked
+			return;
+		assert pe.getAdditionalProperty(key) == npu;
 		npu.set(System.currentTimeMillis()+1);
 	}
 

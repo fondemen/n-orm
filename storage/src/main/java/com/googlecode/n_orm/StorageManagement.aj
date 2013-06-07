@@ -76,16 +76,36 @@ public aspect StorageManagement {
 	 * A general purpose property attached to this persisting element.
 	 * Primarily designed to help building data store drivers.
 	 * Thread-safe using copy-on-write.
+	 * @param key the key of the inserted element
+	 * @param o the inserted value on this persisting element with the given key
+	 * @param checkIfExists if set to true, given value o will be inserted if and only if
+	 *  no existing value with the same key exists
+	 * @return The object inserted as an additional property
+	 * 	or the previously existing value for the key in case checkIfExists was set to true
+	 * @throws NullPointerException if key or o is null
 	 */
-	public void PersistingElement.addAdditionalProperty(String key, Object o) {
+	public Object PersistingElement.addAdditionalProperty(String key, Object o, boolean checkIfExists) {
+		if (key == null)
+			throw new NullPointerException("Key for additional attibute for " + this + " cannot be null.");
+		if (o == null)
+			throw new NullPointerException("Value for additional attibute " + key + " for " + this + " cannot be null.");
 		AtomicReference<Map<String, Object>> ap = this.getAdditionalProperties();
 		while (true) {
-			Map<String, Object> props = ap.get();
-			Map<String, Object> newProps =
-					props == null ? new HashMap<String, Object>() : new HashMap<String, Object>(props);
+			Map<String, Object> oldProps = ap.get(), newProps;
+			if (oldProps == null) {
+				newProps = new HashMap<String, Object>();
+			} else {
+				if (checkIfExists) {
+					Object old = oldProps.get(key);
+					if (old != null) {
+						return old;
+					}
+				}
+				newProps = new HashMap<String, Object>();
+			}
 			newProps.put(key, o);
-			if (ap.compareAndSet(props, Collections.unmodifiableMap(newProps))) {
-				break;
+			if (ap.compareAndSet(oldProps, Collections.unmodifiableMap(newProps))) {
+				return o;
 			}
 		}
 		
