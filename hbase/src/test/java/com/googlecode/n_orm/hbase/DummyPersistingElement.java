@@ -280,8 +280,8 @@ public class DummyPersistingElement implements PersistingElement {
 	}
 	
 	@Override
-	public void addAdditionalProperty(String key, Object o) {
-		
+	public Object addAdditionalProperty(String key, Object o, boolean b) {
+		return null;
 	}
 
 }
