@@ -70,10 +70,15 @@ public privileged aspect PersistingMixin {
 		
 		return this.getIdentifier().equals(((PersistingElement)rhs).getIdentifier());
 	}
+	
+	@Transient private int PersistingElement.hashCode = -1;
 
 	@Continuator
 	public int PersistingElement.hashCode() {
-		return this.getFullIdentifier().hashCode();
+		if (this.hashCode == -1) {
+			this.hashCode = this.getFullIdentifier().hashCode();
+		}
+		return this.hashCode;
 	}
 	
 	public int PersistingElement.compareTo(PersistingElement rhs) {
