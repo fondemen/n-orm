@@ -59,6 +59,58 @@ public class EvolutionTest {
 		v1.store();
 		assertTrue(v0.existsInStore());
 	}
+	
+	@Test
+	public void removedProps() {
+		String key = "JIOJJ:?IKBYI:NIUBYBF";
+		V0NewProps v1 = new V0NewProps();
+		v1.key = key;
+		v1.sval = "huihjk";
+		v1.tval = new Date();
+		v1.ival = 457890;
+		v1.dval = 7.786786e-12f;
+		v1.eval = EnumTest.E2;
+		v1.store();
+		
+		V0 v0 = new V0(); v0.key = key; v0.activate();
+		
+		assertTrue(v0.existsInStore());
+	}
+
+	@Persisting(table="evoltest")
+	public static class V1RemovedProps {
+		private static final long serialVersionUID = 5854170758073427430L;
+
+		@Key public String key;
+		
+		public String sval;
+		//public Date tval;
+		public int ival;
+		//public float dval;
+		public EnumTest eval;
+	}
+	
+	@Test
+	public void removedProps2() {
+		String key = "JIOJJ:?IKBYI:NIUBYBF";
+		V0NewProps v1 = new V0NewProps();
+		v1.key = key;
+		v1.sval = "huihjk";
+		v1.tval = new Date();
+		v1.ival = 457890;
+		v1.dval = 7.786786e-12f;
+		v1.eval = EnumTest.E2;
+		v1.store();
+		
+		V1RemovedProps v2 = new V1RemovedProps();
+		v2.key = key;
+		v2.activate();
+		
+		assertTrue(v2.existsInStore());
+		assertEquals(v1.sval, v2.sval);
+		assertEquals(v1.ival, v2.ival);
+		assertEquals(v1.eval, v2.eval);
+	}
 
 	@Persisting(table="evoltest")
 	public static class V0NewCf {
