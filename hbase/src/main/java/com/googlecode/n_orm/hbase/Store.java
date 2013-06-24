@@ -1849,7 +1849,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			// Checking for WAL policy
 			if (rowPut != null) { // Only Puts can override WAL policy in 0.90
 				HBaseSchema.WALWritePolicy useWal = null;
-				HBaseSchema clazzAnnotation = meta.getClazz() == null ? null : meta.getClazz().getAnnotation(HBaseSchema.class);
+				HBaseSchema clazzAnnotation = meta == null || meta.getClazz() == null ? null : meta.getClazz().getAnnotation(HBaseSchema.class);
 				HBaseSchema.WALWritePolicy clazzWAL = clazzAnnotation == null ? HBaseSchema.WALWritePolicy.UNSET : clazzAnnotation.writeToWAL();
 				for(byte[] famB : rowPut.getFamilyMap().keySet()) {
 					String famS = Bytes.toString(famB);
