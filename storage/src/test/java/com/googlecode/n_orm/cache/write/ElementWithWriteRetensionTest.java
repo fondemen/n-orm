@@ -246,7 +246,7 @@ public class ElementWithWriteRetensionTest {
 		final int incrNr = 1000;
 		final int parallelThreads = 10;
 		
-		final String key = "anelement", qual = "aQual";
+		final String key = UUID.randomUUID().toString(), qual = "aQual";
 		
 		Element e = new Element();
 		e.key = key;
