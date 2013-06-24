@@ -1846,6 +1846,56 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				actions.add(rowPut);
 			}
 			
+			// Checking for WAL policy
+			if (rowPut != null) { // Only Puts can override WAL policy in 0.90
+				HBaseSchema.WALWritePolicy useWal = null;
+				HBaseSchema clazzAnnotation = meta.getClazz() == null ? null : meta.getClazz().getAnnotation(HBaseSchema.class);
+				HBaseSchema.WALWritePolicy clazzWAL = clazzAnnotation == null ? HBaseSchema.WALWritePolicy.UNSET : clazzAnnotation.writeToWAL();
+				for(byte[] famB : rowPut.getFamilyMap().keySet()) {
+					String famS = Bytes.toString(famB);
+					HBaseSchema.WALWritePolicy wtw;
+					if (PropertyManagement.PROPERTY_COLUMNFAMILY_NAME.equals(famS)) {
+						// Properties use schema for classes
+						wtw = clazzWAL;
+					} else {
+						HBaseSchema schema;
+						Field fam = fams.get(famS);
+						if (fam != null) {
+							schema = fam.getAnnotation(HBaseSchema.class);
+						} else {
+							schema = null;
+						}
+						// No explicit schema mean schema for class
+						if (schema == null) {
+							wtw = clazzWAL;
+						} else {
+							wtw = schema.writeToWAL();
+							if (HBaseSchema.WALWritePolicy.UNSET.equals(wtw)) {
+								wtw = clazzWAL;
+							}
+						}
+					}
+					// Grabbing strongest policy for the store
+					if (useWal == null || wtw.strongerThan(useWal)) {
+						useWal = wtw;
+					}
+				}
+				
+				if (useWal == null) {
+					useWal = HBaseSchema.WALWritePolicy.UNSET;
+				}
+				
+				switch(useWal) {
+				case UNSET:
+					break;
+				case SKIP:
+					rowPut.setWriteToWAL(false);
+					break;
+				default:
+					rowPut.setWriteToWAL(true);
+					break;
+				}
+			}
 			
 			Action<?> act;
 			//Running puts and deletes

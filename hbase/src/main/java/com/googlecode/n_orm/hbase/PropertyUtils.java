@@ -256,6 +256,7 @@ public class PropertyUtils {
 		private SettableBoolean forceReplicationScope = defaultHbaseSchema
 				.forceReplicationScope();
 		private int replicationScope = defaultHbaseSchema.replicationScope();
+		private WALWritePolicy writeToWAL = defaultHbaseSchema.writeToWAL();
 
 		@Override
 		public Class<? extends Annotation> annotationType() {
@@ -421,6 +422,15 @@ public class PropertyUtils {
 			this.replicationScope = replicationScope;
 		}
 
+		@Override
+		public WALWritePolicy writeToWAL() {
+			return this.writeToWAL;
+		}
+
+		public void setWriteToWAL(WALWritePolicy writeToWAL) {
+			this.writeToWAL = writeToWAL;
+		}
+		
 	}
 
 	private static Map<TypeWithPostfix, HBaseSchema> specificities = new TreeMap<TypeWithPostfix, HBaseSchema>();
