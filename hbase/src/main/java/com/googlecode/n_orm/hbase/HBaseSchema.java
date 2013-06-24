@@ -23,6 +23,25 @@ public @interface HBaseSchema {
 		UNSET,
 		TRUE,
 		FALSE};
+		
+	public static enum WALWritePolicy {
+		/** No explicit policy set. By default, equivalent to {@link #USE}. */
+		UNSET((byte)63),
+		/** WAL should not be used at all. */
+		SKIP((byte)0),
+		/** WAL should be used synchronously. */ 
+		USE((byte)64);
+		
+		private int strength;
+		
+		private WALWritePolicy(byte strength) {
+			this.strength = strength;
+		}
+		
+		public boolean strongerThan(WALWritePolicy rhs) {
+			return this.strength > rhs.strength;
+		}
+	}
 	
 	/**
 	 * Changes value for {@link Store#isInMemory()} for a particular persisting class or column family.
@@ -43,6 +62,13 @@ public @interface HBaseSchema {
 	 * In case a value is defined at family level for at least one of the activated families (see {@link com.googlecode.n_orm.PersistingElement#activate(String...)}), class- and store-level scan caching is ignored.
 	 */
 	int scanCaching() default -1;
+	
+	/**
+	 * Whether or not to use the Write Away Log (WAL) while storing this {@link com.googlecode.n_orm.PersistingElement} (default is true).
+	 * In case more than one column family are implied in a store, {@link WALWritePolicy#strongerThan(WALWritePolicy) strongest} policy 
+	 * is used for the complete store.
+	 */
+	WALWritePolicy writeToWAL() default WALWritePolicy.UNSET;
 
 	/**
 	 * Changes value for {@link Store#isForceInMemory()} for a particular persisting class or column family.
