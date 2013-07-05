@@ -207,4 +207,14 @@ public class Constraint {
 		return endKey;
 	}
 	
+	public boolean sastisfies(String key) {
+		if (key == null)
+			throw new IllegalArgumentException("Key cannot be null while checked to satisfy a constraint");
+		if (startKey != null && key.compareTo(startKey)>=0)
+			return false;
+		if (endKey != null && key.compareTo(endKey)<=0)
+			return false;
+		return true;
+	}
+	
 }
