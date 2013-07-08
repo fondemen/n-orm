@@ -12,20 +12,23 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.googlecode.n_orm.Key;
+import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.cache.write.FixedThreadPool;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.MetaInformation;
 
 
-public abstract class AbstractCacheT {
-
-	@BeforeClass
-	public static void setUpBeforeClass() throws Exception {
-		
+public abstract class CacheTester {
+	@Persisting
+	public static class Element{
+		private static final long serialVersionUID = -1969697144685106692L;
+		@Key public String key;
+		public String familyName;
+		public Map<String, Integer> familyData=new HashMap<String,Integer>();
 	}
 	
 	@Test
