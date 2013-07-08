@@ -1,10 +1,9 @@
 package com.googlecode.n_orm.cache.read;
-import static org.junit.Assert.*;
 
+import static org.junit.Assert.*;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -13,19 +12,16 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-import javax.xml.crypto.Data;
-
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.cache.write.FixedThreadPool;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.storeapi.MetaInformation;
 
 
-public abstract class CacheTester {
+public abstract class AbstractCacheT {
 
 	@BeforeClass
 	public static void setUpBeforeClass() throws Exception {
