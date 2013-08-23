@@ -18,9 +18,9 @@
 	</scm>
 	
 	<properties>
-		<hbase.version>0.94.2-cdh4.2.0</hbase.version>
-		<hadoop.version>2.0.0-cdh4.2.0</hadoop.version>
-		<hadoop.version.mr1>2.0.0-mr1-cdh4.2.0</hadoop.version.mr1>
+		<hbase.version>0.94.6-cdh4.3.0</hbase.version>
+		<hadoop.version>2.0.0-cdh4.3.0</hadoop.version>
+		<hadoop.version.mr1>2.0.0-mr1-cdh4.3.0</hadoop.version.mr1>
 	</properties>
 
 	<dependencies>

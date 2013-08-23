@@ -353,6 +353,8 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 	protected void storeToPOJO(Object pojo) {
 		@SuppressWarnings("unchecked")
 		Set<T> pojoS = (Set<T>)pojo;
+		
+		pojoS.clear();
 		pojoS.addAll(this);
 	}
 
