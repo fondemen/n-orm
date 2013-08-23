@@ -16,7 +16,7 @@ import com.googlecode.n_orm.storeapi.Row;
  * so that they are iterated
  * {@link PersistingElement#compareTo(PersistingElement) in an ordered way}.
  * In case an element with same id is found from different iterators, an
- * {@link IllegaleStateException exception} is thrown, unless
+ * {@link IllegalStateException exception} is thrown, unless
  * {@link #merge(Row, CloseableKeyIterator, Row, CloseableKeyIterator)}
  * is overridden.
  */
