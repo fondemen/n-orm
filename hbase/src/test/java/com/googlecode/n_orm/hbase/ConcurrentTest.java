@@ -254,17 +254,13 @@ public class ConcurrentTest {
 		ch1.put("k1", new byte[]{1, 2});
 		
 		HConnection cm = store1.getAdmin().getConnection();
-		Method closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
-		closeM.setAccessible(true);
-		closeM.invoke(cm, true);
+		cm.close();
 		
 		store1.storeChanges(null, "t1", "idt1", change1 , null, null);
 		assertTrue(store1.exists(null, "t1", "idt1", "cf1"));
 		
 		cm = store1.getAdmin().getConnection();
-		closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
-		closeM.setAccessible(true);
-		closeM.invoke(cm, true);
+		cm.close();
 		
 		store1.delete(null, "t1", "idt1");
 		assertFalse(store1.exists(null, "t1", "idt1", "cf1"));
@@ -434,7 +430,7 @@ public class ConcurrentTest {
 	}
 	
 	@Test(expected=Test.None.class)
-	public void connectionClosedAfterRestart() throws SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+	public void connectionClosedAfterRestart() throws SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException, IOException {
 
 		String datum = "fyukg,huom,jio,";
 		String key = "aprop";
@@ -449,9 +445,7 @@ public class ConcurrentTest {
 		store1.restart();
 		
 		HConnection cm = store1.getAdmin().getConnection();
-		Method closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
-		closeM.setAccessible(true);
-		closeM.invoke(cm, true);
+		cm.close();
 		
 		out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 		assertEquals(datum, ConversionTools.convert(String.class, out.get(key)));
@@ -460,7 +454,7 @@ public class ConcurrentTest {
 	}
 	
 	@Test(expected=Test.None.class)
-	public void connectionClosedBeforeRestart() throws SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+	public void connectionClosedBeforeRestart() throws SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException, IOException {
 
 		store1.restart();
 		String datum = "fyukg,huom,jio,";
@@ -473,9 +467,7 @@ public class ConcurrentTest {
 		assertTrue(store1.exists(null, "t1", "row"));
 		
 		HConnection cm = store1.getAdmin().getConnection();
-		Method closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
-		closeM.setAccessible(true);
-		closeM.invoke(cm, true);
+		cm.close();
 		
 		Map<String, byte[]> out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 		assertEquals(datum, ConversionTools.convert(String.class, out.get(key)));

@@ -2,11 +2,14 @@ package com.googlecode.n_orm;
 
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
@@ -44,12 +47,79 @@ public aspect StorageManagement {
 	private transient boolean PersistingElement.isStoring = false;
 	private transient Collection<Class<? extends PersistingElement>> PersistingElement.persistingSuperClasses = null;
 	
+	/**
+	 * General-purpose properties.
+	 * First intent is to help data stores.
+	 */
+	private transient AtomicReference<Map<String, Object>> PersistingElement.additionalProperties = null;
+	
 	public boolean PersistingElement.isKnownAsExistingInStore() {
 		return this.exists == Boolean.TRUE;
 	}
 	
 	public boolean PersistingElement.isKnownAsNotExistingInStore() {
 		return this.exists == Boolean.FALSE;
+	}
+	
+	private AtomicReference<Map<String, Object>> PersistingElement.getAdditionalProperties() {
+		if (this.additionalProperties == null) {
+			synchronized(this) {
+				if (this.additionalProperties == null) {
+					this.additionalProperties = new AtomicReference<Map<String, Object>>();
+				}
+			}
+		}
+		return this.additionalProperties;
+	}
+	
+	/**
+	 * A general purpose property attached to this persisting element.
+	 * Primarily designed to help building data store drivers.
+	 * Thread-safe using copy-on-write.
+	 * @param key the key of the inserted element
+	 * @param o the inserted value on this persisting element with the given key
+	 * @param checkIfExists if set to true, given value o will be inserted if and only if
+	 *  no existing value with the same key exists
+	 * @return The object inserted as an additional property
+	 * 	or the previously existing value for the key in case checkIfExists was set to true
+	 * @throws NullPointerException if key or o is null
+	 */
+	public Object PersistingElement.addAdditionalProperty(String key, Object o, boolean checkIfExists) {
+		if (key == null)
+			throw new NullPointerException("Key for additional attibute for " + this + " cannot be null.");
+		if (o == null)
+			throw new NullPointerException("Value for additional attibute " + key + " for " + this + " cannot be null.");
+		AtomicReference<Map<String, Object>> ap = this.getAdditionalProperties();
+		while (true) {
+			Map<String, Object> oldProps = ap.get(), newProps;
+			if (oldProps == null) {
+				newProps = new HashMap<String, Object>();
+			} else {
+				if (checkIfExists) {
+					Object old = oldProps.get(key);
+					if (old != null) {
+						return old;
+					}
+				}
+				newProps = new HashMap<String, Object>();
+			}
+			newProps.put(key, o);
+			if (ap.compareAndSet(oldProps, Collections.unmodifiableMap(newProps))) {
+				return o;
+			}
+		}
+		
+	}
+	
+	/**
+	 * A general purpose property attached to this persisting element.
+	 * Primarily designed to help building data store drivers.
+	 */
+	public Object PersistingElement.getAdditionalProperty(String name) {
+		if (this.additionalProperties == null)
+			return null;
+		Map<String, Object> props = this.additionalProperties.get();
+		return props == null ? null : props.get(name);
 	}
 
 	@Continuator

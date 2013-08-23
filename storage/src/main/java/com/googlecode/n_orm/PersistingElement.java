@@ -21,7 +21,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * The list of possible types for simple properties (including keys).
 	 * Other possible types are array of a possible type, persisting elements and classes with only keys.
 	 */
-	static final Class<?>[] PossiblePropertyTypes = new Class[] { Date.class,
+	public static final Class<?>[] PossiblePropertyTypes = new Class[] { Date.class,
 			String.class, Boolean.class, int.class, byte.class, short.class,
 			long.class, float.class, double.class, boolean.class,
 			char.class, Integer.class, Byte.class, Short.class, Long.class,
@@ -31,7 +31,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	/**
 	 * The store used for this persisting element.
 	 */
-	Store getStore();
+	public Store getStore();
 	
 	/**
 	 * Sets the store used for this persisting element. Note that in most case, you do not need to use this method as stores are automatically discovered.
@@ -39,20 +39,20 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws IllegalStateException in case this persisting element already has a store
 	 * @see Persisting
 	 */
-	void setStore(Store store) throws IllegalStateException;
+	public void setStore(Store store) throws IllegalStateException;
 
 	/**
 	 * The table used to store this persisting element as declared by the {@link Persisting#table()} annotation.
 	 * If the persisting element inherits another persisting element, only the table for the instanciated class is shown.
 	 */
-	String getTable();
+	public String getTable();
 
 	/**
 	 * The list of keys for this persisting element.
 	 * A key is a property annotated with {@link Key}.
 	 * The result is sorted in the order declared by {@link Key#order()}.
 	 */
-	List<Field> getKeys();
+	public List<Field> getKeys();
 	
 	/**
 	 * The {@link ColumnFamily} used to store properties.
@@ -61,26 +61,26 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * The values stored in this column families are the last activated.
 	 * @see #activate(String...)
 	 */
-	PropertyFamily getPropertiesColumnFamily();
+	public PropertyFamily getPropertiesColumnFamily();
 	
 	/**
 	 * The list of all {@link ColumnFamily} held by this persisting element.
 	 */
-	Collection<ColumnFamily<?>> getColumnFamilies(); //Can't be a java.util.Set as CFs are either Sets or Maps whose equals or hashCode must compare collection contents only 
+	public Collection<ColumnFamily<?>> getColumnFamilies(); //Can't be a java.util.Set as CFs are either Sets or Maps whose equals or hashCode must compare collection contents only 
 	
 	/**
 	 * The the {@link ColumnFamily} held by this persisting element with the given name.
 	 * The name is the name of the property for the column family, i.e. the non static, non final , non transient {@link java.util.Map} or {@link java.util.Set} field.
 	 * @see ColumnFamily#getName()
 	 */
-	ColumnFamily<?> getColumnFamily(String columnFamilyName) throws UnknownColumnFamily;
+	public ColumnFamily<?> getColumnFamily(String columnFamilyName) throws UnknownColumnFamily;
 	
 	/**
 	 * The the {@link ColumnFamily} held by this persisting element corresponding to the object stored by the object as a column family.
 	 * Typical use is myPe.getColumnFamily(myPe.myCf)
 	 * @param collection the value for the property stored as a column family.
 	 */
-	ColumnFamily<?> getColumnFamily(Object collection) throws UnknownColumnFamily;
+	public ColumnFamily<?> getColumnFamily(Object collection) throws UnknownColumnFamily;
 
 	/**
 	 * The identifier for this persisting element.
@@ -89,20 +89,20 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws IllegalStateException in case all keys have not been set
 	 * @see com.googlecode.n_orm.conversion.ConversionTools#convertToString(Object)
 	 */
-	String getIdentifier();
+	public String getIdentifier();
 	
 	/**
 	 * Same result as {@link #getIdentifier()}, but postfixed with the name of the class instanciated by this persisting element.
 	 * @see Object#getClass()
 	 */
-	String getFullIdentifier();
+	public String getFullIdentifier();
 
 	/**
 	 * Checks whether this persisting has changed since its last activation.
 	 * In case this object has not changed, a {@link #store()} will not trigger any data store request.
 	 * @see #activate(String...)
 	 */
-	boolean hasChanged();
+	public boolean hasChanged();
 
 	/**
 	 * Stores the object into the data store designated by {@link #getStore()}.
@@ -141,7 +141,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see com.googlecode.n_orm.storeapi.SimpleStore
 	 */
 	@Continuator
-	void store() throws DatabaseNotReachedException;
+	public void store() throws DatabaseNotReachedException;
 	
 	/**
 	 * Store this persisting element as {@link #store()} but ignoring any {@link com.googlecode.n_orm.cache.write.WriteRetentionStore write cache}.
@@ -149,14 +149,14 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws DatabaseNotReachedException
 	 */
 	@Continuator
-	void storeNoCache() throws DatabaseNotReachedException;
+	public void storeNoCache() throws DatabaseNotReachedException;
 	
 	/**
 	 * Deletes rows representing this persisting element in the store.
 	 * @see #store()
 	 */
 	@Continuator
-	void delete() throws DatabaseNotReachedException;
+	public void delete() throws DatabaseNotReachedException;
 	
 	/**
 	 * Deletes rows representing this persisting element in the store.
@@ -164,7 +164,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #store()
 	 */
 	@Continuator
-	void deleteNoCache() throws DatabaseNotReachedException;
+	public void deleteNoCache() throws DatabaseNotReachedException;
 	
 	/**
 	 * If an element with the same id as this element exists in the cache, returns the element from the cache, otherwise returns this element which will be placed in the cache.
@@ -182,7 +182,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * <code>Element elt = new Element("key").getCachedVersion();</code>
 	 * @see com.googlecode.n_orm.cache.perthread.Cache
 	 */
-	PersistingElement getCachedVersion();
+	public PersistingElement getCachedVersion();
 	
 	/**
 	 * Checks whether the row representing this persisting element is known to exist in the store avoiding as much as possible to query the data store.
@@ -191,7 +191,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * In other situations, the data store is queried using {@link #existsInStore()}.
 	 * @see #getCachedVersion()
 	 */
-	boolean exists() throws DatabaseNotReachedException;
+	public boolean exists() throws DatabaseNotReachedException;
 	
 	/**
 	 * Checks whether the row representing this persisting element exists in the store.
@@ -199,7 +199,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #store()
 	 */
 	@Continuator
-	boolean existsInStore() throws DatabaseNotReachedException;
+	public boolean existsInStore() throws DatabaseNotReachedException;
 
 	/**
 	 * Retrieves information from the store and put it into this persisting element.
@@ -210,7 +210,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @param families names of the families to activate even if they are not annotated with {@link ImplicitActivation} (see {@link #getColumnFamily(String)})
 	 * @throws IllegalArgumentException in case a given column family does not exists
 	 */
-	void activate(String... families) throws DatabaseNotReachedException;
+	public void activate(String... families) throws DatabaseNotReachedException;
 
 	/**
 	 * Retrieves information that have not been activated yet from the store and put it into this persisting element.
@@ -220,7 +220,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws IllegalArgumentException in case a given column family does not exists
 	 * @see #getCachedVersion()
 	 */
-	void activateIfNotAlready(String... families) throws DatabaseNotReachedException;
+	public void activateIfNotAlready(String... families) throws DatabaseNotReachedException;
 
 	/**
 	 * Retrieves information that have not been activated yet from the store and put it into this persisting element.
@@ -231,7 +231,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws IllegalArgumentException in case a given column family does not exists
 	 * @see #getCachedVersion()
 	 */
-	void activateIfNotAlready(long lastActivationTimeoutMs, String... families) throws DatabaseNotReachedException;
+	public void activateIfNotAlready(long lastActivationTimeoutMs, String... families) throws DatabaseNotReachedException;
 	
 	/**
 	 * Activates a given column family (does not activate included persisting elements).
@@ -241,7 +241,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #getColumnFamily(String)
 	 */
 	@Continuator
-	void activateColumnFamily(String name) throws UnknownColumnFamily, DatabaseNotReachedException;
+	public void activateColumnFamily(String name) throws UnknownColumnFamily, DatabaseNotReachedException;
 
 	/**
 	 * Activates a given column family (does not activate included persisting elements).
@@ -253,7 +253,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #getColumnFamily(String)
 	 */
 	@Continuator
-	void activateColumnFamily(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
+	public void activateColumnFamily(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
 	/**
 	 * Activates a given column family (does not activate included persisting elements) in case it was not done before (with any possible activation method).
@@ -264,7 +264,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #getColumnFamily(String)
 	 * @see #getCachedVersion()
 	 */
-	void activateColumnFamilyIfNotAlready(String name) throws UnknownColumnFamily, DatabaseNotReachedException;
+	public void activateColumnFamilyIfNotAlready(String name) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
 	/**
 	 * Activates a given column family (does not activate included persisting elements) in case it was not done before (with any possible activation method).
@@ -276,7 +276,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #getColumnFamily(String)
 	 * @see #getCachedVersion()
 	 */
-	void activateColumnFamilyIfNotAlready(String name, long lastActivationTimeoutMs) throws UnknownColumnFamily, DatabaseNotReachedException;
+	public void activateColumnFamilyIfNotAlready(String name, long lastActivationTimeoutMs) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
 	/**
 	 * Activates a given column family (does not activate included persisting elements) in case it was not done before (with any possible activation method).
@@ -289,7 +289,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #getColumnFamily(String)
 	 * @see #getCachedVersion()
 	 */
-	void activateColumnFamilyIfNotAlready(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;	
+	public void activateColumnFamilyIfNotAlready(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;	
 	
 	/**
 	 * Activates a given column family (does not activate included persisting elements) in case it was not done before (with any possible activation method).
@@ -303,19 +303,19 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see #getColumnFamily(String)
 	 * @see #getCachedVersion()
 	 */
-	void activateColumnFamilyIfNotAlready(String name, long lastActivationTimeoutMs, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
+	public void activateColumnFamilyIfNotAlready(String name, long lastActivationTimeoutMs, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
 	/**
 	 * Flushes any outgoing request pending on a {@link com.googlecode.n_orm.cache.write.WriteRetentionStore write-retention store}.
 	 */
 	@Continuator
-	void flush();
+	public void flush();
 	
 	/**
 	 * To be equal, two persisting elements must implement the same class and have the same identifier, no matter they have same values for properties and column families.
 	 * @see Object#equals(Object)
 	 */
-	boolean equals(Object rhs);
+	public boolean equals(Object rhs);
 	
 	/**
 	 * The hash code for {@link #getIdentifier()}.
@@ -323,22 +323,22 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @see Object#hashCode()
 	 */
 	@Continuator
-	int hashCode();
+	public int hashCode();
 	
 	/**
 	 * If instanciated classes are different, class names are compared, in the other case, the result of {@link #getIdentifier()} are compared.
 	 * This method make possible to use persisting elements in {@link java.util.TreeMap}s or  {@link java.util.TreeSet}s.
 	 * @see Comparable#compareTo(Object)
 	 */
-	int compareTo(PersistingElement rhs);
+	public int compareTo(PersistingElement rhs);
 
 	/**
 	 * Adds a listener to this persisting element.
 	 */
-	void addPersistingElementListener(PersistingElementListener listener);
+	public void addPersistingElementListener(PersistingElementListener listener);
 
 	/**
 	 * Removes a listener to this persisting element.
 	 */
-	void removePersistingElementListener(PersistingElementListener listener);
+	public void removePersistingElementListener(PersistingElementListener listener);
 }

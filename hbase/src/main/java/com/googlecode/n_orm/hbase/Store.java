@@ -40,11 +40,11 @@ import org.apache.hadoop.hbase.TableNotDisabledException;
 import org.apache.hadoop.hbase.TableNotEnabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownScannerException;
+import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HConnectionManager;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.HTablePool;
 import org.apache.hadoop.hbase.client.Increment;
@@ -1151,7 +1151,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				}
 			this.tablesD.clear();
 			try {
-				HConnectionManager.deleteConnection(this.config, true);
+				HConnectionManager.deleteConnection(this.config);
 			} catch (Exception x) {
 				logger.log(Level.WARNING, "Problem while closing connection during store restart: " + x.getMessage(), x);
 			}
@@ -1294,6 +1294,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		ZooKeeper zk;
 		try {
 			try {
+				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();
+			} catch (ZooKeeperConnectionException x) { //Lost zookeeper ?
+				this.restart();
 				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();
 			} catch (NullPointerException x) { //Lost zookeeper ?
 				this.restart();
@@ -1525,7 +1528,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			} catch (Exception y) {
 				throw new DatabaseNotReachedException(x);
 			}
-			return (HTable)this.tablesC.getTable(name.getNameAsBytes());
+			return (HTableInterface)this.tablesC.getTable(name.getNameAsBytes());
 		}
 	}
 	
@@ -1828,6 +1831,54 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 		return ret;
 	}
+	
+	/**
+	 * Waits until an element can be updated (stored/deleted) again.
+	 * Objects should be marked using {@link #tagUpdate(MetaInformation, long)}
+	 * each time they are updated.
+	 * @return timestamp to be used within next {@link #tagUpdate(MetaInformation, long)}
+	 */
+	private void waitForNewUpdate(MetaInformation meta, MangledTableName table, String row) {
+		if (meta == null)
+			return;
+		PersistingElement pe = meta.getElement();
+		assert pe != null;
+		ThreadLocal<Long> npu = (ThreadLocal<Long>)pe.getAdditionalProperty("HBaseNextPossibleUpdateInTable"+table.getName());
+		if (npu == null || npu.get() == null)
+			return;
+		long now;
+		while ((now = System.currentTimeMillis()) < npu.get()) {
+			try {
+				Thread.sleep(npu.get()-now);
+			} catch (InterruptedException e) {
+			}
+		}
+	}
+	
+	/**
+	 * Marks necessary additional information
+	 * to use {@link #waitForNewUpdate(MetaInformation)}.
+	 */
+	private void tagUpdate(MetaInformation meta, MangledTableName table, String row) {
+		if (meta == null)
+			return;
+		PersistingElement pe = meta.getElement();
+		assert pe != null;
+		// HBase uses timestamps ; next possible update for this element is next timestamp...
+		// We rely here on meta as it is important to preserve sequentiality for a given
+		// persisting element, but not for different one (even if targeting the same row)
+		// as they are certainly not in the same threads
+		// Corrects com.googlecode.n_orm.ImportExportTest
+		String key = "HBaseNextPossibleUpdateInTable"+table.getName();
+		ThreadLocal<Long> npu = (ThreadLocal<Long>)pe.getAdditionalProperty(key);
+		if (npu == null) {
+			npu = (ThreadLocal<Long>)pe.addAdditionalProperty(key, new ThreadLocal<Long>(), true);
+		}
+		if (npu == null) // Ugh, looks like we are inside a test and pe was mocked
+			return;
+		assert pe.getAdditionalProperty(key) == npu;
+		npu.set(System.currentTimeMillis()+1);
+	}
 
 	@Override
 	public void storeChanges(MetaInformation meta, String tableName, String id,
@@ -1854,6 +1905,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			byte[] row = Bytes.toBytes(id);
 			
 			List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2); //At most one put and one delete
+			
+			this.waitForNewUpdate(meta, table, id);
 	
 			//Transforming changes into a big Put (if necessary)
 			//and registering it as an action to be performed
@@ -1914,6 +1967,56 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				actions.add(rowPut);
 			}
 			
+			// Checking for WAL policy
+			if (rowPut != null) { // Only Puts can override WAL policy in 0.90
+				HBaseSchema.WALWritePolicy useWal = null;
+				HBaseSchema clazzAnnotation = meta == null || meta.getClazz() == null ? null : meta.getClazz().getAnnotation(HBaseSchema.class);
+				HBaseSchema.WALWritePolicy clazzWAL = clazzAnnotation == null ? HBaseSchema.WALWritePolicy.UNSET : clazzAnnotation.writeToWAL();
+				for(byte[] famB : rowPut.getFamilyMap().keySet()) {
+					String famS = Bytes.toString(famB);
+					HBaseSchema.WALWritePolicy wtw;
+					if (PropertyManagement.PROPERTY_COLUMNFAMILY_NAME.equals(famS)) {
+						// Properties use schema for classes
+						wtw = clazzWAL;
+					} else {
+						HBaseSchema schema;
+						Field fam = fams.get(famS);
+						if (fam != null) {
+							schema = fam.getAnnotation(HBaseSchema.class);
+						} else {
+							schema = null;
+						}
+						// No explicit schema mean schema for class
+						if (schema == null) {
+							wtw = clazzWAL;
+						} else {
+							wtw = schema.writeToWAL();
+							if (HBaseSchema.WALWritePolicy.UNSET.equals(wtw)) {
+								wtw = clazzWAL;
+							}
+						}
+					}
+					// Grabbing strongest policy for the store
+					if (useWal == null || wtw.strongerThan(useWal)) {
+						useWal = wtw;
+					}
+				}
+				
+				if (useWal == null) {
+					useWal = HBaseSchema.WALWritePolicy.UNSET;
+				}
+				
+				switch(useWal) {
+				case UNSET:
+					break;
+				case SKIP:
+					rowPut.setWriteToWAL(false);
+					break;
+				default:
+					rowPut.setWriteToWAL(true);
+					break;
+				}
+			}
 			
 			Action<?> act;
 			//Running puts and deletes
@@ -1928,6 +2031,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				this.tryPerform(act, t, meta == null ? null : meta.getClazz(), meta == null ? null : meta.getTablePostfix(), fams);
 				t = act.getTable();
 			}
+			
+			this.tagUpdate(meta, table, id);
 		} finally {
 			if (t != null)
 				try {
@@ -1944,8 +2049,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		MangledTableName table = new MangledTableName(tableName);
 		if (!this.hasTable(table))
 			return;
+		this.waitForNewUpdate(meta, table, id);
 		Delete d = new Delete(Bytes.toBytes(id));
 		this.tryPerform(new DeleteAction(d), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
+		this.tagUpdate(meta, table, id);
 	}
 
 	@Override

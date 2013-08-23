@@ -1,9 +1,6 @@
 package com.googlecode.n_orm;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -12,21 +9,35 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
+import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.operations.ImportExport;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class ImportExportTest {
 
 	private static final String BOOKS_SER_FILE = "books.ser";
+	
+	public ImportExportTest() throws Exception {
+		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
+		Properties props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
+		StoreSelector.getInstance().setPropertiesFor(BookStore.class, props);
+		StoreSelector.getInstance().setPropertiesFor(Book.class, props);
+		StoreSelector.getInstance().setPropertiesFor(Novel.class, props);
+	}
 
 	private BookStore bssut = new BookStore("testbookstore");
 
@@ -35,6 +46,37 @@ public class ImportExportTest {
 		File ser = new File(BOOKS_SER_FILE);
 		if (ser.exists())
 			ser.delete();
+	}
+
+	@After
+	@Before
+	public void deleteElements() throws Exception {
+		this.deleteAll(Element.class);
+	}
+
+	@After
+	@Before
+	public void deleteBooks() throws Exception {
+		this.deleteAll(Book.class);
+	}
+
+	@After
+	@Before
+	public void deleteBookStore() throws Exception {
+		this.deleteAll(BookStore.class);
+	}
+	
+	public <T extends PersistingElement> void deleteAll(Class<T> clazz) throws Exception {
+		while (StorageManagement.findElements().ofClass(clazz).any() != null) {
+			StorageManagement.findElements().ofClass(clazz)
+			.withAtMost(Integer.MAX_VALUE).elements().forEach(new Process<T>() {
+				
+				@Override
+				public void process(T element) throws Throwable {
+					element.delete();
+				}
+			});
+		}
 	}
 
 	@Test
@@ -242,6 +284,169 @@ public class ImportExportTest {
 
 		assertEquals(exported, imported);
 		assertEquals(originalCount, searchQuery1.count() + searchQuery2.count());
+	}
+	
+	@Persisting
+	public static class Element {
+		private static final long serialVersionUID = -179946847012789575L;
+		@Key public String key;
+		public String name;
+		public Set<String> set = null;
+		public Map<String,String> map = null;
+		public Element(String key) {
+			this.key = key;
+		}
+		public String getName() {
+			return name;
+		}
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	@Test
+	public void checkUnserializeExistingBookAndBookStore()
+			throws DatabaseNotReachedException, IOException,
+			ClassNotFoundException, InterruptedException {
+		Element bs1 = new Element("bs1");
+		bs1.setName("bs1");
+		bs1.set.add("k11"); bs1.set.add("k12");
+		bs1.map.put("km11", "valkm11"); bs1.map.put("km12", "valkm12");
+		bs1.store();
+		Element bs2 = new Element("bs2"); bs2.setName("bs2"); bs2.set.add("k21"); bs2.set.add("k22");
+		bs2.store();
+		Element bs3 = new Element("bs3"); bs3.setName(null);
+		bs3.store();
+		
+		SearchableClassConstraintBuilder<Element> searchQuery1 = StorageManagement
+				.findElements().ofClass(Element.class).withAtMost(1000)
+				.elements();
+
+		File f = new File(BOOKS_SER_FILE);
+
+		// Serialize in a file
+		ObjectOutputStream fos = new ObjectOutputStream(new FileOutputStream(f));
+		long exported = searchQuery1.exportTo(fos);
+		fos.close();
+		assertEquals(searchQuery1.count(), exported);
+
+		// Test if the file has been created
+		assertTrue(f.exists());
+
+		TreeSet<PersistingElement> original = new TreeSet<PersistingElement>();
+		original.addAll(searchQuery1.go());
+		long originalCount = searchQuery1.count();
+		
+		// Changing some data a little bit
+		bs1.setName(null);
+		bs1.set.remove("k11"); bs1.set.add("k13");
+		bs1.map.put("km11", "valkm11bis"); bs1.map.remove("km12"); bs1.map.put("km13", "km13val");
+		bs1.store();
+		bs2.setName("2sb");bs2.store();
+		bs3.setName("3sb");bs3.store();
+
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		FileInputStream fis = new FileInputStream(f);
+		long imported = ImportExport
+				.importPersistingElements(fis);
+		Thread.sleep(100);
+		fis.close();
+
+		assertEquals(exported, imported);
+		assertEquals(originalCount, searchQuery1.count());
+
+		// Data in store should be that data restored from serialization
+		Map<String, String> treeMap = new TreeMap<String, String>();
+		
+		assertNull(bs1.getName());
+		assertEquals(new TreeSet<String>(Arrays.asList("k12","k13")), bs1.set);
+		treeMap.clear();
+		treeMap.put("km11", "valkm11bis"); treeMap.put("km13", "km13val");
+		assertEquals(treeMap, bs1.map);
+		bs1.activate("set", "map");
+		assertEquals("bs1", bs1.getName());
+		assertEquals(new TreeSet<String>(Arrays.asList("k11","k12")), bs1.set);
+		treeMap.clear();
+		treeMap.put("km11", "valkm11"); treeMap.put("km12", "valkm12");
+		assertEquals(treeMap, bs1.map);
+		
+		assertEquals("2sb", bs2.getName());
+		assertEquals(new TreeSet<String>(Arrays.asList("k21","k22")), bs2.set);
+		treeMap.clear();
+		assertEquals(treeMap, bs2.map);
+		bs2.activate("set","map");
+		assertEquals("bs2", bs2.getName());
+		assertEquals(new TreeSet<String>(Arrays.asList("k21","k22")), bs2.set);
+		assertEquals(treeMap, bs2.map);
+		
+		assertEquals("3sb", bs3.getName());
+		assertEquals(new TreeSet<String>(), bs3.set);
+		bs3.activate("set");
+		assertNull(bs3.getName());
+		assertEquals(new TreeSet<String>(), bs3.set);
+	}
+	
+	@Test(timeout=300000)
+	public void longList() throws Exception {
+		final int iterations = 5000;
+
+		SearchableClassConstraintBuilder<Element> searchQuery = StorageManagement
+				.findElements().ofClass(Element.class).andActivate()
+				.withAtMost(iterations+1).elements();
+		
+		Process<Element> deleteAll = new Process<Element>() {
+
+			@Override
+			public void process(Element element) throws Throwable {
+				element.delete();
+			}
+		};
+		searchQuery.forEach(deleteAll);
+		assertEquals(0, searchQuery.count());
+		
+		for(int i = 0; i < iterations; ++i) {
+			Element e = new Element("e" + i);
+			e.setName("e" + i + "name");
+			e.store();
+		}
+		assertEquals(iterations, searchQuery.count());
+		
+		for(int i = 0; i < iterations; ++i) {
+			Element e = new Element("e" + i);
+			assertTrue(e.exists());
+		}
+
+		File f = new File(BOOKS_SER_FILE);
+
+		// Serialize in a file
+		ObjectOutputStream fos = new ObjectOutputStream(new FileOutputStream(f));
+		long exported = searchQuery.exportTo(fos);
+		fos.close();
+		assertEquals(iterations, exported);
+
+		// Test if the file has been created
+		assertTrue(f.exists());
+		
+		searchQuery.forEach(deleteAll);
+		assertEquals(0, searchQuery.count());
+
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		FileInputStream fis = new FileInputStream(f);
+		long imported = ImportExport.importPersistingElements(fis);
+		fis.close();
+
+		assertEquals(iterations, imported);
+		assertEquals(iterations, searchQuery.count());
+		
+		for(int i = 0; i < iterations; ++i) {
+			Element e = new Element("e" + i);
+			e.activate();
+			assertTrue(e.exists());
+			assertEquals("e" + i + "name", e.getName());
+				
+		}
 	}
 
 }

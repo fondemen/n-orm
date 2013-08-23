@@ -12,8 +12,7 @@ public class DefaultHBaseSchema implements HBaseSchema {
 	private static HBaseSchema defaultHbaseSchema;
 
 	static {
-		defaultHbaseSchema = DummyClass.class
-				.getAnnotation(HBaseSchema.class);
+		defaultHbaseSchema = DummyClass.class.getAnnotation(HBaseSchema.class);
 	}
 
 	private Class<? extends Annotation> annotationType = defaultHbaseSchema
@@ -22,13 +21,11 @@ public class DefaultHBaseSchema implements HBaseSchema {
 			.forceCompression();
 	private String compression = defaultHbaseSchema.compression();
 	private int scanCaching = defaultHbaseSchema.scanCaching();
-	private SettableBoolean forceInMemory = defaultHbaseSchema
-			.forceInMemory();
+	private SettableBoolean forceInMemory = defaultHbaseSchema.forceInMemory();
 	private SettableBoolean inMemory = defaultHbaseSchema.inMemory();
 	private SettableBoolean forceTimeToLive = defaultHbaseSchema
 			.forceTimeToLive();
-	private int timeToLiveInSeconds = defaultHbaseSchema
-			.timeToLiveInSeconds();
+	private int timeToLiveInSeconds = defaultHbaseSchema.timeToLiveInSeconds();
 	private SettableBoolean forceMaxVersions = defaultHbaseSchema
 			.forceMaxVersions();
 	private int maxVersions = defaultHbaseSchema.maxVersions();
@@ -49,6 +46,7 @@ public class DefaultHBaseSchema implements HBaseSchema {
 			.deferredLogFlush();
 	private SettableBoolean forceDeferredLogFlush = defaultHbaseSchema
 			.forceDeferredLogFlush();
+	private WALWritePolicy writeToWAL = defaultHbaseSchema.writeToWAL();
 
 	@Override
 	public Class<? extends Annotation> annotationType() {
@@ -139,15 +137,20 @@ public class DefaultHBaseSchema implements HBaseSchema {
 	public int replicationScope() {
 		return this.replicationScope;
 	}
-	
+
 	@Override
 	public SettableBoolean deferredLogFlush() {
 		return this.deferredLogFlush;
 	}
-	
+
 	@Override
 	public SettableBoolean forceDeferredLogFlush() {
 		return this.forceDeferredLogFlush;
+	}
+
+	@Override
+	public WALWritePolicy writeToWAL() {
+		return this.writeToWAL;
 	}
 
 	public void setAnnotationType(Class<? extends Annotation> annotationType) {
@@ -198,8 +201,7 @@ public class DefaultHBaseSchema implements HBaseSchema {
 		this.bloomFilterType = bloomFilterType;
 	}
 
-	public void setForceBlockCacheEnabled(
-			SettableBoolean forceBlockCacheEnabled) {
+	public void setForceBlockCacheEnabled(SettableBoolean forceBlockCacheEnabled) {
 		this.forceBlockCacheEnabled = forceBlockCacheEnabled;
 	}
 
@@ -215,8 +217,7 @@ public class DefaultHBaseSchema implements HBaseSchema {
 		this.blockSize = blockSize;
 	}
 
-	public void setForceReplicationScope(
-			SettableBoolean forceReplicationScope) {
+	public void setForceReplicationScope(SettableBoolean forceReplicationScope) {
 		this.forceReplicationScope = forceReplicationScope;
 	}
 
@@ -230,6 +231,10 @@ public class DefaultHBaseSchema implements HBaseSchema {
 
 	public void setForceDeferredLogFlush(SettableBoolean forceDeferredLogFlush) {
 		this.forceDeferredLogFlush = forceDeferredLogFlush;
+	}
+
+	public void setWriteToWAL(WALWritePolicy writeToWAL) {
+		this.writeToWAL = writeToWAL;
 	}
 
 }

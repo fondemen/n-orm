@@ -17,9 +17,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.Incrementing;
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.Process;
+import com.googlecode.n_orm.ProcessException;
+import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.StoreTestLauncher;
 
@@ -47,6 +51,18 @@ public class ElementWithWriteRetensionTest {
 	@Before
 	public void setupSut() {
 		sut = (WriteRetentionStore)StoreSelector.getInstance().getStoreFor(Element.class);
+	}
+	
+	@Before
+	public void removeExistingElements() throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		StorageManagement.findElements().ofClass(Element.class)
+		.withAtMost(Integer.MAX_VALUE).elements().forEach(new Process<Element>() {
+			
+			@Override
+			public void process(Element element) throws Throwable {
+				element.delete();
+			}
+		});
 	}
 
 	@After
@@ -230,7 +246,7 @@ public class ElementWithWriteRetensionTest {
 		final int incrNr = 1000;
 		final int parallelThreads = 10;
 		
-		final String key = "anelement", qual = "aQual";
+		final String key = UUID.randomUUID().toString(), qual = "aQual";
 		
 		Element e = new Element();
 		e.key = key;
