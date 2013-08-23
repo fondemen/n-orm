@@ -52,7 +52,7 @@ public class ActionJob {
 				pois.close(); pbis.close();
 				
 				String[] families = conf.getStrings(FAMILIES_TO_BE_ACTIVATED_PROP);
-				Set<String> fams = new TreeSet<String>(Arrays.asList(families));
+				Set<String> fams = families == null ? new TreeSet<String>() : new TreeSet<String>(Arrays.asList(families));
 				this.process = new ProcessWrapper(p, elementClass, fams);
 			} catch (RuntimeException e) {
 				throw e;
