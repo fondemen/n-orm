@@ -33,37 +33,59 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
  * @see Store
  */
 public class HBase {
-	public static final String[] HBaseDependencies = {
-		"org.apache.zookeeper.ZooKeeper",
-		"org.apache.commons.configuration.Configuration",
-		"org.apache.commons.codec.binary.Base64",
-		"org.apache.commons.io.FileUtils",
-		"org.apache.hadoop.conf.Configuration",
-		"org.apache.commons.httpclient.HttpMethod",
-		"org.apache.hadoop.hbase.HBaseConfiguration",
-		"org.apache.commons.logging.LogFactory",
-		"org.apache.commons.lang.StringUtils",
-		"org.apache.log4j.Logger",
-		"org.codehaus.jackson.map.JsonMappingException",
-		"com.google.protobuf.Message",
-		"com.google.common.base.Predicate",
-		null //Loading Hadoop's patched guava yet not checking it's there (only required by CDH)
-	};
-	public static final String[] HBaseDependenciesJarFilters = {
-		"zookeeper*.jar,lib/zookeeper*.jar",
-		"commons-configuration*.jar,lib/commons-configuration*.jar,configuration*.jar,lib/configuration*.jar",
-		"commons-codec*.jar,lib/commons-codec*.jar,codec*.jar,lib/codec*.jar",
-		"commons-io*.jar,lib/commons-io*.jar,io*.jar,lib/io*.jar",
-		"commons-http*.jar,lib/commons-http*.jar,http*.jar,lib/http*.jar",
-		"hadoop*.jar,lib/hadoop*.jar",
-		"hbase*.jar",
-		"commons-logging*.jar,lib/commons-logging*.jar",
-		"commons-lang*.jar,lib/commons-lang*.jar",
-		"log4j*.jar,lib/log4j*.jar",
-		"jackson*.jar,lib/jackson*.jar",
-		"protobuf*.jar,lib/protobuf*.jar",
-		"guava*.jar,lib/guava*.jar",
-		"guava*jar.jar,lib/guava*jar.jar"
+	
+	/**
+	 * A dependency to be found for HBase to work.
+	 */
+	public static class HBaseDependency {
+		/**
+		 * Filter for finding jar containing dependency
+		 */
+		private final String jarTemplate;
+		
+		/**
+		 * A class to be tested for dependency availability in the classpath
+		 */
+		private final String testClass;
+
+		private HBaseDependency(String jarTemplate, String testClass) {
+			super();
+			this.jarTemplate = jarTemplate;
+			this.testClass = testClass;
+		}
+		
+		/**
+		 * Tests whether this dependency looks available.
+		 * In case no test class is defined, returns null.
+		 */
+		public Boolean hasDependency() {
+			if (this.testClass == null)
+				return null;
+			try {
+				ClassLoader.getSystemClassLoader().loadClass(this.testClass);
+				return true;
+			} catch (ClassNotFoundException x) {
+				return false;
+			}
+		}
+	}
+	
+	public static final HBaseDependency[] HBaseDependencies = {
+		new HBaseDependency("zookeeper*.jar,lib/zookeeper*.jar", "org.apache.zookeeper.ZooKeeper"),
+		new HBaseDependency("commons-configuration*.jar,lib/commons-configuration*.jar,configuration*.jar,lib/configuration*.jar", "org.apache.commons.configuration.Configuration"),
+		new HBaseDependency("commons-codec*.jar,lib/commons-codec*.jar,codec*.jar,lib/codec*.jar", "org.apache.commons.codec.binary.Base64"),
+		new HBaseDependency("commons-io*.jar,lib/commons-io*.jar,io*.jar,lib/io*.jar", "org.apache.commons.io.FileUtils"),
+		new HBaseDependency("commons-http*.jar,lib/commons-http*.jar,http*.jar,lib/http*.jar", "org.apache.hadoop.conf.Configuration"),
+		new HBaseDependency("hadoop*.jar,lib/hadoop*.jar", "org.apache.commons.httpclient.HttpMethod"),
+		new HBaseDependency("hbase*.jar", "org.apache.hadoop.hbase.HBaseConfiguration"),
+		new HBaseDependency("commons-logging*.jar,lib/commons-logging*.jar", "org.apache.commons.logging.LogFactory"),
+		new HBaseDependency("commons-lang*.jar,lib/commons-lang*.jar", "org.apache.commons.lang.StringUtils"),
+		new HBaseDependency("log4j*.jar,lib/log4j*.jar", "org.apache.log4j.Logger"),
+		new HBaseDependency("jackson*.jar,lib/jackson*.jar", "org.codehaus.jackson.map.JsonMappingException"),
+		new HBaseDependency("protobuf*.jar,lib/protobuf*.jar", "com.google.protobuf.Message"),
+		new HBaseDependency("guava*.jar,lib/guava*.jar", "com.google.common.base.Predicate"),
+		new HBaseDependency("guava*jar.jar,lib/guava*jar.jar", null), //Loading Hadoop's patched guava yet not checking it's there (only required by CDH)
+		new HBaseDependency("hadoop-common*.jar,lib/hadoop-common*.jar", null) //Loading hadoop-common yet not checking it's there (only required by CDH)
 	};
 
 	public static final Logger logger;
@@ -162,28 +184,19 @@ public class HBase {
 	}
 
 	private static void checkConfiguration() throws ClassNotFoundException {
-		for (String clazz : HBaseDependencies) {
-			if (clazz != null)
-				ClassLoader.getSystemClassLoader().loadClass(clazz);
+		for (HBaseDependency dep : HBaseDependencies) {
+			if (Boolean.FALSE.equals(dep.hasDependency()))
+				throw new ClassNotFoundException("Cannot find dependency " + dep.jarTemplate +": could not locate class " + dep.testClass);
 		}
 	}
 
 	private static String createFilters() {
 		StringBuffer ret = new StringBuffer();
 		for (int i = 0; i < HBaseDependencies.length; ++i) {
-			boolean load = false;
-			if (HBaseDependencies[i] == null)
-				load = true;
-			else
-				try {
-					ClassLoader.getSystemClassLoader().loadClass(HBaseDependencies[i]);
-				} catch (ClassNotFoundException x) {
-					load = true;
-				}
-			
-			if(load) {
+			if(!Boolean.TRUE.equals(HBaseDependencies[i].hasDependency())) {
+				// Not comparing to FALSE as it can be null (load in any case)
 				ret.append(',');
-				ret.append(HBaseDependenciesJarFilters[i]);
+				ret.append(HBaseDependencies[i].jarTemplate);
 			}
 		}
 		return ret.toString();
