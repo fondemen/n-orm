@@ -431,13 +431,12 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		} catch (Exception e) {
 			errorLogger.log(Level.WARNING, "Cannot read zookeeper info... Might be a bug.", e);
 		}
-		
-		// Loading schema in cache
-		this.loadCache();
-			
-		logger.info("Started store " + this.hashCode());
 
 		this.wasStarted = true;
+		// Loading schema in cache AFTER marked as started
+		this.loadCache();
+		
+		logger.info("Started store " + this.hashCode());
 	}
 
 	/**
