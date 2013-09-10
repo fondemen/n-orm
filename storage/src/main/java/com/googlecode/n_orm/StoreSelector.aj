@@ -256,7 +256,7 @@ public aspect StoreSelector {
 						String valAsString = properties.getProperty(Integer.toString(i));
 						if (valAsString == null)
 							throw new IllegalArgumentException("Missing required value " + Integer.toString(i));
-						Object val = ConvertUtils.convert(valAsString, c);
+						Object val = convert(valAsString, c);
 						args.add(val);
 						i++;
 					}
@@ -270,7 +270,7 @@ public aspect StoreSelector {
 				
 				for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(store)) {
 					if (PropertyUtils.isWriteable(store, property.getName()) && properties.containsKey(property.getName())) {
-						PropertyUtils.setProperty(store, property.getName(), ConvertUtils.convert(properties.getProperty(property.getName()), property.getPropertyType()));
+						PropertyUtils.setProperty(store, property.getName(), convert(properties.getProperty(property.getName()), property.getPropertyType()));
 					}
 				}
 				
@@ -302,6 +302,13 @@ public aspect StoreSelector {
 				throw new DatabaseNotReachedException(x);
 			}
 		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private Object convert(String valAsString, Class<?> c) {
+		if (c.isEnum())
+			return Enum.valueOf(c.asSubclass(Enum.class), valAsString);
+		return ConvertUtils.convert(valAsString, c);
 	}
 
 	/**
