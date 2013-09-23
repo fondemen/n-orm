@@ -140,7 +140,7 @@
 		<profile>
 			<id>hbase-cdh</id>
 			<properties>
-				<hbase.version>0.94.6-cdh4.3.1</hbase.version>
+				<hbase.version>0.94.6-cdh4.4.0</hbase.version>
 			</properties>
 
 			<repositories>

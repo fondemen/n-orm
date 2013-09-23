@@ -480,12 +480,12 @@ public class ConcurrentTest {
 	public void requestTimeout() throws Throwable {
 //		ExecutorService es = Executors.newCachedThreadPool();
 //		try {
-			store1.setClientTimeout(1);
+			store1.setClientTimeout(10);
 			store1.restart();
 
-			assertEquals("1", store1.getConf().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
-			assertEquals("1", store1.getAdmin().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
-			assertEquals("1", store1.getAdmin().getConnection().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			assertEquals("10", store1.getConf().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			assertEquals("10", store1.getAdmin().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			assertEquals("10", store1.getAdmin().getConnection().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
 			
 			//Cannot reliably fail the connection (has to respond 4 times consequently in less than a ms)
 //			final Throwable [] error = {null /*the expected exception*/, null /*any unexpected exception*/};
