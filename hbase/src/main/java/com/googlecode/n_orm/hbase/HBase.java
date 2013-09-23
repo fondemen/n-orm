@@ -84,6 +84,7 @@ public class HBase {
 		new HBaseDependency("jackson*.jar,lib/jackson*.jar", "org.codehaus.jackson.map.JsonMappingException"),
 		new HBaseDependency("protobuf*.jar,lib/protobuf*.jar", "com.google.protobuf.Message"),
 		new HBaseDependency("guava*.jar,lib/guava*.jar", "com.google.common.base.Predicate"),
+		new HBaseDependency("avro*.jar,lib/avro*.jar", "org.apache.avro.io.DatumReader"),
 		new HBaseDependency("guava*jar.jar,lib/guava*jar.jar", null), //Loading Hadoop's patched guava yet not checking it's there (only required by CDH)
 		new HBaseDependency("hadoop-common*.jar,lib/hadoop-common*.jar", null) //Loading hadoop-common yet not checking it's there (only required by CDH)
 	};
