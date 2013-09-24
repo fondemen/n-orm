@@ -81,6 +81,7 @@ public class HBase {
 		new HBaseDependency("commons-logging*.jar,lib/commons-logging*.jar", "org.apache.commons.logging.LogFactory"),
 		new HBaseDependency("commons-lang*.jar,lib/commons-lang*.jar", "org.apache.commons.lang.StringUtils"),
 		new HBaseDependency("log4j*.jar,lib/log4j*.jar", "org.apache.log4j.Logger"),
+		new HBaseDependency("slf4j*.jar,lib/slf4j*.jar", "org.slf4j.LoggerFactory"),
 		new HBaseDependency("jackson*.jar,lib/jackson*.jar", "org.codehaus.jackson.map.JsonMappingException"),
 		new HBaseDependency("protobuf*.jar,lib/protobuf*.jar", "com.google.protobuf.Message"),
 		new HBaseDependency("guava*.jar,lib/guava*.jar", "com.google.common.base.Predicate"),
@@ -154,7 +155,7 @@ public class HBase {
 				
 				try {
 					//Exploiting common configuration
-					String cscf = commaSeparatedConfigurationFolders+",!**/*-tests.jar,!**/*slf4j*.jar,"+createFilters(); //no slf4j since n-orm depends on EHCahe, which depends on a (newer) version of slf4j
+					String cscf = commaSeparatedConfigurationFolders+",!**/*-tests.jar,"+createFilters(); //no slf4j since n-orm depends on EHCahe, which depends on a (newer) version of slf4j
 					addJarAction.clear();
 					addJarAction.addFiles(cscf);
 					try {
