@@ -24,8 +24,11 @@ import com.googlecode.n_orm.Persisting;
 import com.googlecode.n_orm.PersistingMixin;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cf.SetColumnFamily;
+import com.googlecode.n_orm.hbase.HBaseSchema;
+import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.hbase.HBaseSchema.SettableBoolean;
-import com.googlecode.n_orm.hbase.PropertyUtils.DefaultHBaseSchema;
+import com.googlecode.n_orm.hbase.properties.DefaultHBaseSchema;
+import com.googlecode.n_orm.hbase.properties.PropertyUtils;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
@@ -111,11 +114,12 @@ public class PropertyOverloadTest {
 		}
 	}
 	
-	public void createTable(boolean createDefault, boolean defaultInMem, Algorithm defaultCompr, boolean createOvr, boolean ovrInMem, Algorithm ovrCompr) {
+	public void createTable(boolean createDefault, boolean defaultInMem, Algorithm defaultCompr, boolean createOvr, boolean ovrInMem, Algorithm ovrCompr, boolean deferredLogFlush) {
 		try {
 			this.deleteTable();
 			
 			HTableDescriptor td = new HTableDescriptor(table);
+			td.setDeferredLogFlush(deferredLogFlush);
 			if (createDefault) {
 				HColumnDescriptor cd = new HColumnDescriptor(defaultCfField.getName());
 				cd.setInMemory(defaultInMem);
@@ -186,6 +190,8 @@ public class PropertyOverloadTest {
 		HColumnDescriptor def = this.getColumnFamilyDescriptor(defaultCfField, td);
 		HColumnDescriptor ovr = this.getColumnFamilyDescriptor(overloadedCfField, td);
 		HColumnDescriptor dum = this.getColumnFamilyDescriptor(dummyCfField, td);
+		
+		assertFalse(td.isDeferredLogFlush());
 
 		assertEquals(Algorithm.GZ, def.getCompression());
 		assertTrue(def.isInMemory());
@@ -222,7 +228,7 @@ public class PropertyOverloadTest {
 
 	@Test
 	public void alreadyCompressionNoneAllChanges() {
-		this.createTable(true, false, Algorithm.NONE, true, false, Algorithm.NONE);
+		this.createTable(true, false, Algorithm.NONE, true, false, Algorithm.NONE, false);
 		store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, false)).withPostfixedTable(table, ""), table, id, this.getChangedValues(true, true, false), null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
@@ -237,7 +243,7 @@ public class PropertyOverloadTest {
 
 	@Test
 	public void alreadyCompressionOvrOnlyChanges() {
-		this.createTable(true, true, Algorithm.NONE, true, false, Algorithm.NONE);
+		this.createTable(true, true, Algorithm.NONE, true, false, Algorithm.NONE, false);
 		store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, false)).withPostfixedTable(table, ""), table, id, this.getChangedValues(true, true, false), null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
@@ -285,7 +291,7 @@ public class PropertyOverloadTest {
 		String postfix = "p1";
 		try {
 			this.deleteTable(postfix);
-			DefaultHBaseSchema schema = new PropertyUtils.DefaultHBaseSchema();
+			DefaultHBaseSchema schema = new DefaultHBaseSchema();
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(defaultCfField, postfix, schema);
 			elt.postfix = postfix;
@@ -305,7 +311,7 @@ public class PropertyOverloadTest {
 	public void overrideCFSchemaWithEmptyPostfix() {
 		try {
 			this.deleteTable();
-			DefaultHBaseSchema schema = new PropertyUtils.DefaultHBaseSchema();
+			DefaultHBaseSchema schema = new DefaultHBaseSchema();
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(defaultCfField, "", schema);
 			store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, true)).withPostfixedTable(table, ""), table, id, this.getChangedValues(true, true, true), null, null);
@@ -325,7 +331,7 @@ public class PropertyOverloadTest {
 		String postfix = "p1";
 		try {
 			this.deleteTable(postfix);
-			DefaultHBaseSchema schema = new PropertyUtils.DefaultHBaseSchema();
+			DefaultHBaseSchema schema = new DefaultHBaseSchema();
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(defaultCfField, "toto", schema);
 			elt.postfix = postfix;
@@ -346,7 +352,7 @@ public class PropertyOverloadTest {
 		String postfix = "p1";
 		try {
 			this.deleteTable(postfix);
-			DefaultHBaseSchema schema = new PropertyUtils.DefaultHBaseSchema();
+			DefaultHBaseSchema schema = new DefaultHBaseSchema();
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(overloadedCfField, postfix, schema);
 			elt.postfix = postfix;
@@ -368,7 +374,7 @@ public class PropertyOverloadTest {
 		String postfix = "p1";
 		try {
 			this.deleteTable(postfix);
-			DefaultHBaseSchema schema = new PropertyUtils.DefaultHBaseSchema();
+			DefaultHBaseSchema schema = new DefaultHBaseSchema();
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(Element.class, postfix, schema);
 			elt.postfix = postfix;
@@ -389,11 +395,11 @@ public class PropertyOverloadTest {
 		String postfix = "p1";
 		try {
 			this.deleteTable(postfix);
-			DefaultHBaseSchema schema = new PropertyUtils.DefaultHBaseSchema();
+			DefaultHBaseSchema schema = new DefaultHBaseSchema();
 			schema.setTimeToLiveInSeconds(778899);
 			schema.setCompression("none");
 			PropertyUtils.registerSchemaSpecificity(Element.class, postfix, schema);
-			schema = new PropertyUtils.DefaultHBaseSchema();
+			schema = new DefaultHBaseSchema();
 			schema.setTimeToLiveInSeconds(998877);
 			PropertyUtils.registerSchemaSpecificity(defaultCfField, postfix, schema);
 			elt.postfix = postfix;
@@ -408,6 +414,162 @@ public class PropertyOverloadTest {
 			PropertyUtils.clearAllSchemaSpecificities();
 			elt.postfix="";
 		}
+	}
+	
+	@Persisting(table="PropertyOverloadTest")
+	@HBaseSchema(deferredLogFlush=SettableBoolean.TRUE)
+	public static class DLFElement extends DummyPersistingElement {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -6655422356430807115L;
+		@Key public String key;
+	}
+	
+	@Test
+	public void deferredLogFlush() {
+		this.deleteTable();
+		store.storeChanges(new MetaInformation().forElement(new DLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
+		
+		HTableDescriptor td = this.getTableDescriptor();
+		
+		assertTrue(td.isDeferredLogFlush());
+	}
+	
+	@Test
+	public void deferredLogFlushChangedNotForced() {
+		this.deleteTable();
+		this.createTable(false, false, null, false, false, null, false);
+		store.storeChanges(new MetaInformation().forElement(new DLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
+		
+		HTableDescriptor td = this.getTableDescriptor();
+		
+		assertFalse(td.isDeferredLogFlush());
+	}
+	
+	@Persisting(table="PropertyOverloadTest")
+	@HBaseSchema(deferredLogFlush=SettableBoolean.FALSE)
+	public static class NDLFElement extends DummyPersistingElement {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -6655422356430807115L;
+		@Key public String key;
+	}
+	
+	@Test
+	public void notDeferredLogFlush() {
+		this.deleteTable();
+		store.storeChanges(new MetaInformation().forElement(new NDLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
+		
+		HTableDescriptor td = this.getTableDescriptor();
+		
+		assertFalse(td.isDeferredLogFlush());
+
+	}
+	
+	@Test
+	public void notDeferredLogFlushChangedNotForced() {
+		this.deleteTable();
+		this.createTable(false, false, null, false, false, null, true);
+		store.storeChanges(new MetaInformation().forElement(new NDLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
+		
+		HTableDescriptor td = this.getTableDescriptor();
+		
+		assertTrue(td.isDeferredLogFlush());
+	}
+	
+	@Persisting(table="PropertyOverloadTest")
+	@HBaseSchema(deferredLogFlush=SettableBoolean.TRUE, forceDeferredLogFlush=SettableBoolean.FALSE)
+	public static class DLFNotForcedElement extends DummyPersistingElement {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -6655422356430807115L;
+		@Key public String key;
+	}
+	
+	@Test
+	public void deferredLogFlushNotForced() {
+		this.deleteTable();
+		store.storeChanges(new MetaInformation().forElement(new DLFNotForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
+		
+		HTableDescriptor td = this.getTableDescriptor();
+		
+		assertTrue(td.isDeferredLogFlush());
+	}
+	
+	@Test
+	public void deferredLogFlushChangedNotForcedNotForced() {
+		this.deleteTable();
+		this.createTable(false, false, null, false, false, null, false);
+		store.storeChanges(new MetaInformation().forElement(new DLFNotForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
+		
+		HTableDescriptor td = this.getTableDescriptor();
+		
+		assertFalse(td.isDeferredLogFlush());
+	}
+	
+	@Persisting(table="PropertyOverloadTest")
+	@HBaseSchema(deferredLogFlush=SettableBoolean.TRUE, forceDeferredLogFlush=SettableBoolean.TRUE)
+	public static class DLFForcedElement extends DummyPersistingElement {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -6655422356430807115L;
+		@Key public String key;
+	}
+	
+	@Test
+	public void deferredLogFlushForced() {
+		this.deleteTable();
+		store.storeChanges(new MetaInformation().forElement(new DLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
+		
+		HTableDescriptor td = this.getTableDescriptor();
+		
+		assertTrue(td.isDeferredLogFlush());
+	}
+	
+	@Test
+	public void deferredLogFlushChangedForcedForced() {
+		this.deleteTable();
+		this.createTable(false, false, null, false, false, null, false);
+		store.storeChanges(new MetaInformation().forElement(new DLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
+		
+		HTableDescriptor td = this.getTableDescriptor();
+		
+		assertTrue(td.isDeferredLogFlush());
+	}
+	
+	@Persisting(table="PropertyOverloadTest")
+	@HBaseSchema(deferredLogFlush=SettableBoolean.FALSE, forceDeferredLogFlush=SettableBoolean.TRUE)
+	public static class NDLFForcedElement extends DummyPersistingElement {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -6655422356430807115L;
+		@Key public String key;
+	}
+	
+	@Test
+	public void ndeferredLogFlushForced() {
+		this.deleteTable();
+		store.storeChanges(new MetaInformation().forElement(new NDLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
+		
+		HTableDescriptor td = this.getTableDescriptor();
+		
+		assertFalse(td.isDeferredLogFlush());
+	}
+	
+	@Test
+	public void ndeferredLogFlushChangedForcedForced() {
+		this.deleteTable();
+		this.createTable(false, false, null, false, false, null, true);
+		store.storeChanges(new MetaInformation().forElement(new NDLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
+		
+		HTableDescriptor td = this.getTableDescriptor();
+		
+		assertFalse(td.isDeferredLogFlush());
 	}
 
 }
