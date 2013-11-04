@@ -141,4 +141,15 @@ public @interface HBaseSchema {
 	 * Changes value for {@link Store#getReplicationScope()} for a particular persisting class or column family.
 	 */
 	int replicationScope() default -1;
+	
+	/**
+	 * Changes value for {@link Store#getDeferredLogFlush()} for a particular persisting class (ignored on column families).
+	 */
+	SettableBoolean deferredLogFlush() default SettableBoolean.UNSET;
+
+	/**
+	 * Changes value for {@link Store#isForceDeferredLogFlush()} for a particular persisting class (ignored on column families).
+	 * WARNING: to be used with great care in case of use in multiprocess context.
+	 */
+	SettableBoolean forceDeferredLogFlush() default SettableBoolean.UNSET;
 }

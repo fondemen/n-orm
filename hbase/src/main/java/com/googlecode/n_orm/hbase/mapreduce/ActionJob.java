@@ -20,6 +20,7 @@ import org.apache.hadoop.mapreduce.Job;
 
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
+import com.googlecode.n_orm.hbase.MangledTableName;
 import com.googlecode.n_orm.hbase.RowWrapper;
 import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.storeapi.ProcessWrapper;
@@ -51,7 +52,7 @@ public class ActionJob {
 				pois.close(); pbis.close();
 				
 				String[] families = conf.getStrings(FAMILIES_TO_BE_ACTIVATED_PROP);
-				Set<String> fams = new TreeSet<String>(Arrays.asList(families));
+				Set<String> fams = families == null ? new TreeSet<String>() : new TreeSet<String>(Arrays.asList(families));
 				this.process = new ProcessWrapper(p, elementClass, fams);
 			} catch (RuntimeException e) {
 				throw e;
@@ -77,7 +78,7 @@ public class ActionJob {
 		}
 	}
 
-	public static Job createSubmittableJob(Store s, String tableName,
+	public static Job createSubmittableJob(Store s, MangledTableName tableName,
 			Scan scan, Process<? extends PersistingElement> process, Class<? extends PersistingElement> elementClass, String[] families) throws IOException {
 		Class<?> processClass = process.getClass();
 		
@@ -93,7 +94,7 @@ public class ActionJob {
 		
 		Job job = new Job(conf, NAME + "_" + processClass.getName() + "(" + elementClass.getName() + ")_" + scan.hashCode());
 		
-		TableMapReduceUtil.initTableMapperJob(tableName, scan,
+		TableMapReduceUtil.initTableMapperJob(tableName.getNameAsBytes(), scan,
 				ActionMapper.class, ImmutableBytesWritable.class,
 				Result.class, job, false);
 		LocalFormat.prepareJob(job, scan, s);
