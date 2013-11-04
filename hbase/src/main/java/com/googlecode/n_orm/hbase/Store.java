@@ -11,9 +11,11 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -1090,7 +1092,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		this.notExistingTables.clear();
 		try {
 			
-			List<HTableDescriptor> tables = Arrays.asList(this.admin.listTables());
+			HTableDescriptor[] tbls = this.admin.listTables();
+			List<HTableDescriptor> tables = tbls == null || tbls.length == 0 ? new LinkedList<HTableDescriptor>() : Arrays.asList(tbls);
 			for(HTableDescriptor td : tables) {
 				this.tablesD.put(new MangledTableName(td.getNameAsString()), td);
 			}
