@@ -20,6 +20,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.conversion.ConversionTools;
 import com.googlecode.n_orm.hbase.HBaseLauncher;
 import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
@@ -112,6 +113,8 @@ public class ConcurrentTest {
 			store1.truncate(null, table, (Constraint)null);
 			assertEquals(0, store1.count(null, table, (Constraint)null));
 		}
+		if (!store1.getAdmin().isTableEnabled("t1"))
+			store1.getAdmin().enableTable("t1");
 	}
 	
 	@Test
@@ -251,17 +254,13 @@ public class ConcurrentTest {
 		ch1.put("k1", new byte[]{1, 2});
 		
 		HConnection cm = store1.getAdmin().getConnection();
-		Method closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
-		closeM.setAccessible(true);
-		closeM.invoke(cm, true);
+		cm.close();
 		
 		store1.storeChanges(null, "t1", "idt1", change1 , null, null);
 		assertTrue(store1.exists(null, "t1", "idt1", "cf1"));
 		
 		cm = store1.getAdmin().getConnection();
-		closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
-		closeM.setAccessible(true);
-		closeM.invoke(cm, true);
+		cm.close();
 		
 		store1.delete(null, "t1", "idt1");
 		assertFalse(store1.exists(null, "t1", "idt1", "cf1"));
@@ -300,12 +299,16 @@ public class ConcurrentTest {
 			assertTrue(it.hasNext());
 			store1.getAdmin().disableTable("t1");
 			assertEquals("idt2", it.next().getKey());
-	
-			store1.getAdmin().disableTable("t1");
+
+			if (store1.getAdmin().isTableEnabled("t1"))
+				store1.getAdmin().disableTable("t1");
 			
 			assertFalse(it.hasNext());
 		
 		} finally {
+			if (!store1.getAdmin().isTableEnabled("t1"))
+				store1.getAdmin().enableTable("t1");
+			
 			it.close();
 		}
 	}
@@ -427,16 +430,47 @@ public class ConcurrentTest {
 	}
 	
 	@Test(expected=Test.None.class)
-	public void connectionClosedAfterRestart() throws SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+	public void connectionClosedAfterRestart() throws SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException, IOException {
 
+		String datum = "fyukg,huom,jio,";
+		String key = "aprop";
+		ColumnFamilyData change = new DefaultColumnFamilyData();
+		Map<String, byte[]> propChange = new TreeMap<String, byte[]>();
+		propChange.put(key, ConversionTools.convert(datum));
+		change.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, propChange );
+		store1.storeChanges(null, "t1", "row", change , null, null);
+		assertTrue(store1.exists(null, "t1", "row"));
+		Map<String, byte[]> out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		assertEquals(datum, ConversionTools.convert(String.class, out.get(key)));
 		store1.restart();
 		
 		HConnection cm = store1.getAdmin().getConnection();
-		Method closeM = cm.getClass().getDeclaredMethod("close", boolean.class);
-		closeM.setAccessible(true);
-		closeM.invoke(cm, true);
+		cm.close();
 		
-		store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		assertEquals(datum, ConversionTools.convert(String.class, out.get(key)));
+		
+		assertTrue(store1.exists(null, "t1", "row"));
+	}
+	
+	@Test(expected=Test.None.class)
+	public void connectionClosedBeforeRestart() throws SecurityException, NoSuchMethodException, IllegalArgumentException, IllegalAccessException, InvocationTargetException, IOException {
+
+		store1.restart();
+		String datum = "fyukg,huom,jio,";
+		String key = "aprop";
+		ColumnFamilyData change = new DefaultColumnFamilyData();
+		Map<String, byte[]> propChange = new TreeMap<String, byte[]>();
+		propChange.put(key, ConversionTools.convert(datum));
+		change.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, propChange );
+		store1.storeChanges(null, "t1", "row", change , null, null);
+		assertTrue(store1.exists(null, "t1", "row"));
+		
+		HConnection cm = store1.getAdmin().getConnection();
+		cm.close();
+		
+		Map<String, byte[]> out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
+		assertEquals(datum, ConversionTools.convert(String.class, out.get(key)));
 		
 		assertTrue(store1.exists(null, "t1", "row"));
 	}
@@ -446,12 +480,12 @@ public class ConcurrentTest {
 	public void requestTimeout() throws Throwable {
 //		ExecutorService es = Executors.newCachedThreadPool();
 //		try {
-			store1.setClientTimeout(1);
+			store1.setClientTimeout(10);
 			store1.restart();
 
-			assertEquals("1", store1.getConf().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
-			assertEquals("1", store1.getAdmin().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
-			assertEquals("1", store1.getAdmin().getConnection().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			assertEquals("10", store1.getConf().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			assertEquals("10", store1.getAdmin().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			assertEquals("10", store1.getAdmin().getConnection().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
 			
 			//Cannot reliably fail the connection (has to respond 4 times consequently in less than a ms)
 //			final Throwable [] error = {null /*the expected exception*/, null /*any unexpected exception*/};

@@ -12,8 +12,9 @@
 	<packaging>pom</packaging>
 
 	<properties>
-		<hbase.version>0.90.4-cdh3u3</hbase.version>
-		<hadoop.version>0.20.2-cdh3u3</hadoop.version>
+		<hbase.version>0.94.6-cdh4.4.0</hbase.version>
+		<hadoop.version>2.0.0-cdh4.4.0</hadoop.version>
+		<hadoop.version.mr1>2.0.0-mr1-cdh4.4.0</hadoop.version.mr1>
 	</properties>
 
 	<dependencies>
@@ -26,29 +27,31 @@
 			<scope>compile</scope>
 			<exclusions>
 				<exclusion>
-					<artifactId>slf4j-log4j12</artifactId>
 					<groupId>org.slf4j</groupId>
+					<artifactId>slf4j-log4j12</artifactId>
 				</exclusion>
 			</exclusions>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-test</artifactId>
-			<version>${hadoop.version}</version>
-			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.hbase</groupId>
 			<artifactId>hbase</artifactId>
 			<version>${hbase.version}</version>
-			<type>jar</type>
-			<scope>compile</scope>
 			<exclusions>
 				<exclusion>
-					<artifactId>slf4j-log4j12</artifactId>
 					<groupId>org.slf4j</groupId>
+					<artifactId>slf4j-log4j12</artifactId>
 				</exclusion>
 			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-minicluster</artifactId>
+			<version>${hadoop.version.mr1}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-auth</artifactId>
+			<version>${hadoop.version}</version>
 		</dependency>
 	</dependencies>
 
@@ -70,7 +73,7 @@
 
 		<repository>
 			<id>cdh.releases.repo</id>
-			<url>https://repository.cloudera.com/content/repositories/releases</url>
+			<url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
 			<name>CDH Releases Repository</name>
 			<snapshots>
 				<enabled>false</enabled>
@@ -78,7 +81,7 @@
 		</repository>
 		<repository>
 			<id>cdh.snapshots.repo</id>
-			<url>https://repository.cloudera.com/content/repositories/snapshots/</url>
+			<url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
 			<name>CDH Snapshots Repository</name>
 			<snapshots>
 				<enabled>true</enabled>
