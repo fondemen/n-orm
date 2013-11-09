@@ -1,25 +1,28 @@
 package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.Result;
+import org.hbase.async.KeyValue;
+import org.hbase.async.GetRequest;
 
-public class GetAction extends Action<Result> {
+import com.stumbleupon.async.Deferred;
+
+public class GetAction extends Action<ArrayList<KeyValue>> {
 	
-	private final Get get;
+	private final GetRequest get;
 
-	public GetAction(Get get) {
+	public GetAction(GetRequest get) {
 		super();
 		this.get = get;
 	}
 
-	public Get getGet() {
+	public GetRequest getGet() {
 		return get;
 	}
 
 	@Override
-	public Result perform() throws IOException {
+	public Deferred<ArrayList<KeyValue>> perform() throws IOException {
 		return this.getTable().get(this.getGet());
 	}
 	

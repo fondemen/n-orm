@@ -1,17 +1,19 @@
 package com.googlecode.n_orm.hbase.actions;
 
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.hbase.async.HBaseClient;
+
+import com.stumbleupon.async.Deferred;
 
 public abstract class Action<R> {
-	private HTableInterface table;
+	private HBaseClient table;
 	
-	public HTableInterface getTable() {
+	public HBaseClient getTable() {
 		return this.table;
 	}
 	
-	public void setTable(HTableInterface table) {
+	public void setTable(HBaseClient table) {
 		this.table = table;
 	}
 	
-	public abstract R perform() throws Exception;
+	public abstract Deferred<R> perform() throws Exception;
 }

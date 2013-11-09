@@ -1,9 +1,11 @@
 package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
-
 import org.apache.hadoop.hbase.client.Get;
 
+/*
+ * Verifie si le get retourne des éléments ou pas
+ */
 public class ExistsAction extends Action<Boolean> {
 	
 	private final Get get;
