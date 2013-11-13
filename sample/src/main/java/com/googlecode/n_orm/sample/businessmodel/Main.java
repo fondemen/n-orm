@@ -47,6 +47,7 @@ public class Main {
 		WaitingCallBack wc = new WaitingCallBack();
 		StorageManagement.findElements().ofClass(Book.class)
 				.withKey("bookStore").setTo(b.getBookStore()).andActivate()
+				.withAtMost(Integer.MAX_VALUE).elements()
 				.remoteForEach(new Process<Book>() {
 
 					@Override
