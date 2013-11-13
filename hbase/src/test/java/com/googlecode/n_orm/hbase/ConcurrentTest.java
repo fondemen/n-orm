@@ -17,6 +17,7 @@ import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.googlecode.n_orm.PropertyManagement;
@@ -477,6 +478,7 @@ public class ConcurrentTest {
 	
 	//@Test(expected=DatabaseNotReachedException.class)
 	@Test
+	@Ignore
 	public void requestTimeout() throws Throwable {
 //		ExecutorService es = Executors.newCachedThreadPool();
 //		try {

@@ -2,7 +2,9 @@ package com.googlecode.n_orm.hbase;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Map;
 import java.util.Properties;
+import java.util.TreeMap;
 
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.HConstants;
@@ -14,7 +16,7 @@ import com.googlecode.n_orm.hbase.Store;
 
 
 public class HBaseLauncher extends StoreTestLauncher {
-	private static Properties hbaseProperties = null;
+	private static Map<String, Object> hbaseProperties = null;
 
 	public static String hbaseHost;
 	public static Integer hbasePort = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;
@@ -32,10 +34,10 @@ public class HBaseLauncher extends StoreTestLauncher {
 		}
 	}
 
-	public static Properties prepareHBase() {
-		Properties p = new Properties();
-		p.setProperty(StoreSelector.STORE_DRIVERCLASS_PROPERTY, com.googlecode.n_orm.hbase.Store.class.getName());
-		p.setProperty(StoreSelector.STORE_DRIVERCLASS_STATIC_ACCESSOR, "getStore");
+	public static Map<String, Object> prepareHBase() {
+		Map<String, Object> p = new TreeMap<String, Object>();
+		p.put(StoreSelector.STORE_DRIVERCLASS_PROPERTY, com.googlecode.n_orm.hbase.Store.class.getName());
+		p.put(StoreSelector.STORE_DRIVERCLASS_STATIC_ACCESSOR, "getStore");
 
 		if (hbaseStore == null && hBaseServer == null) {
 			hbaseStore = com.googlecode.n_orm.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
@@ -68,9 +70,9 @@ public class HBaseLauncher extends StoreTestLauncher {
 			}
 		}
 
-		p.setProperty("1", hbaseHost);
-		p.setProperty("2", hbasePort.toString());
-		p.setProperty("3", Integer.toString(hbaseMaxRetries));
+		p.put("1", hbaseHost);
+		p.put("2", hbasePort.toString());
+		p.put("3", Integer.toString(hbaseMaxRetries));
 			
 		return p;
 	}
@@ -80,7 +82,7 @@ public class HBaseLauncher extends StoreTestLauncher {
 	}
 
 	@Override
-	public Properties prepare(Class<?> testClass) {
+	public Map<String, Object> prepare(Class<?> testClass) {
 		if (hbaseProperties == null)
 			hbaseProperties = prepareHBase();
 		return hbaseProperties;

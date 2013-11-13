@@ -32,6 +32,28 @@ public class StoreTest {
 		assertTrue(((DummyStore)s).isStarted());
 	}
 	
+	@Test public void testInstanciationJsonFile() {
+		com.googlecode.n_orm.jsonstoragefile.Element p = new com.googlecode.n_orm.jsonstoragefile.Element();
+		Store s = p.getStore();
+		assertSame(DummyStore.class, s.getClass());
+		assertNotSame(DummyStore.INSTANCE, s);
+		assertEquals("no id provided", ((DummyStore)s).getId());
+		assertTrue(((DummyStore)s).isStarted());
+	}
+	
+	@Test public void testInstanciationNestedJsonFile() {
+		com.googlecode.n_orm.nestedjsonstoragefile.Element p = new com.googlecode.n_orm.nestedjsonstoragefile.Element();
+		Store s = p.getStore();
+		assertTrue(s instanceof WriteRetentionStore);
+		assertEquals(500, ((WriteRetentionStore)s).getWriteRetentionMs());
+		assertFalse(((WriteRetentionStore)s).isEnabledByDefault());
+		s = ((WriteRetentionStore)s).getActualStore();
+		assertSame(DummyStore.class, s.getClass());
+		assertNotSame(DummyStore.INSTANCE, s);
+		assertEquals("no id provided", ((DummyStore)s).getId());
+		assertTrue(((DummyStore)s).isStarted());
+	}
+	
 	@Test public void testKeyedInstanciationPropertyFile() {
 		com.googlecode.n_orm.keyedstoragefile.Element p = new com.googlecode.n_orm.keyedstoragefile.Element();
 		Store s = p.getStore();

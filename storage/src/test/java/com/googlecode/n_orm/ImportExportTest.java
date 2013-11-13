@@ -14,7 +14,6 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -33,7 +32,7 @@ public class ImportExportTest {
 	
 	public ImportExportTest() throws Exception {
 		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
-		Properties props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
+		Map<String, Object> props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
 		StoreSelector.getInstance().setPropertiesFor(BookStore.class, props);
 		StoreSelector.getInstance().setPropertiesFor(Book.class, props);
 		StoreSelector.getInstance().setPropertiesFor(Novel.class, props);

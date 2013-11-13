@@ -2,7 +2,8 @@ package com.googlecode.n_orm;
 
 import static org.junit.Assert.assertTrue;
 
-import java.util.Properties;
+import java.util.Map;
+import java.util.TreeMap;
 
 
 import com.googlecode.n_orm.StoreSelector;
@@ -11,18 +12,18 @@ import com.googlecode.n_orm.memory.Memory;
 
 public class MemoryStoreTestLauncher extends StoreTestLauncher {
 	
-	private static Properties properties;
+	private static Map<String, Object> properties;
 
 	static {
-		properties = new Properties();
-		properties.setProperty(StoreSelector.STORE_DRIVERCLASS_PROPERTY,
+		properties = new TreeMap<String, Object>();
+		properties.put(StoreSelector.STORE_DRIVERCLASS_PROPERTY,
 				Memory.class.getName());
-		properties.setProperty(StoreSelector.STORE_DRIVERCLASS_SINGLETON_PROPERTY,
+		properties.put(StoreSelector.STORE_DRIVERCLASS_SINGLETON_PROPERTY,
 				"INSTANCE");
 	}
 
 	@Override
-	public Properties prepare(Class<?> testClass) {
+	public Map<String, Object> prepare(Class<?> testClass) {
 		MemoryStoreTestLauncher.registerStorePropertiesForInnerClasses(
 				this.getClass(), properties);
 		return properties;
