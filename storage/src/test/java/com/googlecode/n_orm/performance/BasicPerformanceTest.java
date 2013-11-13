@@ -5,8 +5,8 @@ import static org.junit.Assert.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,7 +35,7 @@ import com.googlecode.n_orm.StoreTestLauncher;
 public class BasicPerformanceTest {
 
 	public BasicPerformanceTest() {
-		Properties props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
+		Map<String, Object> props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
 		StoreSelector.getInstance().setPropertiesFor(BookStore.class, props);
 		StoreSelector.getInstance().setPropertiesFor(Book.class, props);
 		StoreSelector.getInstance().setPropertiesFor(Novel.class, props);

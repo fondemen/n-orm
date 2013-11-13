@@ -4,17 +4,26 @@ import java.beans.PropertyDescriptor;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.TreeMap;
 
 import org.apache.commons.beanutils.ConvertUtils;
 import org.apache.commons.beanutils.PropertyUtils;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
@@ -35,12 +44,16 @@ public aspect StoreSelector {
 		return INSTANCE;
 	}
 	
+	private static enum FileFormat {
+		JSON, PROPERTIES
+	}
+	
 	public static class StoreProperties implements Comparable<StoreProperties> {
-		public final Properties properties;
+		public final Map<String, Object> properties;
 		public final String pack;
 		public Store store;
 		
-		public StoreProperties(Properties properties, String pack) {
+		public StoreProperties(Map<String, Object> properties, String pack) {
 			this.properties = properties;
 			this.pack = pack;
 		}
@@ -50,8 +63,9 @@ public aspect StoreSelector {
 			return pack.compareTo(rhs.pack);
 		}
 	}
-	
+
 	public static final String PROPERTY_FILE = "store.properties";
+	public static final String JSON_FILE = "store.json";
 	public static final String STORE_DRIVERCLASS_PROPERTY = "class";
 	public static final String STORE_DRIVERCLASS_SINGLETON_PROPERTY = "singleton";
 	public static final String STORE_DRIVERCLASS_STATIC_ACCESSOR = "static-accessor";
@@ -109,7 +123,7 @@ public aspect StoreSelector {
 	}
 	
 	//For test purpose
-	public Properties findProperties(Class<?> clazz) throws IOException {
+	public Map<String, Object> findProperties(Class<?> clazz) throws IOException {
 		return this.findPropertiesInt(clazz).properties;
 	}
     
@@ -129,6 +143,23 @@ public aspect StoreSelector {
     	}
     }
     
+    private InputStream getInputStreamForProperties(File dir, String fileName, List<ClassLoader> classLoaders) {
+		File f = new File(dir, fileName);
+		String path = f.getPath();
+		//Evil windows states that \ is a separator while / is expected by getResourceAsStream
+		if (File.separatorChar == '\\') {
+			path = path.replace('\\', '/');
+		}
+		InputStream in = null;
+		for (ClassLoader loader : classLoaders) {
+			in = loader.getResourceAsStream(path);
+			if (in != null) {
+				return in;
+			}
+		}
+		return null;
+    }
+    
     private StoreProperties findPropertiesInt(File dir, List<ClassLoader> classLoaders) throws IOException {
 		if (dir == null)
 			throw new IOException();
@@ -141,24 +172,43 @@ public aspect StoreSelector {
     			return ret;
     		}
     		
-    		File f = new File(dir, PROPERTY_FILE);
-    		String path = f.getPath();
-    		//Evil windows states that \ is a separator while / is expected by getResourceAsStream
-    		if (File.separatorChar == '\\')
-    			path = path.replace('\\', '/');
-    		InputStream in = null;
-    		for (ClassLoader loader : classLoaders) {
-				in = loader.getResourceAsStream(path);
-				if (in != null) break;
-			}
+    		
+    		// Trying to get JSON
+    		InputStream in = this.getInputStreamForProperties(dir, JSON_FILE, classLoaders);
+    		FileFormat format = FileFormat.JSON;
+    		
+    		// Trying to get properties
+    		if (in == null) {
+    			in = this.getInputStreamForProperties(dir, PROPERTY_FILE, classLoaders);
+    			format = FileFormat.PROPERTIES;
+    		}
     			
     		if (in != null)
 	    		try {
-	    	    	Properties res = new Properties();
-	    			res.load(in);
+	    			Map<String, Object> res;
+	    	    	
+	    	    	switch (format) {
+	    	    	case PROPERTIES:
+	    	    		Properties props = new Properties();
+	    	    		props.load(in);
+	    	    		res = new HashMap<String, Object>();
+	    	    		for (Entry<Object, Object> prop : props.entrySet()) {
+							res.put((String) prop.getKey(), prop.getValue());
+						}
+	    	    		break;
+	    	    	case JSON:
+	    	    		try {
+							res = (JSONObject)new JSONParser().parse(new InputStreamReader(in));
+						} catch (Exception e) {
+							throw new DatabaseNotReachedException("Problem while loading store properties " + dir, e);
+						}
+	    	    		break;
+	    	    	default:
+	    	    		throw new Error("Cannot parse " + format);
+	    	    	}
 	    			
 	    			//Check whether this is a reference to another file
-	    			String ref = res.getProperty(STORE_REFERENCE);
+	    			String ref = (String)res.get(STORE_REFERENCE);
 	    			if (ref != null) {
 	    				//Let's continue searching from the given path
 	    				dir = new File(ref.replace('.', '/').replace('\\', '/'), PROPERTY_FILE);
@@ -183,7 +233,7 @@ public aspect StoreSelector {
     }
     
     //For test purpose.
-    public void setPropertiesFor(Class<? extends PersistingElement> clazz, Properties properties) {
+    public void setPropertiesFor(Class<? extends PersistingElement> clazz, Map<String, Object> properties) {
     	synchronized (this.getLock(clazz)) {
     		this.classStores.put(clazz.getName(), new StoreProperties(properties, clazz.getPackage().getName()));
     	}
@@ -194,10 +244,63 @@ public aspect StoreSelector {
     	synchronized (this.getLock(clazz)) {
     		Properties props = new Properties();
     		props.setProperty(STORE_DRIVERCLASS_PROPERTY, store.getClass().getName());
-    		StoreProperties sprop = new StoreProperties(new Properties(), clazz.getPackage().getName());
+    		StoreProperties sprop = new StoreProperties(new TreeMap<String, Object>(), clazz.getPackage().getName());
     		sprop.store = store;
     		this.classStores.put(clazz.getName(), sprop);
     	}
+    }
+    
+    /**
+     * Get an instance of Store according to properties.
+     * @param builderName The name of a static method to get the store ; constructor if null
+     * @param storeClass The class of the store to be built
+     * @param properties The property descriptor
+     */
+    private Object buildStore(String builderName, Class<?> storeClass, Map<String, Object> properties) {
+		//Detecting parameters number
+		int pmnr = 0;
+		while (properties.get(Integer.toString(pmnr+1)) != null)
+			pmnr++;
+		
+		// Parameters values
+		List<Object> args = new ArrayList<Object>(pmnr);
+		
+		if (builderName == null) {
+			//Finding constructor to invoke
+			for (Constructor<?> c : storeClass.getConstructors()) {
+				if (c.getParameterTypes().length == pmnr) {
+					try {
+						populateArguments(properties, c.getParameterTypes(), args);
+						return c.newInstance(args.toArray());
+					} catch (Exception x) {}
+				}
+			}
+			throw new IllegalArgumentException("Could not find constructor with compatible " + pmnr + " arguments in " + storeClass);
+		} else {
+			//Finding static method to invoke
+			for (Method m : storeClass.getMethods()) {
+				if (m.getName().equals(builderName) && (m.getModifiers() & Modifier.STATIC) != 0 && m.getParameterTypes().length == pmnr) {
+					try {
+						populateArguments(properties, m.getParameterTypes(), args);
+						return m.invoke(null, args.toArray());
+					} catch (Exception x) {}
+				}
+			}
+			throw new IllegalArgumentException("Could not find static accessor method " + builderName + " with compatible " + pmnr + " arguments in " + storeClass);
+		}
+    }
+    
+    private void populateArguments(Map<String, Object> properties, Class<?>[] types, List<Object> args) throws ClassNotFoundException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException {
+		int i = 1;
+		for (Class<?> c : types) {
+			Object val = properties.get(Integer.toString(i));
+			if (val == null) {
+				throw new IllegalArgumentException("Missing required value " + Integer.toString(i));
+			}
+			val = convert(val, c);
+			args.add(val);
+			i++;
+		}
     }
 	
 	public Store getStoreFor(Class<? extends PersistingElement> clazz) throws DatabaseNotReachedException {
@@ -230,59 +333,18 @@ public aspect StoreSelector {
 				}
 				
 				assert ret.store == null && ret.properties != null;
-				Properties properties = ret.properties;
+				Map<String, Object> properties = ret.properties;
 	
-				Class<?> storeClass = Class.forName(properties.getProperty(STORE_DRIVERCLASS_PROPERTY));
-				Object store;
-				if (properties.containsKey(STORE_DRIVERCLASS_STATIC_ACCESSOR)) {
-					String accessorName = properties.getProperty(STORE_DRIVERCLASS_STATIC_ACCESSOR);
-					Method accessor = null;
-					//Detecting parameters number
-					int pmnr = 0;
-					while (properties.getProperty(Integer.toString(pmnr+1)) != null)
-						pmnr++;
-					//Finding static method to invoke
-					for (Method m : storeClass.getMethods()) {
-						if (m.getName().equals(accessorName) && (m.getModifiers() & Modifier.STATIC) != 0 && m.getParameterTypes().length == pmnr) {
-							accessor = m;
-							break;
-						}
-					}
-					if (accessor == null)
-						throw new IllegalArgumentException("Could not find static accessor method " + accessorName + " in class " + storeClass);
-					List<Object> args = new ArrayList<Object>(pmnr);
-					int i = 1;
-					for (Class<?> c : accessor.getParameterTypes()) {
-						String valAsString = properties.getProperty(Integer.toString(i));
-						if (valAsString == null)
-							throw new IllegalArgumentException("Missing required value " + Integer.toString(i));
-						Object val = convert(valAsString, c);
-						args.add(val);
-						i++;
-					}
-					store = accessor.invoke(null, args.toArray());
-				} else if (properties.containsKey(STORE_DRIVERCLASS_SINGLETON_PROPERTY))
-					store = PropertyManagement.getInstance().readValue(null, storeClass.getField(properties.getProperty(STORE_DRIVERCLASS_SINGLETON_PROPERTY)));
-				else
-					store = storeClass.newInstance();
-				
-				assert store != null;
-				
-				for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(store)) {
-					if (PropertyUtils.isWriteable(store, property.getName()) && properties.containsKey(property.getName())) {
-						PropertyUtils.setProperty(store, property.getName(), convert(properties.getProperty(property.getName()), property.getPropertyType()));
-					}
+				// Building store
+				Object store = toObject(properties);
+				if (!(store instanceof Store)) {
+					throw new IllegalArgumentException("Error while loading store for " + clazz + " properties describe " + store + " while expecting an instance of " + Store.class.getName());
 				}
+				ret.store = (Store)store;
 				
-				if (store instanceof Store)
-					ret.store = (Store)store;
-				else if (store instanceof SimpleStore)
-					ret.store = SimpleStoreWrapper.getWrapper((SimpleStore)store);
-				else
-					throw new IllegalArgumentException("Error while getting store for class " + clazz.getName() + ": found store " + store.toString() + " of class " + store.getClass().getName() + " which is not compatible with " + Store.class.getName() + " or " + SimpleStore.class.getName());
-
+				// Checking for write retention in (flat) properties
 				if (ret.properties.containsKey(STORE_WRITE_RETENTION)) {
-					String wrStr = ret.properties.getProperty(STORE_WRITE_RETENTION);
+					String wrStr = (String)ret.properties.get(STORE_WRITE_RETENTION);
 					boolean disabled = wrStr.endsWith("-disabled");
 					if (disabled) {
 						wrStr = wrStr.substring(0, wrStr.length() - "-disabled".length());
@@ -293,6 +355,7 @@ public aspect StoreSelector {
 					ret.store = wrs;
 				}
 
+				// Checking for write retention in annotation
 				ret = checkForRetention(ret, clazz);
 				
 				ret.store.start();
@@ -304,11 +367,47 @@ public aspect StoreSelector {
 		}
 	}
 	
+	private Object toObject(Map<String, Object> properties)
+			throws ClassNotFoundException, IllegalAccessException,
+			InvocationTargetException, NoSuchMethodException,
+			NoSuchFieldException {
+		Class<?> storeClass = Class.forName((String)properties.get(STORE_DRIVERCLASS_PROPERTY));
+		Object ret;
+		if (properties.containsKey(STORE_DRIVERCLASS_STATIC_ACCESSOR)) {
+			String accessorName = (String)properties.get(STORE_DRIVERCLASS_STATIC_ACCESSOR);
+			ret = buildStore(accessorName, storeClass, properties);
+		} else if (properties.containsKey(STORE_DRIVERCLASS_SINGLETON_PROPERTY)) {
+			ret = PropertyManagement.getInstance().readValue(null, storeClass.getField((String)properties.get(STORE_DRIVERCLASS_SINGLETON_PROPERTY)));
+		} else { 
+			ret = buildStore(null, storeClass, properties);
+		}
+		
+		assert ret != null;
+		
+		// Setting properties
+		for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(ret)) {
+			if (PropertyUtils.isWriteable(ret, property.getName()) && properties.containsKey(property.getName())) {
+				PropertyUtils.setProperty(ret, property.getName(), convert(properties.get(property.getName()), property.getPropertyType()));
+			}
+		}
+		
+		// Wrapping if necessary
+		if (ret instanceof SimpleStore)
+			ret = SimpleStoreWrapper.getWrapper((SimpleStore)ret);
+		
+		return ret;
+	}
+	
 	@SuppressWarnings("unchecked")
-	private Object convert(String valAsString, Class<?> c) {
-		if (c.isEnum())
-			return Enum.valueOf(c.asSubclass(Enum.class), valAsString);
-		return ConvertUtils.convert(valAsString, c);
+	private Object convert(Object val, Class<?> c) throws ClassNotFoundException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException {
+		if (val instanceof Map) {
+			return toObject((Map<String, Object>) val);
+		} else {
+			val = val.toString();
+			if (c.isEnum())
+				return Enum.valueOf(c.asSubclass(Enum.class), (String)val);
+			return ConvertUtils.convert((String)val, c);
+		}
 	}
 
 	/**
