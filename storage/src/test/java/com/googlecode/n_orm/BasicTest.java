@@ -9,8 +9,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -31,7 +31,7 @@ import com.googlecode.n_orm.cf.ColumnFamily;
 public class BasicTest {
 
 	public BasicTest() {
-		Properties props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
+		Map<String, Object> props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
 		StoreSelector.getInstance().setPropertiesFor(BookStore.class, props);
 		StoreSelector.getInstance().setPropertiesFor(Book.class, props);
 		StoreSelector.getInstance().setPropertiesFor(Novel.class, props);

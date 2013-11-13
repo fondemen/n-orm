@@ -4,7 +4,6 @@ import static org.junit.Assert.*;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -19,7 +18,7 @@ import com.googlecode.n_orm.Persisting;
 public class IncrementsTest {
 
 	public IncrementsTest() {
-		Properties props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
+		Map<String, Object> props = StoreTestLauncher.INSTANCE.prepare(this.getClass());
 		StoreSelector.getInstance().setPropertiesFor(Element.class, props);
 	}
 

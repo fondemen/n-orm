@@ -1,0 +1,9 @@
+{
+	"class":"com.googlecode.n_orm.cache.write.WriteRetentionStore",
+	"static-accessor":"getWriteRetentionStore",
+	"1":500
+	"2":{
+		"class":"com.googlecode.n_orm.DummyStore"
+	}
+	"enabledByDefault":false
+}
