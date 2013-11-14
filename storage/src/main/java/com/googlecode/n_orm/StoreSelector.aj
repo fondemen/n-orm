@@ -21,9 +21,7 @@ import java.util.TreeMap;
 import org.apache.commons.beanutils.ConvertUtils;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.json.simple.JSONObject;
-import org.json.simple.JSONValue;
 import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
@@ -200,7 +198,7 @@ public aspect StoreSelector {
 	    	    		try {
 							res = (JSONObject)new JSONParser().parse(new InputStreamReader(in));
 						} catch (Exception e) {
-							throw new DatabaseNotReachedException("Problem while loading store properties " + dir, e);
+							throw new DatabaseNotReachedException("Problem while loading store properties " + dir + '/' + JSON_FILE, e);
 						}
 	    	    		break;
 	    	    	default:
@@ -208,10 +206,10 @@ public aspect StoreSelector {
 	    	    	}
 	    			
 	    			//Check whether this is a reference to another file
-	    			String ref = (String)res.get(STORE_REFERENCE);
-	    			if (ref != null) {
+	    			Object ref = res.get(STORE_REFERENCE);
+	    			if ((ref != null) && (ref instanceof String)) {
 	    				//Let's continue searching from the given path
-	    				dir = new File(ref.replace('.', '/').replace('\\', '/'), PROPERTY_FILE);
+	    				dir = new File(((String)ref).replace('.', '/').replace('\\', '/'), PROPERTY_FILE);
 	    			} else { //We found it and it's not an indirection
 		    			ret = new StoreProperties(res, pack);
 		    			packageStores.put(ret.pack, ret);
@@ -333,10 +331,9 @@ public aspect StoreSelector {
 				}
 				
 				assert ret.store == null && ret.properties != null;
-				Map<String, Object> properties = ret.properties;
 	
 				// Building store
-				Object store = toObject(properties);
+				Object store = toObject(ret.properties);
 				if (!(store instanceof Store)) {
 					throw new IllegalArgumentException("Error while loading store for " + clazz + " properties describe " + store + " while expecting an instance of " + Store.class.getName());
 				}
@@ -401,13 +398,20 @@ public aspect StoreSelector {
 	@SuppressWarnings("unchecked")
 	private Object convert(Object val, Class<?> c) throws ClassNotFoundException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException {
 		if (val instanceof Map) {
-			return toObject((Map<String, Object>) val);
+			Object ret = toObject((Map<String, Object>) val);
+			if (! c.isInstance(ret)) {
+				throw new ClassCastException(ret + " as described by properties " + val + " is not instance of " + c);
+			} else {
+				return ret;
+			}
 		} else {
 			val = val.toString();
-			if (c.isEnum())
+			if (c.isEnum()) {
 				return Enum.valueOf(c.asSubclass(Enum.class), (String)val);
+			}
 			return ConvertUtils.convert((String)val, c);
 		}
+		//@ TODO support arrays
 	}
 
 	/**
