@@ -1,27 +1,31 @@
 package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
-import org.apache.hadoop.hbase.client.Get;
+
+//import org.apache.hadoop.hbase.client.Get;
+import org.hbase.async.GetRequest;
+
+import com.stumbleupon.async.Deferred;
 
 /*
  * Verifie si le get retourne des éléments ou pas
  */
-public class ExistsAction extends Action<Boolean> {
+public class ExistsAction extends Action<Object> {
 	
-	private final Get get;
+	private final GetRequest get;
 
-	public ExistsAction(Get get) {
+	public ExistsAction(GetRequest get) {
 		super();
 		this.get = get;
 	}
 
-	public Get getGet() {
+	public GetRequest getGet() {
 		return get;
 	}
 
 	@Override
-	public Boolean perform() throws IOException {
-		return this.getTable().exists(this.getGet());
+	public Deferred<Object> perform() throws IOException {
+		return this.getClient().ensureTableExists(this.getGet().table());
 	}
 	
 }

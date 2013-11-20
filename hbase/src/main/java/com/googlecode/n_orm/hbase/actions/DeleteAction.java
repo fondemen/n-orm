@@ -2,7 +2,6 @@ package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hbase.client.Delete;
 import org.hbase.async.DeleteRequest;
 
 import com.stumbleupon.async.Deferred;
@@ -20,9 +19,12 @@ public class DeleteAction extends Action<Void> {
 		return delete;
 	}
 
+	/**
+	 * perform a delete action 
+	 */
 	@Override
-	public Void perform() throws IOException {
-		this.getTable().delete(this.getDelete());
+	public Deferred<Void> perform() throws IOException {
+		this.getClient().delete(this.getDelete());
 		return null;
 	}
 	

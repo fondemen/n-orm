@@ -3,6 +3,7 @@ package com.googlecode.n_orm.hbase.actions;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import org.hbase.async.HBaseClient;
 import org.hbase.async.KeyValue;
 import org.hbase.async.GetRequest;
 
@@ -22,8 +23,8 @@ public class GetAction extends Action<ArrayList<KeyValue>> {
 	}
 
 	@Override
-	public Deferred<ArrayList<KeyValue>> perform() throws IOException {
-		return this.getTable().get(this.getGet());
+	public Deferred<ArrayList<KeyValue>> perform(HBaseClient client) throws IOException {
+		return client.get(this.getGet());
 	}
 	
 }

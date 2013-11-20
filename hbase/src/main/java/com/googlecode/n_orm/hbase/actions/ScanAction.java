@@ -3,25 +3,28 @@ package com.googlecode.n_orm.hbase.actions;
 import java.io.IOException;
 
 import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Scan;
+//import org.apache.hadoop.hbase.client.Scan;
+import org.hbase.async.Scanner;
+
+import com.stumbleupon.async.Deferred;
 
 
-public class ScanAction extends Action<ResultScanner> {
-	
-	private final Scan scan;
+public class ScanAction extends Action</*Result*/Scanner> {
+       
+        private final Scanner scan;
 
-	public ScanAction(Scan scan) {
-		super();
-		this.scan = scan;
-	}
+        public ScanAction(Scanner scan) {
+                super();
+                this.scan = scan;
+        }
 
-	public Scan getScan() {
-		return scan;
-	}
+        public Scanner getScan() {
+                return scan;
+        }
 
-	@Override
-	public ResultScanner perform() throws IOException {
-		return this.getTable().getScanner(this.getScan());
-	}
-	
+        @Override
+        public Deferred<Scanner> perform() throws IOException {
+                return this.getClient().newScanner(this.getScan());
+        }
+       
 }

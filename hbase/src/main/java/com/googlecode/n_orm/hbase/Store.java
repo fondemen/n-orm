@@ -63,6 +63,7 @@ import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.io.hfile.Compression;
 import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
+import org.apache.hadoop.hbase.ipc.HBaseClient;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.regionserver.StoreFile;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -70,6 +71,7 @@ import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.zookeeper.ZooKeeper;
 import org.codehaus.plexus.util.DirectoryScanner;
+import org.hbase.async.GetRequest;
 
 import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -99,6 +101,7 @@ import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.GenericStore;
 import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+import com.stumbleupon.async.Deferred;
 
 /**
  * The HBase store found according to its configuration folder.
@@ -299,7 +302,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	private long cacheTTLMs = 10*60*1000; //10 min
 	public ConcurrentMap<MangledTableName, HTableDescriptor> tablesD = new ConcurrentHashMap<MangledTableName, HTableDescriptor>();
 	public ConcurrentHashMap<MangledTableName, Object> notExistingTables = new ConcurrentHashMap<MangledTableName, Object>();
-	public HTablePool tablesC;
+	private org.hbase.async.HBaseClient client;
 	
 	private Integer clientTimeout = null;
 	
@@ -402,8 +405,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				throw new DatabaseNotReachedException(e);
 			}
 		
-		this.tablesC = new HTablePool(this.getConf(), Integer.MAX_VALUE);
-		
+		this.client = new org.hbase.async.HBaseClient(this.config.get(CONF_HOST_KEY, "localhost:2181"));
+				
 		//Wait for Zookeeper availability
 		int maxRetries = 100;
 		RecoverableZooKeeper zk = null;
@@ -1248,40 +1251,29 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 	
 	protected <R> R tryPerform(Action<R> action, Class<? extends PersistingElement> clazz,  MangledTableName tableName, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {
-		HTableInterface table = this.getTable(clazz, tableName, tablePostfix, expectedFamilies);
-		try {
-			return this.tryPerform(action, table, clazz, tablePostfix, expectedFamilies);
-		} finally {
-			try {
-				this.returnTable(action.getTable());
-			} catch (IOException x) {
-				throw new DatabaseNotReachedException(x);
-			}
-		}
+		MangledTableName table = this.getTable(clazz, tableName, tablePostfix, expectedFamilies);
+		return this.tryPerform(action, table, clazz, tablePostfix, expectedFamilies);
 		
 	}
 	
 	/**
 	 * Performs an action. Table should be replaced by action.getTable() as it can change in case of problem handling (like a connection lost).
 	 */
-	protected <R> R tryPerform(final Action<R> action, HTableInterface table, Class<? extends PersistingElement> clazz, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {	
+	protected <R> R tryPerform(final Action<R> action, MangledTableName table, Class<? extends PersistingElement> clazz, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {	
 		assert tablePostfix == null || Bytes.toString(table.getTableName()).endsWith(tablePostfix);
-		action.setTable(table);
 		try {
-			return action.perform();
+			Deferred<R> ret = action.perform(this.client);
+			return ret.join();
 		} catch (Throwable e) {
-			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
+			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + table + " for store " + this.hashCode(), e);
 			
-			HTablePool tp = this.tablesC;
-			MangledTableName tableName = new MangledTableName(table);
+			MangledTableName tableName = table;
 			this.handleProblem(e, clazz, tableName, tablePostfix, expectedFamilies);
-			if (tp != this.tablesC) { //Store was restarted ; we should get a new table client
-				table = this.getTable(clazz, tableName, tablePostfix, expectedFamilies);
-				action.setTable(table);
-			}
+			this.getTable(clazz, tableName, tablePostfix, expectedFamilies);
 			try {
 				errorLogger.log(Level.INFO, "Retrying to perform again erroneous " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
-				return action.perform();
+				Deferred<R> ret = action.perform(this.client);
+				return ret.join();
 			} catch (Exception f) {
 				errorLogger.log(Level.SEVERE, "Cannot recover from error while performing a" + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
 				throw new DatabaseNotReachedException(f);
@@ -1512,14 +1504,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		return td;
 	}
 
-	protected HTableInterface getTable(Class<? extends PersistingElement> clazz, MangledTableName name, String tablePostfix, Map<String, Field> expectedFamilies)
+	protected MangledTableName getTable(Class<? extends PersistingElement> clazz, MangledTableName name, String tablePostfix, Map<String, Field> expectedFamilies)
 			throws DatabaseNotReachedException {
 		assert tablePostfix == null || name.getName().endsWith(tablePostfix);
 		
 		try {
 			//Checking that this table actually exists with the expected column families
 			this.getTableDescriptor(clazz, name, tablePostfix, expectedFamilies);
-			return this.tablesC.getTable(name.getNameAsBytes());
 		} catch (Throwable x) {
 			this.handleProblem(x, clazz, name, tablePostfix, expectedFamilies);
 			try {
@@ -1527,15 +1518,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			} catch (Exception y) {
 				throw new DatabaseNotReachedException(x);
 			}
-			return (HTableInterface)this.tablesC.getTable(name.getNameAsBytes());
 		}
+		return name;
 	}
 	
-	protected void returnTable(HTableInterface table) throws IOException {
-		table.close();
-		//this.tablesC.putTable(table);
-	}
-
 	protected boolean hasColumnFamily(MangledTableName table, String family)
 			throws DatabaseNotReachedException {
 		if (!this.hasTable(table))
@@ -1808,25 +1794,25 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		Map<String, Field> cf = toMap(families, meta);
 		
-		Get g = new Get(Bytes.toBytes(id));
+		GetRequest g = new GetRequest(table.getNameAsBytes(), Bytes.toBytes(id));
 		for (String family : families) {
-			g.addFamily(Bytes.toBytes(family));
+			g.family(Bytes.toBytes(family));
 		}
 
-		Result r = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), cf);
+		ArrayList<org.hbase.async.KeyValue> r = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), cf);
 		if (r.isEmpty())
 			return null;
 		
 		ColumnFamilyData ret = new DefaultColumnFamilyData();
-		for (KeyValue kv : r.list()) {
-			String familyName = Bytes.toString(kv.getFamily());
+		for (org.hbase.async.KeyValue kv : r) {
+			String familyName = Bytes.toString(kv.family());
 			Map<String, byte[]> fam = ret.get(familyName);
 			if (fam == null) {
 				fam = new TreeMap<String, byte[]>();
 				ret.put(familyName, fam);
 			}
-			fam.put(Bytes.toString(kv.getQualifier()),
-					kv.getValue());
+			fam.put(Bytes.toString(kv.qualifier()),
+					kv.value());
 		}
 		return ret;
 	}

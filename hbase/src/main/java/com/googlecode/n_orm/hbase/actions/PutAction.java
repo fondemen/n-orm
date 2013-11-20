@@ -22,7 +22,7 @@ public class PutAction extends Action<Void> {
 
 	@Override
 	public Deferred<Void> perform() throws IOException {
-		this.getTable().put(this.getPut());
+		this.getClient().put(this.getPut());
 		return null;
 	}
 	
