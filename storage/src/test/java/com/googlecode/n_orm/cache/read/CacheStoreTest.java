@@ -3,6 +3,7 @@ import static org.junit.Assert.*;
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.cache.read.CacheException;
 import com.googlecode.n_orm.cache.read.ICache;
 import static org.easymock.EasyMock.*;
@@ -29,8 +30,8 @@ public class CacheStoreTest {
 	public static class Element {
 		private static final long serialVersionUID = 571650039153672799L;
 		@Key public String key;
-		public String familyName;
-		public Map<String, Integer> familyData = null;
+		public String property;
+		public Map<String, Integer> family = null;
 		
 	}
 	
@@ -56,15 +57,17 @@ public class CacheStoreTest {
 	@Test
 	public void testGet() throws CacheException {
 		expect(mockCache.getFamilyData(null, "table", "key", "family")).andReturn(null);
-		Map<String, byte[]> familyData=new HashMap<String,byte[]>();
+		Map<String, byte[]> family=new HashMap<String,byte[]>();
 		byte[] Dupond = ConversionTools.convert("Dupont");
 		byte[] Jean = null;
 		byte[] age= ConversionTools.convert("10");
-		familyData.put("nom", Dupond);
-		familyData.put("Prenom", Jean);
-		familyData.put("age", age);
-		expect(mockStore.get(null, "table", "key", "family")).andReturn(familyData);
-		mockCache.insertFamilyData(null, "table", "key", "family", familyData);
+		family.put("nom", Dupond);
+		family.put("Prenom", Jean);
+		family.put("age", age);
+		expect(mockStore.get(null, "table", "key", "family")).andReturn(family);
+		// called when executing assertions
+		expect(mockCache.getFamilyData(null, "table", "key", "family")).andReturn(family).times(0, 1);
+		mockCache.insertFamilyData(null, "table", "key", "family", family);
 		replay();
 		sut.get(null, "table", "key", "family");
 		verify();
@@ -75,9 +78,9 @@ public class CacheStoreTest {
 	public void testExist() throws CacheException{
 		Element e=new Element();
 		e.key="tagada";
-		e.familyName="tsoin tsoin";
-		e.familyData .put("A", 12);
-		e.familyData.put("B", 14);
+		e.property="tsoin tsoin";
+		e.family .put("A", 12);
+		e.family.put("B", 14);
 		MetaInformation meta=new MetaInformation();
 		expect(mockCache.existsData(meta, "table", "key", "family")).andReturn(true);
 		replay();
@@ -89,12 +92,14 @@ public class CacheStoreTest {
 	public void testNotExist() throws CacheException{
 		Element e=new Element();
 		e.key="tagada";
-		e.familyName="tsoin tsoin";
-		e.familyData .put("A", 12);
-		e.familyData.put("B", 14);
-		MetaInformation meta=new MetaInformation();
-		expect(mockCache.existsData(meta, "table", "key", "family")).andReturn(false);
-		expect(sut.exists(meta, "table", "key")).andReturn(false);
+		e.property="tsoin tsoin";
+		e.family .put("A", 12);
+		e.family.put("B", 14);
+		MetaInformation meta=new MetaInformation().forElement(e);
+		expect(mockCache.existsData(meta, "table", "key", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME)).andReturn(false).times(0,1);
+		expect(mockCache.existsData(meta, "table", "key", "family")).andReturn(false).times(0,1);
+		//expect(mockCache.existsData(meta, "table", "key", "family")).andReturn(false).times(0,1);
+		expect(mockStore.exists(meta, "table", "key", "family")).andReturn(false);
 		replay();
 		assertFalse(sut.exists(meta, "table", "key", "family"));
 		verify();
@@ -104,9 +109,9 @@ public class CacheStoreTest {
 	public void testDelete()throws CacheException{
 		Element e=new Element();
 		e.key="tagada";
-		e.familyName="tsoin tsoin";
-		e.familyData.put("A", 12);
-		e.familyData.put("B", 14);
+		e.property="tsoin tsoin";
+		e.family.put("A", 12);
+		e.family.put("B", 14);
 		MetaInformation meta=new MetaInformation();
 		mockCache.delete(meta, "table", "key");
 		mockStore.delete(meta, "table", "key");
@@ -119,12 +124,11 @@ public class CacheStoreTest {
 	public void testExists() throws CacheException{
 		Element e=new Element();
 		e.key="tagada";
-		e.familyName="tsoin tsoin";
-		e.familyData.put("A", 12);
-		e.familyData.put("B", 14);
-		MetaInformation meta=new MetaInformation();
-		meta.forElement(new Element());
-		expect(mockCache.existsData(eq(meta), eq("table"), eq("row"), EasyMock.or(eq("props"), eq("familyData")))).andReturn(true);
+		e.property="tsoin tsoin";
+		e.family.put("A", 12);
+		e.family.put("B", 14);
+		MetaInformation meta=new MetaInformation().forElement(e);
+		expect(mockCache.existsData(eq(meta), eq("table"), eq("row"), EasyMock.or(eq(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), eq("family")))).andReturn(true);
 		replay();
 		sut.exists(meta, "table", "row");
 		verify();
