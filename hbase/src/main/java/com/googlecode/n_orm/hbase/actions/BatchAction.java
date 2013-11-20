@@ -1,7 +1,18 @@
-package com.googlecode.n_orm.hbase.actions;
+
+// Batch n'existe pas en asynchbase
+// Client asychrone donc plus requette en parallèle
+
+
+
+
+/*package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
 import java.util.List;
+
+import org.hbase.async.HBaseClient;
+
+import com.stumbleupon.async.Deferred;
 
 public class BatchAction extends Action<Void> {
 	
@@ -15,11 +26,13 @@ public class BatchAction extends Action<Void> {
 	public List<org.apache.hadoop.hbase.client.Row> getBatch() {
 		return batch;
 	}
-
+	
+	
 	@Override
-	public Void perform() throws IOException, InterruptedException {
-		this.getTable().batch(this.getBatch());
+	public Deferred<Void> perform(HBaseClient client) throws Exception {
+		
 		return null;
 	}
+
 	
-}
+}*/

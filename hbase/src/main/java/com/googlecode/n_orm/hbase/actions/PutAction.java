@@ -3,6 +3,7 @@ package com.googlecode.n_orm.hbase.actions;
 import java.io.IOException;
 
 import org.apache.hadoop.hbase.client.Put;
+import org.hbase.async.HBaseClient;
 import org.hbase.async.PutRequest;
 
 import com.stumbleupon.async.Deferred;
@@ -19,10 +20,10 @@ public class PutAction extends Action<Void> {
 	public PutRequest getPut() {
 		return put;
 	}
-
+	
 	@Override
-	public Deferred<Void> perform() throws IOException {
-		this.getClient().put(this.getPut());
+	public Deferred<Void> perform(HBaseClient client) throws Exception {
+		client.put(this.getPut());
 		return null;
 	}
 	

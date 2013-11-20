@@ -2,8 +2,10 @@ package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
 
+
 //import org.apache.hadoop.hbase.client.Get;
 import org.hbase.async.GetRequest;
+import org.hbase.async.HBaseClient;
 
 import com.stumbleupon.async.Deferred;
 
@@ -24,8 +26,9 @@ public class ExistsAction extends Action<Object> {
 	}
 
 	@Override
-	public Deferred<Object> perform() throws IOException {
-		return this.getClient().ensureTableExists(this.getGet().table());
+	public Deferred<Object> perform(HBaseClient client) throws Exception {
+		// TODO Auto-generated method stub
+		return null;
 	}
 	
 }

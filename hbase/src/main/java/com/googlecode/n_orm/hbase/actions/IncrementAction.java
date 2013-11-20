@@ -2,8 +2,10 @@ package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
 
+
 //import org.apache.hadoop.hbase.client.Increment;
 import org.hbase.async.AtomicIncrementRequest;
+import org.hbase.async.HBaseClient;
 
 import com.stumbleupon.async.Deferred;
 
@@ -21,8 +23,8 @@ public class IncrementAction extends Action<Void> {
 	}
 
 	@Override
-	public Deferred<Void> perform() throws IOException, InterruptedException {
-		this.getClient().atomicIncrement(this.getIncrements());
+	public Deferred<Void> perform(HBaseClient client) throws Exception {
+		// TODO Auto-generated method stub
 		return null;
 	}
 	

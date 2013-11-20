@@ -10,10 +10,12 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
+import org.hbase.async.HBaseClient;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.hbase.mapreduce.Truncator;
+import com.stumbleupon.async.Deferred;
 
 public class TruncateAction extends Action<Void> {
 	private final Store store;
@@ -23,15 +25,6 @@ public class TruncateAction extends Action<Void> {
 		super();
 		this.store = store;
 		this.scan = scan;
-	}
-
-	@Override
-	public Void perform() throws Exception {
-		if (this.store.isTruncateMapRed())
-			this.truncateMapReduce();
-		else
-			this.truncateSimple();
-		return null;
 	}
 	
 	protected void truncateSimple() throws IOException  {
@@ -62,6 +55,12 @@ public class TruncateAction extends Action<Void> {
 		if(!count.waitForCompletion(false)) {
 			throw new DatabaseNotReachedException("Could not truncate table with map/reduce " + tableName);
 		}
+	}
+
+	@Override
+	public Deferred<Void> perform(HBaseClient client) throws Exception {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }
