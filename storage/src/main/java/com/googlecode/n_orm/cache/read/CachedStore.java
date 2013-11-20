@@ -1,7 +1,6 @@
 package com.googlecode.n_orm.cache.read;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -34,8 +33,7 @@ public class CachedStore extends DelegatingStore {
 			cache.delete(meta, table, id);
 			super.delete(meta, table, id);
 		} catch (CacheException e) {
-			throw new DatabaseNotReachedException("Error while removing "
-					+ meta.getElement() + " from cache: " + e.getMessage(), e);
+			throw new DatabaseNotReachedException(e);
 		}
 
 	}
@@ -76,7 +74,7 @@ public class CachedStore extends DelegatingStore {
 				return data;
 			}
 		} catch (CacheException e) {
-			throw new DatabaseNotReachedException("No family Data");
+			throw new DatabaseNotReachedException(e);
 		}
 	}
 
@@ -96,31 +94,36 @@ public class CachedStore extends DelegatingStore {
 		return super.exists(meta, table, row);
 	}
 
-	public ColumnFamilyData get(MetaInformation meta, String table, String id,
-			Set<String> families) throws DatabaseNotReachedException {
+	public ColumnFamilyData get(MetaInformation meta, String table,
+			String id, Set<String> families)
+			throws DatabaseNotReachedException {
 		try {
-			DefaultColumnFamilyData dcfd = new DefaultColumnFamilyData();
+			DefaultColumnFamilyData ret = new DefaultColumnFamilyData();
 			Set<String> familiesName = new TreeSet<String>(families);
 			Iterator<String> it = familiesName.iterator();
-			Map<String, byte[]> data = new HashMap<String, byte[]>();
 
 			while (it.hasNext()) {
 				String name = it.next();
-				data = cache.getFamilyData(meta, table, id, name);
+				Map<String, byte[]> data = cache.getFamilyData(meta, table, id, name);
 				if (data != null) {
-					dcfd.put(name, data);
+					ret.put(name, data);
 					it.remove();
 				}
 			}
-			ColumnFamilyData dataStore = super.get(meta, table, id,
-					familiesName);
 
-			for (Entry<String, Map<String, byte[]>> cfd : dataStore.entrySet()) {
-				dcfd.put(cfd.getKey(), cfd.getValue());
-				cache.insertFamilyData(meta, table, id, cfd.getKey(),
-						cfd.getValue());
+			if (!familiesName.isEmpty()) {
+				ColumnFamilyData dataStore = super.get(meta, table, id,
+						familiesName);
+
+				for (Entry<String, Map<String, byte[]>> cfd : dataStore
+						.entrySet()) {
+					ret.put(cfd.getKey(), cfd.getValue());
+					cache.insertFamilyData(meta, table, id, cfd.getKey(),
+							cfd.getValue());
+				}
 			}
-			return dcfd;
+
+			return ret;
 		} catch (CacheException e) {
 			throw new DatabaseNotReachedException(e);
 		}
