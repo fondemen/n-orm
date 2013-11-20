@@ -72,8 +72,7 @@ public class CachedStore extends DelegatingStore {
 			} else {
 				data = getActualStore().get(meta, table, id, family);
 				cache.insertFamilyData(meta, table, id, family, data);
-				assert data
-						.equals(cache.getFamilyData(meta, table, id, family));
+				assert data.equals(cache.getFamilyData(meta, table, id, family));
 				return data;
 			}
 		} catch (CacheException e) {
