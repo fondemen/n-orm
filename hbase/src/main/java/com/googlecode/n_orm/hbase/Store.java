@@ -538,7 +538,6 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		PropertyUtils.clearCachedValues();
 		this.scanCaching = scanCaching;
 	}
-
 	/**
 	 * Whether {@link HTableDescriptor#setDeferredLogFlush(boolean)} should be set for tables.
 	 * Improves write throughput by making writes log asynchronous on the server while improving risk of data loss in case of server crash.
@@ -1086,7 +1085,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		this.admin = admin;
 		this.setConf(admin.getConfiguration());
 	}
+	///////////////////////////////////////////////***********************************************//////////////////////////////////////**********************
 
+	//HTableDescriptor n'existe pas dans le client asynchrone
 	private void loadCache() {
 		if (! this.wasStarted)
 			return;
@@ -1127,7 +1128,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		this.tablesD.remove(tableName);
 		this.notExistingTables.remove(tableName);
 	}
-
+/////////////////////***********************************************************//////////////**********
 	/**
 	 * Resets the connection to HBase.
 	 * Also vacuum any cached value about the store (but not Cached elements from {@link Cache}).
