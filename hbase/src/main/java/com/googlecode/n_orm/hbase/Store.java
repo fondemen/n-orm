@@ -52,7 +52,9 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
-import org.apache.hadoop.hbase.client.Scan;
+
+import com.googlecode.n_orm.hbase.actions.Scan;
+
 import org.apache.hadoop.hbase.client.ScannerTimeoutException;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
@@ -71,7 +73,9 @@ import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.zookeeper.ZooKeeper;
 import org.codehaus.plexus.util.DirectoryScanner;
+import org.hbase.async.DeleteRequest;
 import org.hbase.async.GetRequest;
+import org.hbase.async.Scanner;
 
 import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -1709,32 +1713,6 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	// Actual implementation methods
 	////////////////////////////////////////////////////////////////////
 
-	private Filter addFilter(Filter f1, Filter f2) {
-		if (f2 == null) {
-			return f1;
-		} else if (f1 == null) {
-			return f2;
-		} else if (f1 instanceof FilterList) {
-			((FilterList) f1).addFilter(f2);
-			return f1;
-		} else {
-			FilterList list = new FilterList();
-			list.addFilter(f1);
-			list.addFilter(f2);
-			return list;
-		}
-	}
-
-	protected Filter createFamilyConstraint(Constraint c) {
-		Filter f = null;
-		if (c.getStartKey() != null)
-			f = new QualifierFilter(CompareOp.GREATER_OR_EQUAL,
-					new BinaryComparator(Bytes.toBytes(c.getStartKey())));
-		if (c.getEndKey() != null)
-			f = this.addFilter(f, new QualifierFilter(CompareOp.LESS_OR_EQUAL,
-					new BinaryComparator(Bytes.toBytes(c.getEndKey()))));
-		return f;
-	}
 
 	protected Scan getScan(Constraint c, Class<? extends PersistingElement> clazz, Map<String, Field> families) throws DatabaseNotReachedException {
 		Scan s = new Scan();
@@ -1779,8 +1757,11 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				s.addFamily(Bytes.toBytes(fam));
 			}
 		} else {
+			byte[] k= null;
 			//No family to load ; avoid getting all information in the row (that may be big)
-			s.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
+			
+			// avec le client asynchrone on fait un filtre à partir de la rowKey
+			s.setFilter(new KeyValue().keyToString(k));
 		}
 		
 		return s;
@@ -1885,7 +1866,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		Map<String, Field> fams = this.toMap(families, meta);
 
 		MangledTableName table = new MangledTableName(tableName);
-		HTableInterface t = this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
+		HTableInterface t =  this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
 
 		try {
 			byte[] row = Bytes.toBytes(id);
@@ -2036,7 +2017,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (!this.hasTable(table))
 			return;
 		this.waitForNewUpdate(meta, table, id);
-		Delete d = new Delete(Bytes.toBytes(id));
+		DeleteRequest d = new DeleteRequest(Bytes.toBytes(tableName), Bytes.toBytes(id));
 		this.tryPerform(new DeleteAction(d), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
 		this.tagUpdate(meta, table, id);
 	}
@@ -2048,7 +2029,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (!this.hasColumnFamily(table, family))
 			return false;
 
-		Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));
+		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row)).family(Bytes.toBytes(family));
 		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
 		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
 	}
@@ -2060,7 +2041,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (!this.hasTable(table))
 			return false;
 
-		Get g = new Get(Bytes.toBytes(row));
+		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row));
 		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
 		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
 	}
@@ -2072,7 +2053,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (! this.hasColumnFamily(table, family))
 			return null;
 
-		Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
+		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
 				Bytes.toBytes(key));
 
 		Result result = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), this.toMap(family, meta == null ? null : meta.getProperty()));
@@ -2097,7 +2078,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (!this.hasTable(table))
 			return null;
 
-		Get g = new Get(Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
+		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
 
 		if (c != null) {
 			g.setFilter(createFamilyConstraint(c));
@@ -2147,7 +2128,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			s.setCaching(limit);
 		
 		String tablePostfix = meta == null ? null : meta.getTablePostfix();
-		ResultScanner r = this.tryPerform(new ScanAction(s), clazz, table, tablePostfix, cf);
+		Scanner  r = this.tryPerform(new ScanAction(s), clazz, table, tablePostfix, cf);
 		return new CloseableIterator(this, clazz, table, tablePostfix, c, limit, cf, r, cf != null);
 	}
 
