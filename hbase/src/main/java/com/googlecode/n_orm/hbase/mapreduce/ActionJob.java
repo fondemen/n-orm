@@ -12,7 +12,6 @@ import java.util.TreeSet;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
@@ -23,6 +22,7 @@ import com.googlecode.n_orm.Process;
 import com.googlecode.n_orm.hbase.MangledTableName;
 import com.googlecode.n_orm.hbase.RowWrapper;
 import com.googlecode.n_orm.hbase.Store;
+import com.googlecode.n_orm.hbase.actions.Scan;
 import com.googlecode.n_orm.storeapi.ProcessWrapper;
 
 public class ActionJob {

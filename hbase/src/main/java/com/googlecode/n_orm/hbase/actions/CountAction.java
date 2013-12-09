@@ -3,12 +3,11 @@ package com.googlecode.n_orm.hbase.actions;
 import java.io.IOException;
 
 import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Scan;
+import com.googlecode.n_orm.hbase.actions.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 import org.hbase.async.HBaseClient;
 import org.hbase.async.Scanner;
-
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.hbase.MangledTableName;
 import com.googlecode.n_orm.hbase.Store;

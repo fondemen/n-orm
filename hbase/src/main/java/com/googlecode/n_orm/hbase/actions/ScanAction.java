@@ -14,16 +14,16 @@ import com.stumbleupon.async.Deferred;
 
 public class ScanAction extends Action</*Result*/Scanner> {
        
-        private final Scanner scan;
+        private final Scan scan;
         private final MangledTableName tableName;
 
-        public ScanAction(Scanner scan, MangledTableName tableName) {
+        public ScanAction(Scan s, MangledTableName tableName) {
                 super();
-                this.scan = scan;
+                this.scan = s;
                 this.tableName=tableName;
         }
 
-        public Scanner getScan() {
+		public Scan getScan() {
                 return scan;
         }
         

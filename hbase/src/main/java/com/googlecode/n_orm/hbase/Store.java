@@ -41,16 +41,10 @@ import org.apache.hadoop.hbase.TableNotEnabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownScannerException;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HConnectionManager;
-import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.HTablePool;
 import org.apache.hadoop.hbase.client.Increment;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
 
 import com.googlecode.n_orm.hbase.actions.Scan;
@@ -2078,9 +2072,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (!this.hasTable(table))
 			return null;
 
-		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));
+		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(id)).family(Bytes.toBytes(family));
 
 		if (c != null) {
+			// the method setFilter is undefined for the type GetRequest.
 			g.setFilter(createFamilyConstraint(c));
 		}
 
@@ -2128,7 +2123,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			s.setCaching(limit);
 		
 		String tablePostfix = meta == null ? null : meta.getTablePostfix();
-		Scanner  r = this.tryPerform(new ScanAction(s), clazz, table, tablePostfix, cf);
+		Scanner  r = this.tryPerform(new ScanAction(s, table), clazz, table, tablePostfix, cf);
 		return new CloseableIterator(this, clazz, table, tablePostfix, c, limit, cf, r, cf != null);
 	}
 
