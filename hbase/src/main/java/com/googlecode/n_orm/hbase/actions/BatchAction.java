@@ -1,11 +1,5 @@
 
-// Batch n'existe pas en asynchbase
-// Client asychrone donc plus requette en parallèle
-
-
-
-
-/*package com.googlecode.n_orm.hbase.actions;
+package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
 import java.util.List;
@@ -35,4 +29,4 @@ public class BatchAction extends Action<Void> {
 	}
 
 	
-}*/
+}

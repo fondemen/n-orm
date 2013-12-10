@@ -3,15 +3,14 @@ package com.googlecode.n_orm.hbase.actions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
+import org.hbase.async.DeleteRequest;
 import org.hbase.async.HBaseClient;
+import org.hbase.async.KeyValue;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.hbase.MangledTableName;
 import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.hbase.mapreduce.Truncator;
 import com.stumbleupon.async.Deferred;
@@ -19,6 +18,7 @@ import com.stumbleupon.async.Deferred;
 public class TruncateAction extends Action<Void> {
 	private final Store store;
 	private final Scan scan;
+	private MangledTableName tableName;
 
 	public TruncateAction(Store store, Scan scan) {
 		super();
@@ -27,19 +27,18 @@ public class TruncateAction extends Action<Void> {
 	}
 	
 	protected void truncateSimple() throws IOException  {
-		ResultScanner r = null;
+		ScanAction sc = new ScanAction(scan, tableName);
+		Scan r =null;
 
 		try {
-			r = this.getTable().getScanner(this.scan);
+			r = sc.getScan();
+	
 			final int nbRows = 100;
-			List<Delete> dels = new ArrayList<Delete>(nbRows);
-			Result [] res = r.next(nbRows);
-			while (res != null && res.length != 0) {
-				dels.clear();
-				for (Result result : res) {
-					dels.add(new Delete(result.getRow()));
+		    ArrayList<KeyValue>  res = r.next(nbRows);
+			while (res != null && res.size() != 0) {
+				for ( KeyValue result : res) {
+					new DeleteRequest(tableName.getNameAsBytes(), result.key());
 				}
-				getTable().delete(dels);
 				res = r.next(nbRows);
 			}
 		} finally {
@@ -49,8 +48,8 @@ public class TruncateAction extends Action<Void> {
 	}
 	
 	protected void truncateMapReduce() throws IOException, InterruptedException, ClassNotFoundException  {
-		String tableName = Bytes.toString(getTable().getTableName());
-		Job count = Truncator.createSubmittableJob(this.store, tableName, this.scan);
+		String table_Name = tableName.toString();
+		Job count = Truncator.createSubmittableJob(this.store, table_Name, this.scan);
 		if(!count.waitForCompletion(false)) {
 			throw new DatabaseNotReachedException("Could not truncate table with map/reduce " + tableName);
 		}

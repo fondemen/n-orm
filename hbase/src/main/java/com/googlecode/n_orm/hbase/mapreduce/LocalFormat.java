@@ -13,7 +13,6 @@ import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.HTablePool;
 import org.apache.hadoop.hbase.client.Increment;
-import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.mapreduce.TableInputFormat;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.mapreduce.Job;
@@ -23,6 +22,7 @@ import org.codehaus.jackson.map.JsonMappingException;
 
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.hbase.Store;
+import com.googlecode.n_orm.hbase.actions.Scan;
 
 public class LocalFormat {
 	public static final String STORE_REF = "store-props";
