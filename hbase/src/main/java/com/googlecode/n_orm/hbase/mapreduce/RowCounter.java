@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.Scan;
+import com.googlecode.n_orm.hbase.actions.Scan;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
@@ -33,8 +33,7 @@ public class RowCounter {
 		}
 	}
 
-	public static Job createSubmittableJob(Store s, String tableName,
-			Scan scan) throws IOException {
+	public static Job createSubmittableJob(Store s, String tableName, Scan scan) throws IOException {
 		Job job = new Job(LocalFormat.prepareConf(s, null), NAME + "_" + tableName + "_" + scan.hashCode());
 		TableMapReduceUtil.initTableMapperJob(tableName, scan,
 				RowCounterMapper.class, ImmutableBytesWritable.class,

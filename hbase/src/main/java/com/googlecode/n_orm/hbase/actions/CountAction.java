@@ -1,8 +1,6 @@
 package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
-
-import org.apache.hadoop.hbase.client.ResultScanner;
 import com.googlecode.n_orm.hbase.actions.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
@@ -26,16 +24,15 @@ public class CountAction extends Action<Long> {
 		this.store = store;
 		this.scan = scan;
 	}
-	/***
-	 * 
-	 * @return the number of rows which are scan
-	 * @throws IOException
-	 */
+	
+
 	protected long countSimple( MangledTableName tableName ) throws IOException {
 		this.scan.setCaching(scanCaching);
+		
 		Scanner scr=new Scanner();
 		
-		ResultScanner r = getTable().getScanner(this.scan);
+		ResultScanner r = getTable().getScanner(this.scan); // retourne le scanner associé 
+														 //à cette table.
 		int count = 0;
 		try {
 			while (true) {

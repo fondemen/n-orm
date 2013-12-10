@@ -8,10 +8,12 @@ import org.hbase.async.Scanner;
 public class Scan {
 	private Integer caching;
 	private byte[] startRow, stopRow;
-	private ArrayList<byte[]> families =new ArrayList<byte[]>();
+	private ArrayList<byte[]> families;
 	private Scanner s;
 	
-	public Scan(){}
+	public Scan(){
+		families =new ArrayList<byte[]>();
+	}
 
 	public void setStartRow(byte[] bytes) {
 		this.startRow=bytes;

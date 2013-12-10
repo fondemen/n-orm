@@ -1,8 +1,6 @@
 package com.googlecode.n_orm.hbase.actions;
 
 import java.io.IOException;
-
-import org.apache.hadoop.hbase.client.Put;
 import org.hbase.async.HBaseClient;
 import org.hbase.async.PutRequest;
 
