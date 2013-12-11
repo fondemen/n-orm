@@ -7,7 +7,7 @@ import org.hbase.async.HBaseClient;
 
 import com.stumbleupon.async.Deferred;
 
-public class DeleteAction extends Action<Void> {
+public class DeleteAction extends Action<Object> {
 	
 	private final DeleteRequest delete;
 
@@ -25,10 +25,9 @@ public class DeleteAction extends Action<Void> {
 	 */
 
 	@Override
-	public Deferred<Void> perform(HBaseClient client) throws Exception {
-		client.delete(this.getDelete());
-	
-		return null;
+	public Deferred<Object> perform(HBaseClient client) throws Exception {
+		Deferred<Object> Object = client.delete(this.getDelete());
+		return Object;
 	}
 	
 }

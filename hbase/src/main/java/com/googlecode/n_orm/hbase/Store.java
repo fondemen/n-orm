@@ -1860,7 +1860,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		Map<String, Field> fams = this.toMap(families, meta);
 
 		MangledTableName table = new MangledTableName(tableName);
-		HTableInterface t =  this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
+	  this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
 
 		try {
 			byte[] row = Bytes.toBytes(id);
@@ -2050,7 +2050,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
 				Bytes.toBytes(key));
 
-		Result result = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), this.toMap(family, meta == null ? null : meta.getProperty()));
+		 ArrayList<org.hbase.async.KeyValue> result = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), this.toMap(family, meta == null ? null : meta.getProperty()));
 		
 		if (result.isEmpty())
 			return null;
