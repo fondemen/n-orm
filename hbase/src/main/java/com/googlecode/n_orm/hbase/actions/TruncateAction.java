@@ -58,7 +58,10 @@ public class TruncateAction extends Action<Void> {
 
 	@Override
 	public Deferred<Void> perform(HBaseClient client) throws Exception {
-		// TODO Auto-generated method stub
+		if(this.store.isTruncateMapRed())
+			this.truncateMapReduce();
+		else
+			this.truncateSimple();
 		return null;
 	}
 	
