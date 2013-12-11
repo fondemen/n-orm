@@ -32,7 +32,6 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.InvalidFamilyOperationException;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.TableExistsException;
@@ -69,7 +68,9 @@ import org.apache.zookeeper.ZooKeeper;
 import org.codehaus.plexus.util.DirectoryScanner;
 import org.hbase.async.DeleteRequest;
 import org.hbase.async.GetRequest;
+import org.hbase.async.PutRequest;
 import org.hbase.async.Scanner;
+import org.hbase.async.KeyValue;
 
 import com.googlecode.n_orm.Callback;
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -1259,7 +1260,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * Performs an action. Table should be replaced by action.getTable() as it can change in case of problem handling (like a connection lost).
 	 */
 	protected <R> R tryPerform(final Action<R> action, MangledTableName table, Class<? extends PersistingElement> clazz, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {	
-		assert tablePostfix == null || Bytes.toString(table.getTableName()).endsWith(tablePostfix);
+		assert tablePostfix == null || table.getName().endsWith(tablePostfix);
+		
 		try {
 			Deferred<R> ret = action.perform(this.client);
 			return ret.join();
@@ -1270,11 +1272,11 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			this.handleProblem(e, clazz, tableName, tablePostfix, expectedFamilies);
 			this.getTable(clazz, tableName, tablePostfix, expectedFamilies);
 			try {
-				errorLogger.log(Level.INFO, "Retrying to perform again erroneous " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
+				errorLogger.log(Level.INFO, "Retrying to perform again erroneous " + action.getClass().getName() + " on table " + action.getTable().getName() + " for store " + this.hashCode(), e);
 				Deferred<R> ret = action.perform(this.client);
 				return ret.join();
 			} catch (Exception f) {
-				errorLogger.log(Level.SEVERE, "Cannot recover from error while performing a" + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
+				errorLogger.log(Level.SEVERE, "Cannot recover from error while performing a" + action.getClass().getName() + " on table " + action.getTable().getName() + " for store " + this.hashCode(), e);
 				throw new DatabaseNotReachedException(f);
 			}
 		}
@@ -1750,13 +1752,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			for (String fam : families.keySet()) {
 				s.addFamily(Bytes.toBytes(fam));
 			}
-		} else {
-			byte[] k= null;
-			//No family to load ; avoid getting all information in the row (that may be big)
-			
-			// avec le client asynchrone on fait un filtre à partir de la rowKey
-			s.setFilter(new KeyValue().keyToString(k));
-		}
+		} 
+		
 		
 		return s;
 	}
@@ -1841,12 +1838,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		npu.set(System.currentTimeMillis()+1);
 	}
 
+	/*
 	@Override
 	public void storeChanges(MetaInformation meta, String tableName, String id,
 			ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
 			throws DatabaseNotReachedException {
+		
 		//Grabbing all involved families
 		Set<String> families = new HashSet<String>();
 		if (changed !=null) families.addAll(changed.keySet());
@@ -1860,27 +1859,28 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		Map<String, Field> fams = this.toMap(families, meta);
 
 		MangledTableName table = new MangledTableName(tableName);
-	  this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
+		this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
 
 		try {
-			byte[] row = Bytes.toBytes(id);
+			byte[] row;
 			
-			List<org.apache.hadoop.hbase.client.Row> actions = new ArrayList<org.apache.hadoop.hbase.client.Row>(2); //At most one put and one delete
+			List<> actions = new ArrayList<?>(2); //At most one put and one delete
 			
 			this.waitForNewUpdate(meta, table, id);
 	
 			//Transforming changes into a big Put (if necessary)
 			//and registering it as an action to be performed
-			Put rowPut = null;
+			PutRequest rowPut = null;
 			if (changed != null && !changed.isEmpty()) {
-				rowPut = new Put(row);
+				
 				for (Entry<String, Map<String, byte[]>> family : changed.entrySet()) {
-					byte[] cf = Bytes.toBytes(family.getKey());
-					for (Entry<String, byte[]> col : family.getValue().entrySet()) {
-						rowPut.add(cf, Bytes.toBytes(col.getKey()), col.getValue());
+					byte[] cf = Bytes.toBytes(family.getKey()); // pour chaque famille on retourne la clé : cf famille
+					
+					for (Entry<String, byte[]> col : family.getValue().entrySet()) { // pour chaque famille on prend la valeur
+						rowPut=new PutRequest(Bytes.toBytes(tableName),row, cf, Bytes.toBytes(col.getKey()), col.getValue()); // col.getKey(): qualifier
 					}
 				}
-				if (rowPut.getFamilyMap().isEmpty())
+				if (rowPut.family().length==0)
 					rowPut = null;
 				else
 					actions.add(rowPut);
@@ -1888,9 +1888,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 
 			//Transforming deletes into a big Delete (if necessary)
 			//and registering it as an action to be performed
-			Delete rowDel = null;
+			DeleteRequest rowDel = null;
 			if (removed != null && !removed.isEmpty()) {
-				rowDel = new Delete(row);
 				for (Entry<String, Set<String>> family : removed.entrySet()) {
 					byte[] cf = Bytes.toBytes(family.getKey());
 					for (String key : family.getValue()) {
@@ -1923,8 +1922,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			//An empty object is to be stored...
 			//Adding a dummy value into properties family
 			if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
-				rowPut = new Put(row);
-				rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
+				rowPut=new PutRequest(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{}, row, row);
 				actions.add(rowPut);
 			}
 			
@@ -2002,7 +2000,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					throw new DatabaseNotReachedException(e);
 				}
 		}
-	}
+	}*/
 
 	@Override
 	public void delete(MetaInformation meta, String tableName, String id)
@@ -2024,7 +2022,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			return false;
 
 		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row)).family(Bytes.toBytes(family));
-		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
+		//g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
+		this.get(null, "Info_Personne", "1", "Personne", "1");
 		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
 	}
 
@@ -2036,7 +2035,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			return false;
 
 		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row));
-		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
+		this.get(null, "Info_Personne", "1", "Personne", "1");
+		//g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
 		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
 	}
 
@@ -2047,14 +2047,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (! this.hasColumnFamily(table, family))
 			return null;
 
-		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),
-				Bytes.toBytes(key));
+		GetRequest g = new GetRequest(Bytes.toBytes(tableName), Bytes.toBytes(key));
 
 		 ArrayList<org.hbase.async.KeyValue> result = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), this.toMap(family, meta == null ? null : meta.getProperty()));
 		
 		if (result.isEmpty())
 			return null;
-		return result.value();
+		else
+		return Bytes.toBytes(result.size()); // on retourne le nombre d'élements retournés par le GEt
 	}
 
 	@Override
@@ -2079,14 +2079,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			g.setFilter(createFamilyConstraint(c));
 		}
 
-		Result r = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), toMap(family, meta == null ? null : meta.getProperty()));
+		ArrayList<KeyValue> r = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), toMap(family, meta == null ? null : meta.getProperty()));
 		if (r.isEmpty())
 			return null;
 		
 		Map<String, byte[]> ret = new HashMap<String, byte[]>();
 		if (!r.isEmpty()) {
-			for (KeyValue kv : r.raw()) {
-				ret.put(Bytes.toString(kv.getQualifier()), kv.getValue());
+			for (KeyValue kv : r) {
+				ret.put(Bytes.toString(kv.qualifier()), kv.value());
 			}
 		}
 		return ret;
@@ -2189,5 +2189,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			}
 		}
 	}
+
+	
 
 }
