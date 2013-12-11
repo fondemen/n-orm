@@ -15,7 +15,7 @@ import com.stumbleupon.async.Deferred;
 public class ScanAction extends Action</*Result*/Scanner> {
        
         private final Scan scan;
-        private final MangledTableName tableName;
+        private MangledTableName tableName;
 
         public ScanAction(Scan s, MangledTableName tableName) {
                 super();
@@ -35,6 +35,15 @@ public class ScanAction extends Action</*Result*/Scanner> {
 		public Deferred<Scanner> perform(HBaseClient client) throws Exception {
 			client.newScanner(this.getMangledTableName().getNameAsBytes());
 			return null;
+		}
+		
+		@Override
+		public MangledTableName getTable() {
+			return tableName;
+		}
+		
+		public void setTable(MangledTableName table){
+			this.tableName=table;
 		}
        
 }

@@ -3,6 +3,7 @@ package com.googlecode.n_orm.hbase.actions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 import org.hbase.async.DeleteRequest;
@@ -59,6 +60,15 @@ public class TruncateAction extends Action<Void> {
 	public Deferred<Void> perform(HBaseClient client) throws Exception {
 		// TODO Auto-generated method stub
 		return null;
+	}
+	
+	@Override
+	public MangledTableName getTable() {
+		return tableName;
+	}
+	
+	public void setTable(MangledTableName table){
+		this.tableName=table;
 	}
 
 }

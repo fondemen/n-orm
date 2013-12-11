@@ -3,10 +3,12 @@ package com.googlecode.n_orm.hbase.actions;
 import java.io.IOException;
 
 
+
 //import org.apache.hadoop.hbase.client.Get;
 import org.hbase.async.GetRequest;
 import org.hbase.async.HBaseClient;
 
+import com.googlecode.n_orm.hbase.MangledTableName;
 import com.stumbleupon.async.Deferred;
 
 /*
@@ -15,6 +17,7 @@ import com.stumbleupon.async.Deferred;
 public class ExistsAction extends Action<Object> {
 	
 	private final GetRequest get;
+	private MangledTableName tableName;
 
 	public ExistsAction(GetRequest get) {
 		super();
@@ -29,6 +32,15 @@ public class ExistsAction extends Action<Object> {
 	public Deferred<Object> perform(HBaseClient client) throws Exception {
 		// TODO Auto-generated method stub
 		return null;
+	}
+	
+	@Override
+	public MangledTableName getTable() {
+		return tableName;
+	}
+	
+	public void setTable(MangledTableName table){
+		this.tableName=table;
 	}
 	
 }

@@ -72,4 +72,13 @@ public class CountAction extends Action<Long> {
 
 	}
 
+	@Override
+	public MangledTableName getTable() {
+		return tableName;
+	}
+	
+	public void setTable(MangledTableName table){
+		this.tableName=table;
+	}
+
 }
