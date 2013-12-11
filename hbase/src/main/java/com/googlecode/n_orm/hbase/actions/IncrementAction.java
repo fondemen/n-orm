@@ -27,7 +27,7 @@ public class IncrementAction extends Action<Void> {
 
 	@Override
 	public Deferred<Void> perform(HBaseClient client) throws Exception {
-		// TODO Auto-generated method stub
+		client.atomicIncrement(this.incr);
 		return null;
 	}
 	
