@@ -2123,7 +2123,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			s.setCaching(limit);
 		
 		String tablePostfix = meta == null ? null : meta.getTablePostfix();
-		Scanner  r = this.tryPerform(new ScanAction(s, table), clazz, table, tablePostfix, cf);
+		Scanner r = this.tryPerform(new ScanAction(s, table), clazz, table, tablePostfix, cf);
 		return new CloseableIterator(this, clazz, table, tablePostfix, c, limit, cf, r, cf != null);
 	}
 
