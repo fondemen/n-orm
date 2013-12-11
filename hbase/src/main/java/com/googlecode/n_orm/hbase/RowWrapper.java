@@ -8,6 +8,7 @@ import java.util.Map.Entry;
 
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.hbase.async.KeyValue;
 
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row;
@@ -17,16 +18,16 @@ public class RowWrapper implements Row, Serializable {
 	private final String key;
 	private final ColumnFamilyData values;
 
-	public RowWrapper(Result r) {
+	public RowWrapper(KeyValue r) {
 		this(r, true);
 	}
 		
-	
-	public RowWrapper(Result r, boolean sendValues) {
-		this.key = Bytes.toString(r.getRow());
+	// on n'a pas un ensemble de valeurs mais une seule valeur
+	public RowWrapper(KeyValue current, boolean sendValues) {
+		this.key = Bytes.toString(current.key());
 		if (sendValues) {
 			this.values = new DefaultColumnFamilyData();
-			for (Entry<byte[], NavigableMap<byte[], byte[]>> famData : r.getNoVersionMap().entrySet()) {
+			for (Entry<byte[], NavigableMap<byte[], byte[]>> famData : current.getNoVersionMap().entrySet()) {
 				Map<String, byte[]> fam = new TreeMap<String, byte[]>();
 				this.values.put(Bytes.toString(famData.getKey()), fam);
 				for (Entry<byte[], byte[]> colData : famData.getValue().entrySet()) {

@@ -1,14 +1,15 @@
 package com.googlecode.n_orm.hbase;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.hadoop.hbase.UnknownScannerException;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.ScannerTimeoutException;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.hbase.async.KeyValue;
+import org.hbase.async.Scanner;
 
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
@@ -17,8 +18,8 @@ import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row;
 
 final class CloseableIterator implements CloseableKeyIterator {
-	private ResultScanner result;
-	private Iterator<Result> iterator;
+	private ArrayList<KeyValue> result;
+	private Iterator<KeyValue> iterator;
 	private final boolean sendValues;
 	private final Class<? extends PersistingElement> clazz;
 	private final MangledTableName table;
@@ -31,7 +32,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 	
 	private byte[] currentKey = null;
 
-	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, ResultScanner res, boolean sendValues) {
+	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, ArrayList<KeyValue> res, boolean sendValues) {
 		this.store = store;
 		this.sendValues = sendValues;
 		this.clazz = clazz;
@@ -43,14 +44,14 @@ final class CloseableIterator implements CloseableKeyIterator {
 		this.setResult(res);
 	}
 	
-	private void setResult(ResultScanner result) {
+	private void setResult(ArrayList<KeyValue> result) {
 		//Trying to close existing scanner
 		if (this.result != null) {
-			final ResultScanner res = this.result;
+			final ArrayList<KeyValue> res = this.result;
 			new Thread(){
 				@Override
 				public void run() {
-					res.close();
+					res.notify(); /**** A REVOIR ***/
 				}
 			}.start();
 		}
@@ -93,8 +94,8 @@ final class CloseableIterator implements CloseableKeyIterator {
 	@Override
 	public Row next() {
 		try {
-			Result current = iterator.next();
-			this.currentKey = current.getRow();
+			 KeyValue current = iterator.next();
+			this.currentKey = current.key(); // pour obtenir la row key.
 			this.limit--;
 			this.reCreated = false;
 			return new RowWrapper(current, this.sendValues);
@@ -124,7 +125,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 	@Override
 	public void close() {
 		try {
-			result.close();
+			((com.googlecode.n_orm.CloseableIterator<Row>) result).close();
 		} catch (RuntimeException x) {
 			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);
 		}
