@@ -80,7 +80,7 @@ public class HBase {
 		new HBaseDependency("hbase*.jar", "org.apache.hadoop.hbase.HBaseConfiguration"),
 		new HBaseDependency("commons-logging*.jar,lib/commons-logging*.jar", "org.apache.commons.logging.LogFactory"),
 		new HBaseDependency("commons-lang*.jar,lib/commons-lang*.jar", "org.apache.commons.lang.StringUtils"),
-		new HBaseDependency("log4j*.jar,lib/log4j*.jar", "org.apache.log4j.Logger"),
+		//new HBaseDependency("log4j*.jar,lib/log4j*.jar", "org.apache.log4j.Logger"),
 		new HBaseDependency("slf4j*.jar,lib/slf4j*.jar", "org.slf4j.LoggerFactory"),
 		new HBaseDependency("jackson*.jar,lib/jackson*.jar", "org.codehaus.jackson.map.JsonMappingException"),
 		new HBaseDependency("protobuf*.jar,lib/protobuf*.jar", "com.google.protobuf.Message"),
