@@ -39,6 +39,12 @@ public class CommandList
 	}
 	
 	@Trigger
+	public void changePromptArray(String [] newPrompt)
+	{
+		shell.setPrompt(newPrompt[0].replaceAll("\\s+$", "") + " ");
+	}
+	
+	@Trigger
 	public int getZero()
 	{
 		return 0;
