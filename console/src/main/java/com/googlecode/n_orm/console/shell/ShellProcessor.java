@@ -2,6 +2,7 @@ package com.googlecode.n_orm.console.shell;
 
 import java.beans.PropertyDescriptor;
 import java.io.Closeable;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -329,10 +330,22 @@ public class ShellProcessor
 							{
 								// Check if the param is not a variable
 								String s = tokens[currentTokenIndex + i];
+								Class<?> type = parameterTypes[i];
+								boolean isArray = type.isArray();
+								if (isArray) { // Array not supported
+									type = type.getComponentType();
+								}
+								
 								if (this.mapShellVariables.containsKey(s))
 									params[i] = this.mapShellVariables.get(s);
 								else
-									params[i] = ConvertUtils.convert(s, parameterTypes[i]);
+									params[i] = ConvertUtils.convert(s, type);
+								
+								if (isArray && !params[i].getClass().isArray()) {
+									Object array = Array.newInstance(type, 1);
+									Array.set(array, 0, params[i]);
+									params[i] = array;
+								}
 							}
 							
 							currentTokenIndex += parameterTypes.length;
