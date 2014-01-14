@@ -105,6 +105,20 @@ public class ShellProcessorTest
 	}
 	
 	@Test
+	public void treatLineWithArrayArgsTest()
+	{
+		String command = "changePromptArray";
+		String args = "newPrompt$";
+		
+		shell.println("method result: null");
+		mapCommands.changePromptArray(new String[] {args});
+		replay(shell);
+		this.sut.treatLine(command + " " + args);
+		verify(shell);
+		reset(shell);
+	}
+	
+	@Test
 	public void treatLineExitTest()
 	{
 		this.sut.treatLine(this.sut.getEscapeCommand());
