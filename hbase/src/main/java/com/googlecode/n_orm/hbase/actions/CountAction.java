@@ -48,7 +48,7 @@ public class CountAction extends Action<Long> {
 		}
 	}
 
-	protected  long countMapRed() throws DatabaseNotReachedException,
+	protected   long countMapRed() throws DatabaseNotReachedException,
 			IOException, InterruptedException, ClassNotFoundException {
 		String table_Name = tableName.toString();
 		Job count = RowCounter.createSubmittableJob(this.store, table_Name,
@@ -62,22 +62,21 @@ public class CountAction extends Action<Long> {
 	}
 
 	@Override
-	public Deferred<Long> perform(HBaseClient client) throws Exception {
-		
-		if (this.store.isCountMapRed())
-			return this.countMapRed();
-		else
-			return this.countSimple();
-
-	}
-
-	@Override
 	public MangledTableName getTable() {
 		return tableName;
 	}
 	
 	public void setTable(MangledTableName table){
 		this.tableName=table;
+	}
+
+	@Override
+	public Deferred<Long> perform(HBaseClient client) throws Exception {
+		if(this.store.isCountMapRed()){
+			return this.countMapRed();
+		}
+		else
+		return this.countSimple();
 	}
 
 }

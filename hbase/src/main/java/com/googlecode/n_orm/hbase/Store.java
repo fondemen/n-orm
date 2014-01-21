@@ -1838,7 +1838,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		npu.set(System.currentTimeMillis()+1);
 	}
 
-	/*
+	
 	@Override
 	public void storeChanges(MetaInformation meta, String tableName, String id,
 			ColumnFamilyData changed,
@@ -2000,7 +2000,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					throw new DatabaseNotReachedException(e);
 				}
 		}
-	}*/
+	}
 
 	@Override
 	public void delete(MetaInformation meta, String tableName, String id)
