@@ -1864,7 +1864,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		MangledTableName t = this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
 
 		try {
-			byte[] row;
+			byte[] row=null;
 			
 			List<Action> actions = new ArrayList<Action>(2); //At most one put and one delete
 			
@@ -1912,7 +1912,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			//Transforming changes into a big Put (if necessary)
 			//but can't register it as an action to be performed (according to HBase API)
 			IncrementAction rowInc = null;
-			AtomicIncrementRequest ainc; 
+			AtomicIncrementRequest ainc = null; 
 			if (increments != null && !increments.isEmpty()) {
 				rowInc = new IncrementAction(ainc);
 				for (Entry<String, Map<String, Number>> incrs : increments.entrySet()) {
@@ -1939,8 +1939,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				HBaseSchema.WALWritePolicy useWal = null;
 				HBaseSchema clazzAnnotation = meta == null || meta.getClazz() == null ? null : meta.getClazz().getAnnotation(HBaseSchema.class);
 				HBaseSchema.WALWritePolicy clazzWAL = clazzAnnotation == null ? HBaseSchema.WALWritePolicy.UNSET : clazzAnnotation.writeToWAL();
-				for(byte[] famB :rowPut) {
-					String famS = Bytes.toString(famB);
+				byte[] famB = rowPut.getPut().key();
+				String famS = Bytes.toString(famB);
 					HBaseSchema.WALWritePolicy wtw;
 					if (PropertyManagement.PROPERTY_COLUMNFAMILY_NAME.equals(famS)) {
 						// Properties use schema for classes
@@ -1967,7 +1967,6 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					if (useWal == null || wtw.strongerThan(useWal)) {
 						useWal = wtw;
 					}
-				}
 				
 				if (useWal == null) {
 					useWal = HBaseSchema.WALWritePolicy.UNSET;
@@ -2003,11 +2002,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			this.tagUpdate(meta, table, key);
 		} finally {
 			if (t != null)
-				try {
-					this.returnTable(t);
-				} catch (IOException e) {
-					throw new DatabaseNotReachedException(e);
-				}
+				this.returnTable(t);
 		}
 	}
 
