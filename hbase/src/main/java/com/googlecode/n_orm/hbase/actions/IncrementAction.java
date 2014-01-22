@@ -27,7 +27,7 @@ public class IncrementAction extends Action<Void> {
 
 	@Override
 	public Deferred<Void> perform(HBaseClient client) throws Exception {
-		client.atomicIncrement(this.incr);
+		client.atomicIncrement(this.getIncrements());
 		return null;
 	}
 	

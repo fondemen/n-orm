@@ -1,6 +1,7 @@
 package com.googlecode.n_orm.hbase;
 
 import java.io.File;
+import org.hbase.async.AtomicIncrementRequest;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -87,6 +88,7 @@ import com.googlecode.n_orm.hbase.actions.DeleteAction;
 import com.googlecode.n_orm.hbase.actions.ExistsAction;
 import com.googlecode.n_orm.hbase.actions.GetAction;
 import com.googlecode.n_orm.hbase.actions.IncrementAction;
+import com.googlecode.n_orm.hbase.actions.PutAction;
 import com.googlecode.n_orm.hbase.actions.ScanAction;
 import com.googlecode.n_orm.hbase.actions.TruncateAction;
 import com.googlecode.n_orm.hbase.mapreduce.ActionJob;
@@ -1840,7 +1842,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 
 	
 	@Override
-	public void storeChanges(MetaInformation meta, String tableName, String id,
+	public void storeChanges(MetaInformation meta, String tableName, String key,
 			ColumnFamilyData changed,
 			Map<String, Set<String>> removed,
 			Map<String, Map<String, Number>> increments)
@@ -1859,28 +1861,30 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		Map<String, Field> fams = this.toMap(families, meta);
 
 		MangledTableName table = new MangledTableName(tableName);
-		this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
+		MangledTableName t = this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
 
 		try {
 			byte[] row;
 			
-			List<> actions = new ArrayList<?>(2); //At most one put and one delete
+			List<Action> actions = new ArrayList<Action>(2); //At most one put and one delete
 			
-			this.waitForNewUpdate(meta, table, id);
+			this.waitForNewUpdate(meta, table, key);
 	
 			//Transforming changes into a big Put (if necessary)
 			//and registering it as an action to be performed
-			PutRequest rowPut = null;
+			PutAction rowPut = null;
 			if (changed != null && !changed.isEmpty()) {
 				
 				for (Entry<String, Map<String, byte[]>> family : changed.entrySet()) {
 					byte[] cf = Bytes.toBytes(family.getKey()); // pour chaque famille on retourne la clé : cf famille
 					
 					for (Entry<String, byte[]> col : family.getValue().entrySet()) { // pour chaque famille on prend la valeur
-						rowPut=new PutRequest(Bytes.toBytes(tableName),row, cf, Bytes.toBytes(col.getKey()), col.getValue()); // col.getKey(): qualifier
+						//
+						PutRequest pr=new PutRequest(Bytes.toBytes(tableName),row, cf, Bytes.toBytes(col.getKey()), col.getValue()); // col.getKey(): qualifier
+						rowPut=new PutAction(pr); 
 					}
 				}
-				if (rowPut.family().length==0)
+				if (rowPut==null)
 					rowPut = null;
 				else
 					actions.add(rowPut);
@@ -1888,16 +1892,18 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 
 			//Transforming deletes into a big Delete (if necessary)
 			//and registering it as an action to be performed
-			DeleteRequest rowDel = null;
+			//DeleteRequest rowDel = null;
+			DeleteAction rowDel=null;
 			if (removed != null && !removed.isEmpty()) {
 				for (Entry<String, Set<String>> family : removed.entrySet()) {
 					byte[] cf = Bytes.toBytes(family.getKey());
-					for (String key : family.getValue()) {
-						rowDel.deleteColumns(cf, Bytes.toBytes(key));
+					for (String _key : family.getValue()) {
+						DeleteRequest dr=new DeleteRequest(cf, Bytes.toBytes(_key));
+						rowDel=new DeleteAction(dr);
 					}
 	
 				}
-				if (rowDel.getFamilyMap().isEmpty())
+				if (rowDel.getDelete()==null)
 					rowDel = null;
 				else
 					actions.add(rowDel);
@@ -1905,16 +1911,18 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 
 			//Transforming changes into a big Put (if necessary)
 			//but can't register it as an action to be performed (according to HBase API)
-			Increment rowInc = null;
+			IncrementAction rowInc = null;
+			AtomicIncrementRequest ainc; 
 			if (increments != null && !increments.isEmpty()) {
-				rowInc = new Increment(row);
+				rowInc = new IncrementAction(ainc);
 				for (Entry<String, Map<String, Number>> incrs : increments.entrySet()) {
 					byte[] cf = Bytes.toBytes(incrs.getKey());
 					for (Entry<String, Number> inc : incrs.getValue().entrySet()) {
-						rowInc.addColumn(cf, Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
+						ainc= new AtomicIncrementRequest(cf, Bytes.toBytes(inc.getKey()), null /*family*/, null /*qualifier*/, inc.getValue().longValue());
+						rowInc=new IncrementAction(ainc);
 					}
 				}
-				if (rowInc.getFamilyMap().isEmpty())
+				if (rowInc.getIncrements()==null)
 					rowInc = null;
 				//Can't add that to actions :(
 			}
@@ -1922,7 +1930,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			//An empty object is to be stored...
 			//Adding a dummy value into properties family
 			if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
-				rowPut=new PutRequest(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{}, row, row);
+				rowPut=new PutAction(new PutRequest(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{}, row, row));
 				actions.add(rowPut);
 			}
 			
@@ -1931,7 +1939,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				HBaseSchema.WALWritePolicy useWal = null;
 				HBaseSchema clazzAnnotation = meta == null || meta.getClazz() == null ? null : meta.getClazz().getAnnotation(HBaseSchema.class);
 				HBaseSchema.WALWritePolicy clazzWAL = clazzAnnotation == null ? HBaseSchema.WALWritePolicy.UNSET : clazzAnnotation.writeToWAL();
-				for(byte[] famB : rowPut.getFamilyMap().keySet()) {
+				for(byte[] famB :rowPut) {
 					String famS = Bytes.toString(famB);
 					HBaseSchema.WALWritePolicy wtw;
 					if (PropertyManagement.PROPERTY_COLUMNFAMILY_NAME.equals(famS)) {
@@ -1978,6 +1986,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			}
 			
 			Action<?> act;
+			
 			//Running puts and deletes
 			if (! actions.isEmpty()) {
 				act = new BatchAction(actions);
@@ -1986,12 +1995,12 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			}
 			//Running increments
 			if (rowInc != null) {
-				act = new IncrementAction(rowInc);
+				act = new IncrementAction(ainc);
 				this.tryPerform(act, t, meta == null ? null : meta.getClazz(), meta == null ? null : meta.getTablePostfix(), fams);
 				t = act.getTable();
 			}
 			
-			this.tagUpdate(meta, table, id);
+			this.tagUpdate(meta, table, key);
 		} finally {
 			if (t != null)
 				try {
@@ -2000,6 +2009,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					throw new DatabaseNotReachedException(e);
 				}
 		}
+	}
+
+	
+
+	private void returnTable(MangledTableName t) {
+		// TODO Auto-generated method stub
+		
 	}
 
 	@Override
@@ -2024,7 +2040,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row)).family(Bytes.toBytes(family));
 		//g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
 		this.get(null, "Info_Personne", "1", "Personne", "1");
-		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
+		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null) != null;
 	}
 
 	@Override
@@ -2037,7 +2053,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row));
 		this.get(null, "Info_Personne", "1", "Personne", "1");
 		//g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
+		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null) != null;
 	}
 
 	@Override
@@ -2123,7 +2139,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			s.setCaching(limit);
 		
 		String tablePostfix = meta == null ? null : meta.getTablePostfix();
-		Scanner r = this.tryPerform(new ScanAction(s, table), clazz, table, tablePostfix, cf);
+		ArrayList<KeyValue> r = this.tryPerform(new ScanAction(s, table), clazz, table, tablePostfix, cf);
 		return new CloseableIterator(this, clazz, table, tablePostfix, c, limit, cf, r, cf != null);
 	}
 

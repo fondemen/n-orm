@@ -30,8 +30,7 @@ public class ExistsAction extends Action<Object> {
 
 	@Override
 	public Deferred<Object> perform(HBaseClient client) throws Exception {
-		// TODO Auto-generated method stub
-		return null;
+		return client.ensureTableFamilyExists(tableName.getNameAsBytes(), this.getGet().family());
 	}
 	
 	@Override

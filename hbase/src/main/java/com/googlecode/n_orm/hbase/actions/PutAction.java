@@ -12,6 +12,7 @@ public class PutAction extends Action<Void> {
 	
 	private final PutRequest put;
 	private MangledTableName tableName;
+	private boolean b;
 
 	public PutAction(PutRequest put) {
 		super();
@@ -25,9 +26,7 @@ public class PutAction extends Action<Void> {
 	@Override
 	public Deferred<Void> perform(HBaseClient client) throws Exception {
 		client.put(this.getPut());
-		return null;
-		
-		// pourquoi à ce niveau on ne rajoute pas de callback pour avoir le resultat????
+		return null;	
 	}
 	
 	@Override
@@ -38,5 +37,12 @@ public class PutAction extends Action<Void> {
 	public void setTable(MangledTableName table){
 		this.tableName=table;
 	}
+
+	public void setWriteToWAL(boolean c) {
+		// TODO Auto-generated method stub
+		
+	}
+
+
 	
 }
