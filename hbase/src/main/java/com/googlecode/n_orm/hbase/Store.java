@@ -1,7 +1,9 @@
 package com.googlecode.n_orm.hbase;
 
 import java.io.File;
+
 import org.hbase.async.AtomicIncrementRequest;
+
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -2065,7 +2067,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (result.isEmpty())
 			return null;
 		else
-		return Bytes.toBytes(result.size()); // on retourne le nombre d'élements retournés par le GEt
+		return Bytes.toBytes(result.size()); // on retourne le nombre d'élements retournés par le GEt sous forme de byte
 	}
 
 	@Override
@@ -2084,19 +2086,19 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			return null;
 
 		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(id)).family(Bytes.toBytes(family));
-
-		if (c != null) {
-			// the method setFilter is undefined for the type GetRequest.
-			g.setFilter(createFamilyConstraint(c));
-		}
-
 		ArrayList<KeyValue> r = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), toMap(family, meta == null ? null : meta.getProperty()));
 		if (r.isEmpty())
 			return null;
 		
 		Map<String, byte[]> ret = new HashMap<String, byte[]>();
+		byte[] qualifier;
 		if (!r.isEmpty()) {
 			for (KeyValue kv : r) {
+				if(c!=null){
+				   qualifier = kv.qualifier();
+				   /**A VOIR DEMAIN*/
+				}
+				
 				ret.put(Bytes.toString(kv.qualifier()), kv.value());
 			}
 		}
@@ -2134,8 +2136,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			s.setCaching(limit);
 		
 		String tablePostfix = meta == null ? null : meta.getTablePostfix();
-		ArrayList<KeyValue> r = this.tryPerform(new ScanAction(s, table), clazz, table, tablePostfix, cf);
-		return new CloseableIterator(this, clazz, table, tablePostfix, c, limit, cf, r, cf != null);
+		Scanner r = this.tryPerform(new ScanAction(s, table), clazz, table, tablePostfix, cf);
+		return new CloseableIterator(this,  clazz, table, tablePostfix, c,  limit, cf, r, cf!=null);
+	
+	
 	}
 
 	public void truncate(MetaInformation meta, String tableName, Constraint c) throws DatabaseNotReachedException {

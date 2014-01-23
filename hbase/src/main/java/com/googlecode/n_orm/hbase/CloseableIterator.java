@@ -16,9 +16,10 @@ import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.MetaInformation;
 import com.googlecode.n_orm.storeapi.Row;
+import com.stumbleupon.async.Deferred;
 
 final class CloseableIterator implements CloseableKeyIterator {
-	private ArrayList<KeyValue> result;
+	private Scanner result;
 	private Iterator<KeyValue> iterator;
 	private final boolean sendValues;
 	private final Class<? extends PersistingElement> clazz;
@@ -32,7 +33,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 	
 	private byte[] currentKey = null;
 
-	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, ArrayList<KeyValue> res, boolean sendValues) {
+	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, Scanner r, boolean sendValues) {
 		this.store = store;
 		this.sendValues = sendValues;
 		this.clazz = clazz;
@@ -41,13 +42,13 @@ final class CloseableIterator implements CloseableKeyIterator {
 		this.constraint = constraint;
 		this.limit = limit;
 		this.families = families;
-		this.setResult(res);
+		this.setResult(r);
 	}
 	
-	private void setResult(ArrayList<KeyValue> result) {
+	private void setResult(Scanner result) {
 		//Trying to close existing scanner
 		if (this.result != null) {
-			final ArrayList<KeyValue> res = this.result;
+			final Scanner res = this.result;
 			new Thread(){
 				@Override
 				public void run() {
@@ -56,7 +57,6 @@ final class CloseableIterator implements CloseableKeyIterator {
 			}.start();
 		}
 		this.result = result;
-		this.iterator = result.iterator();
 	}
 
 	protected void handleProblem(RuntimeException x) {
@@ -82,7 +82,10 @@ final class CloseableIterator implements CloseableKeyIterator {
 	@Override
 	public boolean hasNext() {
 		try {
-			boolean ret = iterator.hasNext();
+			boolean ret = false;
+			if(this.result.nextRows()!=null){
+				ret=true;
+			}
 			this.reCreated = false;
 			return ret;
 		} catch (RuntimeException x) {
@@ -94,12 +97,16 @@ final class CloseableIterator implements CloseableKeyIterator {
 	@Override
 	public Row next() {
 		try {
-			 KeyValue current = iterator.next();
-			this.currentKey = current.key(); // pour obtenir la row key.
+			Deferred<ArrayList<ArrayList<KeyValue>>> current = this.result.nextRows();
+			//this.currentKey = current.key(); // pour obtenir la row key.
+			ArrayList<ArrayList<KeyValue>> i = current.join();
+			
 			this.limit--;
 			this.reCreated = false;
 			return new RowWrapper(current, this.sendValues);
-		} catch (RuntimeException x) {
+			
+		}
+		catch (RuntimeException x) {
 			this.handleProblem(x);
 			return next();
 		}
@@ -125,7 +132,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 	@Override
 	public void close() {
 		try {
-			((com.googlecode.n_orm.CloseableIterator<Row>) result).close();
+			 result.close(); // close the scanner before reaching the end of the key
 		} catch (RuntimeException x) {
 			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);
 		}

@@ -1,6 +1,7 @@
 package com.googlecode.n_orm.hbase;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
@@ -21,7 +22,7 @@ public class RowWrapper implements Row, Serializable {
 	public RowWrapper(KeyValue r) {
 		this(r, true);
 	}
-		
+		private Map<byte[], byte[]> fams=new TreeMap<byte[], byte[]>();
 	// on n'a pas un ensemble de valeurs mais une seule valeur
 	public RowWrapper(KeyValue current, boolean sendValues) {
 		this.key = Bytes.toString(current.key());
