@@ -12,6 +12,7 @@ import org.hbase.async.KeyValue;
 import org.hbase.async.Scanner;
 
 import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.hbase.actions.Scan;
 import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.MetaInformation;
@@ -20,7 +21,6 @@ import com.stumbleupon.async.Deferred;
 
 final class CloseableIterator implements CloseableKeyIterator {
 	private Scanner result;
-	private Iterator<KeyValue> iterator;
 	private final boolean sendValues;
 	private final Class<? extends PersistingElement> clazz;
 	private final MangledTableName table;
@@ -30,10 +30,11 @@ final class CloseableIterator implements CloseableKeyIterator {
 	private final Map<String, Field> families;
 	private final Store store;
 	private boolean reCreated = false;
+	private int scanCaching;
 	
 	private byte[] currentKey = null;
 
-	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, Scanner r, boolean sendValues) {
+	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, Scanner r, boolean sendValues, int scanCaching) {
 		this.store = store;
 		this.sendValues = sendValues;
 		this.clazz = clazz;
@@ -42,6 +43,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 		this.constraint = constraint;
 		this.limit = limit;
 		this.families = families;
+		this.scanCaching=scanCaching;
 		this.setResult(r);
 	}
 	
@@ -52,7 +54,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 			new Thread(){
 				@Override
 				public void run() {
-					res.notify(); /**** A REVOIR ***/
+					res.close();
 				}
 			}.start();
 		}
@@ -75,7 +77,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 		} else {
 			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);
 		}
-		CloseableIterator newResult = (CloseableIterator) store.get(new MetaInformation().forClass(clazz).withColumnFamilies(families), table, constraint, limit, families == null ? null : families.keySet());
+		CloseaRow bleIterator newResult = (CloseableIterator) store.get(new MetaInformation().forClass(clazz).withColumnFamilies(families), table, constraint, limit, families == null ? null : families.keySet());
 		this.setResult(newResult.result);
 	}
 
@@ -83,7 +85,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 	public boolean hasNext() {
 		try {
 			boolean ret = false;
-			if(this.result.nextRows()!=null){
+			if(this.result.next()!=null){
 				ret=true;
 			}
 			this.reCreated = false;
@@ -95,15 +97,16 @@ final class CloseableIterator implements CloseableKeyIterator {
 	}
 
 	@Override
+	/*
+	 * ROW: ArrayList<KeyValue>*/
 	public Row next() {
 		try {
 			Deferred<ArrayList<ArrayList<KeyValue>>> current = this.result.nextRows();
-			//this.currentKey = current.key(); // pour obtenir la row key.
-			ArrayList<ArrayList<KeyValue>> i = current.join();
+			ArrayList<ArrayList<KeyValue>> CurrentResult = current.join();
 			
 			this.limit--;
 			this.reCreated = false;
-			return new RowWrapper(current, this.sendValues);
+			return new RowWrapper(CurrentResult , this.sendValues);
 			
 		}
 		catch (RuntimeException x) {

@@ -8,28 +8,47 @@ import org.hbase.async.Scanner;
 
 import com.stumbleupon.async.Deferred;
 
-
 public class Scan {
 	private Integer caching;
 	private byte[] startRow, stopRow;
-	private int length ;
-	private ArrayList<byte[]> families;
+	private byte[] family;
 	private Scanner s;
-	
-	public Scan(){
-		families =new ArrayList<byte[]>();
+
+	public Scan(Scanner s) {
+		this.s = s;
+	}
+	public Scan() {
 	}
 
-	public void setStartRow(byte[] bytes) {
-		this.startRow=bytes;
+	public byte[] getStartRow() {
+		return startRow;
 	}
 
-	public void setStopRow(byte[] endb) {
-		this.stopRow=endb;
+	public byte[] getStopRow() {
+		return stopRow;
 	}
 
-	public void addFamily(byte[] fam) {
-		families.add(fam);
+	public Scanner getScanner() {
+		return s;
+	}
+
+	public void setScanner(Scanner s) {
+		this.s = s;
+	}
+
+	public void setStartRow(byte[] startRow) {
+		this.s.setStartKey(startRow);
+	}
+
+	public void setStopRow(byte[] stopKey) {
+		this.s.setStopKey(stopKey);
+	}
+
+	public void setFamily(byte[] fam) { // specify a particular column family to scan
+		this.s.setFamily(fam);
+	}
+	public void addFamily(byte[] family){ // Get all the column for the specify family
+		this.s.setFamily(family);
 	}
 
 	public void setFilter(String filter) {
@@ -37,29 +56,37 @@ public class Scan {
 	}
 
 	public void setCaching(Integer caching) {
-		this.caching=caching;
-		
+		this.caching = caching;
 	}
 
 	public int getCaching() {
-		return  this.caching;
+		return this.caching;
 	}
 
-	public void close() {	
+	public void close() {
+		this.s.close();
 	}
 
-	public ArrayList<KeyValue> next(int nbRows) {
-		
-		return null;
+	public Deferred<ArrayList<ArrayList<KeyValue>>> next(int nbRows) {
+		return this.s.nextRows(nbRows);
 	}
 
-	public Object next() {
-		// TODO Auto-generated method stub
-		return null;
+	public Deferred<ArrayList<ArrayList<KeyValue>>> next() {
+		return this.s.nextRows();
 	}
 
 	public void setCacheBlocks(boolean b) {
-		// TODO Auto-generated method stub	
+		this.s.setServerBlockCache(b);
 	}
+
+	public byte[] getFamily() {
+		return this.family;
+	}
+	public byte[] getKey(){
+	
+		return this.s.getCurrentKey();
+		
+	}
+	
 
 }
