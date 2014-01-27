@@ -34,7 +34,26 @@ public class ScanAction extends Action</*Result*/Scanner> {
 		@Override
 		public Deferred<Scanner> perform(HBaseClient client) throws Exception {
 			final Scanner res=client.newScanner(this.getMangledTableName().getNameAsBytes()); // to create a new scanner for a particular table
-			//res.setFamily();
+			byte[] startKey = this.getScan().getStartRow();
+			byte[] stopKey = this.getScan().getStopRow();
+			byte[] family=this.getScan().getFamily();
+			byte[] qualifier=this.getScan().getQualifier();
+			byte[][] qualifiers=this.getScan().getQualifiers();
+			if(startKey!=null){
+				res.setStartKey(startKey);
+			}
+			if(stopKey!=null){
+				res.setStopKey(stopKey);
+			}
+			if(family!=null){
+				res.setFamily(family);
+			}
+			if(qualifier!=null){
+				res.setQualifier(qualifier);
+			}
+			if(qualifiers!=null){
+				res.setQualifiers(qualifiers);
+			}	
 			return Deferred.fromResult(res);
 		}
 		

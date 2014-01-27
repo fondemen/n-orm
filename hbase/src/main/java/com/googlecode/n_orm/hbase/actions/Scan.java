@@ -12,12 +12,13 @@ public class Scan {
 	private Integer caching;
 	private byte[] startRow, stopRow;
 	private byte[] family;
-	private Scanner s;
+	private byte[] qualifier;
+	private byte[][] qualifiers;
+	private  Scanner s;
 
-	public Scan(Scanner s) {
-		this.s = s;
-	}
+	
 	public Scan() {
+		this.s=s;
 	}
 
 	public byte[] getStartRow() {
@@ -82,11 +83,21 @@ public class Scan {
 	public byte[] getFamily() {
 		return this.family;
 	}
-	public byte[] getKey(){
+	public byte[] getCurrentKey(){
 	
 		return this.s.getCurrentKey();
 		
 	}
+	public byte[] getQualifier() {
+		return this.qualifier;
+	}
+	public void setQualifiers(byte[][] qualifiers){
+		this.qualifiers=qualifiers;
+	}
+	public byte[][] getQualifiers(){
+		return this.qualifiers;
+	}
+	
 	
 
 }
