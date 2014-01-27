@@ -4,15 +4,13 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.TreeMap;
-import java.util.Map.Entry;
 
-import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.hbase.async.KeyValue;
 
-import com.googlecode.n_orm.hbase.actions.Scan;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row;
 
@@ -24,13 +22,17 @@ public class RowWrapper implements Row, Serializable {
 	public RowWrapper(ArrayList<KeyValue> r) {
 		this(r, true);
 	}
-		private Map<byte[], byte[]> fams=new TreeMap<byte[], byte[]>();
+	
+	private Map<byte[], byte[]> fams=new TreeMap<byte[], byte[]>();
 	
 	public RowWrapper(ArrayList<KeyValue> r,  boolean sendValues) {
+		Map<byte[],KeyValue>map = new HashMap<byte[],KeyValue>();
+		for(KeyValue i :r)
+			map.put(i.key(), i);
 		this.key = Bytes.toString();
 		if (sendValues) {
 			this.values = new DefaultColumnFamilyData();
-			for (Entry<byte[], NavigableMap<byte[], byte[]>> famData : r.getNoVersionMap().entrySet()) {
+			for (Entry<byte[], KeyValue> famData : map.entrySet()) {
 				Map<String, byte[]> fam = new TreeMap<String, byte[]>();
 				this.values.put(Bytes.toString(famData.getKey()), fam);
 				for (Entry<byte[], byte[]> colData : famData.getValue().entrySet()) {
