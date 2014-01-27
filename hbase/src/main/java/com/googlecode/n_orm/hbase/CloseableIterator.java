@@ -21,7 +21,7 @@ import com.stumbleupon.async.Deferred;
 
 final class CloseableIterator implements CloseableKeyIterator {
 	private Scanner result;
-	private Iterator iterator;
+	private Iterator<Scanner> iterator;
 	private final boolean sendValues;
 	private final Class<? extends PersistingElement> clazz;
 	private final MangledTableName table;
@@ -45,6 +45,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 		this.limit = limit;
 		this.families = families;
 		this.setResult(r);
+
 		
 	}
 	
@@ -82,48 +83,32 @@ final class CloseableIterator implements CloseableKeyIterator {
 		this.setResult(newResult.result);
 	}
 	
-	
-
-/*	@Override
-	public boolean hasNext() {
-		try {
-			boolean ret = false;
-			try {
-				if(this.result.nextRows().join()!=null){
-					ret=true;
-				}
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			this.reCreated = false;
-			return ret;
-		} catch (RuntimeException x) {
-			this.handleProblem(x);
-			return hasNext();
-		}
-	}
-*/
 	@Override
 	/*
 	 * ROW: ArrayList<KeyValue>*/
 	public Row next() {
 		try {
+			this.result.setMaxNumRows(limit);
 			Deferred<ArrayList<ArrayList<KeyValue>>> current = this.result.nextRows();
 			ArrayList<ArrayList<KeyValue>> CurrentResult = current.join();
-			
-			this.limit--;
 			this.reCreated = false;
-			return new RowWrapper(CurrentResult , this.sendValues);
+			Iterator it=CurrentResult.iterator();
+			ArrayList<KeyValue> row = null;
+			while(it.hasNext()){
+				 row = (ArrayList<KeyValue>) it.next();
+			}	
+			return new RowWrapper(row, this.sendValues);
 			
 		}
 		catch (RuntimeException x) {
 			this.handleProblem(x);
 			return next();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
+		return null;
 	}
 
 	@Override
@@ -150,5 +135,21 @@ final class CloseableIterator implements CloseableKeyIterator {
 		} catch (RuntimeException x) {
 			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);
 		}
+	}
+
+	@Override
+	public boolean hasNext() {	
+		 this.result.setMaxNumRows(limit);
+		 Deferred<ArrayList<ArrayList<KeyValue>>> r = this.result.nextRows();
+		 try {
+			ArrayList<ArrayList<KeyValue>> res = r.join();
+			Iterator it= res.iterator();
+			return it.hasNext();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return false;
 	}
 }

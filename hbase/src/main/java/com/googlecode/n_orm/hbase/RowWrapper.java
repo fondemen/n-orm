@@ -21,12 +21,12 @@ public class RowWrapper implements Row, Serializable {
 	private final String key;
 	private final ColumnFamilyData values;
 
-	public RowWrapper(ArrayList<ArrayList<KeyValue>> r) {
+	public RowWrapper(ArrayList<KeyValue> r) {
 		this(r, true);
 	}
 		private Map<byte[], byte[]> fams=new TreeMap<byte[], byte[]>();
 	
-	public RowWrapper(ArrayList<ArrayList<KeyValue>> r,  boolean sendValues) {
+	public RowWrapper(ArrayList<KeyValue> r,  boolean sendValues) {
 		this.key = Bytes.toString();
 		if (sendValues) {
 			this.values = new DefaultColumnFamilyData();
@@ -40,6 +40,7 @@ public class RowWrapper implements Row, Serializable {
 		} else
 			this.values = null;
 	}
+
 
 	@Override
 	public String getKey() {
