@@ -21,20 +21,21 @@ import com.stumbleupon.async.Deferred;
 
 final class CloseableIterator implements CloseableKeyIterator {
 	private Scanner result;
+	private Iterator iterator;
 	private final boolean sendValues;
 	private final Class<? extends PersistingElement> clazz;
 	private final MangledTableName table;
 	private final String tablePostfix;
 	private Constraint constraint;
-	private int limit;
+	private int limit; // scanCaching
 	private final Map<String, Field> families;
 	private final Store store;
 	private boolean reCreated = false;
-	private int scanCaching;
+	
 	
 	private byte[] currentKey = null;
 
-	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, Scanner r, boolean sendValues, int scanCaching) {
+	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, Scanner r, boolean sendValues) {
 		this.store = store;
 		this.sendValues = sendValues;
 		this.clazz = clazz;
@@ -43,8 +44,8 @@ final class CloseableIterator implements CloseableKeyIterator {
 		this.constraint = constraint;
 		this.limit = limit;
 		this.families = families;
-		this.scanCaching=scanCaching;
 		this.setResult(r);
+		
 	}
 	
 	private void setResult(Scanner result) {
@@ -77,16 +78,26 @@ final class CloseableIterator implements CloseableKeyIterator {
 		} else {
 			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);
 		}
-		CloseaRow bleIterator newResult = (CloseableIterator) store.get(new MetaInformation().forClass(clazz).withColumnFamilies(families), table, constraint, limit, families == null ? null : families.keySet());
+		CloseableIterator newResult = (CloseableIterator) store.get(new MetaInformation().forClass(clazz).withColumnFamilies(families), table, constraint, limit, families == null ? null : families.keySet());
 		this.setResult(newResult.result);
 	}
+	
+	
 
-	@Override
+/*	@Override
 	public boolean hasNext() {
 		try {
 			boolean ret = false;
-			if(this.result.next()!=null){
-				ret=true;
+			try {
+				if(this.result.nextRows().join()!=null){
+					ret=true;
+				}
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 			this.reCreated = false;
 			return ret;
@@ -95,7 +106,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 			return hasNext();
 		}
 	}
-
+*/
 	@Override
 	/*
 	 * ROW: ArrayList<KeyValue>*/
