@@ -25,23 +25,25 @@ final class CloseableIterator implements CloseableKeyIterator {
 	private final MangledTableName table;
 	private final String tablePostfix;
 	private Constraint constraint;
-	private int limit; 
+	private int limit;
 	private final Map<String, Field> families;
 	private final Store store;
 	private boolean reCreated = false;
 	private Iterator<ArrayList<KeyValue>> it;
 	private Deferred<ArrayList<ArrayList<KeyValue>>> defer;
-	ArrayList<ArrayList<KeyValue>> nextBlock;
+	private ArrayList<ArrayList<KeyValue>> nextBlock;
 	private int scanCaching;
+	private boolean CheckNextBlock;
 
-
-	private ArrayList<ArrayList<KeyValue>>result;
+	private ArrayList<ArrayList<KeyValue>> result;
 	private int counter;
-	
-	
+
 	private byte[] currentKey = null;
 
-	CloseableIterator(Store store, Class<? extends PersistingElement> clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map<String, Field> families, Scanner r, boolean sendValues, int ScanCaching) {
+	CloseableIterator(Store store, Class<? extends PersistingElement> clazz,
+			MangledTableName table, String tablePostfix, Constraint constraint,
+			int limit, Map<String, Field> families, Scanner r,
+			boolean sendValues, int ScanCaching) {
 		this.store = store;
 		this.sendValues = sendValues;
 		this.clazz = clazz;
@@ -50,19 +52,20 @@ final class CloseableIterator implements CloseableKeyIterator {
 		this.constraint = constraint;
 		this.limit = limit;
 		this.families = families;
-		this.scanCaching=ScanCaching;
-		this.defer=r.nextRows(ScanCaching);
-		this.counter=ScanCaching/2;
+		this.scanCaching = ScanCaching;
+		this.defer = r.nextRows(ScanCaching);
+		this.counter = ScanCaching / 2;
 		this.setResult(r);
+		this.CheckNextBlock = false;
+		this.it = this.result.iterator();
 
-		
 	}
-	
+
 	private void setResult(Scanner s) {
-		//Trying to close existing scanner
+		// Trying to close existing scanner
 		if (this.s != null) {
 			final Scanner res = this.s;
-			new Thread(){
+			new Thread() {
 				@Override
 				public void run() {
 					res.close();
@@ -73,72 +76,101 @@ final class CloseableIterator implements CloseableKeyIterator {
 	}
 
 	protected void handleProblem(RuntimeException x) {
-		//Failure handling
-		//Only one failure per scan accepted
+		// Failure handling
+		// Only one failure per scan accepted
 		if (this.reCreated)
 			throw x;
 		this.reCreated = true;
-		//Creating the iterator again, starting after the last scanned key
+		// Creating the iterator again, starting after the last scanned key
 		if (this.currentKey != null) {
-			this.constraint = new Constraint(Bytes.toString(currentKey) + Character.MIN_VALUE, this.constraint == null ? null : this.constraint.getEndKey());
+			this.constraint = new Constraint(Bytes.toString(currentKey)
+					+ Character.MIN_VALUE, this.constraint == null ? null
+					: this.constraint.getEndKey());
 		}
-		if ((x.getCause() instanceof ScannerTimeoutException) || x.getMessage().contains(ScannerTimeoutException.class.getSimpleName())
-				|| (x.getCause() instanceof UnknownScannerException) || x.getMessage().contains(UnknownScannerException.class.getSimpleName())) {
-			Store.logger.warning("Got exception " + x.getMessage() + " ; consider lowering scanCahing or improve scanner timeout at the HBase level");
+		if ((x.getCause() instanceof ScannerTimeoutException)
+				|| x.getMessage().contains(
+						ScannerTimeoutException.class.getSimpleName())
+				|| (x.getCause() instanceof UnknownScannerException)
+				|| x.getMessage().contains(
+						UnknownScannerException.class.getSimpleName())) {
+			Store.logger
+					.warning("Got exception "
+							+ x.getMessage()
+							+ " ; consider lowering scanCahing or improve scanner timeout at the HBase level");
 		} else {
-			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);
+			store.handleProblem(x, this.clazz, table, tablePostfix,
+					this.families);
 		}
-		CloseableIterator newResult = (CloseableIterator) store.get(new MetaInformation().forClass(clazz).withColumnFamilies(families), table, constraint, limit, families == null ? null : families.keySet());
+		CloseableIterator newResult = (CloseableIterator) store.get(
+				new MetaInformation().forClass(clazz).withColumnFamilies(
+						families), table, constraint, limit,
+				families == null ? null : families.keySet());
 		this.setResult(newResult.s);
 	}
-	
+
+	public boolean checkBlock() { // nous dit s'il y'a un nouveau block à lire
+		return CheckNextBlock;
+	}
+
+	public Deferred<ArrayList<ArrayList<KeyValue>>> askBloc(Scanner s,
+			int sizeBlock) {
+		Deferred<ArrayList<ArrayList<KeyValue>>> nextDefer = s
+				.nextRows(sizeBlock);
+		this.CheckNextBlock = true;
+		return nextDefer;
+	}
+
+	public ArrayList<ArrayList<KeyValue>> findResult() {
+		try {
+			return this.defer.join();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return findResult();
+
+	}
+
 	@Override
 	/*
-	 * ROW: ArrayList<KeyValue>*/
+	 * ROW: ArrayList<KeyValue>
+	 */
+	/*
+	 * si le compteur est à zéro, on demande un autre block. lorsque hasNext()
+	 * est faux on regarde s'il y a un autre block à lire.Si c'est le cas, on
+	 * fait un join sur le block demandé précédemment et on réinitialise
+	 * l'itérateur. Sinon il n'y a plus rien à faire.
+	 */
 	public Row next() {
-		if(this.hasNext()){
-			if(this.counter!=0){
-				this.counter--;
-				this.limit--;
-				this.reCreated=false;
-				return new RowWrapper( it.next(), sendValues);
+		Deferred<ArrayList<ArrayList<KeyValue>>> aBlock = null;
+		if (this.hasNext()) {
+			this.counter--;
+			this.limit--;
+			if (this.counter == 0) {
+				aBlock = askBloc(s, this.scanCaching);
 			}
-			else{
+			return new RowWrapper(it.next());
+
+		} else {
+			if (checkBlock()) {
 				try {
-					this.limit--;
-					this.reCreated=true;
-					new CloseableIterator(store, clazz, table, tablePostfix, constraint, limit, families, s, sendValues, scanCaching);
-					
-					if(this.s!=null){
-						Deferred<ArrayList<ArrayList<KeyValue>>> object = s.nextRows(scanCaching);
-						 this.nextBlock = object.join();
-						 
-					}			
-					return new RowWrapper( it.next(), sendValues);
-				} catch (RuntimeException e) {
-					this.handleProblem(e);
+					this.nextBlock = aBlock.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
 				} catch (Exception e) {
-					
 					e.printStackTrace();
 				}
-				//new CloseableIterator(store, clazz, table, tablePostfix, constraint, limit, families, s, sendValues, scanCaching);
-				
+				this.it = this.nextBlock.iterator();
 			}
 		}
-		else{
-			this.result=this.nextBlock;
-			next();
-			
-		}
-		
+
 		return next();
-		
 	}
 
 	@Override
 	public void remove() {
-		throw new IllegalStateException(
-				"Cannot remove key from a result set.");
+		throw new IllegalStateException("Cannot remove key from a result set.");
 	}
 
 	@Override
@@ -155,27 +187,26 @@ final class CloseableIterator implements CloseableKeyIterator {
 	@Override
 	public void close() {
 		try {
-			 s.close(); // close the scanner before reaching the end of the key
+			s.close(); // close the scanner before reaching the end of the key
 		} catch (RuntimeException x) {
-			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);
+			store.handleProblem(x, this.clazz, table, tablePostfix,
+					this.families);
 		}
 	}
 
 	@Override
-	public boolean hasNext() {	
-	try {
-		this.result = this.defer.join();
-		 this.it=result.iterator();
-		 boolean ret = this.it.hasNext();
-		 return ret;
-	} catch (RuntimeException x) {
-		this.handleProblem(x);
-	} catch (Exception e) {
-		e.printStackTrace();
-	}
+	public boolean hasNext() {
+		try {
+			boolean ret = this.it.hasNext();
+			return ret;
+		} catch (RuntimeException x) {
+			this.handleProblem(x);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 		return hasNext();
 	}
-	
+
 	public int getScanCaching() {
 		return scanCaching;
 	}
