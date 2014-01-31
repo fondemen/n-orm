@@ -23,23 +23,20 @@ public class RowWrapper implements Row, Serializable {
 		this(r, true);
 	}
 	
-	private Map<byte[], byte[]> fams=new TreeMap<byte[], byte[]>();
+	//private Map<byte[], byte[]> fams=new TreeMap<byte[], byte[]>();
 	
 	public RowWrapper(ArrayList<KeyValue> r,  boolean sendValues) {
-		Map<byte[],KeyValue>map = new HashMap<byte[],KeyValue>();
-		for(KeyValue i :r)
-			map.put(i.key(), i);
-		this.key = Bytes.toString();
+		this.key = Bytes.toString(r.get(0).key());
+		
 		if (sendValues) {
 			this.values = new DefaultColumnFamilyData();
-			for (Entry<byte[], KeyValue> famData : map.entrySet()) {
+			for(KeyValue kv: r){
 				Map<String, byte[]> fam = new TreeMap<String, byte[]>();
-				this.values.put(Bytes.toString(famData.getKey()), fam);
-				for (Entry<byte[], byte[]> colData : famData.getValue().entrySet()) {
-					fam.put(Bytes.toString(colData.getKey()), colData.getValue());
+				fam.put(Bytes.toString(kv.qualifier()), kv.value());
+				this.values.put(Bytes.toString(kv.family()), fam);
 				}
 			}
-		} else
+		 else
 			this.values = null;
 	}
 
