@@ -31,6 +31,7 @@ final class CloseableIterator implements CloseableKeyIterator {
 	private boolean reCreated = false;
 	private Iterator<ArrayList<KeyValue>> it;
 	private Deferred<ArrayList<ArrayList<KeyValue>>> defer;
+	ArrayList<ArrayList<KeyValue>> nextBlock;
 	private int scanCaching;
 
 
@@ -104,15 +105,15 @@ final class CloseableIterator implements CloseableKeyIterator {
 			}
 			else{
 				try {
-					this.counter--;
 					this.limit--;
 					this.reCreated=true;
-					ArrayList<ArrayList<KeyValue>> next = this.defer.join();
+					new CloseableIterator(store, clazz, table, tablePostfix, constraint, limit, families, s, sendValues, scanCaching);
 					
-					for(ArrayList<KeyValue> a: next){
-						this.result.add(a);
-					}
-					
+					if(this.s!=null){
+						Deferred<ArrayList<ArrayList<KeyValue>>> object = s.nextRows(scanCaching);
+						 this.nextBlock = object.join();
+						 
+					}			
 					return new RowWrapper( it.next(), sendValues);
 				} catch (RuntimeException e) {
 					this.handleProblem(e);
@@ -123,6 +124,11 @@ final class CloseableIterator implements CloseableKeyIterator {
 				//new CloseableIterator(store, clazz, table, tablePostfix, constraint, limit, families, s, sendValues, scanCaching);
 				
 			}
+		}
+		else{
+			this.result=this.nextBlock;
+			next();
+			
 		}
 		
 		return next();
