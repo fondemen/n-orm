@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.hbase.mapreduce;
+/*package com.googlecode.n_orm.hbase.mapreduce;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -60,3 +60,4 @@ public class Truncator {
 		return job;
 	}
 }
+*/

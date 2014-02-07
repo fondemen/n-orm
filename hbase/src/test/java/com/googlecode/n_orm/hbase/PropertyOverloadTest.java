@@ -258,31 +258,31 @@ public class PropertyOverloadTest {
 	
 	@Test
 	public void scanCaching() {
-		Scan s = store.getScan(null, Element.class, null);
+		com.googlecode.n_orm.hbase.actions.Scan s = store.getScan(null, Element.class, null);
 		assertEquals(1, s.getCaching());
 	}
 	
 	@Test
 	public void scanCachingSimpleFam() {
-		Scan s = store.getScan(null, Element.class, this.getChangedFields(true, false, false));
+		com.googlecode.n_orm.hbase.actions.Scan s = store.getScan(null, Element.class, this.getChangedFields(true, false, false));
 		assertEquals(1, s.getCaching());
 	}
 	
 	@Test
 	public void scanCachingOverFam() {
-		Scan s = store.getScan(null, Element.class, this.getChangedFields(true, true, false));
+		com.googlecode.n_orm.hbase.actions.Scan s = store.getScan(null, Element.class, this.getChangedFields(true, true, false));
 		assertEquals(2, s.getCaching());
 	}
 	
 	@Test
 	public void scanCachingOver2Fam() {
-		Scan s = store.getScan(null, Element.class, this.getChangedFields(true, true, true));
+		com.googlecode.n_orm.hbase.actions.Scan s = store.getScan(null, Element.class, this.getChangedFields(true, true, true));
 		assertEquals(2, s.getCaching());
 	}
 	
 	@Test
 	public void scanCachingOverFam3Only() {
-		Scan s = store.getScan(null, Element.class, this.getChangedFields(false, false, true));
+		com.googlecode.n_orm.hbase.actions.Scan s = store.getScan(null, Element.class, this.getChangedFields(false, false, true));
 		assertEquals(3, s.getCaching());
 	}
 	

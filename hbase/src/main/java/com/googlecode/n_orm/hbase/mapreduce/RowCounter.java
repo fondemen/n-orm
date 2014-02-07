@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.hbase.mapreduce;
+/*package com.googlecode.n_orm.hbase.mapreduce;
 
 import java.io.IOException;
 
@@ -42,4 +42,4 @@ public class RowCounter {
 		job.setNumReduceTasks(0);
 		return job;
 	}
-}
+}*/

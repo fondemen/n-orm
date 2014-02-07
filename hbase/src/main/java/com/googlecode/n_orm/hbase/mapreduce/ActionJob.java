@@ -1,4 +1,4 @@
-package com.googlecode.n_orm.hbase.mapreduce;
+/*package com.googlecode.n_orm.hbase.mapreduce;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -105,3 +105,4 @@ public class ActionJob {
 		return job;
 	}
 }
+*/
