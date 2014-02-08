@@ -10,7 +10,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.HTablePool;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.mapreduce.TableInputFormat;
@@ -21,6 +20,7 @@ import org.aspectj.lang.Aspects;
 import org.codehaus.jackson.map.JsonMappingException;
 
 import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.hbase.MangledTableName;
 import com.googlecode.n_orm.hbase.Store;
 import com.googlecode.n_orm.hbase.actions.Scan;
 
@@ -44,7 +44,7 @@ public class LocalFormat {
 	
 	public static void prepareJob(Job job, Scan scan, Store store) throws IOException {
 		if (store.isMapRedSendHBaseJars())
-			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), org.apache.zookeeper.ZooKeeper.class, HTable.class, HBaseAdmin.class, HTablePool.class, HColumnDescriptor.class, Scan.class, Increment.class, JsonMappingException.class);
+			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), org.apache.zookeeper.ZooKeeper.class, MangledTableName.class, HBaseAdmin.class, HTablePool.class, HColumnDescriptor.class, Scan.class, Increment.class, JsonMappingException.class);
 		if (store.isMapRedSendNOrmJars())
 			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), Store.class, StorageManagement.class, Aspects.class, org.apache.log4j.Logger.class, BeanUtils.class);
 		
@@ -59,10 +59,10 @@ public class LocalFormat {
 		TableMapReduceUtil.setScannerCaching(job, store.getMapRedScanCaching());
 	}
 
-	protected HTable table;
+	protected MangledTableName table;
 	private Configuration conf;
 	
-	public HTable getTable() {
+	public MangledTableName getTable() {
 		return table;
 	}
 
@@ -88,12 +88,7 @@ public class LocalFormat {
 			this.conf = HBaseConfiguration.create(conf);
 		}
 
-		try {
-			table = new HTable(this.conf,
-					conf.get(TableInputFormat.INPUT_TABLE));
-			this.table.setAutoFlush(false);
-		} catch (IOException e) {
-			throw new RuntimeException(e.getMessage(), e);
-		}
+		table = new MangledTableName(conf.get(TableInputFormat.INPUT_TABLE));
+		this.table.setAutoFlush(false);
 	}
 }

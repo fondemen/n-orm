@@ -2,6 +2,7 @@ package com.googlecode.n_orm.hbase;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Map;
 import java.util.Properties;
 
 import org.apache.hadoop.hbase.HBaseTestingUtility;
@@ -78,14 +79,13 @@ public class HBaseLauncher extends StoreTestLauncher {
 	public static void setConf(Store store) {
 		store.setConf(hBaseServer.getConfiguration());
 	}
-
+/*
 	@Override
 	public Properties prepare(Class<?> testClass) {
 		if (hbaseProperties == null)
 			hbaseProperties = prepareHBase();
-		return hbaseProperties;
-	}
-
+		return  hbaseProperties;
+	}*/
 //	@AfterClass
 //	public static void shutdownHBase() {
 //		try {
@@ -94,4 +94,10 @@ public class HBaseLauncher extends StoreTestLauncher {
 //			e.printStackTrace();
 //		}
 //	}
+
+	@Override
+	public Map<String, Object> prepare(Class<?> arg0) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

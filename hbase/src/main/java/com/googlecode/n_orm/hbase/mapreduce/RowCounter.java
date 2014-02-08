@@ -1,10 +1,13 @@
-/*package com.googlecode.n_orm.hbase.mapreduce;
+package com.googlecode.n_orm.hbase.mapreduce;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Result;
+
 import com.googlecode.n_orm.hbase.actions.Scan;
+
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
@@ -17,29 +20,30 @@ public class RowCounter {
 	static final String NAME = "rowcounter";
 
 	public static class RowCounterMapper extends
-			TableMapper<ImmutableBytesWritable, Result> {
+			TableMapper<ImmutableBytesWritable, ArrayList<KeyValue> > {
 
 		public static enum Counters {
 			ROWS
 		}
 
-		@Override
-		public void map(ImmutableBytesWritable row, Result values,
-				Context context) throws IOException {
-			for (@SuppressWarnings("unused") KeyValue value : values.list()) {
+		public void map(ImmutableBytesWritable row, ArrayList<KeyValue> values,
+				Context context) throws IOException {		
+			for (@SuppressWarnings("unused") KeyValue value : values) {
 				context.getCounter(Counters.ROWS).increment(1);
 				break;
 			}
 		}
 	}
 
+	
+
 	public static Job createSubmittableJob(Store s, String tableName, Scan scan) throws IOException {
 		Job job = new Job(LocalFormat.prepareConf(s, null), NAME + "_" + tableName + "_" + scan.hashCode());
-		TableMapReduceUtil.initTableMapperJob(tableName, scan,
+		/*TableMapReduceUtil.initTableMapperJob(tableName, scan,
 				RowCounterMapper.class, ImmutableBytesWritable.class,
 				Result.class, job, false);
 		LocalFormat.prepareJob(job, scan, s);
-		job.setNumReduceTasks(0);
+		job.setNumReduceTasks(0);*/
 		return job;
 	}
-}*/
+}

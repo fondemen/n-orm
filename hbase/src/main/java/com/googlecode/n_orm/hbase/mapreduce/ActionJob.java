@@ -1,10 +1,11 @@
-/*package com.googlecode.n_orm.hbase.mapreduce;
+package com.googlecode.n_orm.hbase.mapreduce;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.TreeSet;
@@ -16,6 +17,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.mapreduce.Job;
+import org.hbase.async.KeyValue;
 
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
@@ -33,7 +35,7 @@ public class ActionJob {
 	private static final String PROCESS_PROP = NAME + ".process";
 
 	public static class ActionMapper extends
-			TableMapper<ImmutableBytesWritable, Result> {
+			TableMapper<ImmutableBytesWritable, ArrayList<KeyValue>> {
 		private ProcessWrapper<?, ?> process;
 
 		@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -61,8 +63,8 @@ public class ActionJob {
 			}
 		}
 
-		@Override
-		protected void map(final ImmutableBytesWritable key, final Result value,
+
+		protected void map(final ImmutableBytesWritable key, final ArrayList<KeyValue> value,
 				Context context) throws IOException, InterruptedException {
 			try {
 				this.process.process(new RowWrapper(value));
@@ -94,15 +96,14 @@ public class ActionJob {
 		
 		Job job = new Job(conf, NAME + "_" + processClass.getName() + "(" + elementClass.getName() + ")_" + scan.hashCode());
 		
-		TableMapReduceUtil.initTableMapperJob(tableName.getNameAsBytes(), scan,
+		/*TableMapReduceUtil.initTableMapperJob(tableName.getNameAsBytes(), scan,
 				ActionMapper.class, ImmutableBytesWritable.class,
 				Result.class, job, false);
 		LocalFormat.prepareJob(job, scan, s);
 		if (s.isMapRedSendJobJars())
 			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), processClass, elementClass);
 		job.setInputFormatClass(ActionLocalInputFormat.class);
-		job.setNumReduceTasks(0);
+		job.setNumReduceTasks(0);*/
 		return job;
 	}
 }
-*/

@@ -1,4 +1,4 @@
-/*package com.googlecode.n_orm.hbase.mapreduce;
+package com.googlecode.n_orm.hbase.mapreduce;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -50,14 +50,13 @@ public class Truncator {
 			String tableName, Scan scan) throws IOException {
 		Configuration conf = LocalFormat.prepareConf(s, null);
 		Job job = new Job(conf, NAME + "_" + tableName + "_" + scan.hashCode());
-		TableMapReduceUtil.initTableMapperJob(tableName, scan,
+		/*TableMapReduceUtil.initTableMapperJob(tableName, scan,
 				TruncatorMapper.class, ImmutableBytesWritable.class,
 				DeleteRequest.class, job, false);
 	    job.setOutputKeyClass(ImmutableBytesWritable.class);
 	    job.setOutputValueClass(DeleteRequest.class);
 	    LocalFormat.prepareJob(job, scan, s);
-		job.setNumReduceTasks(0);
+		job.setNumReduceTasks(0);*/
 		return job;
 	}
 }
-*/

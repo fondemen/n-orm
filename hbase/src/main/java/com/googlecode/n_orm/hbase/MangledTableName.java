@@ -75,4 +75,14 @@ public class MangledTableName implements Comparable<MangledTableName> {
 			return false;
 		return true;
 	}
+
+	public void setAutoFlush(boolean b) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public void flushCommits() {
+		// TODO Auto-generated method stub
+		
+	}
 }

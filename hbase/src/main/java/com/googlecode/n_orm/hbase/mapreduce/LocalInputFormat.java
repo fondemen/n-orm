@@ -7,6 +7,8 @@ import org.apache.hadoop.hbase.mapreduce.ScanHandler;
 import org.apache.hadoop.hbase.mapreduce.TableInputFormat;
 import org.apache.hadoop.hbase.mapreduce.TableRecordReader;
 
+import com.googlecode.n_orm.hbase.MangledTableName;
+
 public class LocalInputFormat extends
 		TableInputFormat implements Configurable {
 	private LocalFormat localFormat = new LocalFormat();
@@ -18,16 +20,26 @@ public class LocalInputFormat extends
 			return;
 
 		localFormat.setConf(conf);
-		this.setHTable(localFormat.getTable());
+		this.setMangledTableName(localFormat.getTable());
 		this.setScan(ScanHandler.getScan(conf));
 	}
 
-	@Override
+	private void setMangledTableName(MangledTableName table) {
+		// TODO Auto-generated method stub
+		MangledTableName tableName=localFormat.getTable();
+		if(tableName!=null){
+			setMangledTableName(tableName);}
+		else{
+			setMangledTableName(table);
+		}
+	}
+
+	/*@Override
 	protected void setHTable(HTable table) {
 		HTable ltable = localFormat.getTable();
 		if (ltable != null)
 			super.setHTable(ltable);
 		else
 			super.setHTable(table);
-	}
+	}*/
 }
