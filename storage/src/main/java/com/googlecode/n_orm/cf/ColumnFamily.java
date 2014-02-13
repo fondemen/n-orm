@@ -134,7 +134,7 @@ public abstract class ColumnFamily<T> implements Comparable<ColumnFamily<T>> {
 	
 	public abstract void activate(Object from, Object to) throws DatabaseNotReachedException;
 
-	@Continuator
+	//@Continuator
 	public void activate(String fromIndex, String toIndex) throws DatabaseNotReachedException {
 		this.activate(new Constraint(fromIndex, toIndex));
 	}

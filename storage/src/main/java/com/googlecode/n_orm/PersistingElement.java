@@ -73,6 +73,7 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * The name is the name of the property for the column family, i.e. the non static, non final , non transient {@link java.util.Map} or {@link java.util.Set} field.
 	 * @see ColumnFamily#getName()
 	 */
+	@Continuator
 	public ColumnFamily<?> getColumnFamily(String columnFamilyName) throws UnknownColumnFamily;
 	
 	/**
@@ -252,7 +253,6 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * @throws DatabaseNotReachedException
 	 * @see #getColumnFamily(String)
 	 */
-	@Continuator
 	public void activateColumnFamily(String name, Object from, Object to) throws UnknownColumnFamily, DatabaseNotReachedException;
 	
 	/**

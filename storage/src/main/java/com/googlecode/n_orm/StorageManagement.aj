@@ -363,7 +363,6 @@ public aspect StorageManagement {
 		this.getColumnFamily(name).activate();
 	}
 
-	@Continuator
 	public void PersistingElement.activateColumnFamily(String name, Object fromObject, Object toObject) throws DatabaseNotReachedException {
 		this.getColumnFamily(name).activate(fromObject, toObject);
 	}
