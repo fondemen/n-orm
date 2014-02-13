@@ -80,6 +80,13 @@ public aspect ColumnFamiliyManagement {
 	}
 	
 	public ColumnFamily<?> PersistingElement.getColumnFamily(Object collection) throws UnknownColumnFamily {
+
+		if (collection instanceof String) {
+			try {
+				return this.getColumnFamily((String)collection);
+			} catch (Exception x) {}
+		}
+		
 		PropertyManagement pm = PropertyManagement.getInstance();
 		for (ColumnFamily<?> cf : this.getColumnFamilies()) {
 			try {
