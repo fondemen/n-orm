@@ -152,31 +152,6 @@ public abstract class CacheTester {
 		assertEquals(size, gc.size());
 	}
 	@Test
-	public void testGetMaximunSize() throws CacheException{
-		ICache gc=createCache();
-		gc.setMaximunSize(200);
-		assertEquals(200, gc.getMaximunSize());
-	}
-	@Test
-	public void testGetTTL() throws CacheException {
-		ICache gc=createCache();
-		gc.setTTL(20);
-		assertEquals(20, gc.getTTL());
-	}
-	@Test
-	public void testSetTTL() throws CacheException {
-		ICache gc=createCache();
-		gc.setTTL(20);
-		assertEquals(20, gc.getTTL());
-		assertNotSame(10, gc.getTTL());
-	}
-	@Test
-	public void testSetMaximunSize() throws CacheException{
-		ICache gc=createCache();
-		gc.setMaximunSize(200);
-		assertEquals(200, gc.getMaximunSize());
-	}
-	@Test
 	public void testReset() throws CacheException{
 		ICache gc=createCache();
 		Map<String, byte[]> familyData=new HashMap<String, byte[]>();
