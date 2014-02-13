@@ -2,14 +2,18 @@ package com.googlecode.n_orm.console.shell;
 
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
+
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+
 import org.junit.Before;
 import org.junit.Test;
+
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.console.commands.CommandList;
 import com.googlecode.n_orm.console.commands.CommandList.Bean;
@@ -93,11 +97,23 @@ public class ShellProcessorTest
 	@Test
 	public void treatLineWithArgsTest()
 	{
-		String command = "changePrompt";
-		String args = "newPrompt$";
+		String command = "returnResult";
+		String args = "treatLineWithArgsTest";
 		
-		shell.println("method result: null");
-		mapCommands.changePrompt(args);
+		shell.println("method result: "+args);
+		replay(shell);
+		this.sut.treatLine(command + " " + args);
+		verify(shell);
+		reset(shell);
+	}
+	
+	@Test
+	public void treatLineWithNullArgsTest()
+	{
+		String command = "returnResult";
+		String args = "null";
+		
+		shell.println("method result: arg was null");
 		replay(shell);
 		this.sut.treatLine(command + " " + args);
 		verify(shell);
@@ -107,13 +123,24 @@ public class ShellProcessorTest
 	@Test
 	public void treatLineWithArrayArgsTest()
 	{
-		String command = "changePromptArray";
-		String args = "newPrompt$";
+		String command = "returnResultArgs";
+		String args = "treatLineWithArrayArgsTest";
 		
-		shell.println("method result: null");
-		mapCommands.changePromptArray(new String[] {args});
+		shell.println("method result: ["+args+']');
 		replay(shell);
 		this.sut.treatLine(command + " " + args);
+		verify(shell);
+		reset(shell);
+	}
+	
+	@Test
+	public void treatLineWithArrayNoArgsTest()
+	{
+		String command = "returnResultArgs";
+		
+		shell.println("method result: []");
+		replay(shell);
+		this.sut.treatLine(command);
 		verify(shell);
 		reset(shell);
 	}

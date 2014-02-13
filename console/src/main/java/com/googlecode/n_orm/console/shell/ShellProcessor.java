@@ -54,6 +54,7 @@ public class ShellProcessor
 			additionalMethods.add(Collection.class.getMethod("size"));
 			additionalMethods.add(Iterator.class.getMethod("hasNext"));
 			additionalMethods.add(Iterator.class.getMethod("next"));
+			additionalMethods.add(Iterator.class.getMethod("remove"));
 			additionalMethods.add(Closeable.class.getMethod("close"));
 			additionalMethods.add(List.class.getMethod("get", int.class));
 		} catch (SecurityException e) {
@@ -307,44 +308,53 @@ public class ShellProcessor
 			}
 			else if (processorCommands.containsKey(command)) // The command must be registered in the processor
 			{
-				try
-				{
+				try {
 					Method m = processorCommands.get(command);
 					Class<?>[] parameterTypes = m.getParameterTypes();
 					// Find parameters of the command
 					Object[] params = new Object[parameterTypes.length];
-					if (parameterTypes.length > 0)
-					{
-						// Check the format of the command and get the parameters
-						if (tokens.length - currentTokenIndex < parameterTypes.length)
-						{
+					if (parameterTypes.length > 0) {
+						boolean lastParamIsArray = parameterTypes[parameterTypes.length-1].isArray();
+						// Check the format of the command and get the parameters ; ellipsis might allow ignoring last one
+						if (tokens.length - currentTokenIndex < parameterTypes.length - (lastParamIsArray ? 1 : 0)) {
 							shell.println("Command format error: " + m.toString().substring(
 									m.toString().substring(0, m.toString().lastIndexOf("(")).lastIndexOf(".") + 1, // Last "." before parameters
 									m.toString().length())
 									);
 							break;
-						}
-						else
-						{
-							for (int i = 0; i < parameterTypes.length; i++)
-							{
-								// Check if the param is not a variable
-								String s = tokens[currentTokenIndex + i];
+						} else {
+							for (int i = 0; i < parameterTypes.length; i++) {
 								Class<?> type = parameterTypes[i];
-								boolean isArray = type.isArray();
-								if (isArray) { // Array not supported
-									type = type.getComponentType();
-								}
-								
-								if (this.mapShellVariables.containsKey(s))
-									params[i] = this.mapShellVariables.get(s);
-								else
-									params[i] = ConvertUtils.convert(s, type);
-								
-								if (isArray && !params[i].getClass().isArray()) {
-									Object array = Array.newInstance(type, 1);
-									Array.set(array, 0, params[i]);
-									params[i] = array;
+								String s;
+								try {
+									s = tokens[currentTokenIndex + i];
+									
+									boolean isArray = type.isArray();
+									if (isArray) { // Array not supported
+										type = type.getComponentType();
+									}
+									
+									if (this.mapShellVariables.containsKey(s))
+										params[i] = this.mapShellVariables.get(s);
+									else if ("null".equals(s))
+										params[i] = null;
+									else
+										params[i] = ConvertUtils.convert(s, type);
+									
+									if (isArray && !params[i].getClass().isArray()) {
+										Object array = Array.newInstance(type, 1);
+										Array.set(array, 0, params[i]);
+										params[i] = array;
+									}
+								} catch (ArrayIndexOutOfBoundsException x) {
+									// We might be facing an ellipsis
+									if (lastParamIsArray) {
+										assert type.isArray();
+										type = type.getComponentType();
+										params[i] = Array.newInstance(type, 0);
+									} else {
+										throw x;
+									}
 								}
 							}
 							
