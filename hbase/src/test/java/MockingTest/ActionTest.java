@@ -1,4 +1,4 @@
-package MockingTest;
+/*package MockingTest;
 
 import static org.mockito.Mockito.*;
 
@@ -11,3 +11,4 @@ GetAction mockGetAction=mock(GetAction.class);
 	
 	
 }
+*/
