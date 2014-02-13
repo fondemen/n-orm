@@ -1,5 +1,7 @@
 package com.googlecode.n_orm.console.commands;
 
+import java.util.Arrays;
+
 import com.googlecode.n_orm.console.shell.Shell;
 import com.googlecode.n_orm.consoleannotations.Trigger;
 
@@ -41,7 +43,17 @@ public class CommandList
 	@Trigger
 	public void changePromptArray(String [] newPrompt)
 	{
-		shell.setPrompt(newPrompt[0].replaceAll("\\s+$", "") + " ");
+		shell.setPrompt(newPrompt.length == 0 ? "" : newPrompt[0].replaceAll("\\s+$", "") + " ");
+	}
+	
+	@Trigger
+	public String returnResult(String arg) {
+		return arg == null ? "arg was null" : arg;
+	}
+	
+	@Trigger
+	public String returnResultArgs(String... args) {
+		return Arrays.toString(args);
 	}
 	
 	@Trigger
