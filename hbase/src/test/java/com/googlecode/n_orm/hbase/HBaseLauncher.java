@@ -96,8 +96,9 @@ public class HBaseLauncher extends StoreTestLauncher {
 //	}
 
 	@Override
-	public Map<String, Object> prepare(Class<?> arg0) {
-		// TODO Auto-generated method stub
-		return null;
+	public Properties prepare(Class<?> arg0) {
+		if (hbaseProperties == null)
+			hbaseProperties = prepareHBase();
+		return  hbaseProperties;
 	}
 }

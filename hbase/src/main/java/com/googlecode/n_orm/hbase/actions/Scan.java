@@ -9,7 +9,7 @@ import org.hbase.async.Scanner;
 import com.stumbleupon.async.Deferred;
 
 public class Scan {
-	private Integer caching;
+	private int caching;
 	private byte[] startRow, stopRow;
 	private byte[] family;
 	private byte[] qualifier;
@@ -19,6 +19,8 @@ public class Scan {
 	
 	public Scan() {
 		this.s=s;
+		this.caching=0;
+		
 	}
 
 	public byte[] getStartRow() {

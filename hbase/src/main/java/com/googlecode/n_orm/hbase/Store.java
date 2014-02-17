@@ -1268,7 +1268,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		try {
 			Deferred<R> ret = action.perform(this.client);
-			return ret.join();
+			return ret == null ? null : ret.join();
 		} catch (Throwable e) {
 			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + table + " for store " + this.hashCode(), e);
 			
@@ -1875,14 +1875,29 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			//Transforming changes into a big Put (if necessary)
 			//and registering it as an action to be performed
 			PutAction rowPut = null;
+			PutRequest pr=null;
+			byte[] Key, famil = null,qualifier,value;
+			
 			if (changed != null && !changed.isEmpty()) {
 				
 				for (Entry<String, Map<String, byte[]>> family : changed.entrySet()) {
-					byte[] cf = Bytes.toBytes(family.getKey()); // pour chaque famille on retourne la clé : cf famille
-					
+					Key= Bytes.toBytes(family.getKey()); // pour chaque famille on retourne la clé 
 					for (Entry<String, byte[]> col : family.getValue().entrySet()) { // pour chaque famille on prend la valeur
-						//
-						PutRequest pr=new PutRequest(Bytes.toBytes(tableName),row, cf, Bytes.toBytes(col.getKey()), col.getValue()); // col.getKey(): qualifier
+						qualifier= Bytes.toBytes(col.getKey());
+						value=col.getValue();
+						pr=new PutRequest(tableName.getBytes(),Key,famil,qualifier,value);
+						
+						/*final byte[] table,
+	                    final byte[] key,
+	                    final byte[] family,
+	                    final byte[] qualifier,
+	                    final byte[] value)*/
+						
+						
+						
+						
+						
+						
 						rowPut=new PutAction(pr); 
 					}
 				}
@@ -2137,7 +2152,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		String tablePostfix = meta == null ? null : meta.getTablePostfix();
 		Scanner r = this.tryPerform(new ScanAction(s, table), clazz, table, tablePostfix, cf);
-		return new CloseableIterator(this,  clazz, table, tablePostfix, c,  limit, cf, r, cf!=null, this.getScanCaching());
+		return new CloseableIterator(this,  clazz, table, tablePostfix, c,  limit, cf, r, cf!=null, /*this.getScanCaching()*/ 200);
 	
 	
 	}

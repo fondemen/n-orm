@@ -44,6 +44,9 @@ final class CloseableIterator implements CloseableKeyIterator {
 			MangledTableName table, String tablePostfix, Constraint constraint,
 			int limit, Map<String, Field> families, Scanner r,
 			boolean sendValues, int ScanCaching) {
+		
+		
+		this.result= new ArrayList<ArrayList<KeyValue>>();
 		this.store = store;
 		this.sendValues = sendValues;
 		this.clazz = clazz;
