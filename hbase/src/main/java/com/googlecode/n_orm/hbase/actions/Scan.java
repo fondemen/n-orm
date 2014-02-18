@@ -40,15 +40,16 @@ public class Scan {
 	}
 
 	public void setStartRow(byte[] startRow) {
-		this.s.setStartKey(startRow);
+		this.startRow=startRow;
+	
 	}
 
 	public void setStopRow(byte[] stopKey) {
-		this.s.setStopKey(stopKey);
+		this.stopRow=stopRow;
 	}
 
 	public void setFamily(byte[] fam) { // specify a particular column family to scan
-		this.s.setFamily(fam);
+		this.family=fam;
 	}
 	public void addFamily(byte[] family){ // Get all the column for the specify family
 		this.s.setFamily(family);
@@ -67,7 +68,7 @@ public class Scan {
 	}
 
 	public void close() {
-		this.s.close();
+		
 	}
 
 	public Deferred<ArrayList<ArrayList<KeyValue>>> next(int nbRows) {

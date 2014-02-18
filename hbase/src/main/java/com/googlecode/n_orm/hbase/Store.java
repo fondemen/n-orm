@@ -1876,7 +1876,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			//and registering it as an action to be performed
 			PutAction rowPut = null;
 			PutRequest pr=null;
-			byte[] Key, famil = null,qualifier,value;
+			byte[] Key, qualifier,value;
+			
+			byte[] famil = {};
 			
 			if (changed != null && !changed.isEmpty()) {
 				
@@ -1946,10 +1948,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	
 			//An empty object is to be stored...
 			//Adding a dummy value into properties family
-			if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
+			/*if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
 				rowPut=new PutAction(new PutRequest(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{}, row, row));
 				actions.add(rowPut);
-			}
+			}*/
 			
 			// Checking for WAL policy
 			if (rowPut != null) { // Only Puts can override WAL policy in 0.90

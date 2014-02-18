@@ -119,7 +119,7 @@ public class HBaseLoaderTest {
 	}
 
 	@Test(expected=Test.None.class)
-	public void loadPropertiesWithWildcardForSubdir2ExcludingJPG() throws IOException {
+	public void loadPropertiesWithWildcardForSubdir2ExcluprocessAsyncdingJPG() throws IOException {
 		Store.getStore(testPath + "/etc/,**/*2/**,!**/*.jpg");
 	}
 

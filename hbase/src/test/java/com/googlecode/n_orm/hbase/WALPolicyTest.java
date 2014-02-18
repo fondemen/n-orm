@@ -1,4 +1,4 @@
-/*package com.googlecode.n_orm.hbase;
+package com.googlecode.n_orm.hbase;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -271,4 +271,4 @@ public class WALPolicyTest {
 		assertTrue(put.getWriteToWAL());
 	}
 
-}*/
+}

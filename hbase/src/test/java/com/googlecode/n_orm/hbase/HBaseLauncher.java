@@ -47,6 +47,8 @@ public class HBaseLauncher extends StoreTestLauncher {
 				try {
 					hBaseServer = new HBaseTestingUtility();
 					hBaseServer.getConfiguration().setInt("hbase.regionserver.msginterval", 100);
+					StoreTestLauncher.INSTANCE = new HBaseLauncher();
+					
 					hBaseServer.getConfiguration().setInt("hbase.client.pause", 250);
 					hBaseServer.getConfiguration().setInt("hbase.client.retries.number", hbaseMaxRetries);
 //					if (hbaseHost != null)
