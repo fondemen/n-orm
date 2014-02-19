@@ -1878,16 +1878,16 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			PutRequest pr=null;
 			byte[] Key, qualifier,value;
 			
-			byte[] famil = {};
+			byte[] famil ;
 			
 			if (changed != null && !changed.isEmpty()) {
 				
 				for (Entry<String, Map<String, byte[]>> family : changed.entrySet()) {
-					Key= Bytes.toBytes(family.getKey()); // pour chaque famille on retourne la clé 
+					famil= Bytes.toBytes(family.getKey()); // pour chaque famille on retourne la clé 
 					for (Entry<String, byte[]> col : family.getValue().entrySet()) { // pour chaque famille on prend la valeur
 						qualifier= Bytes.toBytes(col.getKey());
 						value=col.getValue();
-						pr=new PutRequest(tableName.getBytes(),Key,famil,qualifier,value);
+						pr=new PutRequest(tableName.getBytes(),key.getBytes(),famil,qualifier,value);
 						
 						/*final byte[] table,
 	                    final byte[] key,
