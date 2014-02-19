@@ -99,6 +99,7 @@ import com.googlecode.n_orm.hbase.properties.HTableProperty;
 import com.googlecode.n_orm.hbase.properties.PropertyUtils;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 import com.googlecode.n_orm.storeapi.ActionnableStore;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
 import com.googlecode.n_orm.storeapi.Constraint;
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.GenericStore;
@@ -1205,8 +1206,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		String msg = e.getMessage();
 		if (msg == null) msg = "";
 		
-		//System.err.println("====================== handling " + e + " with message " + msg);
-		
+			
 		if (this.hasProblem(e, TableNotFoundException.class)) {
 			errorLogger.log(Level.INFO, "Trying to recover from exception for store " + this.hashCode() + " it seems that a table was dropped ; recreating", e);
 			this.uncache(table);
@@ -1272,9 +1272,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		} catch (Throwable e) {
 			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + table + " for store " + this.hashCode(), e);
 			
-			MangledTableName tableName = table;
-			this.handleProblem(e, clazz, tableName, tablePostfix, expectedFamilies);
-			this.getTable(clazz, tableName, tablePostfix, expectedFamilies);
+			this.handleProblem(e, clazz, table, tablePostfix, expectedFamilies);
+			this.getTable(clazz, table, tablePostfix, expectedFamilies);
 			try {
 				errorLogger.log(Level.INFO, "Retrying to perform again erroneous " + action.getClass().getName() + " on table " + action.getTable().getName() + " for store " + this.hashCode(), e);
 				Deferred<R> ret = action.perform(this.client);
@@ -1937,7 +1936,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				for (Entry<String, Map<String, Number>> incrs : increments.entrySet()) {
 					byte[] cf = Bytes.toBytes(incrs.getKey());
 					for (Entry<String, Number> inc : incrs.getValue().entrySet()) {
-						ainc= new AtomicIncrementRequest(cf, Bytes.toBytes(inc.getKey()), null /*family*/, null /*qualifier*/, inc.getValue().longValue());
+						ainc= new AtomicIncrementRequest(tableName.getBytes(),key.getBytes(), cf /*family*/, inc.getKey().getBytes() /*qualifier*/);
 						rowInc=new IncrementAction(ainc);
 					}
 				}
@@ -2033,14 +2032,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 
 	@Override
-	public void delete(MetaInformation meta, String tableName, String id)
-			throws DatabaseNotReachedException {
-		MangledTableName table = new MangledTableName(tableName);
-		if (!this.hasTable(table))
+	public void delete(MetaInformation meta, String tableName, String id) throws DatabaseNotReachedException {
+		MangledTableName table=new MangledTableName(tableName);
+		if (!this.hasTable(tableName))
 			return;
 		this.waitForNewUpdate(meta, table, id);
-		DeleteRequest d = new DeleteRequest(Bytes.toBytes(tableName), Bytes.toBytes(id));
-		this.tryPerform(new DeleteAction(d), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
+		DeleteRequest d = new DeleteRequest(tableName.getBytes(),id.getBytes());
+		DeleteAction da = new DeleteAction(d);
+		this.tryPerform(da, meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
 		this.tagUpdate(meta, table, id);
 	}
 
@@ -2051,10 +2050,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (!this.hasColumnFamily(table, family))
 			return false;
 
-		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row)).family(Bytes.toBytes(family));
+		GetRequest g = new GetRequest(tableName.getBytes(),row.getBytes());
 		//g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-		this.get(null, "Info_Personne", "1", "Personne", "1");
-		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null) != null;
+		//this.get(null, "Info_Personne", "1", "Personne", "1");
+		return (Boolean)this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null) ;
 	}
 
 	@Override
@@ -2064,10 +2063,12 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (!this.hasTable(table))
 			return false;
 
-		GetRequest g = new GetRequest(Bytes.toBytes(tableName),Bytes.toBytes(row));
-		this.get(null, "Info_Personne", "1", "Personne", "1");
+		GetRequest g = new GetRequest(tableName.getBytes(),row.getBytes());
+		//this.get(null, "Info_Personne", "1", "Personne", "1");
 		//g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));
-		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null) != null;
+		
+		 return (Boolean) this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);
+
 	}
 
 	@Override
@@ -2135,7 +2136,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	@Override
 	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(MetaInformation meta, String tableName, Constraint c,
 			 int limit, Set<String> families) throws DatabaseNotReachedException {
-		return this.get(meta, new MangledTableName(tableName), c, limit, families);
+		MangledTableName table = new MangledTableName(tableName);
+		CloseableKeyIterator result = this.get(meta, table, c, limit, families);
+		return result==null ? null : result;
 	}
 
 

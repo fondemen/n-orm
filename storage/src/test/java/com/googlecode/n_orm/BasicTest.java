@@ -297,8 +297,8 @@ public class BasicTest {
 		 b2.delete();
 		 
 		 assertEquals(1, storeBooks.size());
-		 //assertTrue(storeBooks.contains(bsut));
-		 //assertTrue(storeBooks.contains(b2));
+		 assertTrue(storeBooks.contains(bsut));
+		 assertTrue(storeBooks.contains(b2));
 		 
 		 Iterator<Book> ib = storeBooks.iterator();
 		 Book fb = ib.next();

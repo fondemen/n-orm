@@ -4,6 +4,9 @@ import java.io.IOException;
 
 
 
+
+
+
 //import org.apache.hadoop.hbase.client.Get;
 import org.hbase.async.GetRequest;
 import org.hbase.async.HBaseClient;
@@ -14,7 +17,7 @@ import com.stumbleupon.async.Deferred;
 /*
  * Verifie si le get retourne des éléments ou pas
  */
-public class ExistsAction extends Action<Object> {
+public class ExistsAction extends Action<Boolean> {
 	
 	private final GetRequest get;
 	private MangledTableName tableName;
@@ -22,15 +25,27 @@ public class ExistsAction extends Action<Object> {
 	public ExistsAction(GetRequest get) {
 		super();
 		this.get = get;
+		
+		
 	}
 
 	public GetRequest getGet() {
-		return get;
+		return this.get;
 	}
 
 	@Override
-	public Deferred<Object> perform(HBaseClient client) throws Exception {
-		return client.ensureTableFamilyExists(tableName.getNameAsBytes(), this.getGet().family());
+	public Deferred<Boolean> perform(HBaseClient client) throws Exception {
+		boolean result;
+		
+		//Deferred<Object> res = client.ensureTableFamilyExists(this.getTable().getNameAsBytes(), this.getGet().family());
+		byte[] res = this.getGet().family();
+		if(res!=null){
+			result=true;
+		}  
+		else{
+			result=false;
+		}
+		return Deferred.fromResult(result);
 	}
 	
 	@Override

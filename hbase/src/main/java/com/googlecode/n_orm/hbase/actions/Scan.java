@@ -14,11 +14,12 @@ public class Scan {
 	private byte[] family;
 	private byte[] qualifier;
 	private byte[][] qualifiers;
+	private  Deferred<ArrayList<ArrayList<KeyValue>>> value;
 	private  Scanner s;
 
 	
 	public Scan() {
-		this.s=s;
+		this.value=null;
 		this.caching=0;
 		
 	}
@@ -52,7 +53,7 @@ public class Scan {
 		this.family=fam;
 	}
 	public void addFamily(byte[] family){ // Get all the column for the specify family
-		this.s.setFamily(family);
+		this.setFamily(family);
 	}
 
 	public void setFilter(String filter) {
@@ -72,11 +73,11 @@ public class Scan {
 	}
 
 	public Deferred<ArrayList<ArrayList<KeyValue>>> next(int nbRows) {
-		return this.s.nextRows(nbRows);
+		return this.value;
 	}
 
 	public Deferred<ArrayList<ArrayList<KeyValue>>> next() {
-		return this.s.nextRows();
+		return this.value;
 	}
 
 	public void setCacheBlocks(boolean b) {
@@ -88,7 +89,7 @@ public class Scan {
 	}
 	public byte[] getCurrentKey(){
 	
-		return this.s.getCurrentKey();
+		return this.startRow;
 		
 	}
 	public byte[] getQualifier() {

@@ -72,11 +72,13 @@ public class CountAction extends Action<Long> {
 
 	@Override
 	public Deferred<Long> perform(HBaseClient client) throws Exception {
+		Deferred<Long> result;
 		if(this.store.isCountMapRed()){
 			return Deferred.fromResult(this.countMapRed());
 		}
 		else
-		return Deferred.fromResult(this.countSimple());
+			result=Deferred.fromResult(this.countSimple());
+	 	return result == null ? null : result;
 	}
 
 }

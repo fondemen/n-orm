@@ -17,9 +17,11 @@ public abstract class Action<R> {
 	 * @throws Exception
 	 */
 	public abstract Deferred<R> perform(HBaseClient client) throws Exception;
-	/**
-	 * 
-	 * @return the table
-	 */
-	public abstract MangledTableName getTable();
+	
+	public  MangledTableName getTable(){
+		return this.tableName;
+	}
+	public void setTable( MangledTableName table){
+		this.tableName=table;
+	}
 }

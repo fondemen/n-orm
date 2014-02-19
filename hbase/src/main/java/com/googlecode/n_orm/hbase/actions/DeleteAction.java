@@ -28,8 +28,8 @@ public class DeleteAction extends Action<Object> {
 
 	@Override
 	public Deferred<Object> perform(HBaseClient client) throws Exception {
-		Deferred<Object> Object = client.delete(this.getDelete());
-		return Object;
+		Deferred<Object> Object = client.delete(this.delete);
+		return Object==null? null : Object;
 	}
 	
 	@Override
