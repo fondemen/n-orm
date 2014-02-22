@@ -89,6 +89,7 @@ public class Process {
 		 */
 		public boolean awaitTermination(long timeout) {
 			long end  = System.currentTimeMillis()+timeout;
+			if (end < 0) end = Long.MAX_VALUE;
 			while (!getPerforming().isEmpty()) {
 				try {
 					Thread.sleep(25);
