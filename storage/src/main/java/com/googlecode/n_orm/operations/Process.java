@@ -82,7 +82,7 @@ public class Process {
 		
 		/**
 		 * Waits for all processes to be done.
-		 * Termination is checked every 25 milliseconds.
+		 * Termination is checked at least each 100ms, and at most each 10ms.
 		 * Should not wait if you did not provide an executor by yourself.
 		 * @param timeout number of milliseconds the wait can happen.
 		 * @return true if termination happened, false if timeout occured
@@ -90,9 +90,10 @@ public class Process {
 		public boolean awaitTermination(long timeout) {
 			long end  = System.currentTimeMillis()+timeout;
 			if (end < 0) end = Long.MAX_VALUE;
-			while (!getPerforming().isEmpty()) {
+			List<Future<?>> prf;
+			while (!(prf = getPerforming()).isEmpty()) {
 				try {
-					Thread.sleep(25);
+					Thread.sleep(Math.min(100, Math.max(10, 2 * prf.size())));
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
