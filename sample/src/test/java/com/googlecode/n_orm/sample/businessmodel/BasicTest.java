@@ -32,6 +32,7 @@ import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.WaitingCallBack;
 import com.googlecode.n_orm.operations.ImportExport;
+import com.googlecode.n_orm.operations.ImportExport.ReadException;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 /**
@@ -410,7 +411,7 @@ public class BasicTest {
 		assertEquals(bsut, b2);
 	 }
 	 
-	 @Ignore @Test public void importExport() throws IOException, ClassNotFoundException, DatabaseNotReachedException {
+	 @Ignore @Test public void importExport() throws IOException, ClassNotFoundException, DatabaseNotReachedException, ReadException {
 		 //Reusable query
 		SearchableClassConstraintBuilder<Book> query = StorageManagement.findElements().ofClass(Book.class).andActivateAllFamilies().withAtMost(1000).elements();
 		
