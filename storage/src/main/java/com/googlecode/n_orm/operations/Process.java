@@ -152,7 +152,7 @@ public class Process {
 			executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();
 		}
 		final List<ProcessException.Problem> problems = Collections.synchronizedList(new LinkedList<ProcessException.Problem>());
-		List<Throwable> exceptions = new ArrayList<Throwable>();
+		List<Throwable> exceptions = new LinkedList<Throwable>();
 		try {
 			ret.performing = new ArrayList<Future<?>>(threadNumber);
 			while (keys.hasNext()) {
