@@ -24,6 +24,7 @@ import org.junit.Test;
 
 import com.googlecode.n_orm.StoreSelector;
 import com.googlecode.n_orm.operations.ImportExport;
+import com.googlecode.n_orm.operations.ImportExport.ReadException;
 import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class ImportExportTest {
@@ -80,7 +81,7 @@ public class ImportExportTest {
 
 	@Test
 	public void importExport() throws IOException, ClassNotFoundException,
-			DatabaseNotReachedException, InterruptedException {
+			DatabaseNotReachedException, InterruptedException, ReadException {
 		// Reusable query
 		SearchableClassConstraintBuilder<Book> query = StorageManagement
 				.findElements().ofClass(Book.class).andActivateAllFamilies()
@@ -136,7 +137,7 @@ public class ImportExportTest {
 
 	@Test
 	public void checkSerializeBook() throws DatabaseNotReachedException,
-			IOException, ClassNotFoundException, InterruptedException {
+			IOException, ClassNotFoundException, InterruptedException, ReadException {
 		Book current;
 		Iterator<Book> it;
 
@@ -182,7 +183,7 @@ public class ImportExportTest {
 
 	@Test
 	public void checkUnserializeBook() throws DatabaseNotReachedException,
-			IOException, ClassNotFoundException, InterruptedException {
+			IOException, ClassNotFoundException, InterruptedException, ReadException {
 		Book current;
 		Iterator<Book> it;
 
@@ -229,9 +230,76 @@ public class ImportExportTest {
 	}
 
 	@Test
+	public void checkProcessBook() throws DatabaseNotReachedException,
+			IOException, ClassNotFoundException, InterruptedException, ReadException {
+		Book current;
+		Iterator<Book> it;
+
+		final Book b2 = new Book(bssut, new Date(12121212), new Date());
+		b2.store();
+		final Book b3 = new Book(new BookStore("rfgbuhfgj"), new Date(123456789),
+				new Date());
+		b3.store();
+
+		SearchableClassConstraintBuilder<Book> searchQuery = StorageManagement
+				.findElements().ofClass(Book.class).withAtMost(1000).elements();
+
+		File f = new File(BOOKS_SER_FILE);
+
+		// Serialize in a file
+		FileOutputStream fos = new FileOutputStream(f);
+		ObjectOutputStream oos = new ObjectOutputStream(fos);
+		long exported = searchQuery.exportTo(oos);
+		oos.close();
+		assertEquals(searchQuery.count(), exported);
+
+		// Test if the file has been created
+		assertTrue(f.exists());
+		NavigableSet<Book> originalBooks = searchQuery.go();
+		long originalCount = searchQuery.count();
+
+		it = originalBooks.iterator();
+		while (it.hasNext()) {
+			current = it.next();
+			current.delete();
+		}
+		assertEquals(0, searchQuery.count());
+
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+
+		final boolean[] found = new boolean [] {false, false};
+		long processed = ImportExport
+				.readSerializedPersistingElements(f.getAbsolutePath(), new Process<Book>() {
+
+					@Override
+					public void process(Book element) throws Throwable {
+						int f = -1;
+						if (b2.equals(element)) {
+							f = 0;
+						} else if (b3.equals(element)) {
+							f = 1;
+						} else if (element == null) {
+							fail();
+						}
+						if (f != -1) {
+							assertFalse(found[f]);
+							found[f] = true;
+						}
+					}
+				});
+		Thread.sleep(100);
+
+		assertEquals(exported, processed);
+		assertTrue(found[0]);
+		assertTrue(found[1]);
+		assertFalse(b2.existsInStore());
+		assertFalse(b3.existsInStore());
+	}
+
+	@Test
 	public void checkUnserializeBookAndBookStore()
 			throws DatabaseNotReachedException, IOException,
-			ClassNotFoundException, InterruptedException {
+			ClassNotFoundException, InterruptedException, ReadException {
 		PersistingElement current;
 		Iterator<PersistingElement> it;
 
@@ -306,7 +374,7 @@ public class ImportExportTest {
 	@Test
 	public void checkUnserializeExistingBookAndBookStore()
 			throws DatabaseNotReachedException, IOException,
-			ClassNotFoundException, InterruptedException {
+			ClassNotFoundException, InterruptedException, ReadException {
 		Element bs1 = new Element("bs1");
 		bs1.setName("bs1");
 		bs1.set.add("k11"); bs1.set.add("k12");
