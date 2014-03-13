@@ -8,7 +8,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -21,9 +20,7 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.Process;
-import com.googlecode.n_orm.ProcessException;
 import com.googlecode.n_orm.PropertyManagement;
-import com.googlecode.n_orm.ProcessException.Problem;
 import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.consoleannotations.Trigger;
 import com.googlecode.n_orm.conversion.ConversionTools;
@@ -163,6 +160,9 @@ public class ImportExport {
 				lastElement = elt;
 				km.unregister(elt);
 				exported++;
+				if (exported % 100 == 0) {
+					out.reset();
+				}
 			}
 			out.flush();
 		} finally {
@@ -211,7 +211,8 @@ public class ImportExport {
 			try {
 				String sep = (String) ois.readObject();
 				ok = SERIALIZATION_SEPARATOR.equals(sep);
-			} catch (Exception x) {x.printStackTrace();
+			} catch (Exception x) {
+				x.printStackTrace();
 				fis.reset();
 				ok = false;
 			}
