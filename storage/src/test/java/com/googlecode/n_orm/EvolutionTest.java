@@ -8,9 +8,12 @@ import java.util.Set;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import com.googlecode.n_orm.Incrementing.Mode;
 import com.googlecode.n_orm.cf.SetColumnFamily;
 
 public class EvolutionTest {
+	
+	public static boolean SUPPORTS_INCREMENTING_CHANGE = false;
 	
 	public EvolutionTest() throws Exception {
 		StoreTestLauncher.registerStorePropertiesForInnerClasses(getClass());
@@ -183,5 +186,86 @@ public class EvolutionTest {
 		old.cf.add("element");
 		old.delete();
 		old.store();
+	}
+
+	@Persisting(table="evoltest")
+	public static class V0NewPropsIncrementing {
+		private static final long serialVersionUID = 5854170758073427430L;
+
+		@Key public String key;
+		
+		public String sval;
+		public Date tval;
+		@Incrementing(mode=Mode.Free) public int ival;
+		public float dval;
+		public EnumTest eval;
+	}
+	
+	@Test
+	public void propMadeIncrementing() {
+		if (!SUPPORTS_INCREMENTING_CHANGE)
+			return;
+		
+		String key = "JIOJJ:?IKBYI:NIUBYBF";
+		V0NewProps old = new V0NewProps();
+		old.key = key;
+		old.ival = 18;
+		old.delete();
+		old.store();
+		
+		KeyManagement.getInstance().unregister(old);
+		V0NewPropsIncrementing sut = new V0NewPropsIncrementing();
+		sut.key = key;
+		sut.activate();
+		assertEquals(old.ival, sut.ival);
+		
+
+		KeyManagement.getInstance().unregister(sut);
+		sut = new V0NewPropsIncrementing();
+		sut.key = key;
+		sut.ival = -4;
+		sut.store();
+		
+
+		KeyManagement.getInstance().unregister(sut);
+		sut = new V0NewPropsIncrementing();
+		sut.key = key;
+		sut.activate();
+		assertEquals(old.ival-4, sut.ival);
+		
+	}
+	
+	@Test
+	public void propMadeNotIncrementing() {
+		if (!SUPPORTS_INCREMENTING_CHANGE)
+			return;
+		
+		String key = "JIOJJ:?IKBYI:NIUBYBF";
+		V0NewPropsIncrementing old = new V0NewPropsIncrementing();
+		old.key = key;
+		old.ival = 18;
+		old.delete();
+		old.store();
+		
+		KeyManagement.getInstance().unregister(old);
+		V0NewProps sut = new V0NewProps();
+		sut.key = key;
+		sut.activate();
+		assertEquals(old.ival, sut.ival);
+		
+
+		KeyManagement.getInstance().unregister(sut);
+		sut = new V0NewProps();
+		sut.key = key;
+		sut.ival = -4;
+		sut.store();
+		
+
+		KeyManagement.getInstance().unregister(sut);
+		sut = new V0NewProps();
+		sut.key = key;
+		sut.activate();
+		assertEquals(-4, sut.ival);
+		
 	}
 }
