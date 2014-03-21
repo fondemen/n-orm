@@ -312,6 +312,13 @@
 		</profile>
 
 		<profile>
+			<id>mongo</id>
+			<modules>
+				<module>../n-orm.mongo</module>
+			</modules>
+		</profile>
+
+		<profile>
 			<id>local-nexus</id>
 			<distributionManagement>
 				<repository>
