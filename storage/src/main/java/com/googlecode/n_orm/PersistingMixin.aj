@@ -24,7 +24,7 @@ public privileged aspect PersistingMixin {
 	////If set within the constructor, we can't know whether the correct value is within the database, or that one that was set within the constructor.
 	//declare error: set(!@Transient !@Key !transient !static (!Collection+) (PersistingElement+).*) && withincode((@Persisting *).new(..)) : "Only key attribute should be set within a persisting constructor.";
 
-	declare error : set(!@Transient static !transient !final * PersistingElement+.*) : "Static fields can only be transient in persisting classes";
+	//declare error : set(!@Transient static !transient !final * PersistingElement+.*) : "Static fields can only be transient in persisting classes";
 	declare error: set(!@Transient final !transient !static * PersistingElement+.*) : "Final fields must be transient";
 	
 	pointcut creation(PersistingElement self): execution(PersistingElement+.new(..)) && this(self) && if(thisJoinPointStaticPart.getSignature().getDeclaringType().equals(self.getClass()));
