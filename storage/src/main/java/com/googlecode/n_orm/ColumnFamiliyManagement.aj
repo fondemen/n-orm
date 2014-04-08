@@ -39,7 +39,7 @@ public aspect ColumnFamiliyManagement {
 	declare soft : InvocationTargetException : within(ColumnFamiliyManagement) && adviceexecution();
 
 	declare error: set(!@Transient !transient !static final (Set || Map || ColumnFamily+) PersistingElement+.*) : "A persisting column family must not be final";
-	declare error: set(static (Set || Map || ColumnFamily+) PersistingElement+.*) : "Column families must not be static";
+	declare error: set(static ColumnFamily+ PersistingElement+.*) : "Column families must not be static";
 	declare error: set(!@Transient !transient !static (Collection+ && !Set && !ColumnFamily+) PersistingElement+.*) : "Only Set and Maps are supported collections";
 
 	declare warning: get(@ImplicitActivation transient * PersistingElement+.*)
