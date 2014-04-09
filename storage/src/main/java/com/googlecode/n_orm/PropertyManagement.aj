@@ -289,7 +289,8 @@ public aspect PropertyManagement {
 				Property p = this.getElement(f.getName());
 				if (p == null) {
 					Object val = pm.candideReadValue(owner, f);
-					if (val == null)
+					Object defaultVal = ConversionTools.getDefaultValue(f.getType());
+					if (defaultVal == null ? val == null : defaultVal.equals(val))
 						continue;
 					p = new Property(this, f, null);
 					this.putElement(p.getName(), p);
