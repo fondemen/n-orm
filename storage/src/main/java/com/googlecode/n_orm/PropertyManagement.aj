@@ -191,6 +191,11 @@ public aspect PropertyManagement {
 		public void updateFromPOJO() {
 			Field f = this.getField();
 			Object val = pm.candideReadValue(owner, f);
+			this.updateFromPOJOInt(val);
+		}
+		
+		private void updateFromPOJOInt(Object val) {
+			Field f = this.getField();
 			if (val == null) {
 				assert !this.delta;
 				if (this.key)
@@ -294,8 +299,10 @@ public aspect PropertyManagement {
 						continue;
 					p = new Property(this, f, null);
 					this.putElement(p.getName(), p);
+					p.updateFromPOJOInt(val);
+				} else {
+					p.updateFromPOJO();
 				}
-				p.updateFromPOJO();
 				assert p.getValue() != null || !this.containsKey(p.getName());
 			}
 		}
