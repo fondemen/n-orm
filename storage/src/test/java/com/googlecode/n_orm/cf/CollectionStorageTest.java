@@ -135,6 +135,11 @@ public class CollectionStorageTest {
 		assertTrue(sut.getColumnFamily(sut.elements).isEmptyInStore());
 	}
 	
+	@Test(expected=IllegalStateException.class)
+	public void cannotSetCFTwice() {
+		sut.elements = new HashSet<CollectionStorageTest.Element>();
+	}
+	
 	@Test
 	public void hasFamily() {
 		assertEquals(SetColumnFamily.class, sut.getColumnFamily(sut.elements).getClass());
