@@ -173,6 +173,10 @@ public aspect ColumnFamiliyManagement {
 		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();
 		Field field = sign.getField();
 		assert isCollectionFamily(field);
+		
+		Object old = PropertyManagement.getInstance().candideReadValue(self, field);
+		if (old != null)
+			throw new IllegalStateException("Column family " + field + " should be set only once (already as value " + old + ')');
 
 		ColumnFamily<?> ccf = createColumnFamily((PersistingElement)self, field, cf);
 		
