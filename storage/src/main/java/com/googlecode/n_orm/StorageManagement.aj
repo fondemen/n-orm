@@ -198,6 +198,7 @@ public aspect StorageManagement {
 			ColumnFamilyData changed = new DefaultColumnFamilyData(), localChanges;
 			Map<String, Set<String>> deleted = new TreeMap<String, Set<String>>();
 			Map<String, Map<String, Number>> increments = new TreeMap<String, Map<String,Number>>();
+			
 			Map<String,Number> propsIncrs = this.getIncrements();
 			if (!propsIncrs.isEmpty()) {
 				Map<String,Number> realPropsIncrs = new TreeMap<String, Number>();
@@ -210,6 +211,7 @@ public aspect StorageManagement {
 				if (!realPropsIncrs.isEmpty())
 					increments.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, realPropsIncrs);
 			}
+			
 			Collection<ColumnFamily<?>> families = this.getColumnFamilies();
 			for (ColumnFamily<?> family : families) {
 				Field cfField = family.getProperty();
@@ -272,7 +274,7 @@ public aspect StorageManagement {
 			}
 			
 			//Storing keys into properties. As keys are final, there is no need to store them again if we know that the object already exists within the base
-			if (annotation.storeKeys() && (this.exists == null || this.exists.equals(Boolean.FALSE))) {
+			if (annotation.storeKeys() && (!Boolean.TRUE.equals(this.exists))) {
 				localChanges = new DefaultColumnFamilyData(changed);
 				Map<String, byte[]> changedProperties = changed.get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
 				if (changedProperties == null) {
@@ -297,11 +299,25 @@ public aspect StorageManagement {
 			if (!(this.exists == Boolean.TRUE && changed.isEmpty() && deleted.isEmpty() && increments.isEmpty())) {
 				
 				this.getStore().storeChanges(new MetaInformation().forElement(this).withColumnFamilies(changedFields), this.getTable(), this.getIdentifier(), localChanges, deleted, increments);
-	
+
+				if (propsIncrs.isEmpty()) { // Increment does not make sure we have latest value
+					boolean fullPropertiesChange = true;
+					for (Field f : pm.getProperties(this.getClass())) {
+						if (! changedFields.containsKey(f.getName()) && !this.getKeys().contains(f)) {
+							fullPropertiesChange = false;
+							break;
+						}
+					}
+					if (fullPropertiesChange) {
+						// All properties were changed and no increment were performed
+						// as such, it's just like an activate (we just stored all)
+						this.getPropertiesColumnFamily().setActivated();
+					}
+				}
+				
 				propsIncrs.clear();
 				for(ColumnFamily<?> family : families) {
 					family.clearChanges();
-					family.setActivated();
 				}
 				
 				//Storing in persisting superclasses

@@ -503,7 +503,22 @@ public class SimpleStorageTest {
 	@Test
 	public void activationAfterStore() {
 		sut1.activateIfNotAlready();
-		hadNoQuery();
+		hadAQuery();
+	}
+	
+	@Test
+	public void activationAfterFullStore() {
+		sut1.nullProp = "";
+		sut1.privProp = "";
+		sut1.bytesProp = new byte[0]; 
+		sut1.intsProp = new int[0];
+		sut1.LongProp = 1l;
+		sut1.prop1 = "jioij";
+		sut1.prop2 = false;
+		sut1.store();
+		hadAQuery();
+		sut1.activateIfNotAlready();
+		hadNoQuery(); // No need for a query: we just stored all possible properties
 	}
 	
 	@Test
