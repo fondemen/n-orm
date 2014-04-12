@@ -340,9 +340,6 @@ public aspect PropertyManagement {
 			if (!this.typeProperties.containsKey(type)) {
 				Set<Field> ret = new HashSet<Field>(Arrays.asList(type
 						.getDeclaredFields()));
-				Class<?> supertype = type.getSuperclass();
-				if (supertype != null)
-					ret.addAll(this.getProperties(supertype));
 				for (Field f : new ArrayList<Field>(ret)) {
 					Class<?> ft = f.getType();
 					if ((f.getModifiers() & (Modifier.STATIC | Modifier.TRANSIENT)) != 0
@@ -352,6 +349,9 @@ public aspect PropertyManagement {
 							|| ColumnFamily.class.isAssignableFrom(ft))
 						ret.remove(f);
 				}
+				Class<?> supertype = type.getSuperclass();
+				if (supertype != null)
+					ret.addAll(this.getProperties(supertype));
 				this.typeProperties.put(type, ret);
 			}
 			return this.typeProperties.get(type);
