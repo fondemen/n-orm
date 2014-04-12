@@ -307,6 +307,7 @@ availableCachesCheck:while (ai.hasNext()) {
 	private volatile Map<String, Element> cache;
 	private volatile Thread thread;
 	private volatile String threadId;
+	private boolean active = true;
 	private volatile boolean shouldCleanup;
 	private volatile long stopped = -1;
 
@@ -314,12 +315,30 @@ availableCachesCheck:while (ai.hasNext()) {
 		this.init();
 	}
 	
+	/**
+	 * Whether this cache actually caches.
+	 */
+	protected boolean isActive() {
+		return active;
+	}
+
+	/**
+	 * Making it possible to disable this cache for test purpose.
+	 * Usage in production is strongly discouraged.
+	 * @param active
+	 */
+	protected void setActive(boolean active) {
+		this.active = active;
+	}
+
 	private synchronized void init() {
 		this.thread = Thread.currentThread();
 		this.threadId = getThreadId(this.thread);
 		
 		this.cache = new HashMap<String, Cache.Element>();
 		this.stopped = -1;
+		
+		this.active = true;
 		
 		synchronized(perThreadCaches) {
 			perThreadCaches.put(this.thread, this);
@@ -371,6 +390,9 @@ availableCachesCheck:while (ai.hasNext()) {
 	 */
 	public void register(PersistingElement element) throws IllegalStateException {
 		this.checkState();
+		
+		if (!this.active)
+			return;
 		
 		if (element == null)
 			return;
