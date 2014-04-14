@@ -45,6 +45,7 @@ public class ShellProcessor
 		try {
 			additionalMethods.add(Object.class.getMethod("equals", Object.class));
 			additionalMethods.add(Object.class.getMethod("hashCode"));
+			additionalMethods.add(Object.class.getMethod("toString"));
 			additionalMethods.add(Comparable.class.getMethod("compareTo", Object.class));
 			additionalMethods.add(Collection.class.getMethod("add", Object.class));
 			additionalMethods.add(Collection.class.getMethod("remove", Object.class));
@@ -57,6 +58,16 @@ public class ShellProcessor
 			additionalMethods.add(Iterator.class.getMethod("remove"));
 			additionalMethods.add(Closeable.class.getMethod("close"));
 			additionalMethods.add(List.class.getMethod("get", int.class));
+			additionalMethods.add(Map.class.getMethod("get", Object.class));
+			additionalMethods.add(Map.class.getMethod("remove", Object.class));
+			additionalMethods.add(Map.class.getMethod("size"));
+			additionalMethods.add(Map.class.getMethod("put", Object.class, Object.class));
+			additionalMethods.add(Map.class.getMethod("entrySet"));
+			additionalMethods.add(Map.class.getMethod("values"));
+			additionalMethods.add(Map.class.getMethod("keySet"));
+			additionalMethods.add(Map.class.getMethod("clear"));
+			additionalMethods.add(Map.Entry.class.getMethod("getKey"));
+			additionalMethods.add(Map.Entry.class.getMethod("getValue"));
 		} catch (SecurityException e) {
 			e.printStackTrace();
 		} catch (NoSuchMethodException e) {
