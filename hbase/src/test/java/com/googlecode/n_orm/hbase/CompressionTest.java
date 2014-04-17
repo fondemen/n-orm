@@ -94,7 +94,7 @@ public class CompressionTest {
 		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		Algorithm cmp = propFamD.getCompression();
 		if (org.apache.hadoop.hbase.util.CompressionTest.testCompression("lz4"))
-			assertTrue(cmp.equals(Algorithm.LZO)) ;
+			assertTrue(cmp.equals(Algorithm.LZ4)) ;
 		else
 			assertTrue(cmp.equals(Algorithm.NONE)) ;
 	}
