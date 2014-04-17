@@ -623,13 +623,23 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					cmp = cmp.substring("tested_".length()).trim();
 				}
 				Algorithm newCompression = getCompressionByName(cmp);
-				if (newCompression != null && (!tested || org.apache.hadoop.hbase.util.CompressionTest.testCompression(cmp))) {
+				if (newCompression != null) {
+					if (tested) {
+						try {
+							org.apache.hadoop.hbase.util.CompressionTest.testCompression(newCompression);
+						} catch (Throwable t) {
+							logger.log(Level.WARNING, "Cannot use compressor: " + newCompression, t);
+							continue;
+						}
+					}
 					PropertyUtils.clearCachedValues();
 					this.compression = newCompression;
 					return;
+				} else {
+					logger.log(Level.WARNING, "Unknown compressor: " + cmp);
 				}
 			}
-			throw new DatabaseNotReachedException("Failed compression test for " + compression);
+			throw new DatabaseNotReachedException("Failed to load compression " + compression);
 		}
 	}
 	
