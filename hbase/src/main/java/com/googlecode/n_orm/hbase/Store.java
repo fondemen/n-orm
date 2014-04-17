@@ -608,20 +608,28 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * Default value is the HBase default (none).
 	 * Compression is used when creating a column family in the HBase cluster.
 	 * In case you set {@link #setForceCompression(boolean)} to true, existing column families are also checked and altered if necessary.
+	 * You can test for LOCALLY available compressors using tested_ prefix (e.g. tested_lzo-or-gz).
 	 */
 	public void setCompression(String compression) {
 		if (compression == null) {
 			PropertyUtils.clearCachedValues();
 			this.compression = null;
 		} else {
+			compression = compression.toLowerCase();
 			for (String cmp : compression.split("-or-")) {
+				cmp = cmp.trim();
+				boolean tested = cmp.startsWith("tested_");
+				if (tested) {
+					cmp = cmp.substring("tested_".length()).trim();
+				}
 				Algorithm newCompression = getCompressionByName(cmp);
-				if (newCompression != null) {
+				if (newCompression != null && (!tested || org.apache.hadoop.hbase.util.CompressionTest.testCompression(cmp))) {
 					PropertyUtils.clearCachedValues();
 					this.compression = newCompression;
-					break;
+					return;
 				}
 			}
+			throw new DatabaseNotReachedException("Failed compression test for " + compression);
 		}
 	}
 	
