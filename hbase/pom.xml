@@ -151,7 +151,19 @@
 			<version>${hadoop.version}</version>
 			<scope>provided</scope>
 		</dependency>
-		
+
+		<dependency>
+			<groupId>org.anarres.lzo</groupId>
+			<artifactId>lzo-hadoop</artifactId>
+			<version>1.0.0</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.iq80.snappy</groupId>
+			<artifactId>snappy</artifactId>
+			<version>0.3</version>
+			<scope>provided</scope>
+		</dependency>
 	</dependencies>
 
 	<description>HBase driver for n-orm.</description>
