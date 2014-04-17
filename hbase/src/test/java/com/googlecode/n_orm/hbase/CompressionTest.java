@@ -13,6 +13,7 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PropertyManagement;
 import com.googlecode.n_orm.hbase.Store;
 
@@ -66,13 +67,66 @@ public class CompressionTest {
 	}
 	
 	@Test
-	@Ignore //No way to test LZO compression on an HBase cluster ; including that one for tests
-	public void testLzoCompressionDefined() throws IOException {
-		store.setCompression("lzo");
+	public void testTestedGzCompressionOrNone() throws IOException {
+		store.setCompression("tested_gz-or-none");
 		store.storeChanges(null, testTable, "row", null, null, null);
 		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		Algorithm cmp = propFamD.getCompression();
-		assertTrue(cmp.equals(Algorithm.LZO) || cmp.equals(Algorithm.NONE)) ;
+		assertTrue(cmp.equals(Algorithm.GZ)) ;
+	}
+	
+	@Test
+	public void testTestedLzoCompressionOrGz() throws IOException {
+		store.setCompression("tested_lzo-or-gz");
+		store.storeChanges(null, testTable, "row", null, null, null);
+		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		Algorithm cmp = propFamD.getCompression();
+		if (org.apache.hadoop.hbase.util.CompressionTest.testCompression("lzo"))
+			assertTrue(cmp.equals(Algorithm.LZO)) ;
+		else
+			assertTrue(cmp.equals(Algorithm.GZ)) ;
+	}
+	
+	@Test
+	public void testTestedLz4CompressionOrGz() throws IOException {
+		store.setCompression("tested_lz4 -or- none");
+		store.storeChanges(null, testTable, "row", null, null, null);
+		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		Algorithm cmp = propFamD.getCompression();
+		if (org.apache.hadoop.hbase.util.CompressionTest.testCompression("lz4"))
+			assertTrue(cmp.equals(Algorithm.LZO)) ;
+		else
+			assertTrue(cmp.equals(Algorithm.NONE)) ;
+	}
+	
+	@Test
+	public void testTestedSnappyCompressionOrGz() throws IOException {
+		store.setCompression("tested_snappy -or- none");
+		store.storeChanges(null, testTable, "row", null, null, null);
+		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		Algorithm cmp = propFamD.getCompression();
+		if (org.apache.hadoop.hbase.util.CompressionTest.testCompression("snappy"))
+			assertTrue(cmp.equals(Algorithm.SNAPPY)) ;
+		else
+			assertTrue(cmp.equals(Algorithm.NONE)) ;
+	}
+	
+	@Test
+	public void testGZCompressionOrNone() throws IOException {
+		store.setCompression("gz-or-none");
+		store.storeChanges(null, testTable, "row", null, null, null);
+		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		Algorithm cmp = propFamD.getCompression();
+		assertTrue(cmp.equals(Algorithm.GZ)) ;
+	}
+	
+	@Test
+	public void testNoneCompressionOrGz() throws IOException {
+		store.setCompression("none-or-gz");
+		store.storeChanges(null, testTable, "row", null, null, null);
+		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		Algorithm cmp = propFamD.getCompression();
+		assertTrue(cmp.equals(Algorithm.NONE)) ;
 	}
 	
 	@Test
@@ -116,5 +170,10 @@ public class CompressionTest {
 		store.storeChanges(null, testTable, "row", null, null, null);
 		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		assertEquals(Algorithm.GZ, propFamD.getCompression());
+	}
+	
+	@Test(expected=DatabaseNotReachedException.class)
+	public void testDummyCompressor() throws IOException {
+		store.setCompression("dummy");
 	}
 }
