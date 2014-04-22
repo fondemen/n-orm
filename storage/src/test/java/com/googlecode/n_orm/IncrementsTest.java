@@ -104,6 +104,17 @@ public class IncrementsTest {
 		e.incrementing -= 10;
 	}
 	
+	@Test
+	public void decrementAnIncrementOnlyPropNotChecked() {
+		IncrementManagement.setImmedatePropertyCheck(false);
+		try {
+			Element e = new Element(1);
+			e.incrementing -= 10;
+		} finally {
+			IncrementManagement.setImmedatePropertyCheck(true);
+		}
+	}
+	
 	@Test(expected=IncrementException.class)
 	public void incrementAnDecrementOnlyProp() {
 		Element e = new Element(1);

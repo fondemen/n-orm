@@ -288,23 +288,23 @@ public aspect PropertyManagement {
 
 		@Override
 		public void updateFromPOJO() {
-//			PropertyManagement pm = PropertyManagement.getInstance();
-//			PersistingElement owner = this.getOwner();
-//			for (Field f : pm.getProperties(owner.getClass())) {
-//				Property p = this.getElement(f.getName());
-//				if (p == null) {
-//					Object val = pm.candideReadValue(owner, f);
-//					Object defaultVal = ConversionTools.getDefaultValue(f.getType());
-//					if (defaultVal == null ? val == null : defaultVal.equals(val))
-//						continue;
-//					p = new Property(this, f, null);
-//					this.putElement(p.getName(), p);
-//					p.updateFromPOJOInt(val, null);
-//				} else {
-//					p.updateFromPOJO();
-//				}
-//				assert p.getValue() != null || !this.containsKey(p.getName());
-//			}
+			PropertyManagement pm = PropertyManagement.getInstance();
+			PersistingElement owner = this.getOwner();
+			for (Field f : pm.getProperties(owner.getClass())) {
+				Property p = this.getElement(f.getName());
+				if (p == null) {
+					Object val = pm.candideReadValue(owner, f);
+					Object defaultVal = ConversionTools.getDefaultValue(f.getType());
+					if (defaultVal == null ? val == null : defaultVal.equals(val))
+						continue;
+					p = new Property(this, f, null);
+					this.putElement(p.getName(), p);
+					p.updateFromPOJOInt(val, null);
+				} else {
+					p.updateFromPOJO();
+				}
+				assert p.getValue() != null || !this.containsKey(p.getName());
+			}
 		}
 
 		@Override
@@ -461,9 +461,7 @@ public aspect PropertyManagement {
 		if (p == null) {
 			p = new Property(pf, f, null);
 			pf.putElement(p.getName(), p);
-			p.updateFromPOJOInt(val, true);
-		} else
-			p.updateFromPOJOInt(val, null);
+		}
 	}
 	
 	public Object candideReadValue(Object self, Field property) {
