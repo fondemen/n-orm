@@ -448,9 +448,9 @@ public aspect PropertyManagement {
 		return this.properties;
 	}
 
-	pointcut attUpdated(PersistingElement self, Object val): set(!@Transient !transient !static !(Collection+ || Map+ || ColumnFamily+) PersistingElement+.*) && target(self) && args(val);
+	pointcut attUpdated(PersistingElement self): set(!@Transient !transient !static !(Collection+ || Map+ || ColumnFamily+) PersistingElement+.*) && target(self);
 	
-	after(PersistingElement self, Object val) returning: attUpdated(self, val) {
+	after(PersistingElement self) returning: attUpdated(self) {
 		Field f = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
 		KeyManagement km = KeyManagement.getInstance();
 		if (km.isKey(f))
