@@ -546,6 +546,7 @@ public class SimpleStorageTest {
 		sut.delete();
 		sut.activate();
 		assertNull(sut.LongProp);
+		assertNull(sut.prop1);
 	}
 	
 	@Test
@@ -564,5 +565,30 @@ public class SimpleStorageTest {
 		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
 		sut.activate();
 		assertNull(sut.LongProp);
+		assertEquals("pro1value", sut.prop1);
+	}
+	
+	@Test
+	public void storeLongNonNUllAndThenNullValueOnDiffrentObjects() {
+		SimpleElement sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		sut.LongProp = 1L;
+		sut.privProp = "toto";
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		assertEquals(Long.valueOf(1L), sut.LongProp);
+		assertEquals("pro1value", sut.prop1);
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.LongProp = null;
+		sut.store(); // Also resets prop1 because of value initialized in constructor
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		assertNull(sut.LongProp);
+		assertEquals("", sut.prop1); // Because of constructor
+		assertEquals("toto", sut.privProp); // Not touched
 	}
 }
