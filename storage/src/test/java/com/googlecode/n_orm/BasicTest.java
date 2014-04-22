@@ -25,6 +25,7 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.PersistingElement;
 import com.googlecode.n_orm.StorageManagement;
 import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.KeyManagement;
 import com.googlecode.n_orm.ProcessTest.InrementNovel;
 import com.googlecode.n_orm.cf.ColumnFamily;
 
@@ -485,5 +486,25 @@ public class BasicTest {
 			 n1.delete();
 			 n2.delete();
 		 }
+	 }
+	 
+	 @Test
+	 public void resetOneAttribute() {
+		 Novel n1 = new Novel(bssut, new Date(1234567989), new Date(0));
+		 n1.setNumber((short)10);
+		 n1.attribute = 67;
+		 n1.store();
+		 
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+		 Novel n2 = new Novel(bssut, new Date(1234567989), new Date(0));
+		 n2.attribute = 0;
+		 n2.store();
+
+		 KeyManagement.getInstance().cleanupKnownPersistingElements();
+		 Novel n3 = new Novel(bssut, new Date(1234567989), new Date(0));
+		 n3.activate();
+
+		 assertEquals(10, n3.getNumber());
+		 assertEquals(0, n3.attribute);
 	 }
 }

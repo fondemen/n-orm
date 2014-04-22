@@ -16,7 +16,7 @@ import java.util.TreeSet;
 
 import org.apache.commons.beanutils.PropertyUtils;
 import org.aspectj.lang.SoftException;
-
+import org.aspectj.lang.reflect.FieldSignature;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
 import com.googlecode.n_orm.Incrementing;
@@ -191,10 +191,10 @@ public aspect PropertyManagement {
 		public void updateFromPOJO() {
 			Field f = this.getField();
 			Object val = pm.candideReadValue(owner, f);
-			this.updateFromPOJOInt(val);
+			this.updateFromPOJOInt(val, null);
 		}
 		
-		private void updateFromPOJOInt(Object val) {
+		private void updateFromPOJOInt(Object val, Boolean hasChanged) {
 			Field f = this.getField();
 			if (val == null) {
 				assert !this.delta;
@@ -203,7 +203,7 @@ public aspect PropertyManagement {
 				this.family.removeKey(f.getName());
 				this.value = null;
 			} else {
-				if (this.hasChanged(val)) {
+				if (hasChanged == null ? this.hasChanged(val) : hasChanged) {
 					if (this.delta) {
 						this.owner.getIncrements().put(this.getName(), im.getActualIncrement((Number)val, (Number)this.value, this.owner.getIncrements().get(this.getName()), f));
 						this.family.setChanged(this, null);
@@ -288,23 +288,23 @@ public aspect PropertyManagement {
 
 		@Override
 		public void updateFromPOJO() {
-			PropertyManagement pm = PropertyManagement.getInstance();
-			PersistingElement owner = this.getOwner();
-			for (Field f : pm.getProperties(owner.getClass())) {
-				Property p = this.getElement(f.getName());
-				if (p == null) {
-					Object val = pm.candideReadValue(owner, f);
-					Object defaultVal = ConversionTools.getDefaultValue(f.getType());
-					if (defaultVal == null ? val == null : defaultVal.equals(val))
-						continue;
-					p = new Property(this, f, null);
-					this.putElement(p.getName(), p);
-					p.updateFromPOJOInt(val);
-				} else {
-					p.updateFromPOJO();
-				}
-				assert p.getValue() != null || !this.containsKey(p.getName());
-			}
+//			PropertyManagement pm = PropertyManagement.getInstance();
+//			PersistingElement owner = this.getOwner();
+//			for (Field f : pm.getProperties(owner.getClass())) {
+//				Property p = this.getElement(f.getName());
+//				if (p == null) {
+//					Object val = pm.candideReadValue(owner, f);
+//					Object defaultVal = ConversionTools.getDefaultValue(f.getType());
+//					if (defaultVal == null ? val == null : defaultVal.equals(val))
+//						continue;
+//					p = new Property(this, f, null);
+//					this.putElement(p.getName(), p);
+//					p.updateFromPOJOInt(val, null);
+//				} else {
+//					p.updateFromPOJO();
+//				}
+//				assert p.getValue() != null || !this.containsKey(p.getName());
+//			}
 		}
 
 		@Override
@@ -449,7 +449,23 @@ public aspect PropertyManagement {
 	}
 
 	pointcut attUpdated(PersistingElement self, Object val): set(!@Transient !transient !static !(Collection+ || Map+ || ColumnFamily+) PersistingElement+.*) && target(self) && args(val);
-
+	
+	after(PersistingElement self, Object val) returning: attUpdated(self, val) {
+		Field f = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
+		KeyManagement km = KeyManagement.getInstance();
+		if (km.isKey(f))
+			return;
+		
+		PropertyFamily pf = self.getPropertiesColumnFamily();
+		Property p = pf.get(f.getName());
+		if (p == null) {
+			p = new Property(pf, f, null);
+			pf.putElement(p.getName(), p);
+			p.updateFromPOJOInt(val, true);
+		} else
+			p.updateFromPOJOInt(val, null);
+	}
+	
 	public Object candideReadValue(Object self, Field property) {
 		try {
 			return this.readValue(self, property);

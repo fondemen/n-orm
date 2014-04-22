@@ -29,22 +29,6 @@ public aspect IncrementManagement {
 										&& !MapColumnFamily && !Map) *.*)
 			: "Only naturals or maps of naturals may be incremented";
 	declare warning: set(@Incrementing @Key * *.*): "Keys (that identify a persisting element) should not be incremented";
-	
-	private static volatile boolean immedatePropertyCheck = true;
-	
-	/**
-	 * Whether setting a property marked as {@link Incrementing} immediately triggers an check that might throw an {@link IncrementException}.
-	 */
-	public static boolean isImmedatePropertyCheck() {
-		return immedatePropertyCheck;
-	}
-
-	/**
-	 * Whether setting a property marked as {@link Incrementing} immediately triggers an check that might throw an {@link IncrementException}.
-	 */
-	public static void setImmedatePropertyCheck(boolean _immedatePropertyCheck) {
-		immedatePropertyCheck = _immedatePropertyCheck;
-	}
 
 	private transient Map<String, Number> PersistingElement.increments;
 	
@@ -114,13 +98,5 @@ public aspect IncrementManagement {
 	public void PropertyFamily.clearChanges() {
 		super.clearChanges();
 		this.getOwner().getIncrements().clear();
-	}
-	
-	before(PersistingElement self, Object newValue): set(@Incrementing (Number+||long||int||short||byte) PersistingElement+.*) && target(self) && args(newValue) && if(immedatePropertyCheck) {
-		Field f = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
-		Incrementing inc = f.getAnnotation(Incrementing.class);
-		if (Mode.Free.equals(inc.mode()))
-			return;
-		this.checkIncrement(f, toLong((Number)newValue, f), toLong((Number)PropertyManagement.getInstance().candideReadValue(self, f), f));
 	}
 }
