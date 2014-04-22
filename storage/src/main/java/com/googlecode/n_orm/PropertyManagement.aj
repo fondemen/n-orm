@@ -451,12 +451,16 @@ public aspect PropertyManagement {
 	pointcut attUpdated(PersistingElement self): set(!@Transient !transient !static !(Collection+ || Map+ || ColumnFamily+) PersistingElement+.*) && target(self);
 	
 	after(PersistingElement self) returning: attUpdated(self) {
+
+		PropertyFamily pf = self.getPropertiesColumnFamily();
+		if (pf.isActivated())
+			return;
+		
 		Field f = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
 		KeyManagement km = KeyManagement.getInstance();
 		if (km.isKey(f))
 			return;
 		
-		PropertyFamily pf = self.getPropertiesColumnFamily();
 		Property p = pf.get(f.getName());
 		if (p == null) {
 			p = new Property(pf, f, null);
