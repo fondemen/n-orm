@@ -24,4 +24,9 @@ class LongConverter extends NaturalConverter<Long> {
 	public byte[] toBytes(Long obj) {
 		return this.unparseBytes(obj);
 	}
+
+	@Override
+	public Long revert(Long obj) {
+		return -obj;
+	}
 }
