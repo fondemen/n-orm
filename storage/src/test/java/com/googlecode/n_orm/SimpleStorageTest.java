@@ -190,6 +190,25 @@ public class SimpleStorageTest {
 		assertEquals(true, this.sut1.prop2);
 		assertEquals("tProp1", this.sut1.tProp1);
 	}
+	
+	@Test
+	public void storeDifferentNullProperties() {
+		Memory.INSTANCE.resetQueries();
+
+		SimpleElement cpy1 = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		cpy1.prop1 = null;
+		cpy1.store();
+		hadAQuery();
+		
+		this.sut1.activate();
+		hadAQuery();
+		
+		assertNull(cpy1.prop1);
+		assertNull(this.sut1.prop1);
+		assertEquals(false, cpy1.prop2);
+		assertEquals(true, this.sut1.prop2);
+		assertEquals("tProp1", this.sut1.tProp1);
+	}
 
 	@Test
 	public void soreNoTransientProperties() {
