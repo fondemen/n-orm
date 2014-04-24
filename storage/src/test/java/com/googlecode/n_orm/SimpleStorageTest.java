@@ -591,4 +591,29 @@ public class SimpleStorageTest {
 		assertEquals("", sut.prop1); // Because of constructor
 		assertEquals("toto", sut.privProp); // Not touched
 	}
+	
+	@Test
+	public void storingUnmodifiedObject() {
+		//Storing some values
+		SimpleElement sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		sut.LongProp = 1787L;
+		sut.privProp = "toto";
+		sut.store();
+		
+		//Storing an untouched object
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.store();
+		
+		//Reading actual values from DB
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		
+		assertEquals(1787L, sut.LongProp.longValue()); // Intact since untouched
+		assertEquals("toto", sut.privProp); // Intact since untouched
+		assertTrue(sut.prop2); // Intact since untouched
+		assertEquals("", sut.prop1); // Because touched in constructor
+	}
 }
