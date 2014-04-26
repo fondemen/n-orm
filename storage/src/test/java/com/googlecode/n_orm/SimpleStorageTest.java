@@ -616,4 +616,22 @@ public class SimpleStorageTest {
 		assertTrue(sut.prop2); // Intact since untouched
 		assertEquals("", sut.prop1); // Because touched in constructor
 	}
+	
+	@Test
+	public void storeActivatedObject() {
+		SimpleElement sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		sut.privProp = "toto";
+		sut.LongProp = 1L;
+		sut.store();
+		sut.activate();
+		sut.store();
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		sut = new SimpleElement("KEY1", new String[]{"KE", "Y2"});
+		sut.activate();
+		assertEquals(Long.valueOf(1L), sut.LongProp);
+		assertEquals("pro1value", sut.prop1);
+		assertEquals("toto", sut.privProp);
+		assertTrue(sut.prop2);
+	}
 }
