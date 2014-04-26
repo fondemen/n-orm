@@ -110,10 +110,8 @@ public aspect IncrementManagement {
 			return l;
 	}
 	
-	//@Override
-	public void PropertyFamily.clearChanges() {
-		super.clearChanges();
-		this.getOwner().getIncrements().clear();
+	after(PropertyFamily pf): execution(void PropertyFamily.clearChanges()) && this(pf) {
+		pf.getOwner().getIncrements().clear();
 	}
 	
 	before(PersistingElement self, Object newValue): set(@Incrementing (Number+||long||int||short||byte) PersistingElement+.*) && target(self) && args(newValue) && if(immedatePropertyCheck) {
