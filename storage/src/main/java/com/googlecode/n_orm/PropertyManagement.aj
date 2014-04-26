@@ -239,6 +239,8 @@ public aspect PropertyManagement {
 	public static class PropertyFamily extends MapColumnFamily<String, Property> {
 		
 		//private transient Map<Field, byte []> lastState = new HashMap<Field, byte []>();
+		
+		private Set<String> changedFields = new TreeSet<String>();
 
 		private PropertyFamily(PersistingElement owner)
 				throws SecurityException, NoSuchFieldException {
@@ -285,6 +287,16 @@ public aspect PropertyManagement {
 			
 			return !Arrays.equals(ConversionTools.convert(lhs, clazz), ConversionTools.convert(rhs, clazz));
 		}
+		
+		private void fieldChanged(Field f) {
+			this.changedFields.add(f.getName());
+		}
+
+		@Override
+		public void clearChanges() {
+			this.changedFields.clear();
+			super.clearChanges();
+		}
 
 		@Override
 		public void updateFromPOJO() {
@@ -295,7 +307,7 @@ public aspect PropertyManagement {
 				if (p == null) {
 					Object val = pm.candideReadValue(owner, f);
 					Object defaultVal = ConversionTools.getDefaultValue(f.getType());
-					if (defaultVal == null ? val == null : defaultVal.equals(val))
+					if ((!this.changedFields.contains(f.getName())) && (defaultVal == null ? val == null : defaultVal.equals(val)))
 						continue;
 					p = new Property(this, f, null);
 					this.putElement(p.getName(), p);
@@ -453,21 +465,14 @@ public aspect PropertyManagement {
 	after(PersistingElement self) returning: attUpdated(self) {
 
 		PropertyFamily pf = self.getPropertiesColumnFamily();
-		if (pf.isActivated())
-			return;
-		
 		Field f = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();
 		KeyManagement km = KeyManagement.getInstance();
 		if (km.isKey(f))
 			return;
 		
-		Property p = pf.get(f.getName());
-		if (p == null) {
-			p = new Property(pf, f, null);
-			pf.putElement(p.getName(), p);
-		}
+		pf.fieldChanged(f);
 	}
-	
+
 	public Object candideReadValue(Object self, Field property) {
 		try {
 			return this.readValue(self, property);
