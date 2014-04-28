@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.client.HConnectionManager;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.HTablePool;
@@ -63,12 +65,14 @@ import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.QualifierFilter;
-import org.apache.hadoop.hbase.io.hfile.Compression;
-import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
+import org.apache.hadoop.hbase.io.compress.Compression;
+import org.apache.hadoop.hbase.io.compress.Compression.Algorithm;
+import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.regionserver.StoreFile;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
+import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.zookeeper.ZooKeeper;
 import org.codehaus.plexus.util.DirectoryScanner;
@@ -322,7 +326,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	private Integer maxVersions = null;
 	private boolean forceMaxVersions = false;
 	
-	private StoreFile.BloomType bloomFilterType = null;
+	private BloomType bloomFilterType = null;
 	private boolean forceBloomFilterType = false;
 
 	private Boolean blockCacheEnabled = null;
@@ -411,7 +415,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		RecoverableZooKeeper zk = null;
 		do {
 			try {
-				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper();
+				HConnection conn = this.admin.getConnection();
+				Method getZK = conn.getClass().getDeclaredMethod("getKeepAliveZooKeeperWatcher");
+				getZK.setAccessible(true);
+				zk = ((ZooKeeperWatcher) getZK.invoke(conn)).getRecoverableZooKeeper();
 			} catch (Exception x) {
 				try {
 					Thread.sleep(50);
@@ -424,7 +431,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		}
 		
 		try {
-			String[] host = this.admin.getConnection().getZooKeeperWatcher().getQuorum().split(",")[0].split(":");
+			String[] host = new String [] {"???"};//this.admin.getConnection().getZooKeeperWatcher().getQuorum().split(",")[0].split(":");
 			this.host = host[0].trim();
 			if (host.length > 1)
 				this.port = Integer.parseInt(host[1].trim());
@@ -793,7 +800,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	/**
 	 * Whether created tables should have {@link HColumnDescriptor#setBloomFilterType(org.apache.hadoop.hbase.regionserver.StoreFile.BloomType)} set. 
 	 */
-	public StoreFile.BloomType getBloomFilterType() {
+	public BloomType getBloomFilterType() {
 		return bloomFilterType;
 	}
 
@@ -802,7 +809,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * Default value is equivalent to {@link HColumnDescriptor#DEFAULT_BLOOMFILTER}
 	 * null is considered as unset (i.e. the default value).
 	 */
-	public void setBloomFilterType(StoreFile.BloomType bloomFilterType) {
+	public void setBloomFilterType(BloomType bloomFilterType) {
 		PropertyUtils.clearCachedValues();
 		this.bloomFilterType = bloomFilterType;
 	}
@@ -1313,19 +1320,19 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	ZooKeeper getZooKeeper() throws DatabaseNotReachedException {
 		ZooKeeper zk;
 		try {
+			HConnection conn = this.admin.getConnection();
+			Method getZK = conn.getClass().getDeclaredMethod("getKeepAliveZooKeeperWatcher");
+			getZK.setAccessible(true);
 			try {
-				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();
-			} catch (ZooKeeperConnectionException x) { //Lost zookeeper ?
+				zk = ((ZooKeeperWatcher) getZK.invoke(conn)).getRecoverableZooKeeper().getZooKeeper();
+			} catch (Exception x) { //Lost zookeeper ?
 				this.restart();
-				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();
-			} catch (NullPointerException x) { //Lost zookeeper ?
-				this.restart();
-				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();
+				zk = ((ZooKeeperWatcher) getZK.invoke(conn)).getRecoverableZooKeeper().getZooKeeper();
 			}
 			if (!zk.getState().isAlive()) {
 				errorLogger.log(Level.WARNING, "Zookeeper connection lost ; restarting...");
 				this.restart();
-				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();
+				zk = null;//this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();
 			}
 			return zk;
 		} catch (Exception e1) {

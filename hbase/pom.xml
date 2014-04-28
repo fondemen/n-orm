@@ -18,17 +18,20 @@
 	</scm>
 
 	<properties>
-		<hbase.version>0.94.6</hbase.version>
-		<hadoop.version>1.0.4</hadoop.version>
+		<hbase.version>0.96.1.1-hadoop2</hbase.version>
 	</properties>
 
 	<dependencies>
 
 		<dependency>
 			<groupId>org.apache.hbase</groupId>
-			<artifactId>hbase</artifactId>
+			<artifactId>hbase-client</artifactId>
 			<version>${hbase.version}</version>
-			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-server</artifactId>
+			<version>${hbase.version}</version>
 			<exclusions>
 				<exclusion>
 					<artifactId>slf4j-log4j12</artifactId>
@@ -99,6 +102,7 @@
 					<groupId>stax</groupId>
 				</exclusion>
 			</exclusions>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
@@ -115,19 +119,6 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>com.googlecode.n_orm</groupId>
-			<artifactId>hbase-test-deps</artifactId>
-			<version>hbase-${hbase.version}-SNAPSHOT</version>
-			<scope>test</scope>
-			<type>pom</type>
-			<exclusions>
-				<exclusion>
-					<artifactId>slf4j-log4j12</artifactId>
-					<groupId>org.slf4j</groupId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-		<dependency>
 			<groupId>org.codehaus.plexus</groupId>
 			<artifactId>plexus-utils</artifactId>
 			<version>2.1</version>
@@ -135,21 +126,15 @@
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-jdk14</artifactId>
+			<version>1.7.2</version>
+		</dependency>
+		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
 			<version>1.9.0</version>
 			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-jdk14</artifactId>
-			<version>1.4.3</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-core</artifactId>
-			<version>${hadoop.version}</version>
-			<scope>provided</scope>
 		</dependency>
 
 		<dependency>
@@ -163,6 +148,12 @@
 			<artifactId>snappy</artifactId>
 			<version>0.3</version>
 			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-testing-util</artifactId>
+			<version>${hbase.version}</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 

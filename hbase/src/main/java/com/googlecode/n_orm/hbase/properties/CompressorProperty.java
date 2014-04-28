@@ -1,7 +1,7 @@
 package com.googlecode.n_orm.hbase.properties;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
+import org.apache.hadoop.hbase.io.compress.Compression.Algorithm;
 
 import com.googlecode.n_orm.hbase.HBaseSchema;
 import com.googlecode.n_orm.hbase.Store;

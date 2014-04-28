@@ -9,9 +9,10 @@ import java.util.TreeMap;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
-import org.apache.hadoop.hbase.regionserver.StoreFile;
+import org.apache.hadoop.hbase.io.compress.Compression.Algorithm;
+import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -191,7 +192,7 @@ public class PropertyOverloadTest {
 		HColumnDescriptor ovr = this.getColumnFamilyDescriptor(overloadedCfField, td);
 		HColumnDescriptor dum = this.getColumnFamilyDescriptor(dummyCfField, td);
 		
-		assertFalse(td.isDeferredLogFlush());
+		assertEquals(Durability.USE_DEFAULT, td.getDurability());
 
 		assertEquals(Algorithm.GZ, def.getCompression());
 		assertTrue(def.isInMemory());
@@ -200,7 +201,7 @@ public class PropertyOverloadTest {
 
 		assertEquals(HColumnDescriptor.DEFAULT_BLOOMFILTER, def.getBloomFilterType().name());
 		assertEquals(HColumnDescriptor.DEFAULT_BLOOMFILTER, dum.getBloomFilterType().name());
-		assertEquals(StoreFile.BloomType.ROW, ovr.getBloomFilterType());
+		assertEquals(BloomType.ROW, ovr.getBloomFilterType());
 
 		assertEquals(HColumnDescriptor.DEFAULT_BLOCKCACHE, def.isBlockCacheEnabled());
 		assertFalse(ovr.isBlockCacheEnabled());
@@ -210,7 +211,6 @@ public class PropertyOverloadTest {
 		assertEquals(HColumnDescriptor.DEFAULT_BLOCKSIZE, dum.getBlocksize());
 		assertEquals(1234, ovr.getBlocksize());
 		
-		assertTrue(HColumnDescriptor.DEFAULT_VERSIONS != 1);
 		assertEquals(HColumnDescriptor.DEFAULT_VERSIONS, def.getMaxVersions());
 		assertEquals(HColumnDescriptor.DEFAULT_VERSIONS, dum.getMaxVersions());
 		assertEquals(1, ovr.getMaxVersions());
