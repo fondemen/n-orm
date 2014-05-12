@@ -507,4 +507,53 @@ public class BasicTest {
 		 assertEquals(10, n3.getNumber());
 		 assertEquals(0, n3.attribute);
 	 }
+	 
+	 @Test(expected=IllegalStateException.class)
+	 public void changedKeyActivateActivate() {
+		 bssut.setHashcode("krfljskflsj");
+		 bssut.activate();
+	 }
+	 
+	 @Test(expected=IllegalStateException.class)
+	 public void changedKeyActivateStore() {
+		 bssut.setHashcode("krfljskflsj");
+		 bssut.store();
+	 }
+	 
+	 @Test(expected=IllegalStateException.class)
+	 public void changedKeyStoreActivate() {
+		 BookStore bs = new BookStore("krfljskflsj");
+		 bs.store();
+		 bs.setHashcode("nkjhjkmuk");
+		 bs.activate();
+	 }
+	 
+	 @Test(expected=IllegalStateException.class)
+	 public void changedKeyStoreStore() {
+		 BookStore bs = new BookStore("krfljskflsj");
+		 bs.store();
+		 bs.setHashcode("nkjhjkmuk");
+		 bs.store();
+	 }
+	 
+	 @Test(expected=IllegalStateException.class)
+	 public void changedKeyFindActivate() {
+		 BookStore bs = StorageManagement.findElements().ofClass(BookStore.class).any();
+		 bs.setHashcode("krfljskflsj");
+		 bs.activate();
+	 }
+	 
+	 @Test(expected=IllegalStateException.class)
+	 public void changedKeyFindStore() {
+		 BookStore bs = StorageManagement.findElements().ofClass(BookStore.class).any();
+		 bs.setHashcode("krfljskflsj");
+		 bs.store();
+	 }
+	 
+	 @Test(expected=IllegalStateException.class)
+	 public void changedKeyActivatedFindActivate() {
+		 BookStore bs = StorageManagement.findElements().ofClass(BookStore.class).andActivate().any();
+		 bs.setHashcode("krfljskflsj");
+		 bs.activate();
+	 }
 }
