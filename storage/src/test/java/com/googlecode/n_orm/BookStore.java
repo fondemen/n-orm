@@ -27,4 +27,8 @@ public class BookStore {
 		return hashcode;
 	}
 
+	protected void setHashcode(String hashcode) {
+		this.hashcode = hashcode;
+	}
+
 }
