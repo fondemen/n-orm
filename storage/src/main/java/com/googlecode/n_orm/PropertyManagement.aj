@@ -94,7 +94,7 @@ public aspect PropertyManagement {
 
 		public void setValue(Object value) {
 			if (value == null)
-				throw new NullPointerException();
+				throw new NullPointerException("Trying to set null to " + field);
 			this.value = value;
 		}
 
