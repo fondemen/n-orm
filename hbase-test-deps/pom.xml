@@ -12,15 +12,15 @@
 	<packaging>pom</packaging>
 
 	<properties>
-		<hbase.version>0.96.1.1-hadoop1</hbase.version>
-		<hadoop.version>1.2.1</hadoop.version>
+		<hbase.version>0.98.1-hadoop2</hbase.version>
+		<hadoop.version>2.3.0</hadoop.version>
 	</properties>
 
 	<dependencies>
 
 		<dependency>
 			<groupId>org.apache.hbase</groupId>
-			<artifactId>hbase</artifactId>
+			<artifactId>hbase-common</artifactId>
 			<version>${hbase.version}</version>
 			<type>test-jar</type>
 			<scope>compile</scope>
@@ -33,7 +33,7 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.hbase</groupId>
-			<artifactId>hbase</artifactId>
+			<artifactId>hbase-common</artifactId>
 			<version>${hbase.version}</version>
 			<type>jar</type>
 			<scope>compile</scope>
