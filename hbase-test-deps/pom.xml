@@ -13,7 +13,7 @@
 
 	<properties>
 		<hbase.version>0.96.1.1-hadoop2</hbase.version>
-		<hadoop.version>2.2.0</hadoop.version>
+		<hadoop.version>2.3.0</hadoop.version>
 	</properties>
 
 	<dependencies>

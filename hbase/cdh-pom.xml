@@ -19,15 +19,15 @@
 	
 	<properties>
 		<hbase.version>0.96.1.1-cdh5.0.2</hbase.version>
-		<hadoop.version>2.2.0-cdh5.0.2</hadoop.version>
-		<hadoop.version.mr1>2.2.0-mr1-cdh5.0.2</hadoop.version.mr1>
+		<hadoop.version>2.3.0-cdh5.0.2</hadoop.version>
+		<hadoop.version.mr1>2.3.0-mr1-cdh5.0.2</hadoop.version.mr1>
 	</properties>
 
 	<dependencies>
 
 		<dependency>
 			<groupId>org.apache.hbase</groupId>
-			<artifactId>hbase</artifactId>
+			<artifactId>hbase-common</artifactId>
 			<version>${hbase.version}</version>
 			<scope>provided</scope>
 			<exclusions>
