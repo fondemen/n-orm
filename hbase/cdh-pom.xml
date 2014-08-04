@@ -27,9 +27,13 @@
 
 		<dependency>
 			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-server</artifactId>
+			<version>${hbase.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hbase</groupId>
 			<artifactId>hbase-common</artifactId>
 			<version>${hbase.version}</version>
-			<scope>provided</scope>
 			<exclusions>
 				<exclusion>
 					<artifactId>slf4j-log4j12</artifactId>
@@ -144,7 +148,7 @@
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-jdk14</artifactId>
-			<version>1.4.3</version>
+			<version>1.7.2</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
