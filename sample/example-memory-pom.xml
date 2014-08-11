@@ -9,8 +9,9 @@
 	<properties>
 		<java.version>1.6</java.version>
 		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
-		<aspectj.version>1.6.12</aspectj.version>
-		<plugin.aspectj.version>1.4</plugin.aspectj.version>
+		<hbase.version>0.96.1.1-hadoop2</hbase.version>
+		<aspectj.version>1.7.4</aspectj.version>
+		<plugin.aspectj.version>1.6</plugin.aspectj.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 	<build>
@@ -97,6 +98,19 @@
 	</build>
 	<dependencies>
 		<dependency>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-server</artifactId>
+			<version>${hbase.version}</version>
+			<type>jar</type>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-server</artifactId>
+			<version>${hbase.version}</version>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<version>4.8.2</version>
@@ -125,12 +139,19 @@
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
+		<dependency>
+			<groupId>com.googlecode.n_orm</groupId>
+			<artifactId>hbase</artifactId>
+			<version>hbase-${hbase.version}-n-orm-${n-orm.version}</version>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
 		
 		<dependency>
 			<!-- Necessary vbecause of the @HBaseSchema annotation used in Book ; otherwise could be removed -->
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>hbase</artifactId>
-			<version>hbase-0.90.3-n-orm-0.0.1-SNAPSHOT</version> <!-- first version with this feature -->
+			<version>hbase-0.96.1.1-hadoop2-n-orm-0.0.1-SNAPSHOT</version>
 			<type>jar</type>
 			<scope>provided</scope>
 		</dependency>
