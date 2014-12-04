@@ -15,6 +15,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.Properties;
 import java.util.TreeMap;
 
@@ -281,7 +283,9 @@ public aspect StoreSelector {
 					try {
 						populateArguments(properties, m.getParameterTypes(), args);
 						return m.invoke(null, args.toArray());
-					} catch (Exception x) {}
+					} catch (Exception x) {
+						Logger.getLogger(StoreSelector.class.getName()).log(Level.WARNING, "Cannot use " + m + " for launching store: " + x.getMessage(), x);
+					}
 				}
 			}
 			throw new IllegalArgumentException("Could not find static accessor method " + builderName + " with compatible " + pmnr + " arguments in " + storeClass);
