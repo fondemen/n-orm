@@ -24,9 +24,12 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.coprocessor.Batch.Call;
 import org.apache.hadoop.hbase.client.coprocessor.Batch.Callback;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
+import org.apache.hadoop.hbase.client.coprocessor.Batch;
 
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
 
 public class TableConnection implements HTableInterface {
 	public static TableConnection get(Configuration conf, MangledTableName tableName) throws IOException {
@@ -63,6 +66,7 @@ public class TableConnection implements HTableInterface {
 			throws IOException, InterruptedException {
 		table.batch(actions, results);
 	}
+	@Deprecated
 	public Object[] batch(List<? extends Row> actions) throws IOException,
 			InterruptedException {
 		return table.batch(actions);
@@ -72,6 +76,7 @@ public class TableConnection implements HTableInterface {
 			InterruptedException {
 		table.batchCallback(actions, results, callback);
 	}
+	@Deprecated
 	public <R> Object[] batchCallback(List<? extends Row> actions,
 			Callback<R> callback) throws IOException, InterruptedException {
 		return table.batchCallback(actions, callback);
@@ -82,6 +87,8 @@ public class TableConnection implements HTableInterface {
 	public Result[] get(List<Get> gets) throws IOException {
 		return table.get(gets);
 	}
+	@Deprecated
+	
 	public Result getRowOrBefore(byte[] row, byte[] family) throws IOException {
 		return table.getRowOrBefore(row, family);
 	}
@@ -134,6 +141,7 @@ public class TableConnection implements HTableInterface {
 		return table.incrementColumnValue(row, family, qualifier, amount,
 				durability);
 	}
+	@Deprecated
 	public long incrementColumnValue(byte[] row, byte[] family,
 			byte[] qualifier, long amount, boolean writeToWAL)
 			throws IOException {
@@ -163,6 +171,7 @@ public class TableConnection implements HTableInterface {
 			Callback<R> callback) throws ServiceException, Throwable {
 		table.coprocessorService(service, startKey, endKey, callable, callback);
 	}
+	@Deprecated
 	public void setAutoFlush(boolean autoFlush) {
 		table.setAutoFlush(autoFlush);
 	}
@@ -177,5 +186,15 @@ public class TableConnection implements HTableInterface {
 	}
 	public void setWriteBufferSize(long writeBufferSize) throws IOException {
 		table.setWriteBufferSize(writeBufferSize);
+	}
+	public <R extends Message> Map<byte[], R> batchCoprocessorService(
+		Descriptors.MethodDescriptor methodDescriptor, Message request,
+		byte[] startKey, byte[] endKey, R responsePrototype) throws ServiceException, Throwable {
+		return table.batchCoprocessorService(methodDescriptor, request, startKey, endKey, responsePrototype);
+	}
+	public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor,
+		Message request, byte[] startKey, byte[] endKey, R responsePrototype,
+		Batch.Callback<R> callback) throws ServiceException, Throwable {
+		table.batchCoprocessorService(methodDescriptor, request, startKey, endKey, responsePrototype, callback);
 	}
 }

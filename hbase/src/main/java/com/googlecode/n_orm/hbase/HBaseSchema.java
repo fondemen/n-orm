@@ -29,6 +29,8 @@ public @interface HBaseSchema {
 		UNSET((byte)63),
 		/** WAL should not be used at all. */
 		SKIP((byte)0),
+		/** WAL should be used asynchronously. */ 
+		ASYNC((byte)32),
 		/** WAL should be used synchronously. */ 
 		USE((byte)64);
 		

@@ -369,7 +369,7 @@ public class BasicTest {
 				element.store();
 			}
 		}
-	 @Test(timeout=20000) public void testSetBooksWithMapReduce() throws DatabaseNotReachedException, InstantiationException, IllegalAccessException, InterruptedException {
+	 @Test(timeout=60000) public void testSetBooksWithMapReduce() throws DatabaseNotReachedException, InstantiationException, IllegalAccessException, InterruptedException {
 		WaitingCallBack wc = new WaitingCallBack();
 		StorageManagement.findElements().ofClass(Book.class).withKey("bookStore").setTo(bssut).withAtMost(10000).elements().andActivate().remoteForEach(new BookSetter((short) 50), wc, 100, 1000);
 		//withAtMost is not necessary using HBase as com.googlecode.n_orm.hbase.Store implements com.googlecode.n_orm.storeapi.ActionnableStore

@@ -12,7 +12,6 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -30,6 +29,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
@@ -39,12 +40,13 @@ import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.TableExistsException;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotDisabledException;
 import org.apache.hadoop.hbase.TableNotEnabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownScannerException;
-import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HConnection;
@@ -69,7 +71,6 @@ import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
-import org.apache.hadoop.hbase.regionserver.StoreFile;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
@@ -1464,7 +1465,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					try {
 						if (!this.hasTableInt(name)) {
 							logger.info("Table " + name + " not found ; creating" + (expectedFamilies == null ? "" : " with column families " + expectedFamilies.keySet().toString()));
-							td = new HTableDescriptor(name.getNameAsBytes());
+							td = new HTableDescriptor(TableName.valueOf(name.getNameAsBytes()));
 							PropertyUtils.setValues(this, td, clazz, tablePostfix);
 							if (expectedFamilies != null) {
 								for (Entry<String, Field> fam : expectedFamilies.entrySet()) {
@@ -1846,15 +1847,15 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			return null;
 		
 		ColumnFamilyData ret = new DefaultColumnFamilyData();
-		for (KeyValue kv : r.list()) {
-			String familyName = Bytes.toString(kv.getFamily());
+		for (Cell kv : r.listCells()) {
+			String familyName = Bytes.toString(CellUtil.cloneFamily(kv));
 			Map<String, byte[]> fam = ret.get(familyName);
 			if (fam == null) {
 				fam = new TreeMap<String, byte[]>();
 				ret.put(familyName, fam);
 			}
-			fam.put(Bytes.toString(kv.getQualifier()),
-					kv.getValue());
+			fam.put(Bytes.toString(CellUtil.cloneQualifier(kv)),
+					CellUtil.cloneValue(kv));
 		}
 		return ret;
 	}
@@ -1964,7 +1965,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					}
 	
 				}
-				if (rowDel.getFamilyMap().isEmpty())
+				if (rowDel.getFamilyCellMap().isEmpty())
 					rowDel = null;
 				else
 					actions.add(rowDel);
@@ -1981,7 +1982,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 						rowInc.addColumn(cf, Bytes.toBytes(inc.getKey()), inc.getValue().longValue());
 					}
 				}
-				if (rowInc.getFamilyMap().isEmpty())
+				if (rowInc.getFamilyCellMap().isEmpty())
 					rowInc = null;
 				//Can't add that to actions :(
 			}
@@ -1999,7 +2000,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				HBaseSchema.WALWritePolicy useWal = null;
 				HBaseSchema clazzAnnotation = meta == null || meta.getClazz() == null ? null : meta.getClazz().getAnnotation(HBaseSchema.class);
 				HBaseSchema.WALWritePolicy clazzWAL = clazzAnnotation == null ? HBaseSchema.WALWritePolicy.UNSET : clazzAnnotation.writeToWAL();
-				for(byte[] famB : rowPut.getFamilyMap().keySet()) {
+				for(byte[] famB : rowPut.getFamilyCellMap().keySet()) {
 					String famS = Bytes.toString(famB);
 					HBaseSchema.WALWritePolicy wtw;
 					if (PropertyManagement.PROPERTY_COLUMNFAMILY_NAME.equals(famS)) {
@@ -2037,10 +2038,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				case UNSET:
 					break;
 				case SKIP:
-					rowPut.setWriteToWAL(false);
+					rowPut.setDurability(Durability.SKIP_WAL);
 					break;
-				default:
-					rowPut.setWriteToWAL(true);
+				case ASYNC:
+					rowPut.setDurability(Durability.ASYNC_WAL);
+					break;
+				case USE:
+					rowPut.setDurability(Durability.SYNC_WAL);
 					break;
 				}
 			}
@@ -2150,8 +2154,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		Map<String, byte[]> ret = new HashMap<String, byte[]>();
 		if (!r.isEmpty()) {
-			for (KeyValue kv : r.raw()) {
-				ret.put(Bytes.toString(kv.getQualifier()), kv.getValue());
+			for (Cell kv : r.rawCells()) {
+				ret.put(Bytes.toString(CellUtil.cloneQualifier(kv)), CellUtil.cloneValue(kv));
 			}
 		}
 		return ret;
