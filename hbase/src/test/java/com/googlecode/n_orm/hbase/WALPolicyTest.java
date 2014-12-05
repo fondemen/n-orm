@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Row;
@@ -85,7 +86,7 @@ public class WALPolicyTest {
 				null, null, null);
 		Put put = getLastPut();
 		assertNotNull(put);
-		assertTrue(put.getWriteToWAL());
+		assertEquals(Durability.USE_DEFAULT, put.getDurability());
 	}
 
 	@Persisting
@@ -102,6 +103,8 @@ public class WALPolicyTest {
 		public Map<String, String> cf2Unwalled = new TreeMap<String, String>();
 		@HBaseSchema(writeToWAL = WALWritePolicy.USE)
 		public Map<String, String> cf3Walled = new TreeMap<String, String>();
+		@HBaseSchema(writeToWAL = WALWritePolicy.ASYNC)
+		public Map<String, String> cf4AWalled = new TreeMap<String, String>();
 	}
 
 	public MetaInformation createMeta(PropsNoWALElement elt) {
@@ -124,6 +127,10 @@ public class WALPolicyTest {
 			if (!elt.cf3Walled.isEmpty()) {
 				fams.put("cf3Walled",
 						PropsNoWALElement.class.getField("cf3Walled"));
+			}
+			if (!elt.cf4AWalled.isEmpty()) {
+				fams.put("cf4AWalled",
+						PropsNoWALElement.class.getField("cf4AWalled"));
 			}
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -171,6 +178,14 @@ public class WALPolicyTest {
 			}
 			ret.put("cf3Walled", ch);
 		}
+		if (!elt.cf4AWalled.isEmpty()) {
+			Map<String, byte[]> ch = new TreeMap<String, byte[]>();
+			for (Entry<String, String> inElt : elt.cf4AWalled.entrySet()) {
+				ch.put(inElt.getKey(),
+						ConversionTools.convert(inElt.getValue()));
+			}
+			ret.put("cf4AWalled", ch);
+		}
 		return ret;
 	}
 
@@ -183,7 +198,7 @@ public class WALPolicyTest {
 				null, null, null);
 		Put put = getLastPut();
 		assertNotNull(put);
-		assertFalse(put.getWriteToWAL());
+		assertEquals(Durability.SKIP_WAL, put.getDurability());
 	}
 
 	@Test
@@ -196,7 +211,7 @@ public class WALPolicyTest {
 				this.createChanges(elt), null, null);
 		Put put = getLastPut();
 		assertNotNull(put);
-		assertFalse(put.getWriteToWAL());
+		assertEquals(Durability.SKIP_WAL, put.getDurability());
 	}
 
 	@Test
@@ -210,7 +225,7 @@ public class WALPolicyTest {
 				this.createChanges(elt), null, null);
 		Put put = getLastPut();
 		assertNotNull(put);
-		assertFalse(put.getWriteToWAL());
+		assertEquals(Durability.SKIP_WAL, put.getDurability());
 	}
 
 	@Test
@@ -224,7 +239,7 @@ public class WALPolicyTest {
 				this.createChanges(elt), null, null);
 		Put put = getLastPut();
 		assertNotNull(put);
-		assertFalse(put.getWriteToWAL());
+		assertEquals(Durability.SKIP_WAL, put.getDurability());
 	}
 
 	@Test
@@ -238,7 +253,7 @@ public class WALPolicyTest {
 				this.createChanges(elt), null, null);
 		Put put = getLastPut();
 		assertNotNull(put);
-		assertFalse(put.getWriteToWAL());
+		assertEquals(Durability.SKIP_WAL, put.getDurability());
 	}
 
 	@Test
@@ -252,7 +267,7 @@ public class WALPolicyTest {
 				this.createChanges(elt), null, null);
 		Put put = getLastPut();
 		assertNotNull(put);
-		assertTrue(put.getWriteToWAL());
+		assertEquals(Durability.SYNC_WAL, put.getDurability());
 	}
 
 	@Test
@@ -263,12 +278,43 @@ public class WALPolicyTest {
 		elt.cf1UnsetWalled.add("sjklqjdklqdsfhsldfjhs");
 		elt.cf2Unwalled.put("sjklsqsdqqj", "dklqdsfhsldfjhs");
 		elt.cf3Walled.put("sjklsqsdqsqqj", "dklqdqsqssfhsldfjhs");
+		elt.cf4AWalled.put("sjsqsdklsqsdqsqqj", "dklqsdqsdfgqssfhsldfjhs");
 		store.storeChanges(this.createMeta(elt),
 				"WALPolicyTest", "AZERTYUIO" + KeyManagement.KEY_END_SEPARATOR,
 				this.createChanges(elt), null, null);
 		Put put = getLastPut();
 		assertNotNull(put);
-		assertTrue(put.getWriteToWAL());
+		assertEquals(Durability.SYNC_WAL, put.getDurability());
+	}
+
+	@Test
+	public final void propsNoWalElementAWalledCFOnly() {
+		PropsNoWALElement elt = new PropsNoWALElement();
+		elt.key = "AZERTYUIO";
+		elt.prop = "jdkhsjdkfhs";
+		elt.cf4AWalled.put("sjklsqxsxsdqsqqj", "dklqdqsqsxssfhsldfjhs");
+		store.storeChanges(this.createMeta(elt),
+				"WALPolicyTest", "AZERTYUIO" + KeyManagement.KEY_END_SEPARATOR,
+				this.createChanges(elt), null, null);
+		Put put = getLastPut();
+		assertNotNull(put);
+		assertEquals(Durability.ASYNC_WAL, put.getDurability());
+	}
+
+	@Test
+	public final void propsNoWalElementAWalledCF() {
+		PropsNoWALElement elt = new PropsNoWALElement();
+		elt.key = "AZERTYUIO";
+		elt.prop = "jdkhsjdkfhs";
+		elt.cf1UnsetWalled.add("sjklqjdklqdsfhsldfjhs");
+		elt.cf2Unwalled.put("sjklsqsdqqj", "dklqdsfhsldfjhs");
+		elt.cf4AWalled.put("sjkqsdsdqsqqj", "qsdqsdqsdvfreb");
+		store.storeChanges(this.createMeta(elt),
+				"WALPolicyTest", "AZERTYUIO" + KeyManagement.KEY_END_SEPARATOR,
+				this.createChanges(elt), null, null);
+		Put put = getLastPut();
+		assertNotNull(put);
+		assertEquals(Durability.ASYNC_WAL, put.getDurability());
 	}
 
 }
