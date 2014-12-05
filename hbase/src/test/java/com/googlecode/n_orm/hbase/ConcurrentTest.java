@@ -12,10 +12,14 @@ import java.util.TreeMap;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -85,6 +89,18 @@ public class ConcurrentTest {
 		store2 = HBaseLauncher.hbaseStore;
 	}
 	
+	private HBaseAdmin admin;
+	
+	@Before
+	public void createAdmin() throws MasterNotRunningException, ZooKeeperConnectionException {
+		this.admin = new HBaseAdmin(store1.getConnection());
+	}
+	
+	@After
+	public void deleteAdmin() throws IOException {
+		this.admin.close();
+	}
+	
 	@Test
 	public void storesAreDifferent() {
 		//Just to know if the test setup is well written...
@@ -95,27 +111,27 @@ public class ConcurrentTest {
 	
 	private void deleteTable(String table) throws IOException {
 
-		if (store1.getAdmin().tableExists(table)) {
-			store1.getAdmin().disableTable(table);
-			store1.getAdmin().deleteTable(table);
+		if (this.admin.tableExists(table)) {
+			this.admin.disableTable(table);
+			this.admin.deleteTable(table);
 		}
 	}
 	
 	private void disableTable(String table) throws IOException {
 
-		if (store1.getAdmin().tableExists(table)) {
-			store1.getAdmin().disableTable(table);
+		if (this.admin.tableExists(table)) {
+			this.admin.disableTable(table);
 		}
 	}
 	
 	private void truncateTable(String table) throws IOException {
 
-		if (store1.getAdmin().tableExists(table)) {
+		if (this.admin.tableExists(table)) {
 			store1.truncate(null, table, (Constraint)null);
 			assertEquals(0, store1.count(null, table, (Constraint)null));
 		}
-		if (!store1.getAdmin().isTableEnabled("t1"))
-			store1.getAdmin().enableTable("t1");
+		if (!this.admin.isTableEnabled("t1"))
+			this.admin.enableTable("t1");
 	}
 	
 	@Test
@@ -254,13 +270,13 @@ public class ConcurrentTest {
 		change1.put("cf1", ch1);
 		ch1.put("k1", new byte[]{1, 2});
 		
-		HConnection cm = store1.getAdmin().getConnection();
+		HConnection cm = this.admin.getConnection();
 		cm.close();
 		
 		store1.storeChanges(null, "t1", "idt1", change1 , null, null);
 		assertTrue(store1.exists(null, "t1", "idt1", "cf1"));
 		
-		cm = store1.getAdmin().getConnection();
+		cm = this.admin.getConnection();
 		cm.close();
 		
 		store1.delete(null, "t1", "idt1");
@@ -292,23 +308,23 @@ public class ConcurrentTest {
 		
 		try {
 		
-			store1.getAdmin().disableTable("t1");
+			this.admin.disableTable("t1");
 			
 			assertTrue(it.hasNext());
 			assertEquals("idt1", it.next().getKey());
 			
 			assertTrue(it.hasNext());
-			store1.getAdmin().disableTable("t1");
+			this.admin.disableTable("t1");
 			assertEquals("idt2", it.next().getKey());
 
-			if (store1.getAdmin().isTableEnabled("t1"))
-				store1.getAdmin().disableTable("t1");
+			if (this.admin.isTableEnabled("t1"))
+				this.admin.disableTable("t1");
 			
 			assertFalse(it.hasNext());
 		
 		} finally {
-			if (!store1.getAdmin().isTableEnabled("t1"))
-				store1.getAdmin().enableTable("t1");
+			if (!this.admin.isTableEnabled("t1"))
+				this.admin.enableTable("t1");
 			
 			it.close();
 		}
@@ -346,15 +362,15 @@ public class ConcurrentTest {
 		store1.storeChanges(null, "t1", "idt1", change1 , null, null);
 		
 		byte[] tblNameBytes = Bytes.toBytes("t1");
-		HTableDescriptor td = store1.getAdmin().getTableDescriptor(tblNameBytes);
+		HTableDescriptor td = this.admin.getTableDescriptor(tblNameBytes);
 		td.removeFamily(Bytes.toBytes("cf1"));
-		store1.getAdmin().disableTable(tblNameBytes);
-		store1.getAdmin().modifyTable(tblNameBytes, td);
-		store1.getAdmin().enableTable(tblNameBytes);
+		this.admin.disableTable(tblNameBytes);
+		this.admin.modifyTable(tblNameBytes, td);
+		this.admin.enableTable(tblNameBytes);
 		synchronized(this) {
 			do {
 				this.wait(500);
-			} while (store1.getAdmin().getTableDescriptor(tblNameBytes).hasFamily(Bytes.toBytes("cf1")));
+			} while (this.admin.getTableDescriptor(tblNameBytes).hasFamily(Bytes.toBytes("cf1")));
 		}
 		
 		ColumnFamilyData change2 = new DefaultColumnFamilyData();
@@ -376,7 +392,7 @@ public class ConcurrentTest {
 			store2.setCompression("none");
 			store1.storeChanges(null, "t1", "row", null, null, null);
 			store2.storeChanges(null, "t1", "row", null, null, null);
-			HColumnDescriptor propFamD = store1.getAdmin().getTableDescriptor(Bytes.toBytes("t1")).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+			HColumnDescriptor propFamD = this.admin.getTableDescriptor(Bytes.toBytes("t1")).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 			assertEquals(Algorithm.NONE, propFamD.getCompression());
 			
 			//Then setting GZ compression
@@ -384,7 +400,7 @@ public class ConcurrentTest {
 			store2.setCompression("gz");
 			//Store1 should alter the table after a store request
 			store1.storeChanges(null, "t1", "row", null, null, null);
-			propFamD = store1.getAdmin().getTableDescriptor(Bytes.toBytes("t1")).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+			propFamD = this.admin.getTableDescriptor(Bytes.toBytes("t1")).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 			assertEquals(Algorithm.GZ, propFamD.getCompression());
 			
 			//Thread to check that table t1 is not disabled while storing changes from store2 does not alter t1
@@ -393,7 +409,6 @@ public class ConcurrentTest {
 
 				@Override
 				public void run() {
-					HBaseAdmin admin = store1.getAdmin();
 					byte[] tableName = Bytes.toBytes("t1");
 					while ((Boolean)disableCheckerParameters[0] && (Boolean)disableCheckerParameters[1]) {
 						try {
@@ -420,7 +435,7 @@ public class ConcurrentTest {
 			//Table was always checked as enabled
 			assertTrue("Table was disabled to change compressor while compressor was already changed by another store", (Boolean)disableCheckerParameters[0]);
 			//and is still in GZ mode
-			propFamD = store1.getAdmin().getTableDescriptor(Bytes.toBytes("t1")).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+			propFamD = this.admin.getTableDescriptor(Bytes.toBytes("t1")).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 			assertEquals(Algorithm.GZ, propFamD.getCompression());
 		} finally {
 			store1.setForceCompression(false);
@@ -445,7 +460,7 @@ public class ConcurrentTest {
 		assertEquals(datum, ConversionTools.convert(String.class, out.get(key)));
 		store1.restart();
 		
-		HConnection cm = store1.getAdmin().getConnection();
+		HConnection cm = this.admin.getConnection();
 		cm.close();
 		
 		out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
@@ -467,7 +482,7 @@ public class ConcurrentTest {
 		store1.storeChanges(null, "t1", "row", change , null, null);
 		assertTrue(store1.exists(null, "t1", "row"));
 		
-		HConnection cm = store1.getAdmin().getConnection();
+		HConnection cm = this.admin.getConnection();
 		cm.close();
 		
 		Map<String, byte[]> out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
@@ -486,8 +501,8 @@ public class ConcurrentTest {
 			store1.restart();
 
 			assertEquals("10", store1.getConf().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
-			assertEquals("10", store1.getAdmin().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
-			assertEquals("10", store1.getAdmin().getConnection().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			assertEquals("10", this.admin.getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
+			assertEquals("10", this.admin.getConnection().getConfiguration().get(HConstants.HBASE_RPC_TIMEOUT_KEY));
 			
 			//Cannot reliably fail the connection (has to respond 4 times consequently in less than a ms)
 //			final Throwable [] error = {null /*the expected exception*/, null /*any unexpected exception*/};

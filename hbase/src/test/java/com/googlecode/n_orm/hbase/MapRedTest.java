@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
@@ -38,13 +39,18 @@ public class MapRedTest {
 		HBaseLauncher.prepareHBase();
 		store = HBaseLauncher.hbaseStore;
 		tableName = "t1";
-		if (!store.getAdmin().tableExists(tableName)) {
-			HTableDescriptor td = new HTableDescriptor(tableName);
-			td.addFamily(new HColumnDescriptor(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
-			store.getAdmin().createTable(td);
-		}
-		if (store.getAdmin().isTableDisabled(tableName)) {
-			store.getAdmin().enableTable(tableName);
+		HBaseAdmin admin = new HBaseAdmin(store.getConnection());
+		try {
+			if (!admin.tableExists(tableName)) {
+				HTableDescriptor td = new HTableDescriptor(tableName);
+				td.addFamily(new HColumnDescriptor(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+				admin.createTable(td);
+			}
+			if (admin.isTableDisabled(tableName)) {
+				admin.enableTable(tableName);
+			}
+		} finally {
+			admin.close();
 		}
 		table = new HTable(store.getConf(), tableName);
 		

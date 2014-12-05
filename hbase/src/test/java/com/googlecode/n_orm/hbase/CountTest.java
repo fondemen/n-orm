@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -28,11 +29,17 @@ public class CountTest {
 		store = HBaseLauncher.hbaseStore;
 	}
 	
+	private HBaseAdmin admin;
+	
 	@Before
 	@After
 	public void truncateTestTable() throws IOException {
+		if (admin != null) {
+			admin.close();
+		}
+		admin = new HBaseAdmin(store.getConnection());
 
-		if (store.getAdmin().tableExists(testTable)) {
+		if (admin.tableExists(testTable)) {
 			store.truncate(null, testTable, (Constraint)null);
 			assertEquals(0, store.count(null, testTable, (Constraint)null));
 		}
@@ -40,9 +47,9 @@ public class CountTest {
 	
 	public void deleteTestTable() throws IOException {
 
-		if (store.getAdmin().tableExists(testTable)) {
-			store.getAdmin().disableTable(testTable);
-			store.getAdmin().deleteTable(testTable);
+		if (admin.tableExists(testTable)) {
+			admin.disableTable(testTable);
+			admin.deleteTable(testTable);
 		}
 	}
 

@@ -61,7 +61,7 @@ public class HBaseLauncher extends StoreTestLauncher {
 					
 					hbaseStore = com.googlecode.n_orm.hbase.Store.getStore(hbaseHost, hbasePort, hbaseMaxRetries);
 					hbaseStore.setConf(hBaseServer.getConfiguration());
-					hbaseStore.setAdmin(hBaseServer.getHBaseAdmin());
+					hbaseStore.setConnection(hBaseServer.getHBaseAdmin().getConnection());
 					hbaseStore.start();
 					
 				} catch (Exception e) {

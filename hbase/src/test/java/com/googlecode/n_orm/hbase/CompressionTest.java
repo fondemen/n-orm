@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 import java.io.IOException;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
@@ -20,6 +21,7 @@ public class CompressionTest {
 	
 	
 	private static Store store;
+	private HBaseAdmin admin;
 	private static String testTable = "compressiontest";
 	private static String defaultCompression;
 
@@ -33,9 +35,17 @@ public class CompressionTest {
 	@Before
 	@After
 	public void deleteIfExists() throws IOException {
-		if (store.getAdmin().tableExists(testTable)) {
-			store.getAdmin().disableTable(testTable);
-			store.getAdmin().deleteTable(testTable);
+		if (admin != null) {
+			admin.close();
+		}
+		admin = new HBaseAdmin(store.getConnection());
+		try {
+			if (admin.tableExists(testTable)) {
+				admin.disableTable(testTable);
+				admin.deleteTable(testTable);
+			}
+		} finally {
+			admin.close();
 		}
 		store.setCompression(defaultCompression);
 	}
@@ -44,7 +54,7 @@ public class CompressionTest {
 	public void testNoCompressionNullDefined() throws IOException {
 		store.setCompression(null);
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		assertEquals(Algorithm.NONE, propFamD.getCompression());
 	}
 	
@@ -52,7 +62,7 @@ public class CompressionTest {
 	public void testNoCompressionDefined() throws IOException {
 		store.setCompression("none");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		assertEquals(Algorithm.NONE, propFamD.getCompression());
 	}
 	
@@ -61,7 +71,7 @@ public class CompressionTest {
 		assertTrue(org.apache.hadoop.hbase.util.CompressionTest.testCompression("gz"));
 		store.setCompression("gz");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		assertEquals(Algorithm.GZ, propFamD.getCompression());
 	}
 	
@@ -69,7 +79,7 @@ public class CompressionTest {
 	public void testTestedGzCompressionOrNone() throws IOException {
 		store.setCompression("tested_gz-or-none");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		Algorithm cmp = propFamD.getCompression();
 		assertTrue(cmp.equals(Algorithm.GZ)) ;
 	}
@@ -78,7 +88,7 @@ public class CompressionTest {
 	public void testTestedLzoCompressionOrGz() throws IOException {
 		store.setCompression("tested_lzo-or-gz");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		Algorithm cmp = propFamD.getCompression();
 		if (org.apache.hadoop.hbase.util.CompressionTest.testCompression("lzo"))
 			assertTrue(cmp.equals(Algorithm.LZO)) ;
@@ -90,7 +100,7 @@ public class CompressionTest {
 	public void testTestedLz4CompressionOrGz() throws IOException {
 		store.setCompression("tested_lz4 -or- none");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		Algorithm cmp = propFamD.getCompression();
 		if (org.apache.hadoop.hbase.util.CompressionTest.testCompression("lz4"))
 			assertTrue(cmp.equals(Algorithm.LZ4)) ;
@@ -102,7 +112,7 @@ public class CompressionTest {
 	public void testTestedSnappyCompressionOrGz() throws IOException {
 		store.setCompression("tested_snappy -or- none");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		Algorithm cmp = propFamD.getCompression();
 		if (org.apache.hadoop.hbase.util.CompressionTest.testCompression("snappy"))
 			assertTrue(cmp.equals(Algorithm.SNAPPY)) ;
@@ -114,7 +124,7 @@ public class CompressionTest {
 	public void testGZCompressionOrNone() throws IOException {
 		store.setCompression("gz-or-none");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		Algorithm cmp = propFamD.getCompression();
 		assertTrue(cmp.equals(Algorithm.GZ)) ;
 	}
@@ -123,7 +133,7 @@ public class CompressionTest {
 	public void testNoneCompressionOrGz() throws IOException {
 		store.setCompression("none-or-gz");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		Algorithm cmp = propFamD.getCompression();
 		assertTrue(cmp.equals(Algorithm.NONE)) ;
 	}
@@ -134,7 +144,7 @@ public class CompressionTest {
 		store.storeChanges(null, testTable, "row", null, null, null);
 		store.setCompression("gz");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		assertEquals(Algorithm.NONE, propFamD.getCompression());
 	}
 	
@@ -146,7 +156,7 @@ public class CompressionTest {
 			store.storeChanges(null, testTable, "row", null, null, null);
 			store.setCompression("gz");
 			store.storeChanges(null, testTable, "row", null, null, null);
-			HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+			HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 			assertEquals(Algorithm.GZ, propFamD.getCompression());
 		} finally {
 			store.setForceCompression(false);
@@ -158,7 +168,7 @@ public class CompressionTest {
 		
 		store.setCompression("gz-or-none");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		assertEquals(Algorithm.GZ, propFamD.getCompression());
 	}
 	
@@ -167,7 +177,7 @@ public class CompressionTest {
 		
 		store.setCompression("dummy-or-gz");
 		store.storeChanges(null, testTable, "row", null, null, null);
-		HColumnDescriptor propFamD = store.getAdmin().getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+		HColumnDescriptor propFamD = admin.getTableDescriptor(Bytes.toBytes(testTable)).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 		assertEquals(Algorithm.GZ, propFamD.getCompression());
 	}
 	

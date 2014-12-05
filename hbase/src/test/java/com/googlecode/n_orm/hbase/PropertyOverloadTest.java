@@ -9,7 +9,10 @@ import java.util.TreeMap;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Durability;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm;
 import org.apache.hadoop.hbase.regionserver.BloomType;
@@ -85,37 +88,44 @@ public class PropertyOverloadTest {
 		}
 	}
 	
-	public void deleteTable() {
+	public void deleteTable() throws Exception {
 		this.deleteTable("");
 	}
 	
-	public void deleteTable(String postfix) {
+	public void deleteTable(String postfix) throws Exception {
+		HBaseAdmin admin = new HBaseAdmin(store.getConnection());
 		try {
 			String actualTable = table+postfix;
-			if (store.getAdmin().tableExists(actualTable)) {
-				if (store.getAdmin().isTableEnabled(actualTable)) {
-					store.getAdmin().disableTable(actualTable);
+			if (admin.tableExists(actualTable)) {
+				if (admin.isTableEnabled(actualTable)) {
+					admin.disableTable(actualTable);
 				}
-				store.getAdmin().deleteTable(actualTable);
+				admin.deleteTable(actualTable);
 			}
 		} catch (Exception x) {
 			throw new RuntimeException(x);
+		} finally {
+			admin.close();
 		}
 	}
 	
-	public HTableDescriptor getTableDescriptor() {
+	public HTableDescriptor getTableDescriptor() throws Exception {
 		return this.getTableDescriptor("");
 	}
 	
-	public HTableDescriptor getTableDescriptor(String postfix) {
+	public HTableDescriptor getTableDescriptor(String postfix) throws Exception {
+		HBaseAdmin admin = new HBaseAdmin(store.getConnection());
 		try {
-			return store.getAdmin().getTableDescriptor(Bytes.toBytes(table+postfix));
+			return admin.getTableDescriptor(Bytes.toBytes(table+postfix));
 		} catch (IOException e) {
 			throw new RuntimeException(e);
+		} finally {
+			admin.close();
 		}
 	}
 	
-	public void createTable(boolean createDefault, boolean defaultInMem, Algorithm defaultCompr, boolean createOvr, boolean ovrInMem, Algorithm ovrCompr, boolean deferredLogFlush) {
+	public void createTable(boolean createDefault, boolean defaultInMem, Algorithm defaultCompr, boolean createOvr, boolean ovrInMem, Algorithm ovrCompr, boolean deferredLogFlush) throws Exception {
+		HBaseAdmin admin = new HBaseAdmin(store.getConnection());
 		try {
 			this.deleteTable();
 			
@@ -134,13 +144,15 @@ public class PropertyOverloadTest {
 				td.addFamily(cd);
 			}
 			
-			store.getAdmin().createTable(td);
+			admin.createTable(td);
 		} catch (Exception x) {
 			throw new RuntimeException(x);
+		} finally {
+			admin.close();
 		}
 	}
 	
-	public HColumnDescriptor getColumnFamilyDescriptor(Field field, HTableDescriptor td) {
+	public HColumnDescriptor getColumnFamilyDescriptor(Field field, HTableDescriptor td) throws Exception {
 		if (td == null)
 			td = this.getTableDescriptor();
 		return td.getFamily(Bytes.toBytes(field == null ? PropertyManagement.PROPERTY_COLUMNFAMILY_NAME : field.getName()));
@@ -183,7 +195,7 @@ public class PropertyOverloadTest {
 	}
 
 	@Test
-	public void firstCreation() {
+	public void firstCreation() throws Exception {
 		this.deleteTable();
 		store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, true)).withPostfixedTable(table, ""), table, id, this.getChangedValues(true, true, true), null, null);
 		
@@ -227,7 +239,7 @@ public class PropertyOverloadTest {
 	}
 
 	@Test
-	public void alreadyCompressionNoneAllChanges() {
+	public void alreadyCompressionNoneAllChanges() throws Exception {
 		this.createTable(true, false, Algorithm.NONE, true, false, Algorithm.NONE, false);
 		store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, false)).withPostfixedTable(table, ""), table, id, this.getChangedValues(true, true, false), null, null);
 		
@@ -242,7 +254,7 @@ public class PropertyOverloadTest {
 	}
 
 	@Test
-	public void alreadyCompressionOvrOnlyChanges() {
+	public void alreadyCompressionOvrOnlyChanges() throws Exception {
 		this.createTable(true, true, Algorithm.NONE, true, false, Algorithm.NONE, false);
 		store.storeChanges(new MetaInformation().forElement(elt).withColumnFamilies(this.getChangedFields(true, true, false)).withPostfixedTable(table, ""), table, id, this.getChangedValues(true, true, false), null, null);
 		
@@ -257,37 +269,37 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void scanCaching() {
+	public void scanCaching() throws Exception {
 		Scan s = store.getScan(null, Element.class, null);
 		assertEquals(1, s.getCaching());
 	}
 	
 	@Test
-	public void scanCachingSimpleFam() {
+	public void scanCachingSimpleFam() throws Exception {
 		Scan s = store.getScan(null, Element.class, this.getChangedFields(true, false, false));
 		assertEquals(1, s.getCaching());
 	}
 	
 	@Test
-	public void scanCachingOverFam() {
+	public void scanCachingOverFam() throws Exception {
 		Scan s = store.getScan(null, Element.class, this.getChangedFields(true, true, false));
 		assertEquals(2, s.getCaching());
 	}
 	
 	@Test
-	public void scanCachingOver2Fam() {
+	public void scanCachingOver2Fam() throws Exception {
 		Scan s = store.getScan(null, Element.class, this.getChangedFields(true, true, true));
 		assertEquals(2, s.getCaching());
 	}
 	
 	@Test
-	public void scanCachingOverFam3Only() {
+	public void scanCachingOverFam3Only() throws Exception {
 		Scan s = store.getScan(null, Element.class, this.getChangedFields(false, false, true));
 		assertEquals(3, s.getCaching());
 	}
 	
 	@Test
-	public void overrideCFSchemaWithPostfix() {
+	public void overrideCFSchemaWithPostfix() throws Exception {
 		String postfix = "p1";
 		try {
 			this.deleteTable(postfix);
@@ -308,7 +320,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void overrideCFSchemaWithEmptyPostfix() {
+	public void overrideCFSchemaWithEmptyPostfix() throws Exception {
 		try {
 			this.deleteTable();
 			DefaultHBaseSchema schema = new DefaultHBaseSchema();
@@ -327,7 +339,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void overrideCFSchemaWithBadPostfix() {
+	public void overrideCFSchemaWithBadPostfix() throws Exception {
 		String postfix = "p1";
 		try {
 			this.deleteTable(postfix);
@@ -348,7 +360,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void overrideOverriddenCFSchemaWithPostfix() {
+	public void overrideOverriddenCFSchemaWithPostfix() throws Exception {
 		String postfix = "p1";
 		try {
 			this.deleteTable(postfix);
@@ -370,7 +382,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void overrideTableSchemaWithPostfix() {
+	public void overrideTableSchemaWithPostfix() throws Exception {
 		String postfix = "p1";
 		try {
 			this.deleteTable(postfix);
@@ -391,7 +403,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void overrideTableAndCfSchemaWithPostfix() {
+	public void overrideTableAndCfSchemaWithPostfix() throws Exception {
 		String postfix = "p1";
 		try {
 			this.deleteTable(postfix);
@@ -427,7 +439,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void deferredLogFlush() {
+	public void deferredLogFlush() throws Exception {
 		this.deleteTable();
 		store.storeChanges(new MetaInformation().forElement(new DLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
@@ -437,7 +449,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void deferredLogFlushChangedNotForced() {
+	public void deferredLogFlushChangedNotForced() throws Exception {
 		this.deleteTable();
 		this.createTable(false, false, null, false, false, null, false);
 		store.storeChanges(new MetaInformation().forElement(new DLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
@@ -458,7 +470,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void notDeferredLogFlush() {
+	public void notDeferredLogFlush() throws Exception {
 		this.deleteTable();
 		store.storeChanges(new MetaInformation().forElement(new NDLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
@@ -469,7 +481,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void notDeferredLogFlushChangedNotForced() {
+	public void notDeferredLogFlushChangedNotForced() throws Exception {
 		this.deleteTable();
 		this.createTable(false, false, null, false, false, null, true);
 		store.storeChanges(new MetaInformation().forElement(new NDLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
@@ -490,7 +502,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void deferredLogFlushNotForced() {
+	public void deferredLogFlushNotForced() throws Exception {
 		this.deleteTable();
 		store.storeChanges(new MetaInformation().forElement(new DLFNotForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
@@ -500,7 +512,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void deferredLogFlushChangedNotForcedNotForced() {
+	public void deferredLogFlushChangedNotForcedNotForced() throws Exception {
 		this.deleteTable();
 		this.createTable(false, false, null, false, false, null, false);
 		store.storeChanges(new MetaInformation().forElement(new DLFNotForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
@@ -521,7 +533,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void deferredLogFlushForced() {
+	public void deferredLogFlushForced() throws Exception {
 		this.deleteTable();
 		store.storeChanges(new MetaInformation().forElement(new DLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
@@ -531,7 +543,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void deferredLogFlushChangedForcedForced() {
+	public void deferredLogFlushChangedForcedForced() throws Exception {
 		this.deleteTable();
 		this.createTable(false, false, null, false, false, null, false);
 		store.storeChanges(new MetaInformation().forElement(new DLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
@@ -552,7 +564,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void ndeferredLogFlushForced() {
+	public void ndeferredLogFlushForced() throws Exception {
 		this.deleteTable();
 		store.storeChanges(new MetaInformation().forElement(new NDLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
@@ -562,7 +574,7 @@ public class PropertyOverloadTest {
 	}
 	
 	@Test
-	public void ndeferredLogFlushChangedForcedForced() {
+	public void ndeferredLogFlushChangedForcedForced() throws Exception {
 		this.deleteTable();
 		this.createTable(false, false, null, false, false, null, true);
 		store.storeChanges(new MetaInformation().forElement(new NDLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);

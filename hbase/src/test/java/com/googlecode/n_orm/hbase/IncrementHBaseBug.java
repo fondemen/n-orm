@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -106,7 +107,13 @@ public class IncrementHBaseBug {
 //		read = ConversionTools.convert(int.class, data);
 //		assertEquals(1, read);
 		
-		store.getAdmin().flush(testTable);
+		HBaseAdmin admin = new HBaseAdmin(store.getConnection());
+		try {
+			admin.flush(testTable);
+		} finally {
+			admin.close();
+		}
+		
 		store.delete(null, testTable, testKey);
 		
 		store.storeChanges(null, testTable, testKey, null, null, all_incrs );
@@ -148,7 +155,12 @@ public class IncrementHBaseBug {
 		elt.ival++;
 		elt.store();
 
-		store.getAdmin().flush(elt.getTable());
+		HBaseAdmin admin = new HBaseAdmin(store.getConnection());
+		try {
+			admin.flush(elt.getTable());
+		} finally {
+			admin.close();
+		}
 		elt.delete();
 
 		elt = new SimpleStorageTest.IncrementingElement(testKey);
