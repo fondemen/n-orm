@@ -36,7 +36,6 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.InvalidFamilyOperationException;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.NotServingRegionException;
 import org.apache.hadoop.hbase.TableExistsException;
@@ -1847,14 +1846,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			return null;
 		
 		ColumnFamilyData ret = new DefaultColumnFamilyData();
-		for (Cell kv : r.listCells()) {
-			String familyName = Bytes.toString(CellUtil.cloneFamily(kv));
+		for (Cell kv : r.rawCells()) {
+			String familyName = Bytes.toString(kv.getFamilyArray(), kv.getFamilyOffset(), kv.getFamilyLength());
 			Map<String, byte[]> fam = ret.get(familyName);
 			if (fam == null) {
 				fam = new TreeMap<String, byte[]>();
 				ret.put(familyName, fam);
 			}
-			fam.put(Bytes.toString(CellUtil.cloneQualifier(kv)),
+			fam.put(Bytes.toString(kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength()),
 					CellUtil.cloneValue(kv));
 		}
 		return ret;
@@ -2155,7 +2154,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		Map<String, byte[]> ret = new HashMap<String, byte[]>();
 		if (!r.isEmpty()) {
 			for (Cell kv : r.rawCells()) {
-				ret.put(Bytes.toString(CellUtil.cloneQualifier(kv)), CellUtil.cloneValue(kv));
+				ret.put(Bytes.toString(kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength()),
+						CellUtil.cloneValue(kv));
 			}
 		}
 		return ret;
