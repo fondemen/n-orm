@@ -6,11 +6,14 @@ import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.Map.Entry;
 
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 public class RowWrapper implements Row, Serializable {
 	private static final long serialVersionUID = -3943538431236454382L;
@@ -26,12 +29,16 @@ public class RowWrapper implements Row, Serializable {
 		this.key = Bytes.toString(r.getRow());
 		if (sendValues) {
 			this.values = new DefaultColumnFamilyData();
-			for (Entry<byte[], NavigableMap<byte[], byte[]>> famData : r.getNoVersionMap().entrySet()) {
-				Map<String, byte[]> fam = new TreeMap<String, byte[]>();
-				this.values.put(Bytes.toString(famData.getKey()), fam);
-				for (Entry<byte[], byte[]> colData : famData.getValue().entrySet()) {
-					fam.put(Bytes.toString(colData.getKey()), colData.getValue());
+
+			for (Cell kv : r.rawCells()) {
+				String familyName = Bytes.toString(kv.getFamilyArray(), kv.getFamilyOffset(), kv.getFamilyLength());
+				Map<String, byte[]> fam = this.values.get(familyName);
+				if (fam == null) {
+					fam = new TreeMap<String, byte[]>();
+					this.values.put(familyName, fam);
 				}
+				fam.put(Bytes.toString(kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength()),
+						CellUtil.cloneValue(kv));
 			}
 		} else
 			this.values = null;
