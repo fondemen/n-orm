@@ -37,8 +37,8 @@ public class LocalFormat {
 		if (outputWriterClass != null)
 			conf.set(LocalOutputFormat.OUTPUTWRITER_CLASS, outputWriterClass.getName());
 		//Disabling speculative execution
-	    conf.setBoolean("mapred.map.tasks.speculative.execution", false);
-	    conf.setBoolean("mapred.reduce.tasks.speculative.execution", false);
+	    conf.setBoolean("mapreduce.map.speculative", false);
+	    conf.setBoolean("mapreduce.reduce.speculative", false);
 		return conf;
 	}
 	
@@ -91,7 +91,7 @@ public class LocalFormat {
 		try {
 			table = new HTable(this.conf,
 					conf.get(TableInputFormat.INPUT_TABLE));
-			this.table.setAutoFlush(false);
+			this.table.setAutoFlushTo(false);
 		} catch (IOException e) {
 			throw new RuntimeException(e.getMessage(), e);
 		}
