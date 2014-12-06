@@ -77,7 +77,10 @@ public class HBase {
 		new HBaseDependency("commons-io*.jar,lib/commons-io*.jar,io*.jar,lib/io*.jar", "org.apache.commons.io.FileUtils"),
 		new HBaseDependency("commons-http*.jar,lib/commons-http*.jar,http*.jar,lib/http*.jar", "org.apache.hadoop.conf.Configuration"),
 		new HBaseDependency("hadoop*.jar,lib/hadoop*.jar", "org.apache.commons.httpclient.HttpMethod"),
-		new HBaseDependency("hbase*.jar", "org.apache.hadoop.hbase.HBaseConfiguration"),
+		new HBaseDependency("hbase-common*.jar,lib/hbase-common*.jar", "org.apache.hadoop.hbase.HBaseConfiguration"),
+		new HBaseDependency("hbase-client*.jar,lib/hbase-client*.jar", "org.apache.hadoop.hbase.client.Put"),
+		new HBaseDependency("hbase-server*.jar,lib/hbase-server*.jar", "org.apache.hadoop.hbase.util.CompressionTest"),
+		new HBaseDependency("hbase-protocol*.jar,lib/hbase-protocol*.jar", "org.apache.hadoop.hbase.protobuf.generated.MasterProtos"),
 		new HBaseDependency("commons-logging*.jar,lib/commons-logging*.jar", "org.apache.commons.logging.LogFactory"),
 		new HBaseDependency("commons-lang*.jar,lib/commons-lang*.jar", "org.apache.commons.lang.StringUtils"),
 		new HBaseDependency("log4j*.jar,lib/log4j*.jar", "org.apache.log4j.Logger"),
@@ -111,7 +114,7 @@ public class HBase {
 						.getDeclaredMethod("addURL", parameters);
 				method.setAccessible(true);
 				method.invoke(sysloader, new Object[] { file.toURI().toURL() });
-				logger.fine(file.getAbsolutePath() + " added to classpath");
+				logger.info(file.getAbsolutePath() + " added to classpath");
 			} catch (Throwable t) {
 				errorLogger.log(Level.SEVERE, "Warning: could not add jar file "	+ file.getAbsolutePath(), t);
 			}

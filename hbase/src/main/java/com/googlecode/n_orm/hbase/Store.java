@@ -1946,7 +1946,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 						rowPut.add(cf, Bytes.toBytes(col.getKey()), col.getValue());
 					}
 				}
-				if (rowPut.getFamilyMap().isEmpty())
+				if (rowPut.getFamilyCellMap().isEmpty())
 					rowPut = null;
 				else
 					actions.add(rowPut);
