@@ -83,14 +83,17 @@ public class HBase {
 		new HBaseDependency("hbase-protocol*.jar,lib/hbase-protocol*.jar", "org.apache.hadoop.hbase.protobuf.generated.MasterProtos"),
 		new HBaseDependency("commons-logging*.jar,lib/commons-logging*.jar", "org.apache.commons.logging.LogFactory"),
 		new HBaseDependency("commons-lang*.jar,lib/commons-lang*.jar", "org.apache.commons.lang.StringUtils"),
+		new HBaseDependency("commons-collections*.jar,lib/commons-collections*.jar", "org.apache.commons.collections.map.UnmodifiableMap"),
 		new HBaseDependency("log4j*.jar,lib/log4j*.jar", "org.apache.log4j.Logger"),
 		new HBaseDependency("slf4j*.jar,lib/slf4j*.jar", "org.slf4j.LoggerFactory"),
 		new HBaseDependency("jackson*.jar,lib/jackson*.jar", "org.codehaus.jackson.map.JsonMappingException"),
 		new HBaseDependency("protobuf*.jar,lib/protobuf*.jar", "com.google.protobuf.Message"),
 		new HBaseDependency("guava*.jar,lib/guava*.jar", "com.google.common.base.Predicate"),
 		new HBaseDependency("avro*.jar,lib/avro*.jar", "org.apache.avro.io.DatumReader"),
+		new HBaseDependency("netty*.jar,lib/netty*.jar", "org.jboss.netty.channel.ChannelFactory"),
 		new HBaseDependency("guava*jar.jar,lib/guava*jar.jar", null), //Loading Hadoop's patched guava yet not checking it's there (only required by CDH)
 		new HBaseDependency("hadoop-common*.jar,lib/hadoop-common*.jar", null), //Loading hadoop-common yet not checking it's there (only required by CDH)
+		new HBaseDependency("htrace*.jar,lib/htrace*.jar", null), //Loading htrace yet not checking it's there (only required by CDH)
 		new HBaseDependency("*snappy*.jar,lib/*snappy*.jar", null),
 		new HBaseDependency("*lzo*.jar,lib/*lzo*.jar", null)
 	};
