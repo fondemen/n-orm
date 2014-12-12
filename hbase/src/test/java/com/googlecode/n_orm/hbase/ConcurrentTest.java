@@ -113,9 +113,9 @@ public class ConcurrentTest {
 		if (store1.getAdmin().tableExists(table)) {
 			store1.truncate(null, table, (Constraint)null);
 			assertEquals(0, store1.count(null, table, (Constraint)null));
+			if (!store1.getAdmin().isTableEnabled("t1"))
+				store1.getAdmin().enableTable("t1");
 		}
-		if (!store1.getAdmin().isTableEnabled("t1"))
-			store1.getAdmin().enableTable("t1");
 	}
 	
 	@Test
