@@ -9,9 +9,9 @@
 	<properties>
 		<java.version>1.6</java.version>
 		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
-		<hbase.version>0.94.6</hbase.version>
+		<hbase.version>0.98.1-hadoop2</hbase.version>
 		<aspectj.version>1.7.4</aspectj.version>
-		<plugin.aspectj.version>1.4</plugin.aspectj.version>
+		<plugin.aspectj.version>1.6</plugin.aspectj.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 	<packaging>jar</packaging>
@@ -125,6 +125,11 @@
 			<version>hbase-${hbase.version}-SNAPSHOT</version>
 			<type>pom</type>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-server</artifactId>
+			<version>${hbase.version}</version>
 		</dependency>
 	</dependencies>
 	

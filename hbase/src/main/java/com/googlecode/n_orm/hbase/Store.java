@@ -403,7 +403,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					throw new DatabaseNotReachedException(new MasterNotRunningException());
 				}
 			} catch (Exception e) {
-				errorLogger.severe("Could not connect HBase for store " + this.hashCode() + " (" +e.getMessage() +')');
+				errorLogger.log(Level.SEVERE, "Could not connect HBase for store " + this.hashCode() + " (" +e.getMessage() +')', e);
 				throw new DatabaseNotReachedException(e);
 			}
 		
@@ -2243,7 +2243,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		Map<String, byte[]> ret = new HashMap<String, byte[]>();
 		if (!r.isEmpty()) {
 			for (Cell kv : r.rawCells()) {
-				ret.put(Bytes.toString(kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength()), 
+				ret.put(Bytes.toString(kv.getQualifierArray(), kv.getQualifierOffset(), kv.getQualifierLength()),
 						CellUtil.cloneValue(kv));
 			}
 		}
