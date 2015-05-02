@@ -115,6 +115,10 @@ public aspect PropertyManagement {
 				if(! field.equals(this.field))
 					throw new Error("Setting property with different fields (was " + this.field.getName() + ", setting to " + field.getName() + ") for " +this.owner);
 			}
+			if (this.name != null && !this.name.equals(field.getName())) {
+				throw new Error("Setting property with bad field name (was " + this.field + ", setting to " + field.getName() + ") for " +this.owner);
+			}
+			
 			this.field = field;
 			this.key = km.isKey(field);
 			this.delta = field.isAnnotationPresent(Incrementing.class);
@@ -313,6 +317,7 @@ public aspect PropertyManagement {
 					this.putElement(p.getName(), p);
 					p.updateFromPOJOInt(val, null);
 				} else {
+					p.setField(f);
 					p.updateFromPOJO();
 				}
 				assert p.getValue() != null || !this.containsKey(p.getName());
