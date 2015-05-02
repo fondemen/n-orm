@@ -101,7 +101,7 @@ public aspect StorageManagement {
 						return old;
 					}
 				}
-				newProps = new HashMap<String, Object>();
+				newProps = new HashMap<String, Object>(oldProps);
 			}
 			newProps.put(key, o);
 			if (ap.compareAndSet(oldProps, Collections.unmodifiableMap(newProps))) {
