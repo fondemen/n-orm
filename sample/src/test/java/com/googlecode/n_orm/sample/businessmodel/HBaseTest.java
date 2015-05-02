@@ -7,6 +7,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Test;
@@ -33,11 +34,16 @@ public class HBaseTest extends BasicTest {
 		//According to src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties, should be GZ
 		assertTrue(st.getCompression().equals("gz"));
 		//Checking with HBase that the property column family is actually stored in GZ
-		HTableDescriptor td = st.getAdmin().getTableDescriptor(Bytes.toBytes(PersistingMixin.getInstance().getTable(Book.class) /*could be bsut.getTable()*/));
-		//Getting the property CF descriptor
-		HColumnDescriptor pd = td.getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
-		//According to src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties, should GZ
-		Algorithm comp = pd.getCompression();
-		assertEquals(st.getCompression(), comp.getName());
+		HBaseAdmin admin = new HBaseAdmin(st.getConnection());
+		try {
+			HTableDescriptor td = admin.getTableDescriptor(Bytes.toBytes(PersistingMixin.getInstance().getTable(Book.class) /*could be bsut.getTable()*/));
+			//Getting the property CF descriptor
+			HColumnDescriptor pd = td.getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+			//According to src/test/resources/com/googlecode/n_orm/sample/businessmodel/store.properties, should GZ
+			Algorithm comp = pd.getCompression();
+			assertEquals(st.getCompression(), comp.getName());
+		} finally {
+			admin.close();
+		}
 	 }
 }
