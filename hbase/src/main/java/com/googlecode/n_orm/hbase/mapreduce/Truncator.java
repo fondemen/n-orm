@@ -3,9 +3,8 @@ package com.googlecode.n_orm.hbase.mapreduce;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
@@ -19,8 +18,7 @@ public class Truncator {
 
 	static final String NAME = "truncator";
 	public static class TruncatorMapper extends
-			TableMapper<ImmutableBytesWritable, Void> {
-		private HTable table;
+			TableMapper<ImmutableBytesWritable, Delete> {
 		
 		@Override
 		protected void setup(Context context) throws IOException,
@@ -28,22 +26,14 @@ public class Truncator {
 			super.setup(context);
 			LocalFormat lf = new LocalFormat();
 			lf.setConf(context.getConfiguration());
-			this.table = lf.getTable();
-		}
-
-		@Override
-		protected void cleanup(Context context) throws IOException,
-				InterruptedException {
-			this.table.flushCommits();
-			super.cleanup(context);
 		}
 
 		@Override
 		public void map(ImmutableBytesWritable row, Result values,
-				Context context) throws IOException {
+				Context context) throws IOException, InterruptedException {
 			for (@SuppressWarnings("unused")
-			KeyValue value : values.list()) {
-				this.table.delete(new Delete(row.get()));
+				Cell value : values.listCells()) {
+				context.write(row, new Delete(row.get()));
 			}
 		}
 	}

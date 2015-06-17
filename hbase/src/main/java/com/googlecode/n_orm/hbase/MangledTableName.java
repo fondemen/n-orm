@@ -1,33 +1,11 @@
 package com.googlecode.n_orm.hbase;
 
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Table;
 
 public class MangledTableName implements Comparable<MangledTableName> {
-	private final String name;
-	private byte[] bytes;
-	
-	public MangledTableName(String name) {
-		this.name = this.mangleTableName(name);
-	}
-	
-	public MangledTableName(HTableInterface table) {
-		this.bytes = table.getTableName();
-		this.name = Bytes.toString(table.getTableName());
-		assert this.name.equals(this.mangleTableName(this.name));
-	}
-	
-	public String getName() {
-		return name;
-	}
-	
-	public byte[] getNameAsBytes() {
-		if (this.bytes == null)
-			this.bytes = Bytes.toBytes(this.getName());
-		return this.bytes;
-	}
 
-	protected String mangleTableName(String table) {
+	protected static String mangleTableName(String table) {
 		if (table.startsWith(".") || table.startsWith("-")) {
 			table = "t" + table;
 		}
@@ -39,6 +17,29 @@ public class MangledTableName implements Comparable<MangledTableName> {
 		}
 		
 		return table;
+	}
+	
+	private TableName tableName;
+	
+	public MangledTableName(String name) {
+		this.tableName = TableName.valueOf(mangleTableName(name));
+	}
+	
+	public MangledTableName(Table table) {
+		this.tableName = table.getName();
+		assert this.getName().equals(mangleTableName(this.getName()));
+	}
+	
+	public String getName() {
+		return this.tableName.getNameAsString();
+	}
+	
+	public byte[] getNameAsBytes() {
+		return this.tableName.getName();
+	}
+	
+	public TableName getTableName() {
+		return this.tableName;
 	}
 
 	@Override
@@ -55,7 +56,7 @@ public class MangledTableName implements Comparable<MangledTableName> {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((name == null) ? 0 : name.hashCode());
+		result = prime * result + ((this.getName() == null) ? 0 : this.getName().hashCode());
 		return result;
 	}
 
@@ -68,10 +69,12 @@ public class MangledTableName implements Comparable<MangledTableName> {
 		if (getClass() != obj.getClass())
 			return false;
 		MangledTableName other = (MangledTableName) obj;
-		if (name == null) {
-			if (other.name != null)
+		String thisName = this.getName();
+		String otherName = other.getName();
+		if (thisName == null) {
+			if (otherName != null)
 				return false;
-		} else if (!name.equals(other.name))
+		} else if (!thisName.equals(otherName))
 			return false;
 		return true;
 	}

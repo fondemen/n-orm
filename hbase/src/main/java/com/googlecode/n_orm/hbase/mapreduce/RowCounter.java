@@ -2,7 +2,7 @@ package com.googlecode.n_orm.hbase.mapreduce;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
@@ -26,7 +26,7 @@ public class RowCounter {
 		@Override
 		public void map(ImmutableBytesWritable row, Result values,
 				Context context) throws IOException {
-			for (@SuppressWarnings("unused") KeyValue value : values.list()) {
+			for (@SuppressWarnings("unused") Cell value : values.listCells()) {
 				context.getCounter(Counters.ROWS).increment(1);
 				break;
 			}

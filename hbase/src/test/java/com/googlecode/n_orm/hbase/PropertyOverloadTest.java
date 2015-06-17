@@ -130,7 +130,7 @@ public class PropertyOverloadTest {
 			this.deleteTable();
 			
 			HTableDescriptor td = new HTableDescriptor(table);
-			td.setDeferredLogFlush(deferredLogFlush);
+			td.setDurability(deferredLogFlush ? Durability.ASYNC_WAL : Durability.SYNC_WAL);
 			if (createDefault) {
 				HColumnDescriptor cd = new HColumnDescriptor(defaultCfField.getName());
 				cd.setInMemory(defaultInMem);
@@ -445,7 +445,7 @@ public class PropertyOverloadTest {
 		
 		HTableDescriptor td = this.getTableDescriptor();
 		
-		assertTrue(td.isDeferredLogFlush());
+		assertEquals(Durability.ASYNC_WAL, td.getDurability());
 	}
 	
 	@Test
@@ -455,8 +455,8 @@ public class PropertyOverloadTest {
 		store.storeChanges(new MetaInformation().forElement(new DLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
-		
-		assertFalse(td.isDeferredLogFlush());
+
+		assertEquals(Durability.SYNC_WAL, td.getDurability());
 	}
 	
 	@Persisting(table="PropertyOverloadTest")
@@ -475,8 +475,8 @@ public class PropertyOverloadTest {
 		store.storeChanges(new MetaInformation().forElement(new NDLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
-		
-		assertFalse(td.isDeferredLogFlush());
+
+		assertEquals(Durability.SYNC_WAL, td.getDurability());
 
 	}
 	
@@ -487,8 +487,8 @@ public class PropertyOverloadTest {
 		store.storeChanges(new MetaInformation().forElement(new NDLFElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
-		
-		assertTrue(td.isDeferredLogFlush());
+
+		assertEquals(Durability.ASYNC_WAL, td.getDurability());
 	}
 	
 	@Persisting(table="PropertyOverloadTest")
@@ -507,8 +507,8 @@ public class PropertyOverloadTest {
 		store.storeChanges(new MetaInformation().forElement(new DLFNotForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
-		
-		assertTrue(td.isDeferredLogFlush());
+
+		assertEquals(Durability.ASYNC_WAL, td.getDurability());
 	}
 	
 	@Test
@@ -518,8 +518,8 @@ public class PropertyOverloadTest {
 		store.storeChanges(new MetaInformation().forElement(new DLFNotForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
-		
-		assertFalse(td.isDeferredLogFlush());
+
+		assertEquals(Durability.SYNC_WAL, td.getDurability());
 	}
 	
 	@Persisting(table="PropertyOverloadTest")
@@ -538,8 +538,8 @@ public class PropertyOverloadTest {
 		store.storeChanges(new MetaInformation().forElement(new DLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
-		
-		assertTrue(td.isDeferredLogFlush());
+
+		assertEquals(Durability.ASYNC_WAL, td.getDurability());
 	}
 	
 	@Test
@@ -549,8 +549,8 @@ public class PropertyOverloadTest {
 		store.storeChanges(new MetaInformation().forElement(new DLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
-		
-		assertTrue(td.isDeferredLogFlush());
+
+		assertEquals(Durability.ASYNC_WAL, td.getDurability());
 	}
 	
 	@Persisting(table="PropertyOverloadTest")
@@ -569,8 +569,8 @@ public class PropertyOverloadTest {
 		store.storeChanges(new MetaInformation().forElement(new NDLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
-		
-		assertFalse(td.isDeferredLogFlush());
+
+		assertEquals(Durability.SYNC_WAL, td.getDurability());
 	}
 	
 	@Test
@@ -580,8 +580,8 @@ public class PropertyOverloadTest {
 		store.storeChanges(new MetaInformation().forElement(new NDLFForcedElement()).withColumnFamilies(this.getChangedFields(true, true, true)), table, id, null, null, null);
 		
 		HTableDescriptor td = this.getTableDescriptor();
-		
-		assertFalse(td.isDeferredLogFlush());
+
+		assertEquals(Durability.SYNC_WAL, td.getDurability());
 	}
 
 }

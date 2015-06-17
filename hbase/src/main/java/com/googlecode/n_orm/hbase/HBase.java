@@ -117,7 +117,7 @@ public class HBase {
 						.getDeclaredMethod("addURL", parameters);
 				method.setAccessible(true);
 				method.invoke(sysloader, new Object[] { file.toURI().toURL() });
-				logger.fine(file.getAbsolutePath() + " added to classpath");
+				logger.info(file.getAbsolutePath() + " added to classpath");
 			} catch (Throwable t) {
 				errorLogger.log(Level.SEVERE, "Warning: could not add jar file "	+ file.getAbsolutePath(), t);
 			}

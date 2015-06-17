@@ -45,13 +45,13 @@ import org.apache.hadoop.hbase.TableNotEnabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.UnknownScannerException;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HConnection;
-import org.apache.hadoop.hbase.client.HConnectionManager;
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -301,7 +301,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	private volatile boolean restarting = false;
 	private final Object restartMutex = new Object();
 	private Configuration config;
-	private HConnection admin;
+	private Connection admin;
 	private long cacheTTLMs = 10*60*1000; //10 min
 	public ConcurrentMap<MangledTableName, HTableDescriptor> tablesD = new ConcurrentHashMap<MangledTableName, HTableDescriptor>();
 	public ConcurrentHashMap<MangledTableName, Object> notExistingTables = new ConcurrentHashMap<MangledTableName, Object>();
@@ -396,12 +396,8 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (this.admin == null)
 			try {
 				logger.fine("Connecting HBase admin for store " + this.hashCode());
-				this.setConnection(HConnectionManager.createConnection(this.config));
+				this.setConnection(ConnectionFactory.createConnection(this.config));
 				logger.fine("Connected HBase admin for store " + this.hashCode());
-				if (!this.admin.isMasterRunning()) {
-					errorLogger.severe("No HBase master running for store " + this.hashCode());
-					throw new DatabaseNotReachedException(new MasterNotRunningException());
-				}
 			} catch (Exception e) {
 				errorLogger.log(Level.SEVERE, "Could not connect HBase for store " + this.hashCode() + " (" +e.getMessage() +')', e);
 				throw new DatabaseNotReachedException(e);
@@ -1055,7 +1051,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * The configuration to be used by this store for its {@link #start()} or {@link #restart()}.
 	 * Only valid when store is not started yet.
 	 * Overloads any other configuration setting already set by {@link #getStore(String)}, {@link #getStore(String, int)}, {@link #getStore(String, int, Integer)}, or {@link #getAdmin()}.
-	 * Ignored in case of a subsequent {@link #setAdmin(HBaseAdmin)}.
+	 * Ignored in case of a subsequent {@link #setAdmin(Admin)}.
 	 * Changed when invoked {@link #start()} or {@link #restart()}.
 	 * @throws IllegalStateException if this store was started already
 	 */
@@ -1088,7 +1084,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			this.maxRetries = null;
 	}
 	
-	public HConnection getConnection() {
+	public Connection getConnection() {
 		return this.admin;
 	}
 
@@ -1097,7 +1093,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	 * Only valid before the store is started.
 	 * @throws IllegalStateException in case this store is already started
 	 */
-	public void setConnection(HConnection conn) {
+	public void setConnection(Connection conn) {
 		if (this.wasStarted)
 			synchronized(this) {
 				if (this.wasStarted)
@@ -1111,9 +1107,11 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		if (! this.wasStarted)
 			return;
 		this.notExistingTables.clear();
+		Admin admin = null;
 		try {
+			admin = this.admin.getAdmin();
 			
-			HTableDescriptor[] tbls = this.admin.listTables();
+			HTableDescriptor[] tbls = admin.listTables();
 			List<HTableDescriptor> tables = tbls == null || tbls.length == 0 ? new LinkedList<HTableDescriptor>() : Arrays.asList(tbls);
 			for(HTableDescriptor td : tables) {
 				this.tablesD.put(new MangledTableName(td.getNameAsString()), td);
@@ -1127,6 +1125,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		} catch (IOException e) {
 			errorLogger.log(Level.SEVERE, "Cannot load existing tables in cache: " + e.getMessage(), e);
 			throw new DatabaseNotReachedException(e);
+		} finally {
+			if (admin != null)
+				try {
+					admin.close();
+				} catch (IOException e) {
+					errorLogger.log(Level.SEVERE, "Cannot close admin while load existing tables in cache: " + e.getMessage(), e);
+				}
 		}
 	}
 	
@@ -1233,9 +1238,9 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			try {
 				TableLocker lock = this.getLock(table);
 				lock.sharedLockTable();
-				HBaseAdmin admin = new HBaseAdmin(this.admin);
+				Admin admin = this.admin.getAdmin();
 				try {
-					if (this.hasTableInt(table) && admin.isTableDisabled(table.getNameAsBytes())) { //First detect the error
+					if (this.hasTableInt(table) && admin.isTableDisabled(table.getTableName())) { //First detect the error
 						errorLogger.log(Level.INFO, "It seems that table " + table + " was disabled ; enabling", e);
 						this.enableTable(clazz, table, tablePostfix);
 					} else // Error was auto-repaired (another thread ?)
@@ -1269,7 +1274,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	}
 	
 	protected <R> R tryPerform(Action<R> action, Class<? extends PersistingElement> clazz,  MangledTableName tableName, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {
-		HTableInterface table = this.getTable(clazz, tableName, tablePostfix, expectedFamilies);
+		Table table = this.getTable(clazz, tableName, tablePostfix, expectedFamilies);
 		try {
 			return this.tryPerform(action, table, clazz, tablePostfix, expectedFamilies);
 		} finally {
@@ -1285,15 +1290,15 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	/**
 	 * Performs an action. Table should be replaced by action.getTable() as it can change in case of problem handling (like a connection lost).
 	 */
-	protected <R> R tryPerform(final Action<R> action, HTableInterface table, Class<? extends PersistingElement> clazz, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {	
-		assert tablePostfix == null || Bytes.toString(table.getTableName()).endsWith(tablePostfix);
+	protected <R> R tryPerform(final Action<R> action, Table table, Class<? extends PersistingElement> clazz, String tablePostfix, Map<String, Field> expectedFamilies) throws DatabaseNotReachedException {	
+		assert tablePostfix == null || Bytes.toString(table.getName().getName()).endsWith(tablePostfix);
 		action.setTable(table);
 		try {
 			return action.perform();
 		} catch (Throwable e) {
-			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
+			errorLogger.log(Level.INFO, "Got an error while performing a " + action.getClass().getName() + " on table " + action.getTable().getName().getNameAsString() + " for store " + this.hashCode(), e);
 			
-			HConnection c = this.admin;
+			Connection c = this.admin;
 			MangledTableName tableName = new MangledTableName(table);
 			this.handleProblem(e, clazz, tableName, tablePostfix, expectedFamilies);
 			if (c != this.admin) { //Store was restarted ; we should get a new table client
@@ -1301,10 +1306,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				action.setTable(table);
 			}
 			try {
-				errorLogger.log(Level.INFO, "Retrying to perform again erroneous " + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
+				errorLogger.log(Level.INFO, "Retrying to perform again erroneous " + action.getClass().getName() + " on table " + action.getTable().getName().getNameAsString() + " for store " + this.hashCode(), e);
 				return action.perform();
 			} catch (Exception f) {
-				errorLogger.log(Level.SEVERE, "Cannot recover from error while performing a" + action.getClass().getName() + " on table " + Bytes.toString(action.getTable().getTableName()) + " for store " + this.hashCode(), e);
+				errorLogger.log(Level.SEVERE, "Cannot recover from error while performing a" + action.getClass().getName() + " on table " + action.getTable().getName().getNameAsString() + " for store " + this.hashCode(), e);
 				throw new DatabaseNotReachedException(f);
 			}
 		}
@@ -1376,18 +1381,18 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	
 	private boolean hasTableInt(MangledTableName name) throws IOException {
 		boolean ret;
-		HBaseAdmin admin = null;
+		Admin admin = null;
 		try {
-			admin = new HBaseAdmin(this.admin);
-			ret = admin.tableExists(name.getNameAsBytes());
+			admin = this.admin.getAdmin();
+			ret = admin.tableExists(name.getTableName());
 		} catch (IOException x) {
 			if (admin != null)
 				admin.close();
-			admin = new HBaseAdmin(this.admin);
+            admin = this.admin.getAdmin();
 			String msg = x.getMessage();
 			if (msg != null && msg.contains("closed")) {
 				this.restart();
-				ret = admin.tableExists(name.getNameAsBytes());
+				ret = admin.tableExists(name.getTableName());
 			} else {
 				throw x;
 			}
@@ -1411,11 +1416,11 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					throws IOException {
 		TableLocker lock = this.getLock(tableName);
 		lock.exclusiveLockTable();
-		HConnection c = this.admin;
-		HBaseAdmin admin = new HBaseAdmin(this.admin);
+		Connection c = this.admin;
+		Admin admin = c.getAdmin();
 		try {
 			try {
-				admin.disableTable(tableName.getNameAsBytes());
+				admin.disableTable(tableName.getTableName());
 			} catch (TableNotEnabledException x) {
 				logger.info("Table " + tableName + " already disabled");
 			} catch (TableNotFoundException x) {
@@ -1423,14 +1428,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				if (c != this.admin) {
 					// Was restarted
 					admin.close();
-					admin = new HBaseAdmin(this.admin);
+					admin = this.admin.getAdmin();
 				}
-				admin.disableTable(tableName.getNameAsBytes());
+				admin.disableTable(tableName.getTableName());
 			} finally {
 				lock.exclusiveUnlockTable();
 				admin.close();
 			}
-			if (! admin.isTableDisabled(tableName.getNameAsBytes()))
+			if (! admin.isTableDisabled(tableName.getTableName()))
 				throw new IOException("Not able to disable table " + tableName);
 		} finally {
 			admin.close();
@@ -1444,11 +1449,11 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					throws IOException {
 		TableLocker lock = this.getLock(tableName);
 		lock.exclusiveLockTable();
-		HConnection c = this.admin;
-		HBaseAdmin admin = new HBaseAdmin(this.admin);
+		Connection c = this.admin;
+		Admin admin = this.admin.getAdmin();
 		try {
-			admin.enableTable(tableName.getNameAsBytes());
-			if (!admin.isTableEnabled(tableName.getNameAsBytes()))
+			admin.enableTable(tableName.getTableName());
+			if (!admin.isTableEnabled(tableName.getTableName()))
 				throw new IOException();
 		} catch (TableNotDisabledException x) {
 			logger.info("Table " + tableName + " already enabled");
@@ -1456,10 +1461,10 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			this.handleProblem(x, clazz, tableName, tablePostfix, null);
 			if (c != this.admin) {
 				admin.close();
-				admin = new HBaseAdmin(this.admin);
+				admin = this.admin.getAdmin();
 			}
-			admin.enableTable(tableName.getNameAsBytes());
-			if (!admin.isTableEnabled(tableName.getNameAsBytes()))
+			admin.enableTable(tableName.getTableName());
+			if (!admin.isTableEnabled(tableName.getTableName()))
 				throw new IOException("SEVERE: cannot enable table " + tableName);
 		} finally {
 			lock.exclusiveUnlockTable();
@@ -1477,7 +1482,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 
 			TableLocker lock = this.getLock(name);
 			lock.sharedLockTable();
-			HBaseAdmin admin = new HBaseAdmin(this.admin);
+			Admin admin = this.admin.getAdmin();
 			try {
 				logger.fine("Unknown table " + name + " for store " + this.hashCode());
 				if (!this.hasTable(name)) {
@@ -1504,7 +1509,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 						}
 					} catch (TableExistsException x) {
 						//Already done by another process...
-						td = admin.getTableDescriptor(name.getNameAsBytes());
+						td = admin.getTableDescriptor(name.getTableName());
 						freshDescriptor = true;
 						logger.fine("Got descriptor for table " + name);
 					} finally {
@@ -1513,7 +1518,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					}
 				}
 				if (td == null) {
-					td = admin.getTableDescriptor(name.getNameAsBytes());
+					td = admin.getTableDescriptor(name.getTableName());
 					freshDescriptor = true;
 					logger.fine("Got descriptor for table " + name);
 				}
@@ -1530,28 +1535,28 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			PropertyUtils.setValues(this, td, clazz, tablePostfix);
 			TableLocker lock = this.getLock(name);
 			lock.exclusiveLockTable();
-			HConnection c = this.admin;
-			HBaseAdmin admin = new HBaseAdmin(this.admin);
+			Connection c = this.admin;
+			Admin admin = this.admin.getAdmin();
 			try {
 				this.disableTable(clazz, name, tablePostfix);
 				try {
-					admin.modifyTable(td.getName(), td);
+					admin.modifyTable(td.getTableName(), td);
 				} catch (TableNotFoundException x) {
 					this.handleProblem(x, clazz, name, tablePostfix, null);
 					if (c != this.admin) {
 						admin.close();
-						admin = new HBaseAdmin(this.admin);
+						admin = this.admin.getAdmin();
 					}
-					admin.modifyTable(td.getName(), td);
+					admin.modifyTable(td.getTableName(), td);
 				}
 				do {
 					Thread.sleep(10);
-					td = admin.getTableDescriptor(td.getName());
+					td = admin.getTableDescriptor(td.getTableName());
 				} while (!PropertyUtils.asExpected(this, td, clazz, tablePostfix));
 				this.enableTable(clazz, name, tablePostfix);
 				HTableProperty<?>[] problems = PropertyUtils.checkIsAsExpected(this, td, clazz, tablePostfix);
 				if (problems.length > 0)
-					throw new IOException("Table " + td.getName() + " still has wrong properties " + Arrays.toString(problems));
+					throw new IOException("Table " + td.getTableName().getNameAsString() + " still has wrong properties " + Arrays.toString(problems));
 			} finally {
 				lock.exclusiveUnlockTable();
 				admin.close();
@@ -1569,14 +1574,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		return td;
 	}
 
-	protected HTableInterface getTable(Class<? extends PersistingElement> clazz, MangledTableName name, String tablePostfix, Map<String, Field> expectedFamilies)
+	protected Table getTable(Class<? extends PersistingElement> clazz, MangledTableName name, String tablePostfix, Map<String, Field> expectedFamilies)
 			throws DatabaseNotReachedException {
 		assert tablePostfix == null || name.getName().endsWith(tablePostfix);
 		
 		try {
 			//Checking that this table actually exists with the expected column families
 			this.getTableDescriptor(clazz, name, tablePostfix, expectedFamilies);
-			return this.admin.getTable(name.getNameAsBytes());
+			return this.admin.getTable(name.getTableName());
 		} catch (Throwable x) {
 			this.handleProblem(x, clazz, name, tablePostfix, expectedFamilies);
 			try {
@@ -1585,14 +1590,14 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				throw new DatabaseNotReachedException(x);
 			}
 			try {
-				return this.admin.getTable(name.getNameAsBytes());
+				return this.admin.getTable(name.getTableName());
 			} catch (IOException e) {
 				throw new DatabaseNotReachedException(e);
 			}
 		}
 	}
 	
-	protected void returnTable(HTableInterface table) throws IOException {
+	protected void returnTable(Table table) throws IOException {
 		table.close();
 		//this.tablesC.putTable(table);
 	}
@@ -1608,11 +1613,11 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		
 		TableLocker lock = this.getLock(table);
 		lock.sharedLockTable();
-		HBaseAdmin admin;
+		Admin admin;
 		try {
-			admin = new HBaseAdmin(this.admin);
+			admin = this.admin.getAdmin();
 			try {
-				td = admin.getTableDescriptor(table.getNameAsBytes());
+				td = admin.getTableDescriptor(table.getTableName());
 				this.cache(table, td);
 			} catch (Exception e) {
 				throw new DatabaseNotReachedException(e);
@@ -1637,15 +1642,13 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		List<HColumnDescriptor> toBeAltered = new ArrayList<HColumnDescriptor>(columnFamilies.size());
 		TableLocker lock = null;
 		boolean recreated = freshDescriptor; //Whether table descriptor was just retrieved from HBase admin
-		HBaseAdmin admin;
+		Admin admin;
 		try {
-			admin = new HBaseAdmin(this.admin);
-		} catch (MasterNotRunningException e1) {
-			throw new DatabaseNotReachedException(e1);
-		} catch (ZooKeeperConnectionException e1) {
-			throw new DatabaseNotReachedException(e1);
+			admin = this.admin.getAdmin();
+		} catch (IOException e) {
+			throw new DatabaseNotReachedException(e);
 		}
-		HConnection c = this.admin;
+		Connection c = this.admin;
 		try {
 		for (Entry<String, Field> cf : columnFamilies.entrySet()) {
 			byte[] cfname = Bytes.toBytes(cf.getKey());
@@ -1656,7 +1659,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				lock = this.getLock(tableName);
 				lock.sharedLockTable();
 				try {
-					tableD = admin.getTableDescriptor(tableD.getName());
+					tableD = admin.getTableDescriptor(tableD.getTableName());
 				} catch (Exception e) {
 					errorLogger.log(Level.INFO, " Problem while getting descriptor for " + tableName + "; retrying", e);
 					this.handleProblem(e, clazz, tableName, tablePostfix, null);
@@ -1696,15 +1699,15 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					this.disableTable(clazz, tableName, tablePostfix);
 					for (HColumnDescriptor hColumnDescriptor : toBeAdded) {
 						try {
-							admin.addColumn(tableD.getName(),hColumnDescriptor);
+							admin.addColumn(tableD.getTableName(),hColumnDescriptor);
 						} catch (TableNotFoundException x) {
 							this.handleProblem(x, clazz, tableName, tablePostfix, null);
 							if (c != this.admin) {
 								admin.close();
-								admin = new HBaseAdmin(this.admin);
+								admin = this.admin.getAdmin();
 								c = this.admin;
 							}
-							admin.addColumn(tableD.getName(),hColumnDescriptor);
+							admin.addColumn(tableD.getTableName(),hColumnDescriptor);
 						} catch (InvalidFamilyOperationException x) {
 							String msg = x.getMessage();
 							if (msg != null && msg.contains("already exists")) {
@@ -1715,21 +1718,21 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 					}
 					for (HColumnDescriptor hColumnDescriptor : toBeAltered) {
 						try {
-							admin.modifyColumn(tableD.getName(), hColumnDescriptor);
+							admin.modifyColumn(tableD.getTableName(), hColumnDescriptor);
 						} catch (TableNotFoundException x) {
 							this.handleProblem(x, clazz, tableName, tablePostfix, null);
 							if (c != this.admin) {
 								admin.close();
-								admin = new HBaseAdmin(this.admin);
+								admin = this.admin.getAdmin();
 								c = this.admin;
 							}
-							admin.modifyColumn(tableD.getName(), hColumnDescriptor);
+							admin.modifyColumn(tableD.getTableName(), hColumnDescriptor);
 						}
 					}
 					boolean done = true;
 					do {
 						Thread.sleep(10);
-						tableD = admin.getTableDescriptor(tableD.getName());
+						tableD = admin.getTableDescriptor(tableD.getTableName());
 						for (int i = 0; done && i < toBeAdded.size(); i++) {
 							done = done && tableD.hasFamily(toBeAdded.get(i).getName());
 						}
@@ -1758,7 +1761,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 							throw new IOException("Table " + tableName + " is now lacking familiy " + expectedFamily.getNameAsString());
 						HColumnFamilyProperty<?>[] problems = PropertyUtils.checkIsAsExpected(this, actualFamily, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix);
 						if (problems.length > 0)
-							throw new IOException("Table " + tableD.getName() + " still has wrong properties for column family " + expectedFamily.getNameAsString() + ": " + Arrays.toString(problems));
+							throw new IOException("Table " + tableD.getTableName().getNameAsString() + " still has wrong properties for column family " + expectedFamily.getNameAsString() + ": " + Arrays.toString(problems));
 					}
 					this.cache(tableName, tableD);
 					logger.info("Table " + tableD.getNameAsString() + " altered");
@@ -2005,7 +2008,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 		Map<String, Field> fams = this.toMap(families, meta);
 
 		MangledTableName table = new MangledTableName(tableName);
-		HTableInterface t = this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
+		Table t = this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);
 
 		try {
 			byte[] row = Bytes.toBytes(id);
@@ -2022,7 +2025,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				for (Entry<String, Map<String, byte[]>> family : changed.entrySet()) {
 					byte[] cf = Bytes.toBytes(family.getKey());
 					for (Entry<String, byte[]> col : family.getValue().entrySet()) {
-						rowPut.add(cf, Bytes.toBytes(col.getKey()), col.getValue());
+						rowPut.addColumn(cf, Bytes.toBytes(col.getKey()), col.getValue());
 					}
 				}
 				if (rowPut.getFamilyCellMap().isEmpty())
@@ -2039,7 +2042,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 				for (Entry<String, Set<String>> family : removed.entrySet()) {
 					byte[] cf = Bytes.toBytes(family.getKey());
 					for (String key : family.getValue()) {
-						rowDel.deleteColumns(cf, Bytes.toBytes(key));
+						rowDel.addColumns(cf, Bytes.toBytes(key));
 					}
 	
 				}
@@ -2069,7 +2072,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 			//Adding a dummy value into properties family
 			if (rowPut == null && rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !
 				rowPut = new Put(row);
-				rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
+				rowPut.addColumn(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});
 				actions.add(rowPut);
 			}
 			

@@ -13,9 +13,10 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HConnection;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
@@ -89,11 +90,11 @@ public class ConcurrentTest {
 		store2 = HBaseLauncher.hbaseStore;
 	}
 	
-	private HBaseAdmin admin;
+	private Admin admin;
 	
 	@Before
-	public void createAdmin() throws MasterNotRunningException, ZooKeeperConnectionException {
-		this.admin = new HBaseAdmin(store1.getConnection());
+	public void createAdmin() throws IOException {
+		this.admin = store1.getConnection().getAdmin();
 	}
 	
 	@After
@@ -110,27 +111,30 @@ public class ConcurrentTest {
 	}
 	
 	private void deleteTable(String table) throws IOException {
+		TableName tn = TableName.valueOf(table);
 
-		if (this.admin.tableExists(table)) {
-			this.admin.disableTable(table);
-			this.admin.deleteTable(table);
+		if (this.admin.tableExists(tn)) {
+			this.admin.disableTable(tn);
+			this.admin.deleteTable(tn);
 		}
 	}
 	
 	private void disableTable(String table) throws IOException {
+		TableName tn = TableName.valueOf(table);
 
-		if (this.admin.tableExists(table)) {
-			this.admin.disableTable(table);
+		if (this.admin.tableExists(tn)) {
+			this.admin.disableTable(tn);
 		}
 	}
 	
 	private void truncateTable(String table) throws IOException {
+		TableName tn = TableName.valueOf(table);
 
-		if (this.admin.tableExists(table)) {
+		if (this.admin.tableExists(tn)) {
 			store1.truncate(null, table, (Constraint)null);
 			assertEquals(0, store1.count(null, table, (Constraint)null));
-			if (!this.admin.isTableEnabled("t1"))
-				this.admin.enableTable("t1");
+			if (!this.admin.isTableEnabled(tn))
+				this.admin.enableTable(tn);
 		}
 	}
 	
@@ -270,7 +274,7 @@ public class ConcurrentTest {
 		change1.put("cf1", ch1);
 		ch1.put("k1", new byte[]{1, 2});
 		
-		HConnection cm = this.admin.getConnection();
+		Connection cm = this.admin.getConnection();
 		cm.close();
 		
 		store1.storeChanges(null, "t1", "idt1", change1 , null, null);
@@ -305,26 +309,27 @@ public class ConcurrentTest {
 		}
 
 		CloseableKeyIterator it = store1.get(new MetaInformation().withColumnFamilies(change1Fams), "t1", (Constraint)null, 100, change1Fams.keySet());
-		
+
+		TableName tn = TableName.valueOf("t1");
 		try {
 		
-			this.admin.disableTable("t1");
+			this.admin.disableTable(tn);
 			
 			assertTrue(it.hasNext());
 			assertEquals("idt1", it.next().getKey());
 			
 			assertTrue(it.hasNext());
-			this.admin.disableTable("t1");
+			this.admin.disableTable(tn);
 			assertEquals("idt2", it.next().getKey());
 
-			if (this.admin.isTableEnabled("t1"))
-				this.admin.disableTable("t1");
+			if (this.admin.isTableEnabled(tn))
+				this.admin.disableTable(tn);
 			
 			assertFalse(it.hasNext());
 		
 		} finally {
-			if (!this.admin.isTableEnabled("t1"))
-				this.admin.enableTable("t1");
+			if (!this.admin.isTableEnabled(tn))
+				this.admin.enableTable(tn);
 			
 			it.close();
 		}
@@ -361,7 +366,7 @@ public class ConcurrentTest {
 		ch1.put("k1", new byte[]{1, 2});
 		store1.storeChanges(null, "t1", "idt1", change1 , null, null);
 		
-		byte[] tblNameBytes = Bytes.toBytes("t1");
+		TableName tblNameBytes = TableName.valueOf("t1");
 		HTableDescriptor td = this.admin.getTableDescriptor(tblNameBytes);
 		td.removeFamily(Bytes.toBytes("cf1"));
 		this.admin.disableTable(tblNameBytes);
@@ -384,6 +389,7 @@ public class ConcurrentTest {
 	
 	@Test
 	public void testCompressionForced() throws Exception {
+		final TableName tn = TableName.valueOf("t1");
 		try {
 			//Setting compression to none forced for both store
 			store1.setForceCompression(true);
@@ -392,7 +398,7 @@ public class ConcurrentTest {
 			store2.setCompression("none");
 			store1.storeChanges(null, "t1", "row", null, null, null);
 			store2.storeChanges(null, "t1", "row", null, null, null);
-			HColumnDescriptor propFamD = this.admin.getTableDescriptor(Bytes.toBytes("t1")).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+			HColumnDescriptor propFamD = this.admin.getTableDescriptor(tn).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 			assertEquals(Algorithm.NONE, propFamD.getCompression());
 			
 			//Then setting GZ compression
@@ -400,7 +406,7 @@ public class ConcurrentTest {
 			store2.setCompression("gz");
 			//Store1 should alter the table after a store request
 			store1.storeChanges(null, "t1", "row", null, null, null);
-			propFamD = this.admin.getTableDescriptor(Bytes.toBytes("t1")).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+			propFamD = this.admin.getTableDescriptor(tn).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 			assertEquals(Algorithm.GZ, propFamD.getCompression());
 			
 			//Thread to check that table t1 is not disabled while storing changes from store2 does not alter t1
@@ -409,10 +415,9 @@ public class ConcurrentTest {
 
 				@Override
 				public void run() {
-					byte[] tableName = Bytes.toBytes("t1");
 					while ((Boolean)disableCheckerParameters[0] && (Boolean)disableCheckerParameters[1]) {
 						try {
-							disableCheckerParameters[0]=admin.isTableEnabled(tableName);
+							disableCheckerParameters[0]=admin.isTableEnabled(tn);
 							Thread.sleep(10);
 						} catch (Exception e) {
 							disableCheckerParameters[2] = e;
@@ -435,7 +440,7 @@ public class ConcurrentTest {
 			//Table was always checked as enabled
 			assertTrue("Table was disabled to change compressor while compressor was already changed by another store", (Boolean)disableCheckerParameters[0]);
 			//and is still in GZ mode
-			propFamD = this.admin.getTableDescriptor(Bytes.toBytes("t1")).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
+			propFamD = this.admin.getTableDescriptor(tn).getFamily(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME));
 			assertEquals(Algorithm.GZ, propFamD.getCompression());
 		} finally {
 			store1.setForceCompression(false);
@@ -460,7 +465,7 @@ public class ConcurrentTest {
 		assertEquals(datum, ConversionTools.convert(String.class, out.get(key)));
 		store1.restart();
 		
-		HConnection cm = this.admin.getConnection();
+		Connection cm = this.admin.getConnection();
 		cm.close();
 		
 		out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);
@@ -482,7 +487,7 @@ public class ConcurrentTest {
 		store1.storeChanges(null, "t1", "row", change , null, null);
 		assertTrue(store1.exists(null, "t1", "row"));
 		
-		HConnection cm = this.admin.getConnection();
+		Connection cm = this.admin.getConnection();
 		cm.close();
 		
 		Map<String, byte[]> out = store1.get(null, "t1", "row", PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);

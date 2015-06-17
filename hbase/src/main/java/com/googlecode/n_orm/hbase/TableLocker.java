@@ -89,7 +89,7 @@ public class TableLocker {
 		this.store = store;
 		this.tableName = table.getName();
 		
-		this.lock = new SharedExclusiveLock(store.getZooKeeper(), "/n-orm/schemalock/" + table.getName());
+		this.lock = new SharedExclusiveLock(store.getZooKeeper(), "/n-orm/schemalock/" + this.tableName);
 	}
 	
 	/**

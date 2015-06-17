@@ -18,18 +18,23 @@
 	</scm>
 	
 	<properties>
-		<hbase.version>0.98.1-cdh5.1.0</hbase.version>
-		<hadoop.version>2.3.0-cdh5.1.0</hadoop.version>
-		<hadoop.version.mr1>2.3.0-mr1-cdh5.1.0</hadoop.version.mr1>
+		<hbase.version>1.0.0-cdh5.4.2</hbase.version>
+		<hadoop.version>2.6.0-cdh5.4.2</hadoop.version>
+		<hadoop.version.mr1>2.6.0-mr1-cdh5.4.2</hadoop.version.mr1>
 	</properties>
 
 	<dependencies>
 
 		<dependency>
 			<groupId>org.apache.hbase</groupId>
-			<artifactId>hbase-common</artifactId>
+			<artifactId>hbase-client</artifactId>
 			<version>${hbase.version}</version>
 			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-server</artifactId>
+			<version>${hbase.version}</version>
 			<exclusions>
 				<exclusion>
 					<artifactId>slf4j-log4j12</artifactId>
@@ -100,6 +105,7 @@
 					<groupId>stax</groupId>
 				</exclusion>
 			</exclusions>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
@@ -119,14 +125,8 @@
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>hbase-test-deps</artifactId>
 			<version>hbase-${hbase.version}-SNAPSHOT</version>
-			<scope>test</scope>
 			<type>pom</type>
-			<exclusions>
-				<exclusion>
-					<artifactId>slf4j-log4j12</artifactId>
-					<groupId>org.slf4j</groupId>
-				</exclusion>
-			</exclusions>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.codehaus.plexus</groupId>
@@ -136,35 +136,16 @@
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-jdk14</artifactId>
+			<version>1.7.2</version>
+		</dependency>
+		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
 			<version>1.9.0</version>
 			<scope>test</scope>
 		</dependency>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-jdk14</artifactId>
-			<version>1.4.3</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-client</artifactId>
-			<version>${hadoop.version.mr1}</version>
-		</dependency>
-		<dependency>
-		
-			<groupId>org.anarres.lzo</groupId>
-			<artifactId>lzo-hadoop</artifactId>
-			<version>1.0.0</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.iq80.snappy</groupId>
-			<artifactId>snappy</artifactId>
-			<version>0.3</version>
-			<scope>provided</scope>
-		</dependency>
-		
 	</dependencies>
 
 	<description>HBase driver for n-orm.</description>

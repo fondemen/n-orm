@@ -4,7 +4,6 @@ import java.io.IOException;
 
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 
 import com.googlecode.n_orm.DatabaseNotReachedException;
@@ -49,7 +48,7 @@ public class CountAction extends Action<Long> {
 	}
 	
 	protected long countMapRed() throws DatabaseNotReachedException, IOException, InterruptedException, ClassNotFoundException {
-		String tableName = Bytes.toString(getTable().getTableName());
+		String tableName = getTable().getName().getNameAsString();
 		Job count = RowCounter.createSubmittableJob(this.store, tableName, this.scan);
 		if(!count.waitForCompletion(false))
 			throw new DatabaseNotReachedException("Row count failed for table " + tableName);

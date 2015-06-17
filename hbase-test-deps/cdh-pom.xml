@@ -12,9 +12,9 @@
 	<packaging>pom</packaging>
 
 	<properties>
-		<hbase.version>0.98.1-cdh5.1.0</hbase.version>
-		<hadoop.version>2.3.0-cdh5.1.0</hadoop.version>
-		<hadoop.version.mr1>2.3.0-mr1-cdh5.1.0</hadoop.version.mr1>
+		<hbase.version>1.0.0-cdh5.4.2</hbase.version>
+		<hadoop.version>2.6.0-cdh5.4.2</hadoop.version>
+		<hadoop.version.mr1>2.6.0-mr1-cdh5.4.2</hadoop.version.mr1>
 	</properties>
 
 	<dependencies>
@@ -36,6 +36,34 @@
 			<groupId>org.apache.hbase</groupId>
 			<artifactId>hbase-common</artifactId>
 			<version>${hbase.version}</version>
+			<type>jar</type>
+			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>org.slf4j</groupId>
+					<artifactId>slf4j-log4j12</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-server</artifactId>
+			<version>${hbase.version}</version>
+			<type>test-jar</type>
+			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>org.slf4j</groupId>
+					<artifactId>slf4j-log4j12</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-server</artifactId>
+			<version>${hbase.version}</version>
+			<type>jar</type>
+			<scope>compile</scope>
 			<exclusions>
 				<exclusion>
 					<groupId>org.slf4j</groupId>
@@ -46,12 +74,13 @@
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-minicluster</artifactId>
-			<version>${hadoop.version.mr1}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-auth</artifactId>
 			<version>${hadoop.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.hbase</groupId>
+			<artifactId>hbase-testing-util</artifactId>
+			<version>${hbase.version}</version>
 		</dependency>
 	</dependencies>
 

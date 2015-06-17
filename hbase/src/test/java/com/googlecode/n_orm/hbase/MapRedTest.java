@@ -9,10 +9,11 @@ import java.util.UUID;
 
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
@@ -31,15 +32,15 @@ import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 public class MapRedTest {
 	
 	private static Store store;
-	private static String tableName;
-	private static HTable table;
+	private static TableName tableName;
+	private static Table table;
 	
 	@BeforeClass
 	public static void prepareStore() throws IOException {
 		HBaseLauncher.prepareHBase();
 		store = HBaseLauncher.hbaseStore;
-		tableName = "t1";
-		HBaseAdmin admin = new HBaseAdmin(store.getConnection());
+		tableName = TableName.valueOf("t1");
+		Admin admin = store.getConnection().getAdmin();
 		try {
 			if (!admin.tableExists(tableName)) {
 				HTableDescriptor td = new HTableDescriptor(tableName);
@@ -52,7 +53,7 @@ public class MapRedTest {
 		} finally {
 			admin.close();
 		}
-		table = new HTable(store.getConf(), tableName);
+		table = store.getConnection().getTable(tableName);
 		
 		store.setCountMapRed(true);
 		store.setTruncateMapRed(true);
@@ -69,8 +70,8 @@ public class MapRedTest {
 	@After
 	public void truncate() throws IOException {
 		store.setTruncateMapRed(false);
-		store.truncate(null, tableName, (Constraint)null);
-		assertEquals(0, store.count(null, tableName, (Constraint)null));
+		store.truncate(null, tableName.getNameAsString(), (Constraint)null);
+		assertEquals(0, store.count(null, tableName.getNameAsString(), (Constraint)null));
 		store.setTruncateMapRed(true);
 		
 		Scan scan = new Scan();
@@ -89,7 +90,7 @@ public class MapRedTest {
 	
 	protected long count() {
 		store.setCountMapRed(false);
-		long ret = store.count(null, tableName, (Constraint)null);
+		long ret = store.count(null, tableName.getNameAsString(), (Constraint)null);
 		store.setCountMapRed(true);
 		return ret;
 	}
@@ -100,42 +101,42 @@ public class MapRedTest {
 			Map<String, byte[]> changes = new TreeMap<String, byte[]>();
 			changes.put("aval", new byte[] {1, 2, 3, 4});
 			changed.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changes );
-			store.storeChanges(null, tableName, UUID.randomUUID().toString(), changed, null, null);
+			store.storeChanges(null, tableName.getNameAsString(), UUID.randomUUID().toString(), changed, null, null);
 		}
 	}
 
 	@Test
 	public void count0() {
-		assertEquals(0, store.count(null, tableName, (Constraint)null));
+		assertEquals(0, store.count(null, tableName.getNameAsString(), (Constraint)null));
 	}
 	
 	@Test
 	public void count1() {
 		this.createElements(1);
-		assertEquals(1, store.count(null, tableName, (Constraint)null));
+		assertEquals(1, store.count(null, tableName.getNameAsString(), (Constraint)null));
 	}
 	
 	@Test
 	public void count100() {
 		this.createElements(100);
-		assertEquals(100, store.count(null, tableName, (Constraint)null));
+		assertEquals(100, store.count(null, tableName.getNameAsString(), (Constraint)null));
 	}
 	
 	@Test
 	public void truncate0() {
-		store.truncate(null, tableName, (Constraint)null);
+		store.truncate(null, tableName.getNameAsString(), (Constraint)null);
 	}
 	
 	@Test
 	public void truncate1() {
 		this.createElements(1);
-		store.truncate(null, tableName, (Constraint)null);
+		store.truncate(null, tableName.getNameAsString(), (Constraint)null);
 	}
 	
 	@Test
 	public void truncate100() {
 		this.createElements(100);
-		store.truncate(null, tableName, (Constraint)null);
+		store.truncate(null, tableName.getNameAsString(), (Constraint)null);
 	}
 
 }

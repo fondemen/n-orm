@@ -1,15 +1,15 @@
 package com.googlecode.n_orm.hbase.actions;
 
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.client.Table;
 
 public abstract class Action<R> {
-	private HTableInterface table;
+	private Table table;
 	
-	public HTableInterface getTable() {
+	public Table getTable() {
 		return this.table;
 	}
 	
-	public void setTable(HTableInterface table) {
+	public void setTable(Table table) {
 		this.table = table;
 	}
 	

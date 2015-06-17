@@ -1,6 +1,7 @@
 package com.googlecode.n_orm.hbase.properties;
 
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.client.Durability;
 
 import com.googlecode.n_orm.hbase.HBaseSchema;
 import com.googlecode.n_orm.hbase.Store;
@@ -31,12 +32,12 @@ class DeferredLogFlushProperty extends ForcableHTableProperty<Boolean> {
 
 	@Override
 	boolean hasValue(Boolean value, HTableDescriptor table) {
-		return table.isDeferredLogFlush() == value.booleanValue();
+		return Durability.ASYNC_WAL.equals(table.getDurability()) == value.booleanValue();
 	}
 
 	@Override
 	public void setValue(Boolean value, HTableDescriptor table) {
-		table.setDeferredLogFlush(value);
+		table.setDurability(value ? Durability.ASYNC_WAL : Durability.SYNC_WAL);
 	}
 
 	@Override

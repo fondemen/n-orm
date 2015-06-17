@@ -57,7 +57,7 @@ public class TruncateAction extends Action<Void> {
 	}
 	
 	protected void truncateMapReduce() throws IOException, InterruptedException, ClassNotFoundException  {
-		String tableName = Bytes.toString(getTable().getTableName());
+		String tableName = getTable().getName().getNameAsString();
 		Job count = Truncator.createSubmittableJob(this.store, tableName, this.scan);
 		if(!count.waitForCompletion(false)) {
 			throw new DatabaseNotReachedException("Could not truncate table with map/reduce " + tableName);

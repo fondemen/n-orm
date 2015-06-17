@@ -18,7 +18,7 @@
 	</scm>
 
 	<properties>
-		<hbase.version>0.98.1-hadoop2</hbase.version>
+		<hbase.version>1.0.1.1</hbase.version>
 	</properties>
 
 	<dependencies>
@@ -120,6 +120,13 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<groupId>com.googlecode.n_orm</groupId>
+			<artifactId>hbase-test-deps</artifactId>
+			<version>hbase-${hbase.version}-SNAPSHOT</version>
+			<type>pom</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.codehaus.plexus</groupId>
 			<artifactId>plexus-utils</artifactId>
 			<version>2.1</version>
@@ -135,25 +142,6 @@
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
 			<version>1.9.0</version>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.anarres.lzo</groupId>
-			<artifactId>lzo-hadoop</artifactId>
-			<version>1.0.0</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.iq80.snappy</groupId>
-			<artifactId>snappy</artifactId>
-			<version>0.3</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.hbase</groupId>
-			<artifactId>hbase-testing-util</artifactId>
-			<version>${hbase.version}</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

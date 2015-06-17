@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -19,7 +21,7 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 public class IncrementHBaseBug {
 	
 	private static Store store;
-	private static String testTable = "incrtest";
+	private static TableName testTable = TableName.valueOf("incrtest");
 	private static String testKey;
 	private static String testIncrCF = "icf";
 	private static String testIncrC = "ic";
@@ -40,7 +42,7 @@ public class IncrementHBaseBug {
 		Map<String, Map<String, Number>> all_incrs = new TreeMap<String, Map<String,Number>>();
 		Map<String, Number> incrs = new TreeMap<String, Number>();
 		all_incrs.put(testIncrCF, incrs);
-		store.storeChanges(null, testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, testTable.getNameAsString(), testKey, null, null, all_incrs );
 	}
 
 	@Test
@@ -49,16 +51,16 @@ public class IncrementHBaseBug {
 		Map<String, Number> incrs = new TreeMap<String, Number>();
 		all_incrs.put(testIncrCF, incrs);
 		incrs.put(testIncrC, 1);
-		store.storeChanges(null, testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, testTable.getNameAsString(), testKey, null, null, all_incrs );
 		
-		byte[] data = store.get(null, testTable, testKey, testIncrCF, testIncrC);
+		byte[] data = store.get(null, testTable.getNameAsString(), testKey, testIncrCF, testIncrC);
 		assertNotNull(data);
 		int read = ConversionTools.convert(int.class, data);
 		assertEquals(1, read);
 		
-		store.storeChanges(null, testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, testTable.getNameAsString(), testKey, null, null, all_incrs );
 		
-		data = store.get(null, testTable, testKey, testIncrCF, testIncrC);
+		data = store.get(null, testTable.getNameAsString(), testKey, testIncrCF, testIncrC);
 		assertNotNull(data);
 		read = ConversionTools.convert(int.class, data);
 		assertEquals(2, read);
@@ -71,18 +73,18 @@ public class IncrementHBaseBug {
 		Map<String, Number> incrs = new TreeMap<String, Number>();
 		all_incrs.put(testIncrCF, incrs);
 		incrs.put(testIncrC, 1);
-		store.storeChanges(null, testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, testTable.getNameAsString(), testKey, null, null, all_incrs );
 		
-		byte[] data = store.get(null, testTable, testKey, testIncrCF, testIncrC);
+		byte[] data = store.get(null, testTable.getNameAsString(), testKey, testIncrCF, testIncrC);
 		assertNotNull(data);
 		int read = ConversionTools.convert(int.class, data);
 		assertEquals(1, read);
 		
-		store.delete(null, testTable, testKey);
+		store.delete(null, testTable.getNameAsString(), testKey);
 		
-		store.storeChanges(null, testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, testTable.getNameAsString(), testKey, null, null, all_incrs );
 		
-		data = store.get(null, testTable, testKey, testIncrCF, testIncrC);
+		data = store.get(null, testTable.getNameAsString(), testKey, testIncrCF, testIncrC);
 		assertNotNull(data);
 		read = ConversionTools.convert(int.class, data);
 		assertEquals(1, read); //Naive implementation of delete would return 2
@@ -99,7 +101,7 @@ public class IncrementHBaseBug {
 		Map<String, Number> incrs = new TreeMap<String, Number>();
 		all_incrs.put(testIncrCF, incrs);
 		incrs.put(testIncrC, 1);
-		store.storeChanges(null, testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, testTable.getNameAsString(), testKey, null, null, all_incrs );
 		
 		byte[] data; int read;
 //		data = store.get(null, null, testTable, testKey, testIncrCF, testIncrC);
@@ -107,18 +109,18 @@ public class IncrementHBaseBug {
 //		read = ConversionTools.convert(int.class, data);
 //		assertEquals(1, read);
 		
-		HBaseAdmin admin = new HBaseAdmin(store.getConnection());
+		Admin admin = store.getConnection().getAdmin();
 		try {
 			admin.flush(testTable);
 		} finally {
 			admin.close();
 		}
 		
-		store.delete(null, testTable, testKey);
+		store.delete(null, testTable.getNameAsString(), testKey);
 		
-		store.storeChanges(null, testTable, testKey, null, null, all_incrs );
+		store.storeChanges(null, testTable.getNameAsString(), testKey, null, null, all_incrs );
 		
-		data = store.get(null, testTable, testKey, testIncrCF, testIncrC);
+		data = store.get(null, testTable.getNameAsString(), testKey, testIncrCF, testIncrC);
 		assertNotNull(data);
 		read = ConversionTools.convert(int.class, data);
 		assertEquals(1, read); //Naive implementation of delete would return 2

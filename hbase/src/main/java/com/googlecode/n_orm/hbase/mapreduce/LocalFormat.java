@@ -9,9 +9,8 @@ import org.apache.commons.beanutils.BeanUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.client.HTable;
-import org.apache.hadoop.hbase.client.HTablePool;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.mapreduce.TableInputFormat;
@@ -44,7 +43,7 @@ public class LocalFormat {
 	
 	public static void prepareJob(Job job, Scan scan, Store store) throws IOException {
 		if (store.isMapRedSendHBaseJars())
-			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), org.apache.zookeeper.ZooKeeper.class, HTable.class, HBaseAdmin.class, HTablePool.class, HColumnDescriptor.class, Scan.class, Increment.class, JsonMappingException.class);
+			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), org.apache.zookeeper.ZooKeeper.class, TableName.class, HBaseAdmin.class, HColumnDescriptor.class, Scan.class, Increment.class, JsonMappingException.class);
 		if (store.isMapRedSendNOrmJars())
 			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), Store.class, StorageManagement.class, Aspects.class, org.apache.log4j.Logger.class, BeanUtils.class);
 		
@@ -59,10 +58,10 @@ public class LocalFormat {
 		TableMapReduceUtil.setScannerCaching(job, store.getMapRedScanCaching());
 	}
 
-	protected HTable table;
+	protected TableName table;
 	private Configuration conf;
 	
-	public HTable getTable() {
+	public TableName getTable() {
 		return table;
 	}
 
@@ -88,12 +87,6 @@ public class LocalFormat {
 			this.conf = HBaseConfiguration.create(conf);
 		}
 
-		try {
-			table = new HTable(this.conf,
-					conf.get(TableInputFormat.INPUT_TABLE));
-			this.table.setAutoFlushTo(false);
-		} catch (IOException e) {
-			throw new RuntimeException(e.getMessage(), e);
-		}
+		table = TableName.valueOf(conf.get(TableInputFormat.INPUT_TABLE));
 	}
 }

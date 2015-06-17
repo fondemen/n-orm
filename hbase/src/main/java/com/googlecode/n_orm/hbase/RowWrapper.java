@@ -2,9 +2,7 @@ package com.googlecode.n_orm.hbase;
 
 import java.io.Serializable;
 import java.util.Map;
-import java.util.NavigableMap;
 import java.util.TreeMap;
-import java.util.Map.Entry;
 
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -13,7 +11,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
 import com.googlecode.n_orm.storeapi.Row;
-import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
 
 public class RowWrapper implements Row, Serializable {
 	private static final long serialVersionUID = -3943538431236454382L;
