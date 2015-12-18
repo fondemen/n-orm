@@ -1,0 +1,8 @@
+
+syntax: regexp
+^.DS_Store$
+^parent$
+^parent-aspect$
+^hbase-test-deps$
+
+
