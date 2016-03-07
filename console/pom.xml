@@ -1,14 +1,18 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
 	<parent>
 		<artifactId>parent</artifactId>
 		<groupId>com.googlecode.n_orm</groupId>
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
-	<modelVersion>4.0.0</modelVersion>
+
 	<artifactId>console</artifactId>
-	<name>n-orm console</name>
 	<version>${project.parent.version}</version>
+    <name>n-orm console</name>
 	<packaging>jar</packaging>
 
 	<description>Command line interface (CLI) for n-orm</description>
@@ -26,6 +30,13 @@
 			<url>file://${basedir}/../../n-orm.wiki/console</url>
 		</site>
 	</distributionManagement>
+
+    <properties>
+        <easymock.version>3.2</easymock.version>
+        <junit.version>4.11</junit.version>
+        <hbase.version>0.94.6</hbase.version>
+        <jline.version>0.9.94</jline.version>
+    </properties>
 
 	<build>
 		<plugins>
@@ -83,6 +94,7 @@
 					</execution>
 				</executions>
 			</plugin>
+
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -96,8 +108,6 @@
 				</configuration>
 			</plugin>
 		</plugins>
-
-
 	</build>
 
 
@@ -108,6 +118,7 @@
 			<name>JLine Project Repository</name>
 			<url>http://jline.sourceforge.net/m2repo</url>
 		</repository>
+
 		<repository>
 			<id>org.sonatype.oss.public</id>
 			<name>OSS public</name>
@@ -119,34 +130,45 @@
 		<dependency>
 			<groupId>org.easymock</groupId>
 			<artifactId>easymock</artifactId>
-			<version>3.0</version>
+			<version>${easymock.version}</version>
 			<type>jar</type>
 			<scope>test</scope>
 		</dependency>
+
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
-			<version>4.8.2</version>
+			<version>${junit.version}</version>
 			<type>jar</type>
 			<scope>test</scope>
 		</dependency>
+
 		<dependency>
 			<groupId>jline</groupId>
 			<artifactId>jline</artifactId>
-			<version>0.9.9</version>
+			<version>${jline.version}</version>
 		</dependency>
+
 		<dependency>
 			<groupId>commons-beanutils</groupId>
 			<artifactId>commons-beanutils</artifactId>
 			<version>1.8.3</version>
 		</dependency>
-		<dependency>
+
+        <dependency>
+            <groupId>com.googlecode.n_orm</groupId>
+            <artifactId>hbase</artifactId>
+            <version>hbase-${hbase.version}-n-orm-${project.parent.version}</version>
+        </dependency>
+
+        <dependency>
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
 			<version>${project.parent.version}</version>
 			<type>test-jar</type>
 			<scope>test</scope>
 		</dependency>
+
 		<dependency>
 			<groupId>com.googlecode.n_orm</groupId>
 			<artifactId>storage</artifactId>
