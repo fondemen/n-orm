@@ -77,6 +77,7 @@ A [sample project](http://code.google.com/p/n-orm/downloads/detail?name=sample-p
 
 # Main features #
 
+  * No additional persistency layer like a DAO, or explicit mapping such as an XML file of mandatory options for annotations
   * Transforming a persisting element and its content so that it can enter/be retreived into/from a [Store](http://wiki.n-orm.googlecode.com/hg/storage/apidocs/com/googlecode/n_orm/storeapi/Store.html) ; possible attributes are given [here](http://wiki.n-orm.googlecode.com/hg/storage/apidocs/com/googlecode/n_orm/Persisting.html).
   * Inferring identifiers from an ordered set of properties marked as keys.
   * Persisting Set and Maps properties.
