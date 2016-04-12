@@ -12,17 +12,15 @@ n-orm is neither an object-database mapping, nor it addresses specifically relat
 
 To keep n-orm simple, it is not possible to use any Java data model, nor any legacy database. n-orm is more a Java view on a column-oriented database, which means that the data model (i.e. Java classes) has to be written according to certain (simple) constraints.
 
-Different data stores are possible, especially column-oriented data stores such as [HBase](http://hbase.apache.org/), [Cassandra](http://cassandra.apache.org/) or [Google BigTable](http://labs.google.com/papers/bigtable.html), though only HBase, [MongoDB](http://www.mongodb.org) and [Redis](http://redis.io/) are supported so far (help would be appreciated ;-)).
+Different data stores are possible, especially column-oriented data stores such as [HBase](http://hbase.apache.org/), [Cassandra](http://cassandra.apache.org/) or [Google BigTable](http://labs.google.com/papers/bigtable.html), though only HBase, [MongoDB](https://github.com/fondemen/n-orm.mongo/) and [Redis](https://github.com/fondemen/n-orm.redis/) are supported so far (help would be appreciated ;-)).
 
-<a href='Hidden comment: 
-= Why yet another persistence layer tool ? =
+# Why yet another persistence layer tool ? #
 
 There are many different persistence frameworks around.
 
-Some are quite generic and able to do almost anything, like [http://www.oracle.com/technetwork/java/index-jsp-135919.html JDO]-based persistence frameworks. Those generic tools are oriented towards relational databases, and hide much of the generated data structure. A problem is that column-oriented data stores are very efficient, but you really need to think data structure properly (e.g. structure for keys for efficient search, column grouping). Moreover, it is often the case that those generic tools have a slow learning curve.
+Some are quite generic and able to do almost anything, like [JDO](http://www.oracle.com/technetwork/java/index-jsp-135919.html)-based persistence frameworks. Those generic tools are oriented towards relational databases, and hide much of the generated data structure. A problem is that column-oriented data stores are very efficient, but you really need to think data structure properly (e.g. structure for keys for efficient search, column grouping). Moreover, it is often the case that those generic tools have a slow learning curve.
 
-Some others, like [https://github.com/ghelmling/meetup.beeno meetup beeno] or [http://code.google.com/p/objectify-appengine/ Objectify], are really simple to use and their behavior is clear. However, they are dedicated to one single kind of data store which might be a problem when you are not sure of the platform you want, when it"s time to migrate platform, or if you want to benefit from advantages of different platforms at same time with an unified mean to describe your data models.
-'></a>
+Some others, like [meetup beeno](https://github.com/ghelmling/meetup.beeno) or [Objectify](http://code.google.com/p/objectify-appengine/), are really simple to use and their behavior is clear. However, they are dedicated to one single kind of data store which might be a problem when you are not sure of the platform you want, when it"s time to migrate platform, or if you want to benefit from advantages of different platforms at same time with an unified mean to describe your data models.
 
 n-orm tries to offer a persistence layer with the following objectives:
   * easy to use and learn,
