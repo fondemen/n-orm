@@ -5,7 +5,7 @@ Targeted stores are "no-sql" as the framework assumes a column-oriented like sto
 
 The framework makes use of annotations and a very simple query language, simple enough to be very efficient, and too simple to let a model not to be efficient... ;-)
 
-Current stores are HBase and Redis, though new drivers should be simple to implement.
+Current stores are [HBase](http://hbase.apache.org), [MongoDB](https://www.mongodb.org/) and [Redis](http://redis.io), though new drivers should be simple to implement.
 Expectations on a data store are that it can handle maps automatically sorted according to their keys, and that it supports atomic increments.
 
 n-orm is neither an object-database mapping, nor it addresses specifically relational databases. Its name was chosen as a reference to the No-SQL movement.
