@@ -1,5 +1,5 @@
 This is an example project using n-orm for HBase.
-See http://n-orm.googlecode.com for more details and updates (look at sources).
+See https://github.com/fondemen/n-orm/ for more details and updates.
 
 To run the project with no HBase instance started on localhost, just run maven (maven 2 required - it takes a while for HBase client to determine that HBase is not running):
 mvn test
