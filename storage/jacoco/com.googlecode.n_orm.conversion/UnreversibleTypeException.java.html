@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>UnreversibleTypeException.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">UnreversibleTypeException.java</span></div><h1>UnreversibleTypeException.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+public class UnreversibleTypeException extends IllegalArgumentException {
+
+	private static final long serialVersionUID = -2239097319110076857L;
+	
+	private final Class&lt;?&gt; type;
+
+	public UnreversibleTypeException(Class&lt;?&gt; type) {
+<span class="nc" id="L10">		super(&quot;Cannot reverse type &quot; + type);</span>
+<span class="nc" id="L11">		this.type = type;</span>
+<span class="nc" id="L12">	}</span>
+
+	public UnreversibleTypeException(String message, Class&lt;?&gt; type, Throwable cause) {
+<span class="nc" id="L15">		super(message + &quot; (cannot reverse type &quot; + type + &quot;)&quot;, cause);</span>
+<span class="nc" id="L16">		this.type = type;</span>
+<span class="nc" id="L17">	}</span>
+
+	public UnreversibleTypeException(String message, Class&lt;?&gt; type) {
+<span class="nc" id="L20">		super(message + &quot; (cannot reverse type &quot; + type + &quot;)&quot;);</span>
+<span class="nc" id="L21">		this.type = type;</span>
+<span class="nc" id="L22">	}</span>
+
+	public UnreversibleTypeException(Class&lt;?&gt; type, Throwable cause) {
+<span class="nc" id="L25">		super(&quot;Cannot reverse type &quot; + type, cause);</span>
+<span class="nc" id="L26">		this.type = type;</span>
+<span class="nc" id="L27">	}</span>
+
+	public Class&lt;?&gt; getType() {
+<span class="nc" id="L30">		return type;</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

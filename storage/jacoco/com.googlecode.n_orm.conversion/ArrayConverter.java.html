@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ArrayConverter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">ArrayConverter.java</span></div><h1>ArrayConverter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+import java.lang.reflect.Array;
+import java.util.StringTokenizer;
+
+import com.googlecode.n_orm.KeyManagement;
+
+<span class="pc bpc" id="L8" title="1 of 2 branches missed.">public class ArrayConverter extends Converter&lt;Object&gt; {</span>
+	//public static final String StringEndSeparator = &quot;]&quot;;
+<span class="fc" id="L10">	private static int IntBytesLength = -1;</span>
+	
+	public static int getIntBytesLength() {
+<span class="fc bfc" id="L13" title="All 2 branches covered.">		if (IntBytesLength == -1)</span>
+<span class="fc" id="L14">			IntBytesLength = ConversionTools.intConverter.toBytes(Integer.MAX_VALUE).length;</span>
+<span class="fc" id="L15">		return IntBytesLength;</span>
+	}
+
+	public ArrayConverter() {
+<span class="fc" id="L19">		super(Object.class);</span>
+<span class="fc" id="L20">	}</span>
+
+	@Override
+	public Object getDefaultValue(Class&lt;?&gt; type) {
+<span class="fc" id="L24">		return null;</span>
+	}
+
+	@Override
+	public Object fromString(String rep, Class&lt;?&gt; expected) {
+<span class="fc" id="L29">		Class&lt;?&gt; clazz = expected.getComponentType();</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">		if (clazz.isArray())</span>
+<span class="nc" id="L31">			throw new IllegalArgumentException(&quot;Cannot convert to string a multidimensional array as &quot; + expected);</span>
+<span class="fc" id="L32">		StringTokenizer t = new StringTokenizer(rep, KeyManagement.ARRAY_SEPARATOR);</span>
+<span class="fc" id="L33">		int length = t.countTokens();</span>
+<span class="fc" id="L34">		Object ret = Array.newInstance(clazz, length);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">		for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L36">			Array.set(ret, i, ConversionTools.convertFromString(clazz, t.nextToken()));</span>
+		}
+<span class="fc" id="L38">		return ret;</span>
+	}
+
+	@Override
+	public String toString(Object obj, Class&lt;?&gt; expected) {
+<span class="fc" id="L43">		StringBuffer sb = new StringBuffer();</span>
+<span class="fc" id="L44">		boolean first = true;</span>
+<span class="fc" id="L45">		Class&lt;?&gt; expectedComponent = expected.getComponentType();</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">		if (expectedComponent.isArray())</span>
+<span class="nc" id="L47">			throw new IllegalArgumentException(&quot;Cannot convert to string a multidimensional array as &quot; + expected);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">		for (int i = 0; i &lt; Array.getLength(obj); i++) {</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">			if (first)</span>
+<span class="fc" id="L50">				first = false;</span>
+			else
+<span class="fc" id="L52">				sb.append(KeyManagement.ARRAY_SEPARATOR);</span>
+<span class="fc" id="L53">			sb.append(ConversionTools.convertToString(Array.get(obj, i), expectedComponent));</span>
+		}
+<span class="fc" id="L55">		return sb.toString();</span>
+	}
+
+	@Override
+	public Object fromBytes(byte[] rep, Class&lt;?&gt; type) {
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">		if (rep.length == 0)</span>
+<span class="nc" id="L61">			return null;</span>
+		
+<span class="fc bfc" id="L63" title="All 2 branches covered.">		if (type.equals(byte[].class))</span>
+<span class="fc" id="L64">			return rep;</span>
+		
+<span class="fc" id="L66">		Class&lt;?&gt; clazz = type.getComponentType();</span>
+<span class="fc" id="L67">		byte [] tmpBytes = new byte [getIntBytesLength()];</span>
+<span class="fc" id="L68">		System.arraycopy(rep, 0, tmpBytes, 0, getIntBytesLength());</span>
+<span class="fc" id="L69">		int pos = getIntBytesLength();</span>
+<span class="fc" id="L70">		int length = ConversionTools.intConverter.fromBytes(tmpBytes, int.class), objLength;</span>
+<span class="fc" id="L71">		Object ret = Array.newInstance(type.getComponentType(), length);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">		for (int i = 0; i &lt; length; ++i) {</span>
+<span class="fc" id="L73">			tmpBytes = new byte [getIntBytesLength()];</span>
+<span class="fc" id="L74">			System.arraycopy(rep, pos, tmpBytes, 0, getIntBytesLength());</span>
+<span class="fc" id="L75">			pos += getIntBytesLength();</span>
+<span class="fc" id="L76">			objLength = ConversionTools.intConverter.fromBytes(tmpBytes, int.class);</span>
+<span class="fc" id="L77">			tmpBytes = new byte[objLength];</span>
+<span class="fc" id="L78">			System.arraycopy(rep, pos, tmpBytes, 0, objLength);</span>
+<span class="fc" id="L79">			pos+= objLength;</span>
+<span class="fc" id="L80">			Array.set(ret, i, ConversionTools.convert(clazz, tmpBytes));</span>
+		}
+		
+<span class="fc" id="L83">		return ret;</span>
+	}
+
+	@Override
+	public byte[] toBytes(Object object, Class&lt;?&gt; expected) {
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">		if (object == null)</span>
+<span class="nc" id="L89">			return new byte [0];</span>
+		
+<span class="fc bfc" id="L91" title="All 2 branches covered.">		if(object instanceof byte[])</span>
+<span class="fc" id="L92">			return (byte[]) object;</span>
+		
+<span class="fc" id="L94">		int objLength = Array.getLength(object);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">		if (objLength == 0)</span>
+<span class="fc" id="L96">			return ConversionTools.intConverter.toBytes(0);</span>
+		
+<span class="fc" id="L98">		byte [] [] elements = new byte [1+(2*objLength)] [];</span>
+<span class="fc" id="L99">		int bytes = 0;</span>
+<span class="fc" id="L100">		elements[0] = ConversionTools.intConverter.toBytes(objLength);</span>
+<span class="fc" id="L101">		bytes += elements[0].length;</span>
+<span class="fc" id="L102">		Class&lt;?&gt; expectedComponent = expected.getComponentType();</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">		for (int i = 0, eltI = 1; i &lt; objLength; i++, eltI+=2) {</span>
+<span class="fc" id="L104">			elements[eltI+1] = ConversionTools.convert(Array.get(object, i), expectedComponent);</span>
+<span class="fc" id="L105">			elements[eltI] = ConversionTools.intConverter.toBytes(elements[eltI+1].length);</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">			assert elements[eltI].length == getIntBytesLength();</span>
+<span class="fc" id="L107">			bytes += getIntBytesLength() + elements[eltI+1].length;</span>
+		}
+		
+<span class="fc" id="L110">		byte[] ret = new byte[bytes];</span>
+<span class="fc" id="L111">		int destPos = 0;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">		for (int i = 0; i &lt; elements.length; i++) {</span>
+<span class="fc" id="L113">			System.arraycopy(elements[i], 0, ret, destPos, elements[i].length);</span>
+<span class="fc" id="L114">			destPos += elements[i].length;</span>
+		}
+		
+<span class="fc" id="L117">		return ret;</span>
+	}
+
+	@Override
+	public boolean canConvert(Class&lt;?&gt; type) {
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">		return type.isArray() &amp;&amp; ConversionTools.canConvert(type.getComponentType());</span>
+	}
+
+	@Override
+	public boolean canConvertToString(Object obj) {
+<span class="fc bfc" id="L127" title="All 4 branches covered.">		return super.canConvertToString(obj) &amp;&amp; !obj.getClass().getComponentType().isArray();</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

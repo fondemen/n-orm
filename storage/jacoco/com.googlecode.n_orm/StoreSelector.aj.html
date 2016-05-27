@@ -1,0 +1,441 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>StoreSelector.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">StoreSelector.aj</span></div><h1>StoreSelector.aj</h1><pre class="source lang-java linenums"><span class="pc bpc" id="L1" title="3 of 4 branches missed.">package com.googlecode.n_orm;</span>
+
+import java.beans.PropertyDescriptor;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.Properties;
+import java.util.TreeMap;
+
+import org.apache.commons.beanutils.ConvertUtils;
+import org.apache.commons.beanutils.PropertyUtils;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.cache.write.WriteRetentionStore;
+import com.googlecode.n_orm.storeapi.DelegatingStore;
+import com.googlecode.n_orm.storeapi.SimpleStore;
+import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.storeapi.SimpleStoreWrapper;
+import com.googlecode.n_orm.StoreSelector;
+
+<span class="pc" id="L38">public aspect StoreSelector {</span>
+	private static StoreSelector INSTANCE;
+
+	public static StoreSelector getInstance() {
+<span class="fc bfc" id="L42" title="All 2 branches covered.">		if (INSTANCE == null)</span>
+<span class="fc" id="L43">			INSTANCE = aspectOf();</span>
+<span class="fc" id="L44">		return INSTANCE;</span>
+	}
+	
+<span class="fc" id="L47">	private static enum FileFormat {</span>
+<span class="fc" id="L48">		JSON, PROPERTIES</span>
+	}
+	
+	public static class StoreProperties implements Comparable&lt;StoreProperties&gt; {
+		public final Map&lt;String, Object&gt; properties;
+		public final String pack;
+		public Store store;
+		
+<span class="fc" id="L56">		public StoreProperties(Map&lt;String, Object&gt; properties, String pack) {</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">			this.properties = properties;</span>
+<span class="fc" id="L58">			this.pack = pack;</span>
+<span class="fc" id="L59">		}</span>
+		
+		@Override
+		public int compareTo(StoreProperties rhs) {
+<span class="nc" id="L63">			return pack.compareTo(rhs.pack);</span>
+		}
+	}
+
+	public static final String PROPERTY_FILE = &quot;store.properties&quot;;
+	public static final String JSON_FILE = &quot;store.json&quot;;
+	public static final String STORE_DRIVERCLASS_PROPERTY = &quot;class&quot;;
+	public static final String STORE_DRIVERCLASS_SINGLETON_PROPERTY = &quot;singleton&quot;;
+	public static final String STORE_DRIVERCLASS_STATIC_ACCESSOR = &quot;static-accessor&quot;;
+	public static final String STORE_REFERENCE = &quot;as-for-package&quot;;
+	public static final String STORE_WRITE_RETENTION = &quot;with-write-retention&quot;;
+
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">	private Map&lt;String, Object&gt; locks = new TreeMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">	private Map&lt;String, StoreProperties&gt; classStores = new TreeMap&lt;String, StoreProperties&gt;();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">	private Map&lt;String, StoreProperties&gt; packageStores = new TreeMap&lt;String, StoreProperties&gt;();</span>
+	
+	private transient Store PersistingElement.store = null;
+	
+	public Store PersistingElement.getStore() {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">		if (this.store == null)</span>
+<span class="pc" id="L83">			synchronized(this) {</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">				if (this.store == null)</span>
+					try {
+<span class="fc" id="L86">						this.setStore(StoreSelector.getInstance().getStoreFor(this.getClass()));</span>
+<span class="nc" id="L87">					} catch (DatabaseNotReachedException x) {</span>
+<span class="nc" id="L88">						throw new IllegalStateException(x);</span>
+					}
+			}
+<span class="fc" id="L91">		return this.store;</span>
+	}
+	
+	public void PersistingElement.setStore(Store store) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">		if (this.store != null)</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">			throw new IllegalStateException(&quot;A store is already registered for object &quot; + (this.getIdentifier() == null ? &quot;&quot; : this.getIdentifier()) + &quot; of class &quot; + this.getClass().getName());</span>
+<span class="fc" id="L97">		this.store = store;</span>
+<span class="fc" id="L98">	}</span>
+	
+	public Store toTypeAwareStore(SimpleStore store) {
+<span class="nc bnc" id="L101" title="All 2 branches missed.">		if (store instanceof Store) {</span>
+<span class="nc" id="L102">			return (Store)store;</span>
+		} else {
+<span class="nc" id="L104">			return SimpleStoreWrapper.getWrapper(store);</span>
+		}
+	}
+	
+	private Object getLock(Class&lt;?&gt; clazz) {
+<span class="fc" id="L109">		return this.getLock(clazz.getName());</span>
+	}
+	
+	private Object getLock(Package pack) {
+<span class="fc" id="L113">		return this.getLock(pack.getName());</span>
+	}
+	
+	private synchronized Object getLock(String elementId) {
+<span class="fc" id="L117">		Object ret = this.locks.get(elementId);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">		if (ret == null) {</span>
+<span class="fc" id="L119">			ret = new Object();</span>
+<span class="fc" id="L120">			this.locks.put(elementId, ret);</span>
+		}
+<span class="fc" id="L122">		return ret;</span>
+	}
+	
+	//For test purpose
+	public Map&lt;String, Object&gt; findProperties(Class&lt;?&gt; clazz) throws IOException {
+<span class="nc" id="L127">		return this.findPropertiesInt(clazz).properties;</span>
+	}
+    
+    private StoreProperties findPropertiesInt(Class&lt;?&gt; clazz) throws IOException {
+<span class="pc" id="L131">    	synchronized (this.getLock(clazz)) {</span>
+<span class="fc" id="L132">	    	File dir = new File(clazz.getName().replace('.', '/') /*+ &quot;.class&quot;*/).getParentFile();</span>
+	    	//@ TODO: consider using thread group to find class loaders of all threads
+<span class="fc" id="L134">	    	List&lt;ClassLoader&gt; classloaders = Arrays.asList(ClassLoader.getSystemClassLoader(), Thread.currentThread().getContextClassLoader(), clazz.getClassLoader());</span>
+	    	
+	    	try {
+<span class="fc" id="L137">	    		StoreProperties ret = this.findPropertiesInt(dir, classloaders);</span>
+<span class="fc" id="L138">	    		classStores.put(clazz.getName(), ret);</span>
+<span class="fc" id="L139">	    		return ret;</span>
+<span class="nc" id="L140">	    	} catch (IOException x) {</span>
+<span class="nc" id="L141">	    		throw new IOException(&quot;Cannot find storage properties for class &quot; + clazz, x.getCause());</span>
+	    	}
+    	}
+    }
+    
+    private InputStream getInputStreamForProperties(File dir, String fileName, List&lt;ClassLoader&gt; classLoaders) {
+<span class="fc" id="L147">		File f = new File(dir, fileName);</span>
+<span class="fc" id="L148">		String path = f.getPath();</span>
+		//Evil windows states that \ is a separator while / is expected by getResourceAsStream
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">		if (File.separatorChar == '\\') {</span>
+<span class="nc" id="L151">			path = path.replace('\\', '/');</span>
+		}
+<span class="fc" id="L153">		InputStream in = null;</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">		for (ClassLoader loader : classLoaders) {</span>
+<span class="fc" id="L155">			in = loader.getResourceAsStream(path);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">			if (in != null) {</span>
+<span class="fc" id="L157">				return in;</span>
+			}
+		}
+<span class="fc" id="L160">		return null;</span>
+    }
+    
+    private StoreProperties findPropertiesInt(File dir, List&lt;ClassLoader&gt; classLoaders) throws IOException {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">		if (dir == null)</span>
+<span class="nc" id="L165">			throw new IOException();</span>
+    		
+<span class="fc" id="L167">		final String pack = dir.getPath().replace('/', '.').replace('\\', '.');</span>
+<span class="pc" id="L168">		synchronized (getLock(pack)) {</span>
+<span class="fc" id="L169">			StoreProperties ret = packageStores.get(pack);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">    		if (ret != null) {</span>
+    			//assert ret.pack.equals(pack) &amp;&amp; ret.properties != null; //Actually, not in case of a STORE_REFERENCE
+<span class="fc" id="L172">    			return ret;</span>
+    		}
+    		
+    		
+    		// Trying to get JSON
+<span class="fc" id="L177">    		InputStream in = this.getInputStreamForProperties(dir, JSON_FILE, classLoaders);</span>
+<span class="fc" id="L178">    		FileFormat format = FileFormat.JSON;</span>
+    		
+    		// Trying to get properties
+<span class="fc bfc" id="L181" title="All 2 branches covered.">    		if (in == null) {</span>
+<span class="fc" id="L182">    			in = this.getInputStreamForProperties(dir, PROPERTY_FILE, classLoaders);</span>
+<span class="fc" id="L183">    			format = FileFormat.PROPERTIES;</span>
+    		}
+    			
+<span class="fc bfc" id="L186" title="All 2 branches covered.">    		if (in != null)</span>
+	    		try {
+	    			Map&lt;String, Object&gt; res;
+	    	    	
+<span class="pc bpc" id="L190" title="1 of 3 branches missed.">	    	    	switch (format) {</span>
+	    	    	case PROPERTIES:
+<span class="fc" id="L192">	    	    		Properties props = new Properties();</span>
+<span class="fc" id="L193">	    	    		props.load(in);</span>
+<span class="fc" id="L194">	    	    		res = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">	    	    		for (Entry&lt;Object, Object&gt; prop : props.entrySet()) {</span>
+<span class="fc" id="L196">							res.put((String) prop.getKey(), prop.getValue());</span>
+						}
+<span class="fc" id="L198">	    	    		break;</span>
+	    	    	case JSON:
+	    	    		try {
+<span class="fc" id="L201">							res = (JSONObject)new JSONParser().parse(new InputStreamReader(in));</span>
+<span class="nc" id="L202">						} catch (Exception e) {</span>
+<span class="nc" id="L203">							throw new DatabaseNotReachedException(&quot;Problem while loading store properties &quot; + dir + '/' + JSON_FILE, e);</span>
+						}
+	    	    		break;
+	    	    	default:
+<span class="nc" id="L207">	    	    		throw new Error(&quot;Cannot parse &quot; + format);</span>
+	    	    	}
+	    			
+	    			//Check whether this is a reference to another file
+<span class="fc" id="L211">	    			Object ref = res.get(STORE_REFERENCE);</span>
+<span class="pc bpc" id="L212" title="1 of 4 branches missed.">	    			if ((ref != null) &amp;&amp; (ref instanceof String)) {</span>
+	    				//Let's continue searching from the given path
+<span class="fc" id="L214">	    				dir = new File(((String)ref).replace('.', '/').replace('\\', '/'), PROPERTY_FILE);</span>
+	    			} else { //We found it and it's not an indirection
+<span class="fc" id="L216">		    			ret = new StoreProperties(res, pack);</span>
+<span class="fc" id="L217">		    			packageStores.put(ret.pack, ret);</span>
+<span class="fc" id="L218">		    			return ret;</span>
+	    			}
+<span class="nc" id="L220">	    		} catch (IOException x) {</span>
+	    		}
+		}
+		
+		//Not found ; let's try in the package above...
+		try {
+<span class="fc" id="L226">			StoreProperties ret = this.findPropertiesInt(dir.getParentFile(), classLoaders);</span>
+<span class="fc" id="L227">			packageStores.put(pack, ret);</span>
+<span class="fc" id="L228">			return ret;</span>
+<span class="nc" id="L229">		} catch (IOException x) {</span>
+<span class="nc" id="L230">			throw new IOException(&quot;Cannot find storage properties for package &quot; + pack, x.getCause());</span>
+		}
+    	
+    }
+    
+    //For test purpose.
+    public void setPropertiesFor(Class&lt;? extends PersistingElement&gt; clazz, Map&lt;String, Object&gt; properties) {
+<span class="pc" id="L237">    	synchronized (this.getLock(clazz)) {</span>
+<span class="fc" id="L238">    		this.classStores.put(clazz.getName(), new StoreProperties(properties, clazz.getPackage().getName()));</span>
+    	}
+<span class="fc" id="L240">    }</span>
+    
+    //For test purpose.
+    public void setPropertiesFor(Class&lt;? extends PersistingElement&gt; clazz, Store store) {
+<span class="pc" id="L244">    	synchronized (this.getLock(clazz)) {</span>
+<span class="fc" id="L245">    		Properties props = new Properties();</span>
+<span class="fc" id="L246">    		props.setProperty(STORE_DRIVERCLASS_PROPERTY, store.getClass().getName());</span>
+<span class="fc" id="L247">    		StoreProperties sprop = new StoreProperties(new TreeMap&lt;String, Object&gt;(), clazz.getPackage().getName());</span>
+<span class="fc" id="L248">    		sprop.store = store;</span>
+<span class="fc" id="L249">    		this.classStores.put(clazz.getName(), sprop);</span>
+    	}
+<span class="fc" id="L251">    }</span>
+    
+    /**
+     * Get an instance of Store according to properties.
+     * @param builderName The name of a static method to get the store ; constructor if null
+     * @param storeClass The class of the store to be built
+     * @param properties The property descriptor
+     */
+    private Object buildStore(String builderName, Class&lt;?&gt; storeClass, Map&lt;String, Object&gt; properties) {
+		//Detecting parameters number
+<span class="fc" id="L261">		int pmnr = 0;</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">		while (properties.get(Integer.toString(pmnr+1)) != null)</span>
+<span class="fc" id="L263">			pmnr++;</span>
+		
+		// Parameters values
+<span class="fc" id="L266">		List&lt;Object&gt; args = new ArrayList&lt;Object&gt;(pmnr);</span>
+		
+<span class="fc bfc" id="L268" title="All 2 branches covered.">		if (builderName == null) {</span>
+			//Finding constructor to invoke
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">			for (Constructor&lt;?&gt; c : storeClass.getConstructors()) {</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">				if (c.getParameterTypes().length == pmnr) {</span>
+					try {
+<span class="fc" id="L273">						populateArguments(properties, c.getParameterTypes(), args);</span>
+<span class="fc" id="L274">						return c.newInstance(args.toArray());</span>
+<span class="nc" id="L275">					} catch (Exception x) {}</span>
+				}
+			}
+<span class="nc" id="L278">			throw new IllegalArgumentException(&quot;Could not find constructor with compatible &quot; + pmnr + &quot; arguments in &quot; + storeClass);</span>
+		} else {
+			//Finding static method to invoke
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">			for (Method m : storeClass.getMethods()) {</span>
+<span class="pc bpc" id="L282" title="2 of 6 branches missed.">				if (m.getName().equals(builderName) &amp;&amp; (m.getModifiers() &amp; Modifier.STATIC) != 0 &amp;&amp; m.getParameterTypes().length == pmnr) {</span>
+					try {
+<span class="fc" id="L284">						populateArguments(properties, m.getParameterTypes(), args);</span>
+<span class="fc" id="L285">						return m.invoke(null, args.toArray());</span>
+<span class="nc" id="L286">					} catch (Exception x) {</span>
+<span class="nc" id="L287">						Logger.getLogger(StoreSelector.class.getName()).log(Level.WARNING, &quot;Cannot use &quot; + m + &quot; for launching store: &quot; + x.getMessage(), x);</span>
+					}
+				}
+			}
+<span class="nc" id="L291">			throw new IllegalArgumentException(&quot;Could not find static accessor method &quot; + builderName + &quot; with compatible &quot; + pmnr + &quot; arguments in &quot; + storeClass);</span>
+		}
+    }
+    
+    private void populateArguments(Map&lt;String, Object&gt; properties, Class&lt;?&gt;[] types, List&lt;Object&gt; args) throws ClassNotFoundException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException {
+<span class="fc" id="L296">		int i = 1;</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">		for (Class&lt;?&gt; c : types) {</span>
+<span class="fc" id="L298">			Object val = properties.get(Integer.toString(i));</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">			if (val == null) {</span>
+<span class="nc" id="L300">				throw new IllegalArgumentException(&quot;Missing required value &quot; + Integer.toString(i));</span>
+			}
+<span class="fc" id="L302">			val = convert(val, c);</span>
+<span class="fc" id="L303">			args.add(val);</span>
+<span class="fc" id="L304">			i++;</span>
+		}
+<span class="fc" id="L306">    }</span>
+	
+	public Store getStoreFor(Class&lt;? extends PersistingElement&gt; clazz) throws DatabaseNotReachedException {
+<span class="pc" id="L309">		synchronized (this.getLock(clazz)) {</span>
+			StoreProperties ret;
+			
+<span class="fc" id="L312">			ret = classStores.get(clazz.getName());</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">			if (ret != null) {</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">				if (ret.store != null)</span>
+<span class="fc" id="L315">					return ret.store;</span>
+			} else {
+<span class="pc" id="L317">				synchronized (getLock(clazz.getPackage())) {</span>
+<span class="fc" id="L318">					ret = packageStores.get(clazz.getPackage().getName());</span>
+				}
+<span class="pc bpc" id="L320" title="1 of 4 branches missed.">				if (ret != null &amp;&amp; ret.store != null) {</span>
+<span class="fc" id="L321">					ret = checkForRetention(ret, clazz);</span>
+<span class="fc" id="L322">					classStores.put(clazz.getName(), ret);</span>
+<span class="fc" id="L323">					return ret.store;</span>
+				}
+			}
+			
+			try {
+<span class="fc bfc" id="L328" title="All 2 branches covered.">				if (ret == null) {</span>
+<span class="fc" id="L329">					ret = findPropertiesInt(clazz);</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">					if (ret.store != null) {</span>
+<span class="fc" id="L331">						ret = checkForRetention(ret, clazz);</span>
+<span class="fc" id="L332">						classStores.put(clazz.getName(), ret);</span>
+<span class="fc" id="L333">						return ret.store;</span>
+					}
+				}
+				
+<span class="pc bpc" id="L337" title="3 of 6 branches missed.">				assert ret.store == null &amp;&amp; ret.properties != null;</span>
+	
+				// Building store
+<span class="fc" id="L340">				Object store = toObject(ret.properties);</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">				if (!(store instanceof Store)) {</span>
+<span class="nc" id="L342">					throw new IllegalArgumentException(&quot;Error while loading store for &quot; + clazz + &quot; properties describe &quot; + store + &quot; while expecting an instance of &quot; + Store.class.getName());</span>
+				}
+<span class="fc" id="L344">				ret.store = (Store)store;</span>
+				
+				// Checking for write retention in (flat) properties
+<span class="fc bfc" id="L347" title="All 2 branches covered.">				if (ret.properties.containsKey(STORE_WRITE_RETENTION)) {</span>
+<span class="fc" id="L348">					String wrStr = (String)ret.properties.get(STORE_WRITE_RETENTION);</span>
+<span class="fc" id="L349">					boolean disabled = wrStr.endsWith(&quot;-disabled&quot;);</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">					if (disabled) {</span>
+<span class="nc" id="L351">						wrStr = wrStr.substring(0, wrStr.length() - &quot;-disabled&quot;.length());</span>
+					}
+<span class="fc" id="L353">					WriteRetentionStore wrs = WriteRetentionStore.getWriteRetentionStore(Long.parseLong(wrStr), ret.store);</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">					if(disabled)</span>
+<span class="nc" id="L355">						wrs.setEnabledByDefault(false);</span>
+<span class="fc" id="L356">					ret.store = wrs;</span>
+				}
+
+				// Checking for write retention in annotation
+<span class="fc" id="L360">				ret = checkForRetention(ret, clazz);</span>
+				
+<span class="fc" id="L362">				ret.store.start();</span>
+<span class="fc" id="L363">				classStores.put(clazz.getName(), ret);</span>
+<span class="fc" id="L364">				return ret.store;</span>
+<span class="nc" id="L365">			} catch (Exception x) {</span>
+<span class="nc" id="L366">				throw new DatabaseNotReachedException(x);</span>
+			}
+		}
+	}
+	
+	private Object toObject(Map&lt;String, Object&gt; properties)
+			throws ClassNotFoundException, IllegalAccessException,
+			InvocationTargetException, NoSuchMethodException,
+			NoSuchFieldException {
+<span class="fc" id="L375">		Class&lt;?&gt; storeClass = Class.forName((String)properties.get(STORE_DRIVERCLASS_PROPERTY));</span>
+		Object ret;
+<span class="fc bfc" id="L377" title="All 2 branches covered.">		if (properties.containsKey(STORE_DRIVERCLASS_STATIC_ACCESSOR)) {</span>
+<span class="fc" id="L378">			String accessorName = (String)properties.get(STORE_DRIVERCLASS_STATIC_ACCESSOR);</span>
+<span class="fc" id="L379">			ret = buildStore(accessorName, storeClass, properties);</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">		} else if (properties.containsKey(STORE_DRIVERCLASS_SINGLETON_PROPERTY)) {</span>
+<span class="fc" id="L381">			ret = PropertyManagement.getInstance().readValue(null, storeClass.getField((String)properties.get(STORE_DRIVERCLASS_SINGLETON_PROPERTY)));</span>
+		} else { 
+<span class="fc" id="L383">			ret = buildStore(null, storeClass, properties);</span>
+		}
+		
+<span class="pc bpc" id="L386" title="2 of 4 branches missed.">		assert ret != null;</span>
+		
+		// Setting properties
+<span class="fc bfc" id="L389" title="All 2 branches covered.">		for (PropertyDescriptor property : PropertyUtils.getPropertyDescriptors(ret)) {</span>
+<span class="fc bfc" id="L390" title="All 4 branches covered.">			if (PropertyUtils.isWriteable(ret, property.getName()) &amp;&amp; properties.containsKey(property.getName())) {</span>
+<span class="fc" id="L391">				PropertyUtils.setProperty(ret, property.getName(), convert(properties.get(property.getName()), property.getPropertyType()));</span>
+			}
+		}
+		
+		// Wrapping if necessary
+<span class="fc bfc" id="L396" title="All 2 branches covered.">		if (ret instanceof SimpleStore)</span>
+<span class="fc" id="L397">			ret = SimpleStoreWrapper.getWrapper((SimpleStore)ret);</span>
+		
+<span class="fc" id="L399">		return ret;</span>
+	}
+	
+	@SuppressWarnings(&quot;unchecked&quot;)
+	private Object convert(Object val, Class&lt;?&gt; c) throws ClassNotFoundException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, NoSuchFieldException {
+<span class="fc bfc" id="L404" title="All 2 branches covered.">		if (val instanceof Map) {</span>
+<span class="fc" id="L405">			Object ret = toObject((Map&lt;String, Object&gt;) val);</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">			if (! c.isInstance(ret)) {</span>
+<span class="nc" id="L407">				throw new ClassCastException(ret + &quot; as described by properties &quot; + val + &quot; is not instance of &quot; + c);</span>
+			} else {
+<span class="fc" id="L409">				return ret;</span>
+			}
+		} else {
+<span class="fc" id="L412">			val = val.toString();</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">			if (c.isEnum()) {</span>
+<span class="nc" id="L414">				return Enum.valueOf(c.asSubclass(Enum.class), (String)val);</span>
+			}
+<span class="fc" id="L416">			return ConvertUtils.convert((String)val, c);</span>
+		}
+		//@ TODO support arrays
+	}
+
+	/**
+	 * Get store for given class bypassing any {@link com.googlecode.n_orm.storeapi.DelegatingStore}
+	 */
+	public Store getActualStoreFor(Class&lt;? extends PersistingElement&gt; clazz) throws DatabaseNotReachedException {
+<span class="fc" id="L425">		Store ret = this.getStoreFor(clazz);</span>
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">		return ret instanceof DelegatingStore ? ((DelegatingStore)ret).getDeepActualStore() : ret;</span>
+	}
+	
+	private StoreProperties checkForRetention(StoreProperties sp,
+			Class&lt;? extends PersistingElement&gt; clazz) {
+<span class="pc bpc" id="L431" title="2 of 4 branches missed.">		assert sp.store != null;</span>
+<span class="fc" id="L432">		Persisting pa = clazz.getAnnotation(Persisting.class);</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">		if (pa.writeRetentionMs() &gt; 0) {</span>
+<span class="fc" id="L434">			StoreProperties ret = new StoreProperties(sp.properties, sp.pack);</span>
+<span class="fc" id="L435">			ret.store = WriteRetentionStore.getWriteRetentionStore(pa.writeRetentionMs(), sp.store);</span>
+<span class="fc" id="L436">			return ret;</span>
+		} else
+<span class="fc" id="L438">			return sp;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

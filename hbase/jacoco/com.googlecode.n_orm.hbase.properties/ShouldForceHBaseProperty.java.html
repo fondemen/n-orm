@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ShouldForceHBaseProperty.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.properties</a> &gt; <span class="el_source">ShouldForceHBaseProperty.java</span></div><h1>ShouldForceHBaseProperty.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.properties;
+
+import com.googlecode.n_orm.hbase.HBaseSchema;
+
+/**
+ * Helper to handle forceXXX properties.
+ */
+<span class="fc" id="L8">abstract class ShouldForceHBaseProperty extends</span>
+		HBaseProperty&lt;Boolean&gt; {
+	static Boolean getBoolean(HBaseSchema.SettableBoolean value) {
+<span class="pc bpc" id="L11" title="1 of 4 branches missed.">		switch (value) {</span>
+		case UNSET:
+<span class="fc" id="L13">			return null;</span>
+		case FALSE:
+<span class="fc" id="L15">			return Boolean.FALSE;</span>
+		case TRUE:
+<span class="fc" id="L17">			return Boolean.TRUE;</span>
+		default:
+<span class="pc" id="L19">			return null;</span>
+		}
+	}
+
+	@Override
+	boolean isSet(Boolean value) {
+<span class="fc bfc" id="L25" title="All 2 branches covered.">		return value != null;</span>
+	}
+
+	abstract HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann);
+
+	@Override
+	Boolean readValue(HBaseSchema ann) {
+<span class="fc" id="L32">		return getBoolean(this.readRawValue(ann));</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

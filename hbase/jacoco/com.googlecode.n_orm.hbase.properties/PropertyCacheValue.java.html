@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PropertyCacheValue.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.properties</a> &gt; <span class="el_source">PropertyCacheValue.java</span></div><h1>PropertyCacheValue.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.properties;
+
+import java.lang.reflect.Field;
+import java.util.Comparator;
+import java.util.SortedMap;
+import java.util.TreeMap;
+
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.hbase.Store;
+
+// A class to be used as the value for properties cache
+<span class="fc" id="L12">class PropertyCacheValue {</span>
+	// The value representing NULL to avoid double checking get and contains in the cache
+<span class="fc" id="L14">	private static final Object NULL_VALUE = new Object();</span>
+	
+	// Comparator for cache sorted map
+<span class="fc" id="L17">	private static final Comparator&lt;HBaseProperty&lt;?&gt;&gt; comparator = new Comparator&lt;HBaseProperty&lt;?&gt;&gt;() {</span>
+
+		@Override
+		public int compare(HBaseProperty&lt;?&gt; o1, HBaseProperty&lt;?&gt; o2) {
+<span class="fc" id="L21">			return o2.hashCode() - o1.hashCode();</span>
+		}
+	};
+	
+	// The cache for values
+<span class="fc" id="L26">	private volatile SortedMap&lt;HBaseProperty&lt;?&gt;, Object&gt; values = new TreeMap&lt;HBaseProperty&lt;?&gt;, Object&gt;(comparator);</span>
+
+	public Object getValue(HBaseProperty&lt;?&gt; property, Store store,
+			Class&lt;? extends PersistingElement&gt; clazz, Field field,
+			String tablePostfix) {
+		// First checking cache (should not return null, but NULL_VALUE)
+<span class="fc" id="L32">		Object ret = this.values.get(property);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">		if (ret == null) {</span>
+			// Value does not exists
+			// Getting it and caching it
+			// Added to cache using copy-on-write
+<span class="fc" id="L37">			synchronized(this) {</span>
+				// Double check in synchronized section
+<span class="fc" id="L39">				ret = this.values.get(property);</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">				if (ret == null) {</span>
+					// Yes, we really have to get that value
+<span class="fc" id="L42">					ret = property.getValueInt(store, clazz, field, tablePostfix);</span>
+					// Not caching null value so that get immediately tells whether value exists in cache
+<span class="fc bfc" id="L44" title="All 2 branches covered.">					if (ret == null)</span>
+<span class="fc" id="L45">						ret = NULL_VALUE;</span>
+					// Copy of cache
+<span class="fc" id="L47">					SortedMap&lt;HBaseProperty&lt;?&gt;, Object&gt; newValues = new TreeMap&lt;HBaseProperty&lt;?&gt;, Object&gt;(values);</span>
+					// Adding value to cache
+<span class="fc" id="L49">					newValues.put(property, ret);</span>
+					// Copy-on-write
+<span class="fc" id="L51">					this.values = newValues;</span>
+				}
+<span class="pc" id="L53">			}</span>
+		}
+<span class="fc bfc" id="L55" title="All 2 branches covered.">		return ret == NULL_VALUE ? null : ret;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

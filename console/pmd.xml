@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pmd version="4.3" timestamp="2013-01-25T21:04:37.883">
+<file name="/Users/fondemen/Documents/workspace/n-orm/console/src/main/java/com/googlecode/n_orm/console/shell/ShellProcessor.java">
+<violation beginline="165" endline="165" begincolumn="33" endcolumn="55" rule="EmptyCatchBlock" ruleset="Basic Rules" package="com.googlecode.n_orm.console.shell" class="ShellProcessor" method="updateProcessorCommands" externalInfoUrl="http://pmd.sourceforge.net/rules/basic.html#EmptyCatchBlock" priority="3">
+Avoid empty catch blocks
+</violation>
+<violation beginline="444" endline="444" begincolumn="57" endcolumn="79" rule="EmptyCatchBlock" ruleset="Basic Rules" package="com.googlecode.n_orm.console.shell" class="ShellProcessor" method="doShow" externalInfoUrl="http://pmd.sourceforge.net/rules/basic.html#EmptyCatchBlock" priority="3">
+Avoid empty catch blocks
+</violation>
+</file>
+<file name="/Users/fondemen/Documents/workspace/n-orm/console/src/main/java/com/googlecode/n_orm/console/util/PackageExplorer.java">
+<violation beginline="139" endline="139" begincolumn="25" endcolumn="47" rule="EmptyCatchBlock" ruleset="Basic Rules" package="com.googlecode.n_orm.console.util" class="PackageExplorer" method="addClassesToListForDirectory" externalInfoUrl="http://pmd.sourceforge.net/rules/basic.html#EmptyCatchBlock" priority="3">
+Avoid empty catch blocks
+</violation>
+<violation beginline="176" endline="176" begincolumn="33" endcolumn="55" rule="EmptyCatchBlock" ruleset="Basic Rules" package="com.googlecode.n_orm.console.util" class="PackageExplorer" method="treatJar" externalInfoUrl="http://pmd.sourceforge.net/rules/basic.html#EmptyCatchBlock" priority="3">
+Avoid empty catch blocks
+</violation>
+<violation beginline="178" endline="178" begincolumn="19" endcolumn="43" rule="EmptyCatchBlock" ruleset="Basic Rules" package="com.googlecode.n_orm.console.util" class="PackageExplorer" method="treatJar" externalInfoUrl="http://pmd.sourceforge.net/rules/basic.html#EmptyCatchBlock" priority="3">
+Avoid empty catch blocks
+</violation>
+</file>
+</pmd>

@@ -1,0 +1,1087 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PropertyUtils.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase</a> &gt; <span class="el_source">PropertyUtils.java</span></div><h1>PropertyUtils.java</h1><pre class="source lang-java linenums"><span class="nc" id="L1">package com.googlecode.n_orm.hbase;</span>
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.util.Comparator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
+import org.apache.hadoop.hbase.regionserver.StoreFile;
+
+import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.PersistingElement;
+
+<span class="nc" id="L20">public class PropertyUtils {</span>
+	public static final HColumnFamilyProperty&lt;?&gt;[] properties;
+
+	static {
+<span class="nc" id="L24">		properties = new HColumnFamilyProperty[] { new InMemoryProperty(),</span>
+<span class="nc" id="L25">				new CompressorProperty(), new TTLProperty(),</span>
+<span class="nc" id="L26">				new MaxVersionsProperty(), new BloomTypeProperty(),</span>
+<span class="nc" id="L27">				new BlockCacheProperty(), new BlockSizeProperty(),</span>
+<span class="nc" id="L28">				new ReplicationScopeProperty() };</span>
+	}
+
+	// A class to be used as the key for properties cache
+	private static class PropertyCacheKey {
+		private final int hashCode;
+		private final Class&lt;? extends PersistingElement&gt; clazz;
+		private final Field field;
+		private final String postfix;
+
+		private PropertyCacheKey(Class&lt;? extends PersistingElement&gt; clazz,
+				Field field, String postfix) {
+<span class="nc" id="L40">			super();</span>
+<span class="nc" id="L41">			this.clazz = clazz;</span>
+<span class="nc" id="L42">			this.field = field;</span>
+<span class="nc" id="L43">			this.postfix = postfix;</span>
+<span class="nc" id="L44">			final int prime = 31;</span>
+<span class="nc" id="L45">			int result = 1;</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">			result = prime * result + ((clazz == null) ? 0 : clazz.hashCode());</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">			result = prime * result + ((field == null) ? 0 : field.hashCode());</span>
+<span class="nc" id="L48">			result = prime * result</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">					+ ((postfix == null) ? 0 : postfix.hashCode());</span>
+<span class="nc" id="L50">			this.hashCode = result;</span>
+<span class="nc" id="L51">		}</span>
+
+		@Override
+		public int hashCode() {
+<span class="nc" id="L55">			return this.hashCode;</span>
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+<span class="nc bnc" id="L60" title="All 2 branches missed.">			if (this == obj)</span>
+<span class="nc" id="L61">				return true;</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">			if (obj == null)</span>
+<span class="nc" id="L63">				return false;</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">			if (getClass() != obj.getClass())</span>
+<span class="nc" id="L65">				return false;</span>
+<span class="nc" id="L66">			PropertyCacheKey other = (PropertyCacheKey) obj;</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">			if (hashCode != other.hashCode)</span>
+<span class="nc" id="L68">				return false;</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">			if (clazz == null) {</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">				if (other.clazz != null)</span>
+<span class="nc" id="L71">					return false;</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">			} else if (!clazz.equals(other.clazz))</span>
+<span class="nc" id="L73">				return false;</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">			if (field == null) {</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">				if (other.field != null)</span>
+<span class="nc" id="L76">					return false;</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">			} else if (!field.equals(other.field))</span>
+<span class="nc" id="L78">				return false;</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">			if (postfix == null) {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">				if (other.postfix != null)</span>
+<span class="nc" id="L81">					return false;</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">			} else if (!postfix.equals(other.postfix))</span>
+<span class="nc" id="L83">				return false;</span>
+<span class="nc" id="L84">			return true;</span>
+		}
+	}
+
+	// A class to be used as the value for properties cache
+<span class="nc" id="L89">	private static class PropertyCacheValue {</span>
+<span class="nc" id="L90">		private final Map&lt;HBaseProperty&lt;?&gt;, Object&gt; values = new TreeMap&lt;HBaseProperty&lt;?&gt;, Object&gt;(</span>
+<span class="nc" id="L91">				new Comparator&lt;HBaseProperty&lt;?&gt;&gt;() {</span>
+
+					@Override
+					public int compare(HBaseProperty&lt;?&gt; o1, HBaseProperty&lt;?&gt; o2) {
+<span class="nc" id="L95">						return o2.hashCode() - o1.hashCode();</span>
+					}
+				});
+
+		public Object getValue(HBaseProperty&lt;?&gt; property, Store store,
+				Class&lt;? extends PersistingElement&gt; clazz, Field field,
+				String tablePostfix) {
+<span class="nc" id="L102">			Object ret = this.values.get(property);</span>
+<span class="nc bnc" id="L103" title="All 4 branches missed.">			if (ret == null &amp;&amp; !this.values.containsKey(property)) {</span>
+<span class="nc" id="L104">				ret = property.getValueInt(store, clazz, field, tablePostfix);</span>
+<span class="nc" id="L105">				this.values.put(property, ret);</span>
+			}
+<span class="nc" id="L107">			return ret;</span>
+		}
+	}
+
+<span class="nc" id="L111">	private static final Map&lt;PropertyCacheKey, PropertyCacheValue&gt; values = new ConcurrentHashMap&lt;PropertyCacheKey, PropertyCacheValue&gt;();</span>
+
+	static void clearCachedValues() {
+<span class="nc" id="L114">		values.clear();</span>
+<span class="nc" id="L115">	}</span>
+
+	private static abstract class TypeWithPostfix implements
+			Comparable&lt;TypeWithPostfix&gt; {
+		private final String postfix;
+
+<span class="nc" id="L121">		public TypeWithPostfix(String postfix) {</span>
+<span class="nc" id="L122">			this.postfix = postfix;</span>
+<span class="nc" id="L123">		}</span>
+
+		public String getPostfix() {
+<span class="nc" id="L126">			return postfix;</span>
+		}
+
+		@Override
+		public int compareTo(TypeWithPostfix o) {
+<span class="nc bnc" id="L131" title="All 2 branches missed.">			if (!this.getClass().equals(o.getClass()))</span>
+<span class="nc" id="L132">				return this.getClass().getSimpleName()</span>
+<span class="nc" id="L133">						.compareTo(o.getClass().getName());</span>
+<span class="nc" id="L134">			return this.getPostfix().compareTo(o.getPostfix());</span>
+		}
+	}
+
+	private static class ClassWithPostfix extends TypeWithPostfix {
+		private final Class&lt;? extends PersistingElement&gt; clazz;
+
+		private ClassWithPostfix(Class&lt;? extends PersistingElement&gt; clazz,
+				String postfix) {
+<span class="nc" id="L143">			super(postfix);</span>
+<span class="nc" id="L144">			this.clazz = clazz;</span>
+<span class="nc" id="L145">		}</span>
+
+		public Class&lt;? extends PersistingElement&gt; getClazz() {
+<span class="nc" id="L148">			return clazz;</span>
+		}
+
+		@Override
+		public int compareTo(TypeWithPostfix o) {
+<span class="nc" id="L153">			int ret = super.compareTo(o);</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">			if (ret != 0)</span>
+<span class="nc" id="L155">				return ret;</span>
+<span class="nc" id="L156">			return this</span>
+<span class="nc" id="L157">					.getClazz()</span>
+<span class="nc" id="L158">					.getSimpleName()</span>
+<span class="nc" id="L159">					.compareTo(</span>
+<span class="nc" id="L160">							((ClassWithPostfix) o).getClazz().getSimpleName());</span>
+		}
+
+	}
+
+	private static class ColumnFamilyWithPostfix extends TypeWithPostfix {
+		private final Field field;
+
+		private ColumnFamilyWithPostfix(Field field, String postfix) {
+<span class="nc" id="L169">			super(postfix);</span>
+<span class="nc" id="L170">			this.field = field;</span>
+<span class="nc" id="L171">		}</span>
+
+		public Field getField() {
+<span class="nc" id="L174">			return field;</span>
+		}
+
+		@Override
+		public int compareTo(TypeWithPostfix o) {
+<span class="nc" id="L179">			int ret = super.compareTo(o);</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">			if (ret != 0)</span>
+<span class="nc" id="L181">				return ret;</span>
+<span class="nc" id="L182">			return this</span>
+<span class="nc" id="L183">					.getField()</span>
+<span class="nc" id="L184">					.getName()</span>
+<span class="nc" id="L185">					.compareTo(</span>
+<span class="nc" id="L186">							((ColumnFamilyWithPostfix) o).getField().getName());</span>
+		}
+
+	}
+
+	@HBaseSchema
+<span class="nc" id="L192">	private static class DummyClass {</span>
+	}
+
+<span class="nc" id="L195">	public static class DefaultHBaseSchema implements HBaseSchema {</span>
+		private static HBaseSchema defaultHbaseSchema;
+
+		static {
+<span class="nc" id="L199">			defaultHbaseSchema = DummyClass.class</span>
+<span class="nc" id="L200">					.getAnnotation(HBaseSchema.class);</span>
+<span class="nc" id="L201">		}</span>
+
+<span class="nc" id="L203">		private Class&lt;? extends Annotation&gt; annotationType = defaultHbaseSchema</span>
+<span class="nc" id="L204">				.annotationType();</span>
+<span class="nc" id="L205">		private SettableBoolean forceCompression = defaultHbaseSchema</span>
+<span class="nc" id="L206">				.forceCompression();</span>
+<span class="nc" id="L207">		private String compression = defaultHbaseSchema.compression();</span>
+<span class="nc" id="L208">		private int scanCaching = defaultHbaseSchema.scanCaching();</span>
+<span class="nc" id="L209">		private SettableBoolean forceInMemory = defaultHbaseSchema</span>
+<span class="nc" id="L210">				.forceInMemory();</span>
+<span class="nc" id="L211">		private SettableBoolean inMemory = defaultHbaseSchema.inMemory();</span>
+<span class="nc" id="L212">		private SettableBoolean forceTimeToLive = defaultHbaseSchema</span>
+<span class="nc" id="L213">				.forceTimeToLive();</span>
+<span class="nc" id="L214">		private int timeToLiveInSeconds = defaultHbaseSchema</span>
+<span class="nc" id="L215">				.timeToLiveInSeconds();</span>
+<span class="nc" id="L216">		private SettableBoolean forceMaxVersions = defaultHbaseSchema</span>
+<span class="nc" id="L217">				.forceMaxVersions();</span>
+<span class="nc" id="L218">		private int maxVersions = defaultHbaseSchema.maxVersions();</span>
+<span class="nc" id="L219">		private SettableBoolean forceBloomFilterType = defaultHbaseSchema</span>
+<span class="nc" id="L220">				.forceBloomFilterType();</span>
+<span class="nc" id="L221">		private String bloomFilterType = defaultHbaseSchema.bloomFilterType();</span>
+<span class="nc" id="L222">		private SettableBoolean forceBlockCacheEnabled = defaultHbaseSchema</span>
+<span class="nc" id="L223">				.forceBlockCacheEnabled();</span>
+<span class="nc" id="L224">		private SettableBoolean blockCacheEnabled = defaultHbaseSchema</span>
+<span class="nc" id="L225">				.blockCacheEnabled();</span>
+<span class="nc" id="L226">		private SettableBoolean forceBlockSize = defaultHbaseSchema</span>
+<span class="nc" id="L227">				.forceBlockSize();</span>
+<span class="nc" id="L228">		private int blockSize = defaultHbaseSchema.blockSize();</span>
+<span class="nc" id="L229">		private SettableBoolean forceReplicationScope = defaultHbaseSchema</span>
+<span class="nc" id="L230">				.forceReplicationScope();</span>
+<span class="nc" id="L231">		private int replicationScope = defaultHbaseSchema.replicationScope();</span>
+
+		@Override
+		public Class&lt;? extends Annotation&gt; annotationType() {
+<span class="nc" id="L235">			return this.annotationType;</span>
+		}
+
+		@Override
+		public SettableBoolean forceCompression() {
+<span class="nc" id="L240">			return this.forceCompression;</span>
+		}
+
+		@Override
+		public String compression() {
+<span class="nc" id="L245">			return this.compression;</span>
+		}
+
+		@Override
+		public int scanCaching() {
+<span class="nc" id="L250">			return this.scanCaching;</span>
+		}
+
+		@Override
+		public SettableBoolean forceInMemory() {
+<span class="nc" id="L255">			return this.forceInMemory;</span>
+		}
+
+		@Override
+		public SettableBoolean inMemory() {
+<span class="nc" id="L260">			return this.inMemory;</span>
+		}
+
+		@Override
+		public SettableBoolean forceTimeToLive() {
+<span class="nc" id="L265">			return this.forceTimeToLive;</span>
+		}
+
+		@Override
+		public int timeToLiveInSeconds() {
+<span class="nc" id="L270">			return this.timeToLiveInSeconds;</span>
+		}
+
+		@Override
+		public SettableBoolean forceMaxVersions() {
+<span class="nc" id="L275">			return this.forceMaxVersions;</span>
+		}
+
+		@Override
+		public int maxVersions() {
+<span class="nc" id="L280">			return this.maxVersions;</span>
+		}
+
+		@Override
+		public SettableBoolean forceBloomFilterType() {
+<span class="nc" id="L285">			return this.forceBloomFilterType;</span>
+		}
+
+		@Override
+		public String bloomFilterType() {
+<span class="nc" id="L290">			return this.bloomFilterType;</span>
+		}
+
+		@Override
+		public SettableBoolean forceBlockCacheEnabled() {
+<span class="nc" id="L295">			return this.forceBlockCacheEnabled;</span>
+		}
+
+		@Override
+		public SettableBoolean blockCacheEnabled() {
+<span class="nc" id="L300">			return this.blockCacheEnabled;</span>
+		}
+
+		@Override
+		public SettableBoolean forceBlockSize() {
+<span class="nc" id="L305">			return this.forceBlockSize;</span>
+		}
+
+		@Override
+		public int blockSize() {
+<span class="nc" id="L310">			return this.blockSize;</span>
+		}
+
+		@Override
+		public SettableBoolean forceReplicationScope() {
+<span class="nc" id="L315">			return this.forceReplicationScope;</span>
+		}
+
+		@Override
+		public int replicationScope() {
+<span class="nc" id="L320">			return this.replicationScope;</span>
+		}
+
+		public void setAnnotationType(Class&lt;? extends Annotation&gt; annotationType) {
+<span class="nc" id="L324">			this.annotationType = annotationType;</span>
+<span class="nc" id="L325">		}</span>
+
+		public void setForceCompression(SettableBoolean forceCompression) {
+<span class="nc" id="L328">			this.forceCompression = forceCompression;</span>
+<span class="nc" id="L329">		}</span>
+
+		public void setCompression(String compression) {
+<span class="nc" id="L332">			this.compression = compression;</span>
+<span class="nc" id="L333">		}</span>
+
+		public void setScanCaching(int scanCaching) {
+<span class="nc" id="L336">			this.scanCaching = scanCaching;</span>
+<span class="nc" id="L337">		}</span>
+
+		public void setForceInMemory(SettableBoolean forceInMemory) {
+<span class="nc" id="L340">			this.forceInMemory = forceInMemory;</span>
+<span class="nc" id="L341">		}</span>
+
+		public void setInMemory(SettableBoolean inMemory) {
+<span class="nc" id="L344">			this.inMemory = inMemory;</span>
+<span class="nc" id="L345">		}</span>
+
+		public void setForceTimeToLive(SettableBoolean forceTimeToLive) {
+<span class="nc" id="L348">			this.forceTimeToLive = forceTimeToLive;</span>
+<span class="nc" id="L349">		}</span>
+
+		public void setTimeToLiveInSeconds(int timeToLiveInSeconds) {
+<span class="nc" id="L352">			this.timeToLiveInSeconds = timeToLiveInSeconds;</span>
+<span class="nc" id="L353">		}</span>
+
+		public void setForceMaxVersions(SettableBoolean forceMaxVersions) {
+<span class="nc" id="L356">			this.forceMaxVersions = forceMaxVersions;</span>
+<span class="nc" id="L357">		}</span>
+
+		public void setMaxVersions(int maxVersions) {
+<span class="nc" id="L360">			this.maxVersions = maxVersions;</span>
+<span class="nc" id="L361">		}</span>
+
+		public void setForceBloomFilterType(SettableBoolean forceBloomFilterType) {
+<span class="nc" id="L364">			this.forceBloomFilterType = forceBloomFilterType;</span>
+<span class="nc" id="L365">		}</span>
+
+		public void setBloomFilterType(String bloomFilterType) {
+<span class="nc" id="L368">			this.bloomFilterType = bloomFilterType;</span>
+<span class="nc" id="L369">		}</span>
+
+		public void setForceBlockCacheEnabled(
+				SettableBoolean forceBlockCacheEnabled) {
+<span class="nc" id="L373">			this.forceBlockCacheEnabled = forceBlockCacheEnabled;</span>
+<span class="nc" id="L374">		}</span>
+
+		public void setBlockCacheEnabled(SettableBoolean blockCacheEnabled) {
+<span class="nc" id="L377">			this.blockCacheEnabled = blockCacheEnabled;</span>
+<span class="nc" id="L378">		}</span>
+
+		public void setForceBlockSize(SettableBoolean forceBlockSize) {
+<span class="nc" id="L381">			this.forceBlockSize = forceBlockSize;</span>
+<span class="nc" id="L382">		}</span>
+
+		public void setBlockSize(int blockSize) {
+<span class="nc" id="L385">			this.blockSize = blockSize;</span>
+<span class="nc" id="L386">		}</span>
+
+		public void setForceReplicationScope(
+				SettableBoolean forceReplicationScope) {
+<span class="nc" id="L390">			this.forceReplicationScope = forceReplicationScope;</span>
+<span class="nc" id="L391">		}</span>
+
+		public void setReplicationScope(int replicationScope) {
+<span class="nc" id="L394">			this.replicationScope = replicationScope;</span>
+<span class="nc" id="L395">		}</span>
+
+	}
+
+<span class="nc" id="L399">	private static Map&lt;TypeWithPostfix, HBaseSchema&gt; specificities = new TreeMap&lt;TypeWithPostfix, HBaseSchema&gt;();</span>
+
+	static void clearAllSchemaSpecificities() {
+<span class="nc" id="L402">		specificities.clear();</span>
+<span class="nc" id="L403">		values.clear();</span>
+<span class="nc" id="L404">	}</span>
+
+	/**
+	 * Provides a mean to override a schema specification for a specific table
+	 * in case of a class to be persisted in a {@link Persisting#federated()
+	 * federated table}. Please note that if a column family is defined using
+	 * {@link HBaseSchema}, this definition is not overridden by overriding
+	 * class using this method.
+	 * 
+	 * @param clazz
+	 *            the class of the persisting elements
+	 * @param tablePostfix
+	 *            the postfix for the table for which which schema specificities
+	 *            should be registered ; null means no postfix
+	 * @param schema
+	 *            the schema specificities ; can be a {@link DefaultHBaseSchema}
+	 */
+	public static void registerSchemaSpecificity(
+			Class&lt;? extends PersistingElement&gt; clazz, String tablePostfix,
+			HBaseSchema schema) {
+<span class="nc bnc" id="L424" title="All 2 branches missed.">		if (clazz == null)</span>
+<span class="nc" id="L425">			throw new NullPointerException();</span>
+<span class="nc" id="L426">		specificities.put(new ClassWithPostfix(clazz, tablePostfix), schema);</span>
+<span class="nc" id="L427">		values.clear();</span>
+<span class="nc" id="L428">	}</span>
+
+	/**
+	 * Provides a mean to override a schema specification for a specific column
+	 * family in case of a class to be persisted in a
+	 * {@link Persisting#federated() federated table}.
+	 * 
+	 * @param field
+	 *            the column family
+	 * @param tablePostfix
+	 *            the postfix for the table for which which schema specificities
+	 *            should be registered ; null means no postfix
+	 * @param schema
+	 *            the schema specificities ; can be a {@link DefaultHBaseSchema}
+	 */
+	public static void registerSchemaSpecificity(Field field,
+			String tablePostfix, HBaseSchema schema) {
+<span class="nc bnc" id="L445" title="All 2 branches missed.">		if (field == null)</span>
+<span class="nc" id="L446">			throw new NullPointerException();</span>
+<span class="nc" id="L447">		specificities.put(new ColumnFamilyWithPostfix(field, tablePostfix),</span>
+<span class="nc" id="L448">				schema);</span>
+<span class="nc" id="L449">		values.clear();</span>
+<span class="nc" id="L450">	}</span>
+
+<span class="nc" id="L452">	public static abstract class HBaseProperty&lt;T&gt; {</span>
+		abstract String getName();
+
+		abstract T readValue(HBaseSchema ann);
+
+		abstract T getDefaultValue(Store store);
+
+		abstract boolean isSet(T value);
+
+		/**
+		 * Gets the value for this property for the given field, class, or store
+		 * (in that order of preference). Result is cached in
+		 * {@link PropertyUtils#values}.
+		 * 
+		 * @return null if unset
+		 */
+		@SuppressWarnings(&quot;unchecked&quot;)
+		final T getValue(Store store, Class&lt;? extends PersistingElement&gt; clazz,
+				Field field, String tablePostfix) {
+<span class="nc" id="L471">			PropertyCacheKey cacheKey = new PropertyCacheKey(clazz, field,</span>
+<span class="nc" id="L472">					tablePostfix);</span>
+
+<span class="nc" id="L474">			PropertyCacheValue cacheVal = values.get(cacheKey);</span>
+<span class="nc bnc" id="L475" title="All 2 branches missed.">			if (cacheVal == null) {</span>
+<span class="nc" id="L476">				cacheVal = new PropertyCacheValue();</span>
+<span class="nc" id="L477">				values.put(cacheKey, cacheVal);</span>
+			}
+
+<span class="nc" id="L480">			return (T) cacheVal.getValue(this, store, clazz, field,</span>
+<span class="nc" id="L481">					tablePostfix);</span>
+		}
+
+		/**
+		 * Actual method that determines the value for this property according
+		 * to field, class and store (in that order). This method is used by
+		 * {@link PropertyCacheValue values} of the {@link PropertyUtils#values
+		 * property cache} when not set.
+		 * 
+		 * @return null if unset
+		 */
+		private T getValueInt(Store store,
+				Class&lt;? extends PersistingElement&gt; clazz, Field field,
+				String tablePostfix) {
+<span class="nc" id="L495">			List&lt;HBaseSchema&gt; possibleSchemas = new LinkedList&lt;HBaseSchema&gt;();</span>
+			HBaseSchema tmp;
+
+<span class="nc bnc" id="L498" title="All 2 branches missed.">			if (field != null) {</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">				if (tablePostfix != null) {</span>
+<span class="nc" id="L500">					tmp = specificities.get(new ColumnFamilyWithPostfix(field,</span>
+<span class="nc" id="L501">							tablePostfix));</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">					if (tmp != null)</span>
+<span class="nc" id="L503">						possibleSchemas.add(tmp);</span>
+				}
+
+<span class="nc" id="L506">				tmp = field.getAnnotation(HBaseSchema.class);</span>
+<span class="nc bnc" id="L507" title="All 2 branches missed.">				if (tmp != null)</span>
+<span class="nc" id="L508">					possibleSchemas.add(tmp);</span>
+			}
+
+<span class="nc bnc" id="L511" title="All 2 branches missed.">			if (clazz != null) {</span>
+<span class="nc bnc" id="L512" title="All 2 branches missed.">				if (tablePostfix != null) {</span>
+<span class="nc" id="L513">					tmp = specificities.get(new ClassWithPostfix(clazz,</span>
+<span class="nc" id="L514">							tablePostfix));</span>
+<span class="nc bnc" id="L515" title="All 2 branches missed.">					if (tmp != null)</span>
+<span class="nc" id="L516">						possibleSchemas.add(tmp);</span>
+				}
+
+<span class="nc" id="L519">				tmp = clazz.getAnnotation(HBaseSchema.class);</span>
+<span class="nc bnc" id="L520" title="All 2 branches missed.">				if (tmp != null)</span>
+<span class="nc" id="L521">					possibleSchemas.add(tmp);</span>
+			}
+
+<span class="nc bnc" id="L524" title="All 2 branches missed.">			for (HBaseSchema schemaSpecificities : possibleSchemas) {</span>
+<span class="nc bnc" id="L525" title="All 2 branches missed.">				if (schemaSpecificities != null) {</span>
+<span class="nc" id="L526">					T ret = this.readValue(schemaSpecificities);</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">					if (this.isSet(ret))</span>
+<span class="nc" id="L528">						return ret;</span>
+				}
+			}
+
+<span class="nc" id="L532">			return this.getDefaultValue(store);</span>
+		}
+
+		@Override
+		public String toString() {
+<span class="nc" id="L537">			return this.getName();</span>
+		}
+	}
+
+<span class="nc" id="L541">	public static abstract class HColumnFamilyProperty&lt;T&gt; extends</span>
+			HBaseProperty&lt;T&gt; {
+		abstract boolean hasValue(T value, HColumnDescriptor cf);
+
+		public boolean hasValue(HColumnDescriptor cf, Store store,
+				Class&lt;? extends PersistingElement&gt; clazz, Field field,
+				String tablePostfix) {
+<span class="nc" id="L548">			T value = this.getValue(store, clazz, field, tablePostfix);</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">			return this.isSet(value) ? this.hasValue(value, cf) : true;</span>
+		}
+
+		public abstract void setValue(T value, HColumnDescriptor cf);
+
+		public void setValue(HColumnDescriptor cf, Store store,
+				Class&lt;? extends PersistingElement&gt; clazz, Field field,
+				String tablePostfix) {
+<span class="nc" id="L557">			T value = this.getValue(store, clazz, field, tablePostfix);</span>
+<span class="nc bnc" id="L558" title="All 2 branches missed.">			if (this.isSet(value)) {</span>
+<span class="nc" id="L559">				this.setValue(value, cf);</span>
+			}
+<span class="nc" id="L561">		}</span>
+
+		public boolean alter(HColumnDescriptor cf, Store store,
+				Class&lt;? extends PersistingElement&gt; clazz, Field field,
+				String tablePostfix) {
+<span class="nc" id="L566">			T value = this.getValue(store, clazz, field, tablePostfix);</span>
+<span class="nc bnc" id="L567" title="All 4 branches missed.">			if (this.isSet(value) &amp;&amp; !this.hasValue(value, cf)) {</span>
+<span class="nc" id="L568">				this.setValue(value, cf);</span>
+<span class="nc" id="L569">				return true;</span>
+			} else {
+<span class="nc" id="L571">				return false;</span>
+			}
+		}
+
+	}
+
+<span class="nc" id="L577">	private static abstract class ShouldForceHBaseProperty extends</span>
+			HBaseProperty&lt;Boolean&gt; {
+		static Boolean getBoolean(HBaseSchema.SettableBoolean value) {
+<span class="pc bnc" id="L580" title="All 4 branches missed.">			switch (value) {</span>
+			case UNSET:
+<span class="nc" id="L582">				return null;</span>
+			case FALSE:
+<span class="nc" id="L584">				return Boolean.FALSE;</span>
+			case TRUE:
+<span class="nc" id="L586">				return Boolean.TRUE;</span>
+			default:
+<span class="nc" id="L588">				return null;</span>
+			}
+		}
+
+		@Override
+		boolean isSet(Boolean value) {
+<span class="nc bnc" id="L594" title="All 2 branches missed.">			return value != null;</span>
+		}
+
+		abstract HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann);
+
+		@Override
+		Boolean readValue(HBaseSchema ann) {
+<span class="nc" id="L601">			return getBoolean(this.readRawValue(ann));</span>
+		}
+	}
+
+	private static abstract class ForcableHBaseProperty&lt;T&gt; extends
+			HColumnFamilyProperty&lt;T&gt; {
+		private ShouldForceHBaseProperty forcedProperty;
+
+<span class="nc" id="L609">		public ForcableHBaseProperty(ShouldForceHBaseProperty forcedProperty) {</span>
+<span class="nc" id="L610">			this.forcedProperty = forcedProperty;</span>
+<span class="nc" id="L611">		}</span>
+
+		@Override
+		public boolean alter(HColumnDescriptor cf, Store store,
+				Class&lt;? extends PersistingElement&gt; clazz, Field field,
+				String tablePostfix) {
+<span class="nc" id="L617">			Boolean shouldForce = this.forcedProperty.getValue(store, clazz,</span>
+<span class="nc" id="L618">					field, tablePostfix);</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">			if (this.forcedProperty.isSet(shouldForce)</span>
+<span class="nc bnc" id="L620" title="All 2 branches missed.">					&amp;&amp; Boolean.TRUE.equals(shouldForce)) {</span>
+<span class="nc" id="L621">				return super.alter(cf, store, clazz, field, tablePostfix);</span>
+			} else {
+<span class="nc" id="L623">				return false;</span>
+			}
+		}
+	}
+
+<span class="nc" id="L628">	private static class CompressorForcedProperty extends</span>
+			ShouldForceHBaseProperty {
+		@Override
+		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
+<span class="nc" id="L632">			return ann.forceCompression();</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="nc" id="L637">			return store.isForceCompression();</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L642">			return &quot;force compression&quot;;</span>
+		}
+
+	}
+
+	private static class CompressorProperty extends
+			ForcableHBaseProperty&lt;Algorithm&gt; {
+		public CompressorProperty() {
+<span class="nc" id="L650">			super(new CompressorForcedProperty());</span>
+<span class="nc" id="L651">		}</span>
+
+		@Override
+		boolean hasValue(Algorithm value, HColumnDescriptor cf) {
+<span class="nc" id="L655">			return cf.getCompressionType().equals(value);</span>
+		}
+
+		@Override
+		public void setValue(Algorithm value, HColumnDescriptor cf) {
+<span class="nc" id="L660">			cf.setCompressionType(value);</span>
+<span class="nc" id="L661">		}</span>
+
+		@Override
+		Algorithm readValue(HBaseSchema ann) {
+<span class="nc" id="L665">			return Store.getCompressionByName(ann.compression());</span>
+		}
+
+		@Override
+		Algorithm getDefaultValue(Store store) {
+<span class="nc" id="L670">			return store.getCompressionAlgorithm();</span>
+		}
+
+		@Override
+		boolean isSet(Algorithm value) {
+<span class="nc bnc" id="L675" title="All 2 branches missed.">			return value != null;</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L680">			return &quot;compression&quot;;</span>
+		}
+	}
+
+<span class="nc" id="L684">	private static class InMemoryForcedProperty extends</span>
+			ShouldForceHBaseProperty {
+		@Override
+		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
+<span class="nc" id="L688">			return ann.forceInMemory();</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="nc" id="L693">			return store.isForceInMemory();</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L698">			return &quot;force inMemory&quot;;</span>
+		}
+
+	}
+
+	private static class InMemoryProperty extends
+			ForcableHBaseProperty&lt;Boolean&gt; {
+		public InMemoryProperty() {
+<span class="nc" id="L706">			super(new InMemoryForcedProperty());</span>
+<span class="nc" id="L707">		}</span>
+
+		@Override
+		boolean hasValue(Boolean value, HColumnDescriptor cf) {
+<span class="nc bnc" id="L711" title="All 2 branches missed.">			return cf.isInMemory() == value.booleanValue();</span>
+		}
+
+		@Override
+		public void setValue(Boolean value, HColumnDescriptor cf) {
+<span class="nc" id="L716">			cf.setInMemory(value);</span>
+<span class="nc" id="L717">		}</span>
+
+		@Override
+		Boolean readValue(HBaseSchema ann) {
+<span class="nc" id="L721">			return ShouldForceHBaseProperty.getBoolean(ann.inMemory());</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="nc" id="L726">			return store.isInMemory();</span>
+		}
+
+		@Override
+		boolean isSet(Boolean value) {
+<span class="nc bnc" id="L731" title="All 2 branches missed.">			return value != null;</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L736">			return &quot;inMemory&quot;;</span>
+		}
+	}
+
+<span class="nc" id="L740">	private static class TTLForcedProperty extends ShouldForceHBaseProperty {</span>
+		@Override
+		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
+<span class="nc" id="L743">			return ann.forceTimeToLive();</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="nc" id="L748">			return store.isForceTimeToLive();</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L753">			return &quot;force TTL&quot;;</span>
+		}
+
+	}
+
+	private static class TTLProperty extends ForcableHBaseProperty&lt;Integer&gt; {
+		public TTLProperty() {
+<span class="nc" id="L760">			super(new TTLForcedProperty());</span>
+<span class="nc" id="L761">		}</span>
+
+		@Override
+		boolean hasValue(Integer value, HColumnDescriptor cf) {
+<span class="nc bnc" id="L765" title="All 2 branches missed.">			return cf.getTimeToLive() == value.intValue();</span>
+		}
+
+		@Override
+		public void setValue(Integer value, HColumnDescriptor cf) {
+<span class="nc" id="L770">			cf.setTimeToLive(value);</span>
+<span class="nc" id="L771">		}</span>
+
+		@Override
+		Integer readValue(HBaseSchema ann) {
+<span class="nc" id="L775">			return ann.timeToLiveInSeconds();</span>
+		}
+
+		@Override
+		Integer getDefaultValue(Store store) {
+<span class="nc" id="L780">			return store.getTimeToLiveSeconds();</span>
+		}
+
+		@Override
+		boolean isSet(Integer value) {
+<span class="nc bnc" id="L785" title="All 4 branches missed.">			return value != null &amp;&amp; value &gt; 0;</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L790">			return &quot;TTL (in seconds)&quot;;</span>
+		}
+	}
+
+<span class="nc" id="L794">	private static class MaxVersionsForcedProperty extends</span>
+			ShouldForceHBaseProperty {
+		@Override
+		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
+<span class="nc" id="L798">			return ann.forceMaxVersions();</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="nc" id="L803">			return store.isForceMaxVersions();</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L808">			return &quot;force max versions&quot;;</span>
+		}
+
+	}
+
+	private static class MaxVersionsProperty extends
+			ForcableHBaseProperty&lt;Integer&gt; {
+		public MaxVersionsProperty() {
+<span class="nc" id="L816">			super(new MaxVersionsForcedProperty());</span>
+<span class="nc" id="L817">		}</span>
+
+		@Override
+		boolean hasValue(Integer value, HColumnDescriptor cf) {
+<span class="nc bnc" id="L821" title="All 2 branches missed.">			return cf.getMaxVersions() == value.intValue();</span>
+		}
+
+		@Override
+		public void setValue(Integer value, HColumnDescriptor cf) {
+<span class="nc" id="L826">			cf.setMaxVersions(value);</span>
+<span class="nc" id="L827">		}</span>
+
+		@Override
+		Integer readValue(HBaseSchema ann) {
+<span class="nc" id="L831">			return ann.maxVersions();</span>
+		}
+
+		@Override
+		Integer getDefaultValue(Store store) {
+<span class="nc" id="L836">			return store.getMaxVersions();</span>
+		}
+
+		@Override
+		boolean isSet(Integer value) {
+<span class="nc bnc" id="L841" title="All 4 branches missed.">			return value != null &amp;&amp; value &gt; 0;</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L846">			return &quot;max versions&quot;;</span>
+		}
+	}
+
+<span class="nc" id="L850">	private static class BloomTypeForcedProperty extends</span>
+			ShouldForceHBaseProperty {
+		@Override
+		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
+<span class="nc" id="L854">			return ann.forceBloomFilterType();</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="nc" id="L859">			return store.isForceBloomFilterType();</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L864">			return &quot;force bloom filter type&quot;;</span>
+		}
+
+	}
+
+	private static class BloomTypeProperty extends
+			ForcableHBaseProperty&lt;StoreFile.BloomType&gt; {
+		public BloomTypeProperty() {
+<span class="nc" id="L872">			super(new BloomTypeForcedProperty());</span>
+<span class="nc" id="L873">		}</span>
+
+		@Override
+		boolean hasValue(StoreFile.BloomType value, HColumnDescriptor cf) {
+<span class="nc" id="L877">			return cf.getBloomFilterType().equals(value);</span>
+		}
+
+		@Override
+		public void setValue(StoreFile.BloomType value, HColumnDescriptor cf) {
+<span class="nc" id="L882">			cf.setBloomFilterType(value);</span>
+<span class="nc" id="L883">		}</span>
+
+		@Override
+		StoreFile.BloomType readValue(HBaseSchema ann) {
+<span class="nc" id="L887">			String name = ann.bloomFilterType();</span>
+<span class="nc bnc" id="L888" title="All 2 branches missed.">			if (name == null)</span>
+<span class="nc" id="L889">				return null;</span>
+<span class="nc" id="L890">			name = name.trim();</span>
+<span class="nc bnc" id="L891" title="All 2 branches missed.">			if (name.length() == 0)</span>
+<span class="nc" id="L892">				return null;</span>
+			try {
+<span class="nc" id="L894">				return StoreFile.BloomType</span>
+<span class="nc" id="L895">						.valueOf(ann.bloomFilterType().trim());</span>
+<span class="nc" id="L896">			} catch (Exception x) {</span>
+<span class="nc" id="L897">				Store.errorLogger.log(Level.WARNING, &quot;Unknown bloom type: &quot;</span>
+<span class="nc" id="L898">						+ name, x);</span>
+<span class="nc" id="L899">				return null;</span>
+			}
+		}
+
+		@Override
+		StoreFile.BloomType getDefaultValue(Store store) {
+<span class="nc" id="L905">			return store.getBloomFilterType();</span>
+		}
+
+		@Override
+		boolean isSet(StoreFile.BloomType value) {
+<span class="nc bnc" id="L910" title="All 2 branches missed.">			return value != null;</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L915">			return &quot;max versions&quot;;</span>
+		}
+	}
+
+<span class="nc" id="L919">	private static class BlockCacheForcedProperty extends</span>
+			ShouldForceHBaseProperty {
+		@Override
+		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
+<span class="nc" id="L923">			return ann.forceBlockCacheEnabled();</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="nc" id="L928">			return store.isForceBlockCacheEnabled();</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L933">			return &quot;force block cache&quot;;</span>
+		}
+
+	}
+
+	private static class BlockCacheProperty extends
+			ForcableHBaseProperty&lt;Boolean&gt; {
+		public BlockCacheProperty() {
+<span class="nc" id="L941">			super(new BlockCacheForcedProperty());</span>
+<span class="nc" id="L942">		}</span>
+
+		@Override
+		boolean hasValue(Boolean value, HColumnDescriptor cf) {
+<span class="nc bnc" id="L946" title="All 2 branches missed.">			return cf.isBlockCacheEnabled() == value.booleanValue();</span>
+		}
+
+		@Override
+		public void setValue(Boolean value, HColumnDescriptor cf) {
+<span class="nc" id="L951">			cf.setBlockCacheEnabled(value);</span>
+<span class="nc" id="L952">		}</span>
+
+		@Override
+		Boolean readValue(HBaseSchema ann) {
+<span class="nc" id="L956">			return ShouldForceHBaseProperty.getBoolean(ann.blockCacheEnabled());</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="nc" id="L961">			return store.getBlockCacheEnabled();</span>
+		}
+
+		@Override
+		boolean isSet(Boolean value) {
+<span class="nc bnc" id="L966" title="All 2 branches missed.">			return value != null;</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L971">			return &quot;block cache&quot;;</span>
+		}
+	}
+
+<span class="nc" id="L975">	private static class BlockSizeForcedProperty extends</span>
+			ShouldForceHBaseProperty {
+		@Override
+		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
+<span class="nc" id="L979">			return ann.forceBlockSize();</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="nc" id="L984">			return store.isForceBlockSize();</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L989">			return &quot;force block size&quot;;</span>
+		}
+
+	}
+
+	private static class BlockSizeProperty extends
+			ForcableHBaseProperty&lt;Integer&gt; {
+		public BlockSizeProperty() {
+<span class="nc" id="L997">			super(new BlockSizeForcedProperty());</span>
+<span class="nc" id="L998">		}</span>
+
+		@Override
+		boolean hasValue(Integer value, HColumnDescriptor cf) {
+<span class="nc bnc" id="L1002" title="All 2 branches missed.">			return cf.getBlocksize() == value.intValue();</span>
+		}
+
+		@Override
+		public void setValue(Integer value, HColumnDescriptor cf) {
+<span class="nc" id="L1007">			cf.setBlocksize(value);</span>
+<span class="nc" id="L1008">		}</span>
+
+		@Override
+		Integer readValue(HBaseSchema ann) {
+<span class="nc" id="L1012">			return ann.blockSize();</span>
+		}
+
+		@Override
+		Integer getDefaultValue(Store store) {
+<span class="nc" id="L1017">			return store.getBlockSize();</span>
+		}
+
+		@Override
+		boolean isSet(Integer value) {
+<span class="nc bnc" id="L1022" title="All 4 branches missed.">			return value != null &amp;&amp; value &gt; 0;</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L1027">			return &quot;block size&quot;;</span>
+		}
+	}
+
+<span class="nc" id="L1031">	private static class ReplicationScopeForcedProperty extends</span>
+			ShouldForceHBaseProperty {
+		@Override
+		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
+<span class="nc" id="L1035">			return ann.forceReplicationScope();</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="nc" id="L1040">			return store.isForceReplicationScope();</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L1045">			return &quot;force replication scope&quot;;</span>
+		}
+
+	}
+
+	private static class ReplicationScopeProperty extends
+			ForcableHBaseProperty&lt;Integer&gt; {
+		public ReplicationScopeProperty() {
+<span class="nc" id="L1053">			super(new ReplicationScopeForcedProperty());</span>
+<span class="nc" id="L1054">		}</span>
+
+		@Override
+		boolean hasValue(Integer value, HColumnDescriptor cf) {
+<span class="nc bnc" id="L1058" title="All 2 branches missed.">			return cf.getScope() == value.intValue();</span>
+		}
+
+		@Override
+		public void setValue(Integer value, HColumnDescriptor cf) {
+<span class="nc" id="L1063">			cf.setScope(value);</span>
+<span class="nc" id="L1064">		}</span>
+
+		@Override
+		Integer readValue(HBaseSchema ann) {
+<span class="nc" id="L1068">			return ann.replicationScope();</span>
+		}
+
+		@Override
+		Integer getDefaultValue(Store store) {
+<span class="nc" id="L1073">			return store.getReplicationScope();</span>
+		}
+
+		@Override
+		boolean isSet(Integer value) {
+<span class="nc bnc" id="L1078" title="All 6 branches missed.">			return value != null &amp;&amp; value &gt; 0 &amp;&amp; value &lt; 2;</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L1083">			return &quot;replication scope&quot;;</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

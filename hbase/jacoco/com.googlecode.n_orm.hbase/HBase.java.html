@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>HBase.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase</a> &gt; <span class="el_source">HBase.java</span></div><h1>HBase.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+import java.util.logging.StreamHandler;
+
+import org.codehaus.plexus.util.DirectoryScanner;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+
+/**
+ * An HBase {@link Store} starter found according to its configuration folder.
+ * An example store.properties file is:&lt;br&gt;&lt;code&gt;
+ * class=com.googlecode.n_orm.hbase.HBase&lt;br&gt;
+ * static-accessor=getStore&lt;br&gt;
+ * 1=/usr/lib/hadoop,/usr/lib/hbase,!/usr/lib/hadoop/example-confs
+ * &lt;/code&gt;&lt;br&gt;
+ * Given files and directories are explored recursively ignoring files given with a ! prefix. You can also define (positive or negative with a ! prefix) filters using wilcards such as * (any character set), ? (any character), and ** (any sub-directory) can be used both in included and excluded patterns (see {@link DirectoryScanner}), but at least one directory to look in must be defined without wildcard.
+ * All available properties for {@link Store} are supported.
+ * Most properties can be overloaded at class or column-family level by using the annotation {@link HBaseSchema}.
+ * Difference with {@link Store} is that jars found in the given folders are added to the classpath so that you don't need to include the HBase client jars in your application.
+ * However, if your application is ran within a servlet container (Tomcat, JBoss...), you should care excluding servlet and jsp APIs whom HBase depends on... 
+ * @see Store
+ */
+<span class="nc" id="L35">public class HBase {</span>
+	
+	/**
+	 * A dependency to be found for HBase to work.
+	 */
+<span class="nc" id="L40">	public static class HBaseDependency {</span>
+		/**
+		 * Filter for finding jar containing dependency
+		 */
+		private final String jarTemplate;
+		
+		/**
+		 * A class to be tested for dependency availability in the classpath
+		 */
+		private final String testClass;
+
+		private HBaseDependency(String jarTemplate, String testClass) {
+<span class="fc" id="L52">			super();</span>
+<span class="fc" id="L53">			this.jarTemplate = jarTemplate;</span>
+<span class="fc" id="L54">			this.testClass = testClass;</span>
+<span class="fc" id="L55">		}</span>
+		
+		/**
+		 * Tests whether this dependency looks available.
+		 * In case no test class is defined, returns null.
+		 */
+		public Boolean hasDependency() {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">			if (this.testClass == null)</span>
+<span class="nc" id="L63">				return null;</span>
+			try {
+<span class="nc" id="L65">				ClassLoader.getSystemClassLoader().loadClass(this.testClass);</span>
+<span class="nc" id="L66">				return true;</span>
+<span class="nc" id="L67">			} catch (ClassNotFoundException x) {</span>
+<span class="nc" id="L68">				return false;</span>
+			}
+		}
+	}
+	
+<span class="fc" id="L73">	public static final HBaseDependency[] HBaseDependencies = {</span>
+		new HBaseDependency(&quot;zookeeper*.jar,lib/zookeeper*.jar&quot;, &quot;org.apache.zookeeper.ZooKeeper&quot;),
+		new HBaseDependency(&quot;commons-configuration*.jar,lib/commons-configuration*.jar,configuration*.jar,lib/configuration*.jar&quot;, &quot;org.apache.commons.configuration.Configuration&quot;),
+		new HBaseDependency(&quot;commons-codec*.jar,lib/commons-codec*.jar,codec*.jar,lib/codec*.jar&quot;, &quot;org.apache.commons.codec.binary.Base64&quot;),
+		new HBaseDependency(&quot;commons-io*.jar,lib/commons-io*.jar,io*.jar,lib/io*.jar&quot;, &quot;org.apache.commons.io.FileUtils&quot;),
+		new HBaseDependency(&quot;commons-http*.jar,lib/commons-http*.jar,http*.jar,lib/http*.jar&quot;, &quot;org.apache.hadoop.conf.Configuration&quot;),
+		new HBaseDependency(&quot;hadoop*.jar,lib/hadoop*.jar&quot;, &quot;org.apache.commons.httpclient.HttpMethod&quot;),
+		new HBaseDependency(&quot;hbase*.jar&quot;, &quot;org.apache.hadoop.hbase.HBaseConfiguration&quot;),
+		new HBaseDependency(&quot;commons-logging*.jar,lib/commons-logging*.jar&quot;, &quot;org.apache.commons.logging.LogFactory&quot;),
+		new HBaseDependency(&quot;commons-lang*.jar,lib/commons-lang*.jar&quot;, &quot;org.apache.commons.lang.StringUtils&quot;),
+		new HBaseDependency(&quot;log4j*.jar,lib/log4j*.jar&quot;, &quot;org.apache.log4j.Logger&quot;),
+		new HBaseDependency(&quot;slf4j*.jar,lib/slf4j*.jar&quot;, &quot;org.slf4j.LoggerFactory&quot;),
+		new HBaseDependency(&quot;jackson*.jar,lib/jackson*.jar&quot;, &quot;org.codehaus.jackson.map.JsonMappingException&quot;),
+		new HBaseDependency(&quot;protobuf*.jar,lib/protobuf*.jar&quot;, &quot;com.google.protobuf.Message&quot;),
+		new HBaseDependency(&quot;guava*.jar,lib/guava*.jar&quot;, &quot;com.google.common.base.Predicate&quot;),
+		new HBaseDependency(&quot;avro*.jar,lib/avro*.jar&quot;, &quot;org.apache.avro.io.DatumReader&quot;),
+		new HBaseDependency(&quot;guava*jar.jar,lib/guava*jar.jar&quot;, null), //Loading Hadoop's patched guava yet not checking it's there (only required by CDH)
+		new HBaseDependency(&quot;hadoop-common*.jar,lib/hadoop-common*.jar&quot;, null), //Loading hadoop-common yet not checking it's there (only required by CDH)
+		new HBaseDependency(&quot;*snappy*.jar,lib/*snappy*.jar&quot;, null),
+		new HBaseDependency(&quot;*lzo*.jar,lib/*lzo*.jar&quot;, null)
+	};
+
+	public static final Logger logger;
+	public static final Logger errorLogger;
+
+<span class="fc" id="L98">	private static Map&lt;String, Store&gt; knownStores = new HashMap&lt;String, Store&gt;();</span>
+	
+<span class="fc" id="L100">	private static Class&lt;?&gt;[] parameters = new Class[] { URL.class };</span>
+<span class="fc" id="L101">	private static RecursiveFileAction addJarAction = new RecursiveFileAction() {</span>
+
+		@Override
+		public void fileFound(File file, Report r) {
+<span class="nc" id="L105">			URLClassLoader sysloader = (URLClassLoader) ClassLoader</span>
+					.getSystemClassLoader();
+<span class="nc" id="L107">			Class&lt;URLClassLoader&gt; sysclass = URLClassLoader.class;</span>
+
+			try {
+<span class="nc" id="L110">				Method method = sysclass</span>
+						.getDeclaredMethod(&quot;addURL&quot;, parameters);
+<span class="nc" id="L112">				method.setAccessible(true);</span>
+<span class="nc" id="L113">				method.invoke(sysloader, new Object[] { file.toURI().toURL() });</span>
+<span class="nc" id="L114">				logger.fine(file.getAbsolutePath() + &quot; added to classpath&quot;);</span>
+<span class="nc" id="L115">			} catch (Throwable t) {</span>
+<span class="nc" id="L116">				errorLogger.log(Level.SEVERE, &quot;Warning: could not add jar file &quot;	+ file.getAbsolutePath(), t);</span>
+<span class="nc" id="L117">			}</span>
+<span class="nc" id="L118">		}</span>
+
+		@Override
+		public boolean acceptFile(File file) {
+<span class="nc" id="L122">			return file.getName().endsWith(&quot;.jar&quot;);</span>
+		}
+	};
+	
+	static {
+<span class="fc" id="L127">		logger = Logger.getLogger(HBase.class.getName());</span>
+<span class="fc" id="L128">		errorLogger = Logger.getLogger(HBase.class.getName()+&quot;-err&quot;);</span>
+<span class="fc" id="L129">		initSimpleLogger(logger, System.out);</span>
+<span class="fc" id="L130">		initSimpleLogger(errorLogger, System.err);</span>
+<span class="fc" id="L131">	}</span>
+	
+	private static void initSimpleLogger(Logger logger, PrintStream out) {
+<span class="fc" id="L134">		StreamHandler handler = new StreamHandler(out, new SimpleFormatter());</span>
+<span class="fc" id="L135">		logger.addHandler(handler);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">		for (Handler h : logger.getHandlers()) {</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">			if (h != handler)</span>
+<span class="nc" id="L138">				logger.removeHandler(h);</span>
+		}
+<span class="fc" id="L140">	}</span>
+
+	/**
+	 * Get an HBase store according to a set of comma-separated configuration
+	 * folders. Those folders are supposed to have configuration files following
+	 * the pattern *-site.xml. Typically, one could state
+	 * &quot;/usr/lib/hadoop,/usr/lib/hbase&quot; as the configuration folder. Compared to
+	 * {@link Store#getStore(String)}, it appends to the class path any jar
+	 * found under the configuration folder. As such, you must not supply HBase
+	 * jars in the CLASSPATH.
+	 */
+	public static Store getStore(String commaSeparatedConfigurationFolders)
+			throws IOException {
+<span class="nc" id="L153">		synchronized(HBase.class) {</span>
+<span class="nc" id="L154">			Store ret = knownStores.get(commaSeparatedConfigurationFolders);</span>
+			
+<span class="nc bnc" id="L156" title="All 2 branches missed.">			if (ret == null) {</span>
+				
+				try {
+					//Exploiting common configuration
+<span class="nc" id="L160">					String cscf = commaSeparatedConfigurationFolders+&quot;,!**/*-tests.jar,&quot;+createFilters(); //no slf4j since n-orm depends on EHCahe, which depends on a (newer) version of slf4j</span>
+<span class="nc" id="L161">					addJarAction.clear();</span>
+<span class="nc" id="L162">					addJarAction.addFiles(cscf);</span>
+					try {
+<span class="nc" id="L164">						addJarAction.explore(null);</span>
+<span class="nc" id="L165">					} catch (IllegalArgumentException x) {</span>
+<span class="nc" id="L166">						throw new DatabaseNotReachedException(&quot;Invalid configuration folders specification &quot; + commaSeparatedConfigurationFolders + &quot;: &quot; + x.getMessage());</span>
+<span class="nc" id="L167">					}</span>
+<span class="nc" id="L168">					checkConfiguration();</span>
+<span class="nc" id="L169">				} catch (ClassNotFoundException x) {</span>
+<span class="nc" id="L170">					errorLogger.warning(&quot;Could not load all necessary classes (&quot; + x.getMessage() + &quot;) ; retrying loading all possible libraries...&quot;);</span>
+					//Explore all possibilities
+<span class="nc" id="L172">					String cscf = commaSeparatedConfigurationFolders; //any jars, anywhere</span>
+<span class="nc" id="L173">					addJarAction.clear();</span>
+<span class="nc" id="L174">					addJarAction.addFiles(cscf);</span>
+<span class="nc" id="L175">					addJarAction.explore(null);</span>
+					try {
+<span class="nc" id="L177">						checkConfiguration();</span>
+<span class="nc" id="L178">					} catch (ClassNotFoundException e) {</span>
+<span class="nc" id="L179">						throw new DatabaseNotReachedException(&quot;Cannot load necessary jars from &quot; + commaSeparatedConfigurationFolders + &quot; (&quot; + e.getMessage() + ')');</span>
+<span class="nc" id="L180">					}</span>
+<span class="nc" id="L181">				}</span>
+<span class="nc" id="L182">				ret = Store.getStore(commaSeparatedConfigurationFolders);</span>
+<span class="nc" id="L183">				knownStores.put(commaSeparatedConfigurationFolders, ret);</span>
+			}
+			
+<span class="nc" id="L186">			return ret;</span>
+<span class="nc" id="L187">		}</span>
+	}
+
+	private static void checkConfiguration() throws ClassNotFoundException {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">		for (HBaseDependency dep : HBaseDependencies) {</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">			if (Boolean.FALSE.equals(dep.hasDependency()))</span>
+<span class="nc" id="L193">				throw new ClassNotFoundException(&quot;Cannot find dependency &quot; + dep.jarTemplate +&quot;: could not locate class &quot; + dep.testClass);</span>
+		}
+<span class="nc" id="L195">	}</span>
+
+	private static String createFilters() {
+<span class="nc" id="L198">		StringBuffer ret = new StringBuffer();</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">		for (int i = 0; i &lt; HBaseDependencies.length; ++i) {</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">			if(!Boolean.TRUE.equals(HBaseDependencies[i].hasDependency())) {</span>
+				// Not comparing to FALSE as it can be null (load in any case)
+<span class="nc" id="L202">				ret.append(',');</span>
+<span class="nc" id="L203">				ret.append(HBaseDependencies[i].jarTemplate);</span>
+			}
+		}
+<span class="nc" id="L206">		return ret.toString();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

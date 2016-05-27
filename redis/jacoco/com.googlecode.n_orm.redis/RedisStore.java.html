@@ -1,0 +1,739 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>RedisStore.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Redis driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.redis</a> &gt; <span class="el_source">RedisStore.java</span></div><h1>RedisStore.java</h1><pre class="source lang-java linenums"><span class="fc" id="L1">package com.googlecode.n_orm.redis;</span>
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import org.apache.commons.codec.binary.Base64;
+
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.Protocol;
+import redis.clients.jedis.Response;
+import redis.clients.jedis.Transaction;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+import com.googlecode.n_orm.storeapi.SimpleStore;
+
+// &lt;table&gt; -&gt; liste ordonnée avec (poids-&gt; id)
+// &lt;table&gt;:families -&gt; un set de string
+// &lt;table&gt;:&lt;id&gt;:&lt;column family&gt;:keys -&gt; un sorted set de string
+//&lt;table&gt;:&lt;id&gt;:&lt;column family&gt;:vals -&gt; un hash de string -&gt; string
+//&lt;table&gt;:&lt;id&gt;:&lt;column family&gt;:increments -&gt; un hash de string -&gt; string
+
+<span class="fc" id="L38">public class RedisStore implements SimpleStore {</span>
+	private static final String SEPARATOR = &quot;:&quot;;
+
+<span class="fc" id="L41">	public static enum DataTypes {</span>
+<span class="fc" id="L42">		keys, vals, increments</span>
+	}
+
+	private static final String FAMILIES = &quot;families&quot;;
+	private static final int DEFAULT_ID_SCORE = 0;
+	private static final int DEFAULT_COLUMN_SCORE = 0;
+
+<span class="fc" id="L49">	public static ConcurrentMap&lt;Properties, RedisStore&gt; stores = new ConcurrentHashMap&lt;Properties, RedisStore&gt;();</span>
+<span class="fc" id="L50">	public static JedisPoolConfig poolConfig = new JedisPoolConfig();</span>
+
+<span class="fc" id="L52">	protected int scanCaching = 50;</span>
+
+<span class="fc" id="L54">	protected boolean isWriting = false;</span>
+
+	public JedisPool pool;
+
+	/**
+	 * Instantiate a unique RedisStore and return it
+	 * 
+	 * @return the RedisStore
+	 */
+	public static RedisStore getStore() {
+<span class="fc" id="L64">		return getStore(new Properties());</span>
+	}
+
+	public static RedisStore getStore(String host) {
+<span class="nc" id="L68">		Properties p = new Properties();</span>
+<span class="nc" id="L69">		p.put(&quot;host&quot;, host);</span>
+<span class="nc" id="L70">		return getStore(p);</span>
+	}
+
+	public static RedisStore getStore(String host, int port) {
+<span class="nc" id="L74">		Properties p = new Properties();</span>
+<span class="nc" id="L75">		p.put(&quot;host&quot;, host);</span>
+<span class="nc" id="L76">		p.put(&quot;port&quot;, port);</span>
+<span class="nc" id="L77">		return getStore(p);</span>
+	}
+
+	public static RedisStore getStore(String host, int port, int timeout,
+			String password) {
+<span class="nc" id="L82">		Properties p = new Properties();</span>
+<span class="nc" id="L83">		p.put(&quot;host&quot;, host);</span>
+<span class="nc" id="L84">		p.put(&quot;port&quot;, port);</span>
+<span class="nc" id="L85">		p.put(&quot;timeout&quot;, timeout);</span>
+<span class="nc" id="L86">		p.put(&quot;password&quot;, password);</span>
+<span class="nc" id="L87">		return getStore(p);</span>
+	}
+
+	public static RedisStore getStore(String host, int port, int timeout,
+			String password, int database) {
+<span class="nc" id="L92">		Properties p = new Properties();</span>
+<span class="nc" id="L93">		p.put(&quot;host&quot;, host);</span>
+<span class="nc" id="L94">		p.put(&quot;port&quot;, port);</span>
+<span class="nc" id="L95">		p.put(&quot;timeout&quot;, timeout);</span>
+<span class="nc" id="L96">		p.put(&quot;password&quot;, password);</span>
+<span class="nc" id="L97">		p.put(&quot;database&quot;, database);</span>
+<span class="nc" id="L98">		return getStore(p);</span>
+	}
+
+	public static RedisStore getStore(Properties p) {
+<span class="fc" id="L102">		RedisStore store = stores.get(p);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">		if (store == null) {</span>
+<span class="fc" id="L104">			store = new RedisStore();</span>
+<span class="fc" id="L105">			RedisStore s = stores.putIfAbsent(p, store);</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">			if (s != null)</span>
+<span class="nc" id="L107">				store = s;</span>
+			else {
+				Integer port;
+				try {
+<span class="fc" id="L111">					port = (Integer) p.get(&quot;port&quot;);</span>
+<span class="nc" id="L112">				} catch (ClassCastException x) {</span>
+<span class="nc" id="L113">					port = null;</span>
+				}
+				Integer timeout;
+				try {
+<span class="fc" id="L117">					timeout = (Integer) p.get(&quot;timeout&quot;);</span>
+<span class="nc" id="L118">				} catch (ClassCastException x) {</span>
+<span class="nc" id="L119">					timeout = null;</span>
+				}
+				Integer database;
+				try {
+<span class="fc" id="L123">					database = (Integer) p.get(&quot;database&quot;);</span>
+<span class="nc" id="L124">				} catch (ClassCastException x) {</span>
+<span class="nc" id="L125">					database = null;</span>
+				}
+<span class="fc" id="L127">				store.pool = new JedisPool(poolConfig,</span>
+<span class="fc" id="L128">						p.getProperty(&quot;host&quot;, &quot;localhost&quot;),</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">						port == null ?  Protocol.DEFAULT_PORT : port,</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">						timeout == null ?  Protocol.DEFAULT_TIMEOUT : timeout,</span>
+<span class="fc" id="L131">						p.getProperty(&quot;password&quot;),</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">						database == null ? Protocol.DEFAULT_DATABASE : database);</span>
+			}
+		}
+<span class="fc" id="L135">		return store;</span>
+	}
+
+	/**
+	 * The number of elements collected at once by an iterator.
+	 * 
+	 * @see #get(String, Constraint, int, Set)
+	 */
+	public int getScanCaching() {
+<span class="fc" id="L144">		return scanCaching;</span>
+	}
+
+	/**
+	 * The number of elements collected at once by an iterator. Default value is
+	 * 50.
+	 * 
+	 * @see #get(String, Constraint, int, Set)
+	 */
+	public void setScanCaching(int scanCaching) {
+<span class="nc" id="L154">		this.scanCaching = scanCaching;</span>
+<span class="nc" id="L155">	}</span>
+
+	public Jedis getReadableRedis() {
+<span class="fc" id="L158">		return null;</span>
+	}
+
+	protected Jedis getWritableRedis() {
+<span class="fc" id="L162">		return null;</span>
+	}
+
+	@Override
+	public void start() throws DatabaseNotReachedException {
+		// Do nothing
+
+<span class="fc" id="L169">	}</span>
+
+	@Override
+	public boolean hasTable(String tableName)
+			throws DatabaseNotReachedException {
+<span class="nc bnc" id="L174" title="All 2 branches missed.">		return this.getReadableRedis().exists(this.getKey(tableName));</span>
+	}
+
+	/**
+	 * Test if an id exists in the table
+	 * &lt;table&gt;
+	 */
+	@Override
+	public boolean exists(String table, String id)
+			throws DatabaseNotReachedException {
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">		return (this.getReadableRedis().zscore(this.getKey(table), id) != null);</span>
+	}
+
+	/**
+	 * Test if a family exists for the element &lt;id&gt; in the table
+	 * &lt;table&gt;
+	 * (test if
+	 * &lt;table&gt;
+	 * :&lt;id&gt;:&lt;family&gt;:keys exist
+	 */
+	@Override
+	public boolean exists(String table, String id, String family)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L197">		return (this.getReadableRedis().zcard(</span>
+<span class="pc bpc" id="L198" title="1 of 4 branches missed.">				this.getKey(table, id, family, DataTypes.keys)) &gt; 0);</span>
+	}
+
+	/**
+	 * Get an iterator on a list of Row specified with a Constraint, and for a
+	 * list of families
+	 */
+	@Override
+	public CloseableKeyIterator get(String table, Constraint c, int limit,
+			Set&lt;String&gt; families) throws DatabaseNotReachedException {
+<span class="fc bfc" id="L208" title="All 2 branches covered.">		return new CloseableIterator(RedisStore.this, c == null ? null</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">				: c.getStartKey(), c == null ? null : c.getEndKey(), table,</span>
+<span class="fc" id="L210">				limit, families);</span>
+	}
+
+	public List&lt;Row&gt; get(String table, String startKey, String stopKey,
+			Set&lt;String&gt; families2, int maxBulk) {
+<span class="fc" id="L215">		List&lt;Row&gt; result = new ArrayList&lt;Row&gt;(maxBulk);</span>
+
+<span class="fc bfc" id="L217" title="All 2 branches covered.">		long firstRank = startKey == null ? 0 : this.idToRank(table, startKey,</span>
+<span class="fc" id="L218">				false);</span>
+
+<span class="fc" id="L220">		Set&lt;String&gt; redisKeys = this.getReadableRedis().zrange(</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">				this.getKey(table), firstRank, firstRank + maxBulk);</span>
+
+<span class="fc bfc" id="L223" title="All 2 branches covered.">		for (String key : redisKeys) {</span>
+<span class="fc bfc" id="L224" title="All 4 branches covered.">			if (stopKey == null || stopKey.compareTo(key) &gt; 0)</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">				result.add(new RowWrapper(key, families2 == null ? null : this</span>
+<span class="fc" id="L226">						.get(table, key, families2)));</span>
+		}
+<span class="fc" id="L228">		return result;</span>
+	}
+
+	/**
+	 * Get the value associated to the key, for the (table, id, family) n-uplet
+	 * returns the value or null if the value do not exist
+	 */
+	@Override
+	public byte[] get(String table, String id, String family, String key)
+			throws DatabaseNotReachedException {
+
+		// Getting value from normal vals
+<span class="fc" id="L240">		String result = this.getReadableRedis().hget(</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">				this.getKey(table, id, family, DataTypes.vals), key);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">		if (result != null)</span>
+<span class="fc" id="L243">			return this.decodeFromRedis(table, id, family, key, result);</span>
+
+		// Getting value from incrementing vals
+<span class="fc" id="L246">		result = this.getReadableRedis().hget(</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">				this.getKey(table, id, family, DataTypes.increments), key);</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">		if (result != null)</span>
+<span class="nc" id="L249">			return decodeIncrementing(result);</span>
+
+<span class="fc" id="L251">		return null;</span>
+	}
+
+	/**
+	 * Get a Map of {key =&gt; value} for a specified id and a specified family
+	 */
+	@Override
+	public Map&lt;String, byte[]&gt; get(String table, String id, String family)
+			throws DatabaseNotReachedException {
+
+<span class="fc" id="L261">		Map&lt;String, byte[]&gt; ret = new HashMap&lt;String, byte[]&gt;();</span>
+		Map&lt;String, String&gt; familyRedisResult;
+
+		// Grabbing all values
+<span class="fc" id="L265">		familyRedisResult = this.getReadableRedis().hgetAll(</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">				this.getKey(table, id, family, DataTypes.vals));</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">		for (Entry&lt;String, String&gt; result : familyRedisResult.entrySet()) {</span>
+<span class="fc" id="L268">			ret.put(result.getKey(), this.decodeFromRedis(table, id, family,</span>
+<span class="fc" id="L269">					result.getKey(), result.getValue()));</span>
+		}
+
+		// Grabbing incrementing values
+<span class="fc" id="L273">		familyRedisResult = this.getReadableRedis().hgetAll(</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">				this.getKey(table, id, family, DataTypes.increments));</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">		for (Entry&lt;String, String&gt; result : familyRedisResult.entrySet()) {</span>
+<span class="fc" id="L276">			ret.put(result.getKey(), this.decodeIncrementing(result.getValue()));</span>
+		}
+<span class="fc" id="L278">		return ret;</span>
+	}
+
+	/**
+	 * Get a specified row from a specified table and family with rows specified
+	 * with a Constraint
+	 */
+	@Override
+	public Map&lt;String, byte[]&gt; get(String table, String id, String family,
+			Constraint c) throws DatabaseNotReachedException {
+		// la contrainte porte sur les clés dans la famille
+<span class="fc bfc" id="L289" title="All 4 branches covered.">		long rangeMin = (c != null &amp;&amp; c.getStartKey() != null) ? this</span>
+<span class="fc" id="L290">				.columnToRank(table, id, family, c.getStartKey(), false)</span>
+<span class="fc" id="L291">				: DEFAULT_COLUMN_SCORE;</span>
+<span class="fc bfc" id="L292" title="All 4 branches covered.">		long rangeMax = (c != null &amp;&amp; c.getEndKey() != null) ? this</span>
+<span class="fc" id="L293">				.columnToRank(table, id, family, c.getEndKey(), true)</span>
+<span class="fc" id="L294">				: Long.MAX_VALUE;</span>
+
+<span class="fc" id="L296">		Set&lt;String&gt; keysS = this.getReadableRedis().zrange(</span>
+<span class="fc" id="L297">				this.getKey(table, id, family, DataTypes.keys), rangeMin,</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">				rangeMax);</span>
+<span class="fc" id="L299">		String[] keys = keysS.toArray(new String[keysS.size()]);</span>
+
+<span class="fc" id="L301">		Map&lt;String, byte[]&gt; familyResult = new HashMap&lt;String, byte[]&gt;();</span>
+
+<span class="fc bfc" id="L303" title="All 2 branches covered.">		if (keys.length == 0)</span>
+<span class="fc" id="L304">			return familyResult;</span>
+
+		// Here, we assume that there are more values than increments
+		// First getting normal values
+<span class="fc" id="L308">		List&lt;String&gt; familyRedisResult = this.getReadableRedis().hmget(</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">				this.getKey(table, id, family, DataTypes.vals), keys);</span>
+<span class="fc" id="L310">		List&lt;String&gt; missingKeys = new ArrayList&lt;String&gt;(keys.length);</span>
+		// add and convert values from the family to a map
+<span class="fc bfc" id="L312" title="All 2 branches covered.">		for (int i = 0; i &lt; keys.length; i++) {</span>
+<span class="fc" id="L313">			String val = familyRedisResult.get(i);</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">			if (val != null)</span>
+<span class="fc" id="L315">				familyResult.put(keys[i], this.decodeFromRedis(table, id,</span>
+<span class="fc" id="L316">						family, keys[i], familyRedisResult.get(i)));</span>
+			else
+<span class="nc" id="L318">				missingKeys.add(keys[i]);</span>
+		}
+
+		// grabbing missing values from increments
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">		if (!missingKeys.isEmpty()) {</span>
+<span class="nc" id="L323">			keys = missingKeys.toArray(new String[missingKeys.size()]);</span>
+<span class="nc" id="L324">			familyRedisResult = this.getReadableRedis().hmget(</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">					this.getKey(table, id, family, DataTypes.increments), keys);</span>
+			// add and convert values from the family to a map
+<span class="nc bnc" id="L327" title="All 2 branches missed.">			for (int i = 0; i &lt; keys.length; i++) {</span>
+<span class="nc" id="L328">				String val = familyRedisResult.get(i);</span>
+<span class="nc" id="L329">				familyResult.put(keys[i], decodeIncrementing(val));</span>
+			}
+		}
+
+<span class="fc" id="L333">		return familyResult;</span>
+	}
+
+	/**
+	 * Returns all the values associated to the families for an specified id
+	 */
+	@Override
+	public ColumnFamilyData get(String table, String id,
+			Set&lt;String&gt; columnFamilies) throws DatabaseNotReachedException {
+
+<span class="fc" id="L343">		ColumnFamilyData result = new DefaultColumnFamilyData();</span>
+
+		// Iteration on families
+		Map&lt;String, byte[]&gt; keys;
+<span class="fc bfc" id="L347" title="All 2 branches covered.">		for (String family : columnFamilies) {</span>
+<span class="fc" id="L348">			keys = this.get(table, id, family);</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">			if (keys.size() &gt; 0)</span>
+<span class="fc" id="L350">				result.put(family, keys);</span>
+		}
+
+		// Return null if no result
+<span class="fc bfc" id="L354" title="All 2 branches covered.">		if (result.size() == 0)</span>
+<span class="fc" id="L355">			return null;</span>
+
+<span class="fc" id="L357">		return result;</span>
+	}
+
+	/**
+	 * Return the list of the families associated to an id and a table
+	 * 
+	 * @param table
+	 * @return Set of family (or empty set)
+	 */
+	protected Set&lt;String&gt; getFamilies(String table) {
+<span class="nc" id="L367">		Set&lt;String&gt; families = this.getReadableRedis().smembers(</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">				this.getFamiliesKey(table));</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">		return (families != null) ? families : new TreeSet&lt;String&gt;();</span>
+	}
+
+	/**
+	 * save changes in the database : - add or update the &quot;changed&quot; field -
+	 * remove the &quot;removed&quot; fields - increments the Integer fields
+	 * 
+	 * @param table
+	 * @param id
+	 * @param changed
+	 * @param removed
+	 * @param increments
+	 * @throws DatabaseNotReachedException
+	 */
+	@Override
+	public void storeChanges(String table, String id, ColumnFamilyData changed,
+			Map&lt;String, Set&lt;String&gt;&gt; removed,
+			Map&lt;String, Map&lt;String, Number&gt;&gt; increments)
+
+	throws DatabaseNotReachedException {
+<span class="fc" id="L389">		Jedis r = this.pool.getResource();</span>
+		try {
+<span class="fc" id="L391">			tryStoreChanges(table, id, changed, removed, increments, r);</span>
+<span class="fc" id="L392">			this.pool.returnResource(r);</span>
+<span class="nc" id="L393">		} catch (RuntimeException x) {</span>
+<span class="nc" id="L394">			this.pool.returnBrokenResource(r);</span>
+<span class="nc" id="L395">			r = this.pool.getResource();</span>
+			try {
+<span class="nc" id="L397">				tryStoreChanges(table, id, changed, removed, increments, r);</span>
+<span class="nc" id="L398">				this.pool.returnResource(r);</span>
+<span class="nc" id="L399">			} catch (RuntimeException y) {</span>
+<span class="nc" id="L400">				this.pool.returnBrokenResource(r);</span>
+<span class="nc" id="L401">				throw x;</span>
+			}
+		}
+<span class="fc" id="L404">	}</span>
+
+	private void tryStoreChanges(String table, String id,
+			ColumnFamilyData changed, Map&lt;String, Set&lt;String&gt;&gt; removed,
+			Map&lt;String, Map&lt;String, Number&gt;&gt; increments, Jedis r)
+
+	throws DatabaseNotReachedException {
+		List&lt;Object&gt; res;
+
+		do {
+<span class="fc" id="L414">			String tableKey = this.getKey(table);</span>
+<span class="fc" id="L415">			String famKey = this.getFamiliesKey(table);</span>
+	
+<span class="fc" id="L417">			Transaction t = r.multi();</span>
+	
+			// Add the key
+<span class="fc" id="L420">			t.zadd(tableKey, this.idToScore(id), id);</span>
+			// t.sadd(famKey, &quot;&quot;);
+	
+<span class="fc bfc" id="L423" title="All 2 branches covered.">			if (changed != null) {</span>
+	
+				// Add changed rows for each families
+<span class="fc bfc" id="L426" title="All 2 branches covered.">				for (Map.Entry&lt;String, Map&lt;String, byte[]&gt;&gt; family : changed</span>
+<span class="fc" id="L427">						.entrySet()) {</span>
+<span class="fc" id="L428">					Map&lt;String, String&gt; dataToBeInserted = new HashMap&lt;String, String&gt;();</span>
+	
+					// Convert Map&lt;String, byte[]&gt; to Map&lt;String, String&gt; before
+					// inserting
+<span class="fc bfc" id="L432" title="All 2 branches covered.">					for (Map.Entry&lt;String, byte[]&gt; key : family.getValue()</span>
+<span class="fc" id="L433">							.entrySet()) {</span>
+<span class="fc" id="L434">						dataToBeInserted.put(key.getKey(),</span>
+<span class="fc" id="L435">								this.encodeToRedis(key.getValue()));</span>
+					}
+					// add the family in the set of family
+<span class="fc" id="L438">					t.sadd(famKey, family.getKey());</span>
+	
+					// add the set of keys
+<span class="fc bfc" id="L441" title="All 2 branches covered.">					for (String redisKey : family.getValue().keySet()) {</span>
+<span class="fc" id="L442">						t.zadd(this.getKey(table, id, family.getKey(),</span>
+<span class="fc" id="L443">								DataTypes.keys), this.columnToScore(redisKey),</span>
+<span class="fc" id="L444">								redisKey);</span>
+					}
+	
+					// add the { key =&gt; value } hashmap
+<span class="fc" id="L448">					t.hmset(this.getKey(table, id, family.getKey(), DataTypes.vals),</span>
+<span class="fc" id="L449">							dataToBeInserted);</span>
+	
+				}
+			}
+	
+<span class="fc bfc" id="L454" title="All 2 branches covered.">			if (removed != null) {</span>
+				// Remove the keys
+<span class="fc bfc" id="L456" title="All 2 branches covered.">				for (Entry&lt;String, Set&lt;String&gt;&gt; family : removed.entrySet()) {</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">					for (String redisKey : family.getValue()) {</span>
+						// remove from the list of keys...
+<span class="fc" id="L459">						t.zrem(this.getKey(table, id, family.getKey(),</span>
+<span class="fc" id="L460">								DataTypes.keys), redisKey);</span>
+						// ... and from the hashmap
+<span class="fc" id="L462">						t.hdel(this.getKey(table, id, family.getKey(),</span>
+<span class="fc" id="L463">								DataTypes.vals), redisKey);</span>
+	
+						// Useless for an increment cannot be removed (i.e. get
+						// null)
+						// t.hdel(
+						// this.getKey(table, id, family.getKey(),
+						// DataTypes.increments), redisKey);
+					}
+				}
+			}
+	
+<span class="fc bfc" id="L474" title="All 2 branches covered.">			if (increments != null) {</span>
+				// Increment the values
+<span class="fc bfc" id="L476" title="All 2 branches covered.">				for (Map.Entry&lt;String, Map&lt;String, Number&gt;&gt; family : increments</span>
+<span class="fc" id="L477">						.entrySet()) {</span>
+	
+					// if the family does not exist, create it
+<span class="fc" id="L480">					t.sadd(famKey, family.getKey());</span>
+	
+					// add the set of keys
+<span class="fc bfc" id="L483" title="All 2 branches covered.">					for (String redisKey : family.getValue().keySet()) {</span>
+<span class="fc" id="L484">						t.zadd(this.getKey(table, id, family.getKey(),</span>
+<span class="fc" id="L485">								DataTypes.keys), this.columnToScore(redisKey),</span>
+<span class="fc" id="L486">								redisKey);</span>
+					}
+	
+<span class="fc bfc" id="L489" title="All 2 branches covered.">					for (Entry&lt;String, Number&gt; familyKey : family.getValue()</span>
+<span class="fc" id="L490">							.entrySet()) {</span>
+						// Increment directly in the &quot;increments&quot; database
+<span class="fc" id="L492">						t.hincrBy(this.getKey(table, id, family.getKey(),</span>
+<span class="fc" id="L493">								DataTypes.increments), familyKey.getKey(),</span>
+<span class="fc" id="L494">								familyKey.getValue().longValue());</span>
+					}
+				}
+			}
+	
+<span class="fc" id="L499">			res = t.exec();</span>
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">		} while(res == null);</span>
+<span class="fc" id="L501">	}</span>
+
+	/**
+	 * Delete a row from a table
+	 * 
+	 * @param table
+	 * @param id
+	 * @throws DatabaseNotReachedException
+	 */
+	@Override
+	public void delete(String table, String id)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L513">		Jedis r = this.pool.getResource();</span>
+		try {
+<span class="fc" id="L515">			tryDelete(table, id, r);</span>
+<span class="fc" id="L516">			this.pool.returnResource(r);</span>
+<span class="nc" id="L517">		} catch (RuntimeException x) {</span>
+<span class="nc" id="L518">			this.pool.returnBrokenResource(r);</span>
+<span class="nc" id="L519">			r = this.pool.getResource();</span>
+			try {
+<span class="nc" id="L521">				tryDelete(table, id, r);</span>
+<span class="nc" id="L522">				this.pool.returnResource(r);</span>
+<span class="nc" id="L523">			} catch (RuntimeException y) {</span>
+<span class="nc" id="L524">				this.pool.returnBrokenResource(r);</span>
+<span class="nc" id="L525">				throw x;</span>
+			}
+		}
+<span class="fc" id="L528">	}</span>
+
+	private void tryDelete(String table, String id, Jedis r)
+			throws DatabaseNotReachedException {
+		// delete :
+		// - &lt;table&gt;
+
+		List&lt;Object&gt; res;
+
+		do {
+<span class="fc" id="L538">			List&lt;String&gt; keysToBeDeleted = new ArrayList&lt;String&gt;();</span>
+
+<span class="fc" id="L540">			String famKey = this.getFamiliesKey(table);</span>
+
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">			r.watch(famKey);</span>
+
+<span class="pc bpc" id="L544" title="1 of 2 branches missed.">			Set&lt;String&gt; families = r.smembers(famKey);</span>
+<span class="fc bfc" id="L545" title="All 2 branches covered.">			for (String family : families) {</span>
+				// - &lt;table&gt;:&lt;id&gt;:&lt;column family&gt;:keys
+<span class="fc" id="L547">				keysToBeDeleted.add(this.getKey(table, id, family,</span>
+<span class="fc" id="L548">						DataTypes.keys));</span>
+				// - &lt;table&gt;:&lt;id&gt;:&lt;column family&gt;:vals
+<span class="fc" id="L550">				keysToBeDeleted.add(this.getKey(table, id, family,</span>
+<span class="fc" id="L551">						DataTypes.vals));</span>
+				// - &lt;table&gt;:&lt;id&gt;:&lt;column family&gt;:increments
+<span class="fc" id="L553">				keysToBeDeleted.add(this.getKey(table, id, family,</span>
+<span class="fc" id="L554">						DataTypes.increments));</span>
+			}
+
+<span class="fc" id="L557">			Transaction t = r.multi();</span>
+
+<span class="fc" id="L559">			t.zrem(this.getKey(table), id);</span>
+<span class="fc bfc" id="L560" title="All 2 branches covered.">			if (!keysToBeDeleted.isEmpty())</span>
+<span class="fc" id="L561">				t.del(keysToBeDeleted.toArray(new String[keysToBeDeleted.size()]));</span>
+
+<span class="fc" id="L563">			res = t.exec();</span>
+<span class="pc bpc" id="L564" title="1 of 2 branches missed.">		} while (res == null);</span>
+<span class="fc" id="L565">	}</span>
+
+	/**
+	 * Return the number of the rows specified with a Constraint
+	 */
+	@Override
+	public long count(String table, Constraint c)
+			throws DatabaseNotReachedException {
+
+<span class="pc bpc" id="L574" title="1 of 4 branches missed.">		long rangeMin = (c != null &amp;&amp; c.getStartKey() != null) ? this.idToRank(</span>
+<span class="fc" id="L575">				table, c.getStartKey(), false) : 0;</span>
+<span class="pc bpc" id="L576" title="1 of 4 branches missed.">		long rangeMax = (c != null &amp;&amp; c.getEndKey() != null) ? this.idToRank(</span>
+<span class="fc" id="L577">				table, c.getEndKey(), false) : this.getReadableRedis()</span>
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">				.zcard(this.getKey(table)).intValue();</span>
+
+<span class="fc" id="L580">		return rangeMax - rangeMin;</span>
+	}
+
+	public void flushAll() {
+<span class="pc bpc" id="L584" title="1 of 2 branches missed.">		this.getWritableRedis().flushAll();</span>
+<span class="fc" id="L585">	}</span>
+
+	/**
+	 * Return the redis keys for the elements'keys for the table
+	 * 
+	 * @param table
+	 * @return liste ordonnée avec (poids-&gt; id)
+	 */
+	protected String getKey(String table) {
+<span class="fc" id="L594">		return table;</span>
+	}
+
+	/**
+	 * Return the redis key for the list of families for the table
+	 * 
+	 * @param table
+	 * @return table:families -&gt; un set de string
+	 */
+	protected String getFamiliesKey(String table) {
+<span class="fc" id="L604">		return table + SEPARATOR + FAMILIES;</span>
+	}
+
+	/**
+	 * @return &lt;table&gt;
+	 *         :&lt;id&gt;:&lt;column family&gt;:vals -&gt; hash de string -&gt; string
+	 *         &lt;table&gt;
+	 *         &lt;table&gt;
+	 *         :&lt;id&gt;:&lt;column family&gt;:keys -&gt; un set de strings
+	 */
+	protected String getKey(String table, String id, String family,
+			DataTypes type) {
+<span class="fc" id="L616">		return table + SEPARATOR + id + SEPARATOR + FAMILIES + SEPARATOR</span>
+<span class="fc" id="L617">				+ family + SEPARATOR + type.name();</span>
+	}
+
+	public double idToScore(String id) {
+<span class="fc" id="L621">		return DEFAULT_ID_SCORE;</span>
+	}
+
+	public double columnToScore(String id) {
+<span class="fc" id="L625">		return DEFAULT_COLUMN_SCORE;</span>
+	}
+
+	/**
+	 * Return the rank of a id
+	 */
+	public long idToRank(String table, String id, Boolean endSearch) {
+<span class="fc" id="L632">		return this.redisKeyToRank(this.getKey(table), id, endSearch);</span>
+	}
+
+	/**
+	 * Return the rank of a column synchro because of the add/remove dring the
+	 * search
+	 */
+	public long columnToRank(String table, String id, String family, String key,
+			Boolean endSearch) {
+<span class="fc" id="L641">		return this.redisKeyToRank(</span>
+<span class="fc" id="L642">				this.getKey(table, id, family, DataTypes.keys), key, endSearch);</span>
+	}
+
+	/**
+	 * Return the rank of a potential key
+	 * 
+	 * @param hashKey
+	 *            : the hashset where the keys are stored
+	 * @param id
+	 *            : the id of the searchable element
+	 * @param endSearch
+	 *            : is it a start or a stop search
+	 */
+	protected long redisKeyToRank(String hashKey, String id, Boolean endSearch) {
+
+<span class="pc bpc" id="L657" title="1 of 2 branches missed.">		Long rank = this.getReadableRedis().zrank(hashKey, id);</span>
+		// Remember if the key already exists
+<span class="fc bfc" id="L659" title="All 2 branches covered.">		if (rank != null) {</span>
+			// the key is existing, return the rank :
+<span class="fc" id="L661">			return rank.longValue();</span>
+		} else {
+			// the keys does not exist
+			Response&lt;Long&gt; rankR;
+<span class="fc" id="L665">			Jedis r = this.pool.getResource();</span>
+			try {
+<span class="fc" id="L667">				rankR = tryKeyToRank(hashKey, id, r);</span>
+<span class="fc" id="L668">				this.pool.returnResource(r);</span>
+<span class="nc" id="L669">			} catch (RuntimeException x) {</span>
+<span class="nc" id="L670">				this.pool.returnBrokenResource(r);</span>
+<span class="nc" id="L671">				r = this.pool.getResource();</span>
+				try {
+<span class="nc" id="L673">					rankR = tryKeyToRank(hashKey, id, r);</span>
+<span class="nc" id="L674">					this.pool.returnResource(r);</span>
+<span class="nc" id="L675">				} catch (RuntimeException y) {</span>
+<span class="nc" id="L676">					this.pool.returnBrokenResource(r);</span>
+<span class="nc" id="L677">					throw x;</span>
+				}
+			}
+<span class="fc" id="L680">			rank = rankR.get();</span>
+
+			// if the value do not already exists, remove 1 from the rank
+			// if we want the previous value (endSearch)
+<span class="fc bfc" id="L684" title="All 2 branches covered.">			if (endSearch)</span>
+<span class="fc" id="L685">				rank--;</span>
+
+<span class="fc" id="L687">			return rank.intValue();</span>
+		}
+
+	}
+
+	private Response&lt;Long&gt; tryKeyToRank(String hashKey, String id, Jedis r) {
+		List&lt;Object&gt; res;
+		Response&lt;Long&gt; rankR;
+		
+		do {
+<span class="fc" id="L697">			Transaction t = r.multi();</span>
+	
+			// Add the key
+<span class="fc" id="L700">			t.zadd(hashKey, 0, id);</span>
+	
+			// get the rank of the freshly inserted id
+<span class="fc" id="L703">			rankR = t.zrank(hashKey, id);</span>
+	
+			// Remove the key
+<span class="fc" id="L706">			t.zrem(hashKey, id);</span>
+	
+			// Doing transaction
+<span class="fc" id="L709">			res = t.exec();</span>
+<span class="pc bpc" id="L710" title="1 of 2 branches missed.">		} while (res == null);</span>
+
+<span class="fc" id="L712">		return rankR;</span>
+	}
+
+	/**
+	 * Encode binary data to Base64 String
+	 */
+	public String encodeToRedis(byte[] data) {
+<span class="fc" id="L719">		return Base64.encodeBase64String(data);</span>
+	}
+
+	/**
+	 * Decode Base64-encoded String to binary data
+	 */
+	public byte[] decodeFromRedis(String table, String id, String family,
+			String row, String data) {
+<span class="pc bpc" id="L727" title="1 of 4 branches missed.">		return (data != null &amp;&amp; data.length() != 0) ? Base64.decodeBase64(data)</span>
+<span class="fc" id="L728">				: new byte[0];</span>
+	}
+
+	/**
+	 * Decode encoded number to binary data
+	 */
+	public byte[] decodeIncrementing(String result) {
+<span class="fc" id="L735">		return ConversionTools.convert(Long.parseLong(result), Long.class);</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

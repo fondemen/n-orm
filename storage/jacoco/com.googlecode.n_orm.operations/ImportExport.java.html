@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ImportExport.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.operations</a> &gt; <span class="el_source">ImportExport.java</span></div><h1>ImportExport.java</h1><pre class="source lang-java linenums"><span class="pc" id="L1">package com.googlecode.n_orm.operations;</span>
+
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+import com.googlecode.n_orm.CloseableIterator;
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.KeyManagement;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.Process;
+import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.consoleannotations.Trigger;
+import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row;
+
+public class ImportExport {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">	private static class Element implements Row, Serializable {</span>
+		private static final long serialVersionUID = -8217112442099719281L;
+		
+		private String key;
+		private Class&lt;? extends PersistingElement&gt; clazz;
+		private ColumnFamilyData values;
+		
+<span class="fc" id="L38">		public Element(PersistingElement pe) {</span>
+<span class="fc" id="L39">			pe.checkIsValid();</span>
+<span class="fc" id="L40">			pe.updateFromPOJO();</span>
+<span class="fc" id="L41">			this.clazz = pe.getClass();</span>
+<span class="fc" id="L42">			this.key = pe.getIdentifier();</span>
+<span class="fc" id="L43">			Collection&lt;ColumnFamily&lt;?&gt;&gt; fams = pe.getColumnFamilies();</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">			values = new DefaultColumnFamilyData();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">			for (ColumnFamily&lt;?&gt; family : fams) {</span>
+<span class="fc" id="L46">				Map&lt;String, byte[]&gt; familyMap = new TreeMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L47">				values.put(family.getName(), familyMap);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">				for (String qualifier : family.getKeys()) {</span>
+<span class="fc" id="L49">					Object element = family.getElement(qualifier);</span>
+					Class&lt;?&gt; expected;
+<span class="fc bfc" id="L51" title="All 2 branches covered.">					if (family.getProperty() != null) {</span>
+<span class="fc" id="L52">						expected = family.getClazz();</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">					} else if (element instanceof PropertyManagement.Property) {</span>
+<span class="fc" id="L54">						Field propField = ((PropertyManagement.Property)element).getField();</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">						if (propField == null)</span>
+<span class="nc" id="L56">							continue;</span>
+<span class="fc" id="L57">						expected = propField.getType();</span>
+					} else {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">						assert false;</span>
+<span class="nc" id="L60">						expected = element.getClass();</span>
+					}
+<span class="fc" id="L62">					familyMap.put(qualifier, ConversionTools.convert(element, expected));</span>
+				}
+			}
+<span class="fc" id="L65">		}</span>
+	
+		@Override
+		public String getKey() {
+<span class="nc" id="L69">			return key;</span>
+		}
+	
+		@Override
+		public ColumnFamilyData getValues() {
+<span class="fc" id="L74">			return values;</span>
+		}
+		
+		public PersistingElement getElement() {
+<span class="fc" id="L78">			PersistingElement ret = KeyManagement.getInstance().createElement(this.clazz, this.key);</span>
+<span class="fc" id="L79">			ret.activateFromRawData(ret.getColumnFamilyNames(), this.getValues());</span>
+<span class="fc" id="L80">			return ret;</span>
+		}
+		
+	}
+
+	public static class ExportReport {
+		private final PersistingElement element;
+		private final long exportedElements;
+		public ExportReport(PersistingElement element, long exportedElements) {
+<span class="fc" id="L89">			super();</span>
+<span class="fc" id="L90">			this.element = element;</span>
+<span class="fc" id="L91">			this.exportedElements = exportedElements;</span>
+<span class="fc" id="L92">		}</span>
+		public PersistingElement getElement() {
+<span class="nc" id="L94">			return element;</span>
+		}
+		public long getExportedElements() {
+<span class="fc" id="L97">			return exportedElements;</span>
+		}
+	}
+
+	/**
+	 * An exception rose during a deserialization process.
+	 */
+	public static class ProcessReadException extends Exception {
+		private final PersistingElement element;
+		private final InputStream input;
+		private ProcessReadException(PersistingElement element,
+				Throwable exception, InputStream input) {
+<span class="nc" id="L109">			super(&quot;Problem while reading element &quot; + element, exception);</span>
+<span class="nc" id="L110">			this.element = element;</span>
+<span class="nc" id="L111">			this.input = input;</span>
+<span class="nc" id="L112">		}</span>
+		protected PersistingElement getElement() {
+<span class="nc" id="L114">			return element;</span>
+		}
+		protected InputStream getInput() {
+<span class="nc" id="L117">			return input;</span>
+		}
+	}
+	
+	/**
+	 * The list of exception raised during a read process.
+	 */
+	public static class ReadException extends Exception {
+		private final Collection&lt;ProcessReadException&gt; exceptions;
+		
+		public ReadException(Collection&lt;ProcessReadException&gt; exceptions) {
+<span class="nc" id="L128">			super(exceptions.size() + &quot; problems while reading serialized elements&quot;, exceptions.iterator().next());</span>
+<span class="nc" id="L129">			this.exceptions = Collections.unmodifiableCollection(exceptions);</span>
+<span class="nc" id="L130">		}</span>
+
+		protected Collection&lt;ProcessReadException&gt; getExceptions() {
+<span class="nc" id="L133">			return exceptions;</span>
+		}
+		
+	}
+	
+	public static final String SERIALIZATION_SEPARATOR = &quot;n-orm&quot;;
+
+<span class="nc" id="L140">	private ImportExport() {}</span>
+
+	/**
+	 * Serialize a binary representation for elements in an OutputStream.
+	 * Dependencies are not serialized.
+	 * Elements are removed from cache to avoid memory consumption.
+	 * @param elementsIterator an iterator over the elements to be serialized ; closed by the method
+	 * @return lastElement the last element serialized from the collection
+	 */
+	public static ExportReport exportPersistingElements(CloseableIterator&lt;? extends PersistingElement&gt; elementsIterator, ObjectOutputStream out) throws IOException {
+<span class="fc" id="L150">		PersistingElement lastElement = null;</span>
+<span class="fc" id="L151">		KeyManagement km = KeyManagement.getInstance();</span>
+<span class="fc" id="L152">		long exported = 0;</span>
+		try {
+<span class="fc bfc" id="L154" title="All 2 branches covered.">			while (elementsIterator.hasNext()) {</span>
+<span class="fc" id="L155">				PersistingElement elt = elementsIterator.next();</span>
+<span class="fc" id="L156">				elt.checkIsValid();</span>
+<span class="fc" id="L157">				elt.updateFromPOJO();</span>
+<span class="fc" id="L158">				out.writeObject(SERIALIZATION_SEPARATOR);</span>
+<span class="fc" id="L159">				out.writeObject(new Element(elt));</span>
+<span class="fc" id="L160">				lastElement = elt;</span>
+<span class="fc" id="L161">				km.unregister(elt);</span>
+<span class="fc" id="L162">				exported++;</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">				if (exported % 100 == 0) {</span>
+<span class="fc" id="L164">					out.reset();</span>
+				}
+			}
+<span class="fc" id="L167">			out.flush();</span>
+<span class="nc" id="L168">		} finally {</span>
+<span class="pc" id="L169">			elementsIterator.close();</span>
+<span class="nc" id="L170">		}</span>
+		
+<span class="fc" id="L172">		return new ExportReport(lastElement, exported);</span>
+	}
+
+	/**
+	 * Import a serialized set in a InputStream. Each element is loaded with data found from the input stream and stored.
+	 * Elements are removed from cache to avoid memory consumption.
+	 * @param fis the input stream to import from ; must support {@link InputStream#markSupported()}
+	 * @return the number of imported elements
+	 */
+	public static long importPersistingElements(InputStream fis) throws DatabaseNotReachedException, IOException, ClassNotFoundException, ReadException {
+<span class="fc" id="L182">		return readSerializedPersistingElements(fis, new Process&lt;PersistingElement&gt;() {</span>
+
+			@Override
+			public void process(PersistingElement element) throws Throwable {
+<span class="fc" id="L186">				element.store();</span>
+<span class="fc" id="L187">			}</span>
+		});
+	}
+	
+	/**
+	 * Processes sequentially each element of a serialized stream without importing them.
+	 * Each element is removed from cache as soon as it is processed so as to avoid memory consumption.
+	 * @param fis the input stream of elements
+	 * @param process the process to be applied to each element
+	 * @return the number of processed elements, including those that rose an error
+	 * @throws ReadException errors while processing elements
+	 */
+	public static &lt;T extends PersistingElement&gt; long readSerializedPersistingElements(InputStream fis, Process&lt;T&gt; process) throws DatabaseNotReachedException, IOException, ClassNotFoundException, ReadException {
+<span class="fc bfc" id="L200" title="All 2 branches covered.">		if (!fis.markSupported())</span>
+<span class="fc" id="L201">			fis = new BufferedInputStream(fis);</span>
+		
+<span class="fc" id="L203">		ObjectInputStream ois = new ObjectInputStream(fis);</span>
+<span class="fc" id="L204">		KeyManagement km = KeyManagement.getInstance();</span>
+<span class="fc" id="L205">		long ret = 0;</span>
+<span class="fc" id="L206">		boolean ok = true;</span>
+
+<span class="fc" id="L208">		List&lt;ProcessReadException&gt; problems = new LinkedList&lt;ProcessReadException&gt;();</span>
+<span class="fc bfc" id="L209" title="All 4 branches covered.">		while(ok &amp;&amp; fis.available()&gt;0) {</span>
+<span class="fc" id="L210">			fis.mark(SERIALIZATION_SEPARATOR.getBytes().length*2);</span>
+			try {
+<span class="fc" id="L212">				String sep = (String) ois.readObject();</span>
+<span class="fc" id="L213">				ok = SERIALIZATION_SEPARATOR.equals(sep);</span>
+<span class="fc" id="L214">			} catch (Exception x) {</span>
+<span class="fc" id="L215">				x.printStackTrace();</span>
+<span class="fc" id="L216">				fis.reset();</span>
+<span class="fc" id="L217">				ok = false;</span>
+			}
+<span class="fc bfc" id="L219" title="All 2 branches covered.">			if (ok) {</span>
+<span class="fc" id="L220">				Element elt = (Element)ois.readObject();</span>
+<span class="fc" id="L221">				PersistingElement pe = elt.getElement();</span>
+<span class="fc" id="L222">				pe.delete(); //To be sure that store will get only read data</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">				for (ColumnFamily&lt;?&gt; cf : pe.getColumnFamilies()) {</span>
+<span class="fc" id="L224">					cf.setAllChanged();</span>
+				}
+				try {
+<span class="fc" id="L227">					process.process((T)pe);</span>
+<span class="nc" id="L228">				} catch (Throwable e) {</span>
+<span class="nc" id="L229">					problems.add(new ProcessReadException(pe, e, fis));</span>
+				}
+<span class="fc" id="L231">				km.unregister(pe);</span>
+<span class="fc" id="L232">				ret++;</span>
+			}
+		}
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">		if (!problems.isEmpty()) {</span>
+<span class="nc" id="L236">			throw new ReadException(problems);</span>
+		}
+<span class="fc" id="L238">		return ret;</span>
+	}
+
+	/**
+	 * Import a serialized set from a file. Each element is loaded with data found from the file and stored.
+	 * Elements are removed from cache to avoid memory consumption.
+	 * @param file the file to import from
+	 * @return the number of imported elements
+	 */
+	@Trigger
+	public static long importPersistingElements(String file) throws DatabaseNotReachedException, IOException, ClassNotFoundException, ReadException {
+<span class="nc" id="L249">		BufferedInputStream fis = new BufferedInputStream(new FileInputStream(file));</span>
+		try {
+<span class="nc" id="L251">			return importPersistingElements(fis);</span>
+<span class="nc" id="L252">		} finally {</span>
+<span class="nc" id="L253">			fis.close();</span>
+<span class="nc" id="L254">		}</span>
+	}
+
+	/**
+	 * Processes sequentially each element of a serialized file without importing them.
+	 * Each element is removed from cache as soon as it is processed so as to avoid memory consumption.
+	 * @param file the file to import from
+	 * @param process the process to be applied to each element
+	 * @return the number of processed elements, including those that rose an error
+	 * @throws ReadException errors while processing elements
+	 */
+	public static long readSerializedPersistingElements(String file, Process&lt;? extends PersistingElement&gt; process) throws DatabaseNotReachedException, IOException, ClassNotFoundException, ReadException {
+<span class="fc" id="L266">		BufferedInputStream fis = new BufferedInputStream(new FileInputStream(file));</span>
+		try {
+<span class="fc" id="L268">			return readSerializedPersistingElements(fis, process);</span>
+<span class="nc" id="L269">		} finally {</span>
+<span class="pc" id="L270">			fis.close();</span>
+<span class="nc" id="L271">		}</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

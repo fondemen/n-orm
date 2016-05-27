@@ -1,0 +1,30 @@
+-classpath
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/storage/target/classes:/home/stefrd/.m2/repository/commons-beanutils/commons-beanutils-core/1.8.3/commons-beanutils-core-1.8.3.jar:/home/stefrd/.m2/repository/commons-logging/commons-logging/1.1.1/commons-logging-1.1.1.jar:/home/stefrd/.m2/repository/org/aspectj/aspectjrt/1.6.12/aspectjrt-1.6.12.jar'
+-encoding
+'UTF-8'
+-protected
+-sourcepath
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/storage/src/main/java'
+-author
+-bottom
+'Copyright &#169; 2013. All Rights Reserved.'
+-charset
+'UTF-8'
+-d
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/storage/target/site/apidocs'
+-docencoding
+'UTF-8'
+-doctitle
+'n-orm core 0.0.1-SNAPSHOT API'
+-link
+'http://java.sun.com/javase/6/docs/api'
+-linkoffline
+'http://n-orm.googlecode.com/console/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/console/target/site/apidocs'
+-linkoffline
+'http://n-orm.googlecode.com/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/hbase/target/site/apidocs'
+-linkoffline
+'http://n-orm.googlecode.com/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm.redis/target/site/apidocs'
+-use
+-version
+-windowtitle
+'n-orm core 0.0.1-SNAPSHOT API'

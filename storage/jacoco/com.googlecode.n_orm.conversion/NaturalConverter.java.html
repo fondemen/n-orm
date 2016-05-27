@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>NaturalConverter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">NaturalConverter.java</span></div><h1>NaturalConverter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+abstract class NaturalConverter&lt;T extends Number&gt; extends PrimitiveConverter&lt;T&gt; {
+
+	public NaturalConverter(Class&lt;T&gt; clazz, Class&lt;?&gt; primitiveClazz, int byteSize, T defaultValue) {
+<span class="fc" id="L6">		super(clazz, primitiveClazz, 1, byteSize, 1, byteSize*2, defaultValue);</span>
+<span class="fc" id="L7">	}</span>
+
+	public long parseString(String rep) {
+<span class="fc" id="L10">		byte digits = (byte) (rep.length() / 2);</span>
+<span class="fc bfc" id="L11" title="All 2 branches covered.">		if (rep.length() % 2 != 0) {</span>
+<span class="fc" id="L12">			digits++;</span>
+<span class="fc" id="L13">			rep = &quot;0&quot; + rep;</span>
+		}
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">		if (digits == 0)</span>
+<span class="nc" id="L16">			return 0;</span>
+<span class="fc" id="L17">		byte[] ret = new byte[digits];</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">		for (int i = 0; i &lt; digits; ++i) {</span>
+<span class="fc" id="L19">			char br = rep.charAt(2 * i);</span>
+<span class="fc" id="L20">			byte b = 0;</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">			if (br &gt;= 'a') {</span>
+<span class="fc" id="L22">				b = (byte) ((br - (byte) 'a') + (byte) 10);</span>
+			} else {
+<span class="fc" id="L24">				b = (byte) (br - (byte) '0');</span>
+			}
+<span class="fc" id="L26">			b &lt;&lt;= 4;</span>
+<span class="fc" id="L27">			br = rep.charAt(2 * i + 1);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">			if (br &gt;= 'a') {</span>
+<span class="fc" id="L29">				b |= (br - (byte) 'a') + (byte) 10;</span>
+			} else {
+<span class="fc" id="L31">				b |= br - (byte) '0';</span>
+			}
+<span class="fc" id="L33">			ret[i] = b;</span>
+		}
+<span class="fc" id="L35">		flipFirstBit(ret);</span>
+<span class="fc" id="L36">		return this.parseBytes(ret);</span>
+	}
+
+	public String unparseString(long obj) {
+<span class="fc" id="L40">		byte[] ret = this.unparseBytes(obj);</span>
+
+<span class="fc" id="L42">		flipFirstBit(ret); // Removing sign so that elements are sorted as</span>
+							// expected.
+
+<span class="fc" id="L45">		StringBuffer out = new StringBuffer();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">		for (int i = 0; i &lt; ret.length; ++i) {</span>
+<span class="fc" id="L47">			byte b = (byte) ((ret[i] &gt;&gt;&gt; 4) &amp; 0x0F);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">			if (b &lt; 10)</span>
+<span class="fc" id="L49">				out.append((char) (b + (byte) '0'));</span>
+			else
+<span class="fc" id="L51">				out.append((char) (b - (byte) 10 + (byte) 'a'));</span>
+<span class="fc" id="L52">			b = (byte) (ret[i] &amp; 0x0F);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">			if (b &lt; 10)</span>
+<span class="fc" id="L54">				out.append((char) (b + (int) '0'));</span>
+			else
+<span class="fc" id="L56">				out.append((char) (b - (byte) 10 + (byte) 'a'));</span>
+		}
+
+<span class="fc" id="L59">		return out.toString();</span>
+	}
+
+	public long parseBytes(byte[] rep) {
+<span class="fc" id="L63">	    long l = 0;</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">	    for(int i = 0; i &lt; rep.length; i++) {</span>
+<span class="fc" id="L65">	      l &lt;&lt;= 8;</span>
+<span class="fc" id="L66">	      l ^= (long)rep[i] &amp; 0xFF;</span>
+	    }
+<span class="fc" id="L68">	    return l;</span>
+	}
+
+	public byte[] unparseBytes(long obj) {
+<span class="fc" id="L72">	    byte [] b = new byte[this.getMaxByteSize()];</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">	    for(int i=this.getMaxByteSize()-1;i&gt;0;i--) {</span>
+<span class="fc" id="L74">	      b[i] = (byte)(obj);</span>
+<span class="fc" id="L75">	      obj &gt;&gt;&gt;= 8;</span>
+	    }
+<span class="fc" id="L77">	    b[0] = (byte)(obj);</span>
+<span class="fc" id="L78">	    return b;</span>
+	}
+
+	private void flipFirstBit(byte[] rep) {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">		if ((rep[0] &amp; 0x80) == 0)</span>
+<span class="fc" id="L83">			rep[0] = (byte) (rep[0] | (byte) 0x80);</span>
+		else
+<span class="fc" id="L85">			rep[0] = (byte) (rep[0] &amp; (byte) 0x7f);</span>
+<span class="fc" id="L86">	}</span>
+
+	@Override
+	protected boolean canConvert(byte[] rep) {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">		return rep.length &lt;= Long.SIZE/Byte.SIZE;</span>
+	}
+
+	@Override
+	protected boolean canConvert(String rep) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">		return rep.length()/2 &lt;= Long.SIZE/Byte.SIZE;</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PrimitiveConverter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">PrimitiveConverter.java</span></div><h1>PrimitiveConverter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+abstract class PrimitiveConverter&lt;T&gt; extends SimpleConverter&lt;T&gt; {
+	private final Class&lt;?&gt; primitiveClazz;
+	private final int minByteSize; 
+	private final int maxByteSize; 
+	private final int minStringSize; 
+	private final int maxStringSize; 
+	private final T primitiveDefaultValue;
+	
+	
+	public PrimitiveConverter(Class&lt;T&gt; clazz, Class&lt;?&gt; primitiveClazz,
+			int minByteSize, int maxByteSize, int minStringSize,
+			int maxStringSize, T primitiveDefaultValue) {
+<span class="fc" id="L15">		super(clazz);</span>
+<span class="fc" id="L16">		this.primitiveClazz = primitiveClazz;</span>
+<span class="fc" id="L17">		this.minByteSize = minByteSize;</span>
+<span class="fc" id="L18">		this.maxByteSize = maxByteSize;</span>
+<span class="fc" id="L19">		this.minStringSize = minStringSize;</span>
+<span class="fc" id="L20">		this.maxStringSize = maxStringSize;</span>
+<span class="fc" id="L21">		this.primitiveDefaultValue = primitiveDefaultValue;</span>
+<span class="fc" id="L22">	}</span>
+
+	public Class&lt;?&gt; getPrimitiveClazz() {
+<span class="fc" id="L25">		return this.primitiveClazz;</span>
+	}
+
+	public int getMinByteSize() {
+<span class="fc" id="L29">		return minByteSize;</span>
+	}
+
+	public int getMaxByteSize() {
+<span class="fc" id="L33">		return maxByteSize;</span>
+	}
+
+	public int getMinStringSize() {
+<span class="fc" id="L37">		return minStringSize;</span>
+	}
+
+	public int getMaxStringSize() {
+<span class="fc" id="L41">		return maxStringSize;</span>
+	}
+
+	@Override
+	public T getDefaultValue(Class&lt;?&gt; type) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">		if (this.getClazz().isAssignableFrom(type))</span>
+<span class="fc" id="L47">			return null; //It's the non-primitive type (e.g. Integer and not int)</span>
+<span class="fc" id="L48">		return primitiveDefaultValue;</span>
+	}
+
+	@Override
+	protected boolean canConvert(byte[] rep) {
+<span class="pc bpc" id="L53" title="1 of 6 branches missed.">		return super.canConvert(rep) &amp;&amp; this.getMinByteSize() &lt;= rep.length &amp;&amp; rep.length &lt;= this.getMaxByteSize();</span>
+	}
+
+	@Override
+	protected boolean canConvert(String rep) {
+<span class="pc bpc" id="L58" title="3 of 6 branches missed.">		return super.canConvert(rep) &amp;&amp; this.getMinStringSize() &lt;= rep.length() &amp;&amp; rep.length() &lt;= this.getMaxStringSize();</span>
+	}
+
+	@Override
+	public boolean canConvert(Class&lt;?&gt; type) {
+<span class="fc bfc" id="L63" title="All 4 branches covered.">		return super.canConvert(type) || this.getPrimitiveClazz().equals(type);</span>
+	}
+
+	@Override
+	public void checkInstance(T obj, Class&lt;? extends T&gt; expected) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">		if (this.getPrimitiveClazz().equals(expected))</span>
+<span class="fc" id="L69">			expected = this.getClazz();</span>
+<span class="fc" id="L70">		super.checkInstance(obj, expected);</span>
+<span class="fc" id="L71">	}</span>
+	
+	public T revert(T obj) {
+<span class="nc" id="L74">		throw new UnreversibleTypeException(obj.getClass());</span>
+	}
+
+	@Override
+	public Object fromStringReverted(String rep, Class&lt;?&gt; type) {
+<span class="fc" id="L79">		return this.revert(this.fromString(rep, type));</span>
+	}
+
+	@Override
+	public String toStringReverted(T obj, Class&lt;? extends T&gt; expected) {
+<span class="fc" id="L84">		return this.toString(this.revert(obj), expected);</span>
+	}
+	
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

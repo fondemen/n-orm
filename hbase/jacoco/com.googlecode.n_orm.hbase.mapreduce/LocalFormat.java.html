@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>LocalFormat.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.mapreduce</a> &gt; <span class="el_source">LocalFormat.java</span></div><h1>LocalFormat.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.mapreduce;
+
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.util.Properties;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.HTablePool;
+import org.apache.hadoop.hbase.client.Increment;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.mapreduce.TableInputFormat;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
+import org.aspectj.lang.Aspects;
+import org.codehaus.jackson.map.JsonMappingException;
+
+import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.hbase.Store;
+
+<span class="fc" id="L27">public class LocalFormat {</span>
+	public static final String STORE_REF = &quot;store-props&quot;;
+	
+	public static final Configuration prepareConf(Store s, Class&lt;?&gt; outputWriterClass) throws IOException {
+<span class="fc" id="L31">		Configuration conf = HBaseConfiguration.create(s.getConf());</span>
+<span class="fc" id="L32">		Properties props = s.getLaunchProps();</span>
+<span class="fc" id="L33">		StringWriter swp = new StringWriter();</span>
+<span class="fc" id="L34">		props.store(swp, null);</span>
+<span class="fc" id="L35">		String sp = swp.toString();</span>
+<span class="fc" id="L36">		conf.set(LocalFormat.STORE_REF, sp);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">		if (outputWriterClass != null)</span>
+<span class="nc" id="L38">			conf.set(LocalOutputFormat.OUTPUTWRITER_CLASS, outputWriterClass.getName());</span>
+		//Disabling speculative execution
+<span class="fc" id="L40">	    conf.setBoolean(&quot;mapred.map.tasks.speculative.execution&quot;, false);</span>
+<span class="fc" id="L41">	    conf.setBoolean(&quot;mapred.reduce.tasks.speculative.execution&quot;, false);</span>
+<span class="fc" id="L42">		return conf;</span>
+	}
+	
+	public static void prepareJob(Job job, Scan scan, Store store) throws IOException {
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">		if (store.isMapRedSendHBaseJars())</span>
+<span class="fc" id="L47">			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), org.apache.zookeeper.ZooKeeper.class, HTable.class, HBaseAdmin.class, HTablePool.class, HColumnDescriptor.class, Scan.class, Increment.class, JsonMappingException.class);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">		if (store.isMapRedSendNOrmJars())</span>
+<span class="fc" id="L49">			TableMapReduceUtil.addDependencyJars(job.getConfiguration(), Store.class, StorageManagement.class, Aspects.class, org.apache.log4j.Logger.class, BeanUtils.class);</span>
+		
+<span class="fc" id="L51">		scan.setCaching(store.getMapRedScanCaching());</span>
+<span class="fc" id="L52">		scan.setCacheBlocks(false);</span>
+		
+<span class="fc" id="L54">		job.setInputFormatClass(LocalInputFormat.class);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">		if (job.getConfiguration().get(LocalOutputFormat.OUTPUTWRITER_CLASS) != null)</span>
+<span class="nc" id="L56">			job.setOutputFormatClass(LocalOutputFormat.class);</span>
+		else
+<span class="fc" id="L58">			job.setOutputFormatClass(NullOutputFormat.class);</span>
+<span class="fc" id="L59">		TableMapReduceUtil.setScannerCaching(job, store.getMapRedScanCaching());</span>
+<span class="fc" id="L60">	}</span>
+
+	protected HTable table;
+	private Configuration conf;
+	
+	public HTable getTable() {
+<span class="fc" id="L66">		return table;</span>
+	}
+
+	public Configuration getConf() {
+<span class="nc" id="L70">		return conf;</span>
+	}
+	
+	protected void setConf(Configuration conf) {
+
+<span class="fc" id="L75">		Store hstore = null;</span>
+		try {
+<span class="fc" id="L77">			Properties props = null;</span>
+<span class="fc" id="L78">			StringReader srp = new StringReader(conf.get(STORE_REF));</span>
+<span class="fc" id="L79">			props = new Properties();</span>
+<span class="fc" id="L80">			props.load(srp);</span>
+<span class="fc" id="L81">			hstore = Store.getKnownStore(props);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">			if (hstore != null)</span>
+<span class="fc" id="L83">				this.conf = hstore.getConf();</span>
+			else
+<span class="nc" id="L85">				this.conf = HBaseConfiguration.create(conf);</span>
+<span class="nc" id="L86">		} catch (Exception e1) {</span>
+<span class="nc" id="L87">			e1.printStackTrace();</span>
+<span class="nc" id="L88">			this.conf = HBaseConfiguration.create(conf);</span>
+<span class="fc" id="L89">		}</span>
+
+		try {
+<span class="fc" id="L92">			table = new HTable(this.conf,</span>
+					conf.get(TableInputFormat.INPUT_TABLE));
+<span class="fc" id="L94">			this.table.setAutoFlush(false);</span>
+<span class="nc" id="L95">		} catch (IOException e) {</span>
+<span class="nc" id="L96">			throw new RuntimeException(e.getMessage(), e);</span>
+<span class="fc" id="L97">		}</span>
+<span class="fc" id="L98">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

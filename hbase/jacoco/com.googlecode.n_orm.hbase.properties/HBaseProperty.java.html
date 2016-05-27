@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>HBaseProperty.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.properties</a> &gt; <span class="el_source">HBaseProperty.java</span></div><h1>HBaseProperty.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.properties;
+
+import java.lang.reflect.Field;
+import java.util.LinkedList;
+import java.util.List;
+
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.hbase.HBaseSchema;
+import com.googlecode.n_orm.hbase.Store;
+
+/**
+ * A property handler to manage HBase schemas.
+ * @param &lt;T&gt; the type of the handled property.
+ */
+<span class="fc" id="L16">public abstract class HBaseProperty&lt;T&gt; {</span>
+	
+	/**
+	 * The identifying name of the property.
+	 */
+	abstract String getName();
+
+	/**
+	 * Reads the value of the property as defined by annotation.
+	 */
+	abstract T readValue(HBaseSchema ann);
+
+	/**
+	 * The value of the property as prescribed by the store
+	 * (could be configured by {@link StorageManagement store.properties}).
+	 */
+	abstract T getDefaultValue(Store store);
+
+	/**
+	 * Whether the obtained value for the property represents a set property.
+	 */
+	abstract boolean isSet(T value);
+
+	/**
+	 * Gets the value for this property for the given field, class, or store
+	 * (in that order of preference). Result is cached in
+	 * {@link PropertyUtils#values}.
+	 * 
+	 * @return null if unset
+	 */
+	@SuppressWarnings(&quot;unchecked&quot;)
+	final T getValue(Store store, Class&lt;? extends PersistingElement&gt; clazz,
+			Field field, String tablePostfix) {
+<span class="fc" id="L49">		PropertyCacheKey cacheKey = new PropertyCacheKey(clazz, field,</span>
+				tablePostfix);
+
+<span class="fc" id="L52">		PropertyCacheValue cacheVal = PropertyUtils.values.get(cacheKey);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">		if (cacheVal == null) {</span>
+<span class="fc" id="L54">			cacheVal = new PropertyCacheValue();</span>
+<span class="fc" id="L55">			PropertyUtils.values.put(cacheKey, cacheVal);</span>
+		}
+
+<span class="fc" id="L58">		return (T) cacheVal.getValue(this, store, clazz, field,</span>
+				tablePostfix);
+	}
+
+	/**
+	 * Actual method that determines the value for this property according
+	 * to field, class and store (in that order). This method is used by
+	 * {@link PropertyCacheValue values} of the {@link PropertyUtils#values
+	 * property cache} when not set.
+	 * 
+	 * @return null if unset
+	 */
+	T getValueInt(Store store,
+			Class&lt;? extends PersistingElement&gt; clazz, Field field,
+			String tablePostfix) {
+<span class="fc" id="L73">		List&lt;HBaseSchema&gt; possibleSchemas = new LinkedList&lt;HBaseSchema&gt;();</span>
+		HBaseSchema tmp;
+
+<span class="fc bfc" id="L76" title="All 2 branches covered.">		if (field != null) {</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">			if (tablePostfix != null) {</span>
+<span class="fc" id="L78">				tmp = PropertyUtils.specificities.get(new ColumnFamilyWithPostfix(field,</span>
+						tablePostfix));
+<span class="fc bfc" id="L80" title="All 2 branches covered.">				if (tmp != null)</span>
+<span class="fc" id="L81">					possibleSchemas.add(tmp);</span>
+			}
+
+<span class="fc" id="L84">			tmp = field.getAnnotation(HBaseSchema.class);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">			if (tmp != null)</span>
+<span class="fc" id="L86">				possibleSchemas.add(tmp);</span>
+		}
+
+<span class="fc bfc" id="L89" title="All 2 branches covered.">		if (clazz != null) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">			if (tablePostfix != null) {</span>
+<span class="fc" id="L91">				tmp = PropertyUtils.specificities.get(new ClassWithPostfix(clazz,</span>
+						tablePostfix));
+<span class="fc bfc" id="L93" title="All 2 branches covered.">				if (tmp != null)</span>
+<span class="fc" id="L94">					possibleSchemas.add(tmp);</span>
+			}
+
+<span class="fc" id="L97">			tmp = clazz.getAnnotation(HBaseSchema.class);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">			if (tmp != null)</span>
+<span class="fc" id="L99">				possibleSchemas.add(tmp);</span>
+		}
+
+<span class="fc bfc" id="L102" title="All 2 branches covered.">		for (HBaseSchema schemaSpecificities : possibleSchemas) {</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">			if (schemaSpecificities != null) {</span>
+<span class="fc" id="L104">				T ret = this.readValue(schemaSpecificities);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">				if (this.isSet(ret))</span>
+<span class="fc" id="L106">					return ret;</span>
+			}
+<span class="fc" id="L108">		}</span>
+
+<span class="fc" id="L110">		return this.getDefaultValue(store);</span>
+	}
+
+	@Override
+	public String toString() {
+<span class="nc" id="L115">		return this.getName();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

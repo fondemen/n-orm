@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Constraint.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.storeapi</a> &gt; <span class="el_source">Constraint.java</span></div><h1>Constraint.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.storeapi;
+
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import org.apache.commons.beanutils.ConvertUtils;
+
+import com.googlecode.n_orm.Key;
+import com.googlecode.n_orm.KeyManagement;
+import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.conversion.ConversionTools;
+
+/**
+ * A restriction to a {@link SimpleStore} search.
+ * In case this restriction applies to a table (as in {@link SimpleStore#get(String, Constraint, int, java.util.Set)}, returned rows should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
+ * In case this restrictions applies to a column family (as in {@link SimpleStore#get(String, String, String, Constraint)}, returned columns should have key be between {@link #getStartKey()} and {@link #getEndKey()}.
+ */
+public class Constraint {
+	
+	protected static Map&lt;Field, Object&gt; toMapOfFields(Class&lt;?&gt; clazz, Map&lt;String, Object&gt; values) {
+<span class="fc bfc" id="L24" title="All 2 branches covered.">		if (values == null)</span>
+<span class="fc" id="L25">			return null;</span>
+		
+<span class="fc" id="L27">		Map&lt;String, Field&gt; fields = new HashMap&lt;String, Field&gt;();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">		for (Field f : PropertyManagement.getInstance().getProperties(clazz)) {</span>
+<span class="fc" id="L29">			fields.put(f.getName(), f);</span>
+		}
+		
+<span class="fc" id="L32">		Map&lt;Field, Object&gt; ret = new HashMap&lt;Field, Object&gt;();</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">		for (Entry&lt;String, Object&gt; field : values.entrySet()) {</span>
+<span class="fc" id="L34">			ret.put(fields.get(field.getKey()), field.getValue());</span>
+		}
+		
+<span class="fc" id="L37">		return ret;</span>
+	}
+	
+	private final String startKey, endKey;
+	
+<span class="fc" id="L42">	public Constraint(String startKey, String endKey) {</span>
+		// In case we are restricting to one sigle table, this is a constraint that might be violated
+		// See FederatedTableManagement.ConstraintWithTable
+<span class="pc bpc" id="L45" title="1 of 6 branches missed.">		if (this.getClass() == Constraint.class &amp;&amp; startKey == null &amp;&amp; endKey == null)</span>
+<span class="nc" id="L46">			throw new IllegalArgumentException(&quot;A search requires at least a start or an end value.&quot;);</span>
+<span class="fc" id="L47">		this.startKey = startKey;</span>
+<span class="fc" id="L48">		this.endKey = endKey;</span>
+<span class="fc" id="L49">	}</span>
+
+	public Constraint(Map&lt;Field, Object&gt; values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {
+<span class="fc" id="L52">		this(searchedKey.getDeclaringClass(), values, searchedKey, startValue, endValue, checkKeys);</span>
+<span class="fc" id="L53">	}</span>
+	
+	/**
+	 * Describes a search for a particular key.
+	 * To search for a range of a key of cardinality n, all values for k of cardinalities less than n must be supplied.
+	 * startValue and endValue are both inclusive.
+	 * @param checkKeys to check whether all keys with a lower category is given a value
+	 */
+<span class="fc" id="L61">	public Constraint(Class&lt;?&gt; clazz, Map&lt;Field, Object&gt; values, Field searchedKey, Object startValue, Object endValue, boolean checkKeys) {</span>
+<span class="pc bpc" id="L62" title="1 of 8 branches missed.">		if (searchedKey == null != (startValue == null &amp;&amp; endValue == null)) {</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">			if (searchedKey == null)</span>
+<span class="nc" id="L64">				throw new IllegalArgumentException(&quot;No searched key defined while either start key (&quot; + startValue + &quot;) or end key (&quot; + endValue + &quot;) is provided.&quot;);</span>
+			else
+<span class="nc" id="L66">				throw new IllegalArgumentException(&quot;Searched key is &quot; + searchedKey + &quot; but neither start value nor end value is provided.&quot;);</span>
+		}
+<span class="fc" id="L68">		String fixedPart = getPrefix(clazz, values, searchedKey, checkKeys);</span>
+		String start, end;
+<span class="fc bfc" id="L70" title="All 2 branches covered.">		if (searchedKey == null) {</span>
+<span class="fc" id="L71">			start = null;</span>
+<span class="fc" id="L72">			end = null;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">		} else if (searchedKey.getAnnotation(Key.class).reverted()) {</span>
+<span class="fc" id="L74">			start = ConversionTools.convertToStringReverted(startValue, searchedKey.getType());</span>
+<span class="fc" id="L75">			end = ConversionTools.convertToStringReverted(endValue, searchedKey.getType());</span>
+		} else {
+<span class="fc" id="L77">			start = ConversionTools.convertToString(startValue, searchedKey.getType());</span>
+<span class="fc" id="L78">			end = ConversionTools.convertToString(endValue, searchedKey.getType());</span>
+		}
+<span class="fc bfc" id="L80" title="All 2 branches covered.">		this.startKey = createStart(fixedPart, startValue == null ? null : start);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">		this.endKey = createEnd(fixedPart, endValue == null ? null : end, true);</span>
+<span class="fc" id="L82">	}</span>
+
+	/**
+	 * Describes a search for a particular key.
+	 * To search for a range of a key of cardinality n, all values for k of cardinalities less than n must be supplied.
+	 * startValue are endValue both inclusive.
+	 */
+	public Constraint(Class&lt;?&gt; type, Map&lt;String, Object&gt; values, String field, Object startValue, Object endValue) {
+<span class="fc" id="L90">		this(toMapOfFields(type, values), PropertyManagement.getInstance().getProperty(type, field), startValue, endValue, true);</span>
+<span class="fc" id="L91">	}</span>
+	
+	public Constraint(Map&lt;Field, Object&gt; values, Field searchedKey, Constraint subkeySearch) {
+<span class="fc" id="L94">		this(values, searchedKey, subkeySearch, true);</span>
+<span class="fc" id="L95">	}</span>
+	
+<span class="fc" id="L97">	public Constraint(Map&lt;Field, Object&gt; values, Field searchedKey, Constraint subkeySearch, boolean checkKeys) {</span>
+<span class="fc" id="L98">		String fixedPart = getPrefix(searchedKey.getDeclaringClass(), values, searchedKey, checkKeys);</span>
+<span class="fc" id="L99">		this.startKey = createStart(fixedPart, subkeySearch.getStartKey());</span>
+<span class="fc" id="L100">		this.endKey = createEnd(fixedPart, subkeySearch.getEndKey(), false);</span>
+<span class="fc" id="L101">	}</span>
+	
+	public Constraint(Class&lt;?&gt; type, Map&lt;String, Object&gt; values, String searchedKey, Constraint subkeySearch) {
+<span class="fc" id="L104">		this(toMapOfFields(type, values), PropertyManagement.getInstance().getProperty(type, searchedKey), subkeySearch, true);</span>
+<span class="fc" id="L105">	}</span>
+
+	private static String getPrefix(Class&lt;?&gt; clazz, Map&lt;Field, Object&gt; values,Field searchedKey, boolean checkKeys) {
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">		if (searchedKey == null &amp;&amp; values.isEmpty())</span>
+<span class="nc" id="L109">			throw new IllegalArgumentException(&quot;A search can only happen on a key ; please, supply one.&quot;);</span>
+
+<span class="fc bfc" id="L111" title="All 2 branches covered.">		int length = values == null ? 0 : values.size();</span>
+<span class="pc bpc" id="L112" title="1 of 4 branches missed.">		if (checkKeys &amp;&amp; searchedKey != null) {</span>
+<span class="fc" id="L113">			int index = searchedKey.getAnnotation(Key.class).order();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">			if (length != index-1)</span>
+<span class="fc" id="L115">				throw new IllegalArgumentException(&quot;In order to search depending on key &quot; + searchedKey + &quot; of order &quot; + index + &quot;, you must supply values for keys of previous orders.&quot;);</span>
+		}
+		
+<span class="fc" id="L118">		List&lt;Field&gt; keys = KeyManagement.getInstance().detectKeys(clazz);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">		if (keys.size() &lt; length)</span>
+<span class="nc" id="L120">			throw new IllegalArgumentException(&quot;Too many constrained values compared to the number of keys ; only key values may be constrained.&quot;);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">		boolean allKeysThere = keys.size() == length;</span>
+<span class="fc" id="L122">		StringBuffer fixedPartb = new StringBuffer();</span>
+<span class="fc" id="L123">		String sep = KeyManagement.KEY_SEPARATOR;</span>
+		Field f; Object val;
+<span class="fc bfc" id="L125" title="All 2 branches covered.">		values = values == null ? new HashMap&lt;Field, Object&gt;() : new HashMap&lt;Field, Object&gt;(values);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">		for(int i = 0; i &lt; length; ++i) {</span>
+<span class="fc" id="L127">			f = keys.get(i);</span>
+<span class="fc" id="L128">			val = values.get(f);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">			if (val == null) {</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">				if (checkKeys)</span>
+<span class="nc" id="L131">					throw new IllegalArgumentException(&quot;In order to select an element of class &quot; + clazz + &quot;, you must supply a value for &quot; + f);</span>
+			} else {
+<span class="fc" id="L133">				Object actualVal = values.get(keys.get(i));</span>
+<span class="fc" id="L134">				Class&lt;?&gt; type = f.getType();</span>
+<span class="fc bfc" id="L135" title="All 4 branches covered.">				if ((actualVal instanceof String) &amp;&amp; (! type.isInstance(actualVal))) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">					if (type.isEnum()) {</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">						for (Object ec : type.getEnumConstants()) {</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">							if (((Enum&lt;?&gt;)ec).name().equals(actualVal)) {</span>
+<span class="fc" id="L139">								actualVal = ec;</span>
+<span class="fc" id="L140">								break;</span>
+							}
+						}
+<span class="fc bfc" id="L143" title="All 2 branches covered.">						if (! type.isInstance(actualVal)) // Enum value not found</span>
+<span class="fc" id="L144">							throw new IllegalArgumentException(actualVal + &quot; is not a possible enum value for key &quot; + f);</span>
+					} else
+<span class="fc" id="L146">						actualVal = ConvertUtils.convert((String)actualVal, type);</span>
+				}
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">				String rep = f.getAnnotation(Key.class).reverted() ?</span>
+<span class="nc" id="L149">							ConversionTools.convertToStringReverted(actualVal, type)</span>
+<span class="fc" id="L150">						:	ConversionTools.convertToString(actualVal, type);</span>
+<span class="fc" id="L151">				fixedPartb.append(rep);</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">				if (allKeysThere &amp;&amp; i == length-1)</span>
+<span class="fc" id="L153">					fixedPartb.append(KeyManagement.KEY_END_SEPARATOR);</span>
+				else
+<span class="fc" id="L155">					fixedPartb.append(sep);</span>
+<span class="fc" id="L156">				values.remove(f);</span>
+			}
+		}
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">		if (!values.isEmpty())</span>
+<span class="nc" id="L160">			throw new IllegalArgumentException(&quot;Can only search according to keys with cardinality up to the searched key ; remove values for &quot; + values.keySet());</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">		return fixedPartb.length() &gt; 0 ? fixedPartb.toString() : null;</span>
+	}
+
+	private static String createStart(String fixedPart, String start) {
+		String ret;
+<span class="fc bfc" id="L166" title="All 2 branches covered.">		if(start == null) {</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">			if (fixedPart == null) {</span>
+<span class="nc" id="L168">				ret = null;</span>
+			} else {
+<span class="fc" id="L170">				ret = fixedPart;</span>
+			}
+		} else
+<span class="fc bfc" id="L173" title="All 2 branches covered.">			ret = (fixedPart == null ? &quot;&quot; : fixedPart) + start;</span>
+<span class="fc" id="L174">		return ret;</span>
+	}
+
+	private static String createEnd(String fixedPart, String end, boolean increment) {
+		String ret;
+<span class="fc bfc" id="L179" title="All 2 branches covered.">		if (end == null) {</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">			if (fixedPart == null) {</span>
+<span class="fc" id="L181">				ret = null;</span>
+			} else {
+<span class="fc" id="L183">				ret = fixedPart.substring(0, fixedPart.length()-1);</span>
+			}
+		} else {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">			ret = (fixedPart == null ? &quot;&quot; : fixedPart) + end;</span>
+		}
+<span class="fc bfc" id="L188" title="All 4 branches covered.">		if (ret != null &amp;&amp; increment) {</span>
+<span class="fc" id="L189">			char lastEnd = ret.charAt(ret.length()-1);</span>
+<span class="fc" id="L190">			lastEnd++;</span>
+<span class="fc" id="L191">			ret = ret.substring(0, ret.length()-1) + lastEnd;</span>
+		}
+<span class="fc" id="L193">		return ret;</span>
+	}
+
+	/**
+	 * The minimal (inclusive) value for searched keys
+	 */
+	public String getStartKey() {
+<span class="fc" id="L200">		return startKey;</span>
+	}
+
+	/**
+	 * The maximal (inclusive) value for searched keys
+	 */
+	public String getEndKey() {
+<span class="fc" id="L207">		return endKey;</span>
+	}
+	
+	public boolean sastisfies(String key) {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">		if (key == null)</span>
+<span class="nc" id="L212">			throw new IllegalArgumentException(&quot;Key cannot be null while checked to satisfy a constraint&quot;);</span>
+<span class="nc bnc" id="L213" title="All 4 branches missed.">		if (startKey != null &amp;&amp; key.compareTo(startKey)&gt;=0)</span>
+<span class="nc" id="L214">			return false;</span>
+<span class="nc bnc" id="L215" title="All 4 branches missed.">		if (endKey != null &amp;&amp; key.compareTo(endKey)&lt;=0)</span>
+<span class="nc" id="L216">			return false;</span>
+<span class="nc" id="L217">		return true;</span>
+	}
+	
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

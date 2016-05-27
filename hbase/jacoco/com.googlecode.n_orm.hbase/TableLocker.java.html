@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TableLocker.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase</a> &gt; <span class="el_source">TableLocker.java</span></div><h1>TableLocker.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Level;
+
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
+import org.apache.zookeeper.recipes.lock.SharedExclusiveLock;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+
+/**
+ * A zookeeper-based read write lock for protecting table schemas operations.
+ * Read lock can be promoted to write lock ;
+ * in this latter case write unlock brings back read lock.
+ * Uses the &quot;/n-orm/schemalock/&lt;table name&gt;&quot; directory
+ * at the zookeeper level.&lt;br&gt;
+ * For a given thread, locks can be acquired a reentrant way.
+ * However, they must be released in the reversed order the've been acquired.
+ * As an example, a thread can perform the following scenario:&lt;ol&gt;
+ * &lt;li&gt;sharedLockTable (actually gets a shared lock here)
+ * &lt;li&gt;sharedLockTable
+ * &lt;li&gt;exclusiveLockTable (actually releases the shared lock and then gets an exclusive lock here)
+ * &lt;li&gt;sharedLockTable
+ * &lt;li&gt;exclusiveLockTable
+ * 
+ * &lt;li&gt;exclusiveUnlockTable (cannot call sharedUnlockTable here)
+ * &lt;li&gt;sharedUnlockTable
+ * &lt;li&gt;exclusiveUnlockTable (actually releases the exclusive lock and then gets a shared lock here)
+ * &lt;li&gt;sharedUnlockTable
+ * &lt;li&gt;sharedUnlockTable (actually releases the shared lock here)
+ * &lt;/ol&gt;&lt;br&gt;
+ * It is enforced that if a thread holds an exclusive lock,
+ * an exclusive lock is acquired at the zookeeper level ;
+ * otherwise, if there is a thread that holds a shared lock,
+ * a shared lock is acquired at the zookeeper level ;
+ * otherwise, no lock is held from zookeeper.
+ */
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">public class TableLocker {</span>
+	public static final long lockTimeout = 10000;
+	
+<span class="pc" id="L49">	private static enum LockKind {</span>
+<span class="fc" id="L50">		SHARED, EXCLUSIVE</span>
+	}
+	
+	/**
+	 * The store to which belongs this lock
+	 */
+	private final Store store;
+	/**
+	 * The table for which this lock is made for
+	 */
+	private final String tableName;
+	
+	/**
+	 * The actual zookeeper lock.
+	 */
+	private final SharedExclusiveLock lock;
+	
+	/**
+	 * The Zookeeper SharedExclusiveLock recipe does not handle
+	 * intra-JVM interlocking ; using this ReentrantReadWriteLock to overcome this drawback. 
+	 */
+<span class="fc" id="L71">	private final ReentrantReadWriteLock intraLock = new ReentrantReadWriteLock();</span>
+	
+	/**
+	 * The list of thread holding a shared lock
+	 */
+<span class="fc" id="L76">	private final Map&lt;Thread, LinkedList&lt;LockKind&gt;&gt; acquiredLocks = Collections.synchronizedMap(new HashMap&lt;Thread, LinkedList&lt;LockKind&gt;&gt;());</span>
+	
+	/**
+	 * The number of acquired shared locks
+	 */
+<span class="fc" id="L81">	private final AtomicInteger sharedLocks = new AtomicInteger(0);</span>
+	
+	/**
+	 * @param store the store to which this lock is to belong
+	 * @param table the table to be shared/exclusive locked
+	 */
+	public TableLocker(Store store, MangledTableName table) {
+<span class="fc" id="L88">		super();</span>
+<span class="fc" id="L89">		this.store = store;</span>
+<span class="fc" id="L90">		this.tableName = table.getName();</span>
+		
+<span class="fc" id="L92">		this.lock = new SharedExclusiveLock(store.getZooKeeper(), &quot;/n-orm/schemalock/&quot; + table.getName());</span>
+<span class="fc" id="L93">	}</span>
+	
+	/**
+	 * Checks that we have the proper connection to zookeeper (that one of the store).
+	 */
+	protected void checkZooKeeper() {
+<span class="fc" id="L99">		ZooKeeper zk = this.store.getZooKeeper();</span>
+		
+<span class="fc bfc" id="L101" title="All 2 branches covered.">		if (lock.getZookeeper() != zk) {</span>
+<span class="fc" id="L102">			lock.setZookeeper(zk);</span>
+		}
+<span class="fc" id="L104">	}</span>
+	
+	/**
+	 * Checks that zookeeper directories are here.
+	 * Triggers (at least) a zookeeper query.
+	 */
+	protected void checkIsZKLockable() {
+<span class="fc" id="L111">		this.checkZooKeeper();</span>
+<span class="fc" id="L112">		ZooKeeper zk = lock.getZookeeper();</span>
+
+		try {
+<span class="pc bpc" id="L115" title="3 of 6 branches missed.">			assert lock.getPath() != null &amp;&amp; lock.getPath().startsWith(&quot;/n-orm/schemalock&quot;);</span>
+			
+<span class="fc bfc" id="L117" title="All 2 branches covered.">			while (zk.exists(lock.getPath(), false) == null) {</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">				while (zk.exists(&quot;/n-orm/schemalock&quot;, false) == null)  {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">					while (zk.exists(&quot;/n-orm&quot;, false) == null)  {</span>
+						try {
+<span class="nc" id="L121">							zk.create(&quot;/n-orm&quot;, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);</span>
+<span class="nc" id="L122">						} catch (NodeExistsException x){}</span>
+					}
+					try {
+<span class="nc" id="L125">						zk.create(&quot;/n-orm/schemalock&quot;, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);</span>
+<span class="nc" id="L126">					} catch (NodeExistsException x){}</span>
+				}
+				try {
+<span class="fc" id="L129">					String node = zk.create(lock.getPath(), null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);</span>
+<span class="fc" id="L130">					Store.logger.info(&quot;Created lock node &quot; + node);</span>
+<span class="pc" id="L131">				} catch (NodeExistsException x){}</span>
+			}
+<span class="nc" id="L133">		} catch (Exception e) {</span>
+<span class="nc" id="L134">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L135">		}</span>
+<span class="fc" id="L136">	}</span>
+	
+	/**
+	 * Locks the table: first gets the local shared lock, then acquires
+	 * a zookeeper shared lock on the table.
+	 */
+	public void sharedLockTable() throws DatabaseNotReachedException {
+<span class="fc" id="L143">		this.sharedLocks.getAndIncrement();</span>
+		
+<span class="fc" id="L145">		LinkedList&lt;LockKind&gt; locks = this.acquiredLocks.get(Thread.currentThread());</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">		if (locks != null) {</span>
+			// This thread already holds a lock
+			// referencing this request as the last for this thread
+			// and returning immediately
+<span class="pc bpc" id="L150" title="2 of 4 branches missed.">			assert !locks.isEmpty();</span>
+<span class="fc" id="L151">			locks.addFirst(LockKind.SHARED);</span>
+<span class="fc" id="L152">			return;</span>
+		}
+		
+		// Getting local lock
+<span class="fc" id="L156">		this.intraLock.readLock().lock();</span>
+		
+<span class="pc bpc" id="L158" title="2 of 4 branches missed.">		assert ! this.isExclusiveLocked() : &quot;Acquiring a shared lock on table &quot; + this.tableName + &quot; while an exclusive lock is already set !&quot;;</span>
+		// Handling sharedLockThreads and zookeeper lock in mutual exclusion
+<span class="fc" id="L160">		synchronized (this) {</span>
+			// One should acquire zookeeper shared lock if and only if it's the first to ask for the lock
+<span class="fc bfc" id="L162" title="All 2 branches covered.">			if (!this.isShareLocked()) {</span>
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">				assert ! this.isExclusiveLocked() : &quot;Can't acquire shared lock on table &quot; + this.tableName + &quot; while it's already exclusively locked&quot;;</span>
+				try {
+					// Checking zookeeper connection and directories
+<span class="fc" id="L166">					this.checkIsZKLockable();</span>
+					// Acquiring zookeeper shared lock
+<span class="fc" id="L168">					lock.getSharedLock(lockTimeout);</span>
+<span class="nc" id="L169">				} catch (Exception e) {</span>
+<span class="nc" id="L170">					throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L171">				}</span>
+			}
+<span class="pc" id="L173">		}</span>
+		
+<span class="fc" id="L175">		locks = new LinkedList&lt;LockKind&gt;();</span>
+<span class="fc" id="L176">		locks.addFirst(LockKind.SHARED);</span>
+<span class="fc" id="L177">		this.acquiredLocks.put(Thread.currentThread(), locks);</span>
+		
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">		assert this.isShareLocked() : &quot;Acquired a shared lock on table &quot; + this.tableName + &quot; but not referenced by zookeeper !&quot;;</span>
+<span class="pc bpc" id="L180" title="2 of 4 branches missed.">		assert this.acquiredLocks.containsKey(Thread.currentThread()) : &quot;Acquired a shared lock on table &quot; + this.tableName + &quot; but thread is not referenced as having one&quot;;</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">		assert LockKind.SHARED.equals(this.acquiredLocks.get(Thread.currentThread()).peek());</span>
+<span class="fc" id="L182">	}</span>
+	
+	public void sharedUnlockTable() throws DatabaseNotReachedException {
+<span class="fc" id="L185">		LinkedList&lt;LockKind&gt; locks = this.acquiredLocks.get(Thread.currentThread());</span>
+		// Checking that last acquired lock is a shared lock
+<span class="fc" id="L187">		LockKind last = locks.peek();</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">		if (!LockKind.SHARED.equals(last)) {</span>
+<span class="nc" id="L189">			throw new IllegalMonitorStateException(&quot;Last lock for table &quot; + this.tableName + &quot; for this thread is not a shared lock&quot;);</span>
+		}
+
+<span class="fc" id="L192">		int sl = this.sharedLocks.decrementAndGet();</span>
+		
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">		assert sl &gt;= 0;</span>
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">		assert isShareLocked();</span>
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">		assert ! isExclusiveLocked();</span>
+		
+		// Removing the last shared lock
+<span class="fc" id="L199">		locks.poll();</span>
+		// If we hold another lock, returning
+<span class="fc bfc" id="L201" title="All 2 branches covered.">		if (locks.isEmpty())</span>
+<span class="fc" id="L202">			this.acquiredLocks.remove(Thread.currentThread());</span>
+		else
+<span class="fc" id="L204">			return;</span>
+		
+<span class="fc" id="L206">		synchronized (this) {</span>
+<span class="pc bpc" id="L207" title="1 of 4 branches missed.">			if (isShareLocked() &amp;&amp; this.sharedLocks.get() == 0) {</span>
+				try {
+<span class="fc" id="L209">					this.checkZooKeeper();</span>
+<span class="fc" id="L210">					lock.releaseSharedLock();</span>
+<span class="nc" id="L211">				} catch (Exception e) {</span>
+					try {
+<span class="nc" id="L213">						this.checkZooKeeper();</span>
+<span class="nc" id="L214">						lock.releaseSharedLock();</span>
+<span class="nc" id="L215">					} catch (Exception f) {</span>
+<span class="nc" id="L216">						Store.errorLogger.log(Level.SEVERE, &quot;Error unlocking table &quot; + tableName, e);</span>
+<span class="nc" id="L217">					}</span>
+<span class="fc" id="L218">				}</span>
+			}
+<span class="pc" id="L220">		}</span>
+		
+<span class="fc" id="L222">		this.intraLock.readLock().unlock();</span>
+		
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">		assert ! this.isExclusiveLocked();</span>
+<span class="fc" id="L225">	}</span>
+
+	public boolean isShareLocked() {
+<span class="fc bfc" id="L228" title="All 2 branches covered.">		return lock.getCurrentSharedLock() != null;</span>
+	}
+	
+	public void exclusiveLockTable() throws DatabaseNotReachedException {
+		boolean wasReadLocked;
+<span class="fc" id="L233">		LinkedList&lt;LockKind&gt; locks = this.acquiredLocks.get(Thread.currentThread());</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">		if (locks != null) {</span>
+			// This thread already holds a lock
+			// referencing this request as the last for this thread
+			// and returning immediately if we already own the exclusive lock
+<span class="pc bpc" id="L238" title="2 of 4 branches missed.">			assert !locks.isEmpty();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">			if (this.intraLock.isWriteLockedByCurrentThread()) {</span>
+				// We already hold an exclusive lock
+				// It should be already referenced
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">				assert locks.contains(LockKind.EXCLUSIVE);</span>
+<span class="fc" id="L243">				locks.addFirst(LockKind.EXCLUSIVE);</span>
+<span class="fc" id="L244">				return;</span>
+			}
+<span class="fc" id="L246">			wasReadLocked = locks.contains(LockKind.SHARED);</span>
+		} else {
+<span class="fc" id="L248">			wasReadLocked = false;</span>
+		}
+		
+<span class="pc bpc" id="L251" title="2 of 4 branches missed.">		assert !this.intraLock.isWriteLockedByCurrentThread();</span>
+<span class="pc bpc" id="L252" title="2 of 6 branches missed.">		assert locks == null || ! locks.contains(LockKind.EXCLUSIVE);</span>
+			
+<span class="fc bfc" id="L254" title="All 2 branches covered.">		if (wasReadLocked)</span>
+<span class="fc" id="L255">			this.intraLock.readLock().unlock();</span>
+<span class="fc" id="L256">		this.intraLock.writeLock().lock();</span>
+
+		//synchronized (this) { // Useless as we already own the internal write lock
+<span class="fc bfc" id="L259" title="All 2 branches covered.">			if (isShareLocked()) {</span>
+<span class="pc bpc" id="L260" title="2 of 4 branches missed.">				assert this.sharedLocks.get() &gt; 0;</span>
+				try {
+<span class="fc" id="L262">					this.checkZooKeeper();</span>
+<span class="fc" id="L263">					lock.releaseSharedLock();</span>
+<span class="nc" id="L264">				} catch (Exception e) {</span>
+<span class="nc" id="L265">					throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L266">				}</span>
+			} else {
+<span class="pc bpc" id="L268" title="2 of 4 branches missed.">				assert !wasReadLocked;</span>
+<span class="pc bpc" id="L269" title="2 of 4 branches missed.">				assert this.sharedLocks.get() == 0;</span>
+			}
+			try {
+<span class="fc" id="L272">				this.checkIsZKLockable();</span>
+<span class="fc" id="L273">				lock.getExclusiveLock(lockTimeout);</span>
+<span class="nc" id="L274">			} catch (Exception e) {</span>
+<span class="nc" id="L275">				throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L276">			}</span>
+		//}
+		
+<span class="fc bfc" id="L279" title="All 2 branches covered.">		if (locks == null) {</span>
+<span class="fc" id="L280">			locks = new LinkedList&lt;LockKind&gt;();</span>
+<span class="fc" id="L281">			this.acquiredLocks.put(Thread.currentThread(), locks);</span>
+		}
+<span class="fc" id="L283">		locks.addFirst(LockKind.EXCLUSIVE);</span>
+			
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">		assert ! this.isShareLocked();</span>
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">		assert this.isExclusiveLocked();</span>
+<span class="fc" id="L287">	}</span>
+	
+	public void exclusiveUnlockTable() {
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">		if (!this.intraLock.isWriteLockedByCurrentThread())</span>
+<span class="nc" id="L291">			throw new IllegalMonitorStateException(&quot;Thread &quot; + Thread.currentThread() + &quot; does not hold exclusive lock for table &quot; + this.tableName + &quot;; can't release&quot;);</span>
+
+<span class="pc bpc" id="L293" title="2 of 4 branches missed.">		assert isExclusiveLocked();</span>
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">		assert !this.isShareLocked();</span>
+		
+<span class="fc" id="L296">		LinkedList&lt;LockKind&gt; locks = this.acquiredLocks.get(Thread.currentThread());</span>
+		// Checking that last acquired lock is an exclusive lock
+<span class="fc" id="L298">		LockKind last = locks.peek();</span>
+<span class="pc bpc" id="L299" title="2 of 4 branches missed.">		assert last != null;</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">		if (!LockKind.EXCLUSIVE.equals(last)) {</span>
+<span class="nc" id="L301">			throw new IllegalMonitorStateException(&quot;Last lock for table &quot; + this.tableName + &quot; for this thread is not an exclusive lock&quot;);</span>
+		}
+		// Removing the last shared lock
+<span class="fc" id="L304">		locks.poll();</span>
+		// If we hold another exclusive lock, returning
+<span class="fc bfc" id="L306" title="All 2 branches covered.">		if (locks.contains(LockKind.EXCLUSIVE))</span>
+<span class="fc" id="L307">			return;</span>
+
+		boolean shouldAcquireSharedLock;
+<span class="fc bfc" id="L310" title="All 2 branches covered.">		if (locks.isEmpty()) {</span>
+<span class="fc" id="L311">			shouldAcquireSharedLock = false;</span>
+<span class="fc" id="L312">			this.acquiredLocks.remove(Thread.currentThread());</span>
+		} else {
+<span class="fc" id="L314">			shouldAcquireSharedLock = true;</span>
+<span class="pc bpc" id="L315" title="2 of 4 branches missed.">			assert LockKind.SHARED.equals(locks.peek());</span>
+<span class="pc bpc" id="L316" title="2 of 4 branches missed.">			assert this.sharedLocks.get() &gt; 0;</span>
+		}
+
+		//synchronized (this) { // Useless as we already own the internal write lock
+			
+			try {
+<span class="fc" id="L322">				this.checkZooKeeper();</span>
+<span class="fc" id="L323">				lock.releaseExclusiveLock();</span>
+<span class="nc" id="L324">			} catch (Exception e) {</span>
+				try {
+<span class="nc" id="L326">					this.checkZooKeeper();</span>
+<span class="nc" id="L327">					lock.releaseExclusiveLock();</span>
+<span class="nc" id="L328">				} catch (Exception f) {</span>
+<span class="nc" id="L329">					Store.errorLogger.log(Level.SEVERE, &quot;Error unlocking table &quot; + tableName + &quot; locked in exclusion&quot;, e);</span>
+<span class="nc" id="L330">				}</span>
+			} finally {
+<span class="pc bpc" id="L332" title="4 of 6 branches missed.">				if (this.sharedLocks.get() &gt; 0) {</span>
+					try {
+<span class="pc" id="L334">						this.checkIsZKLockable();</span>
+<span class="pc" id="L335">						lock.getSharedLock(lockTimeout);</span>
+<span class="nc" id="L336">					} catch (Exception e) {</span>
+						try {
+<span class="nc" id="L338">							this.checkIsZKLockable();</span>
+<span class="nc" id="L339">							lock.getSharedLock(lockTimeout);</span>
+<span class="nc" id="L340">						} catch (Exception f) {</span>
+<span class="nc" id="L341">							throw new DatabaseNotReachedException(e);</span>
+<span class="nc" id="L342">						}</span>
+<span class="pc" id="L343">					}</span>
+				}
+			}
+		//}
+<span class="pc bpc" id="L347" title="2 of 4 branches missed.">		assert ! this.isExclusiveLocked();</span>
+		
+<span class="fc" id="L349">		this.intraLock.writeLock().unlock();</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">		if (shouldAcquireSharedLock) {</span>
+<span class="fc" id="L351">			this.intraLock.readLock().lock();</span>
+		}
+<span class="fc" id="L353">	}</span>
+
+	public boolean isExclusiveLocked() {
+<span class="fc bfc" id="L356" title="All 2 branches covered.">		return lock.getCurrentExclusiveLock() != null;</span>
+	}
+
+	public boolean isFree() {
+<span class="nc bnc" id="L360" title="All 6 branches missed.">		return !this.isExclusiveLocked() &amp;&amp; !this.isShareLocked() &amp;&amp; !Thread.holdsLock(this);</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

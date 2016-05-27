@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PersistingMixin.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">PersistingMixin.aj</span></div><h1>PersistingMixin.aj</h1><pre class="source lang-java linenums"><span class="pc bpc" id="L1" title="3 of 4 branches missed.">package com.googlecode.n_orm;</span>
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.TreeMap;
+
+import com.googlecode.n_orm.KeyManagement;
+import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingMixin;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+
+<span class="pc" id="L13">public privileged aspect PersistingMixin {</span>
+	private static PersistingMixin INSTANCE;
+	
+	public static PersistingMixin getInstance() {
+<span class="fc bfc" id="L17" title="All 2 branches covered.">		if (INSTANCE == null)</span>
+<span class="fc" id="L18">			INSTANCE = aspectOf();</span>
+<span class="fc" id="L19">		return INSTANCE;</span>
+	}
+
+	declare parents: (@Persisting *) implements PersistingElement;
+
+	////If set within the constructor, we can't know whether the correct value is within the database, or that one that was set within the constructor.
+	//declare error: set(!@Transient !@Key !transient !static (!Collection+) (PersistingElement+).*) &amp;&amp; withincode((@Persisting *).new(..)) : &quot;Only key attribute should be set within a persisting constructor.&quot;;
+
+	//declare error : set(!@Transient static !transient !final * PersistingElement+.*) : &quot;Static fields can only be transient in persisting classes&quot;;
+	declare error: set(!@Transient final !transient !static * PersistingElement+.*) : &quot;Final fields must be transient&quot;;
+	
+	pointcut creation(PersistingElement self): execution(PersistingElement+.new(..)) &amp;&amp; this(self) &amp;&amp; if(thisJoinPointStaticPart.getSignature().getDeclaringType().equals(self.getClass()));
+	
+	before(PersistingElement self): PersistingMixin.creation(self) {
+<span class="fc bfc" id="L33" title="All 2 branches covered.">		if (! self.getClass().isAnnotationPresent(Persisting.class))</span>
+<span class="fc" id="L34">			throw new IllegalStateException(&quot;Class &quot; + self.getClass() + &quot; implements &quot; + PersistingElement.class +&quot; instead of declaring annotation &quot; + Persisting.class);</span>
+		
+<span class="fc" id="L36">		KeyManagement.getInstance().detectKeys(self.getClass());</span>
+<span class="fc" id="L37">	}</span>
+	
+<span class="fc" id="L39">	private transient Map&lt;String /*class name*/, String /*table*/&gt; tables = Collections.emptyMap();</span>
+	
+	public String getTable(Class&lt;? extends PersistingElement&gt; clazz) {
+<span class="fc" id="L42">		String ret = this.tables.get(clazz.getName());</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">		if (ret == null) {</span>
+<span class="fc" id="L44">			Persisting pa = clazz.getAnnotation(Persisting.class);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">			if (pa == null)</span>
+<span class="nc" id="L46">				throw new IllegalStateException(&quot;Persisting &quot; + clazz + &quot; must be annotated with &quot; + Persisting.class);</span>
+<span class="fc" id="L47">			ret = pa.table();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">			ret = ret.length() == 0 ? clazz.getName() : ret;</span>
+<span class="fc" id="L49">			Map&lt;String, String&gt; newTablesCache = new TreeMap&lt;String, String&gt;(tables);</span>
+<span class="fc" id="L50">			newTablesCache.put(clazz.getName(), ret);</span>
+<span class="fc" id="L51">			this.tables = newTablesCache;</span>
+		}
+<span class="fc" id="L53">		return ret;</span>
+	}
+	
+	private transient String PersistingElement.table;
+	
+	public String PersistingElement.getTable() {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">		if (this.table == null) {</span>
+<span class="fc" id="L60">			this.table = PersistingMixin.getInstance().getTable(this.getClass());</span>
+		}
+<span class="fc" id="L62">		return this.table;</span>
+	}
+	
+	public boolean PersistingElement.equals(Object rhs) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">		if (rhs == null)</span>
+<span class="nc" id="L67">			return false;</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">		if (!this.getClass().equals(rhs.getClass()))</span>
+<span class="fc" id="L69">			return false;</span>
+		
+<span class="fc" id="L71">		return this.getIdentifier().equals(((PersistingElement)rhs).getIdentifier());</span>
+	}
+	
+	@Transient private int PersistingElement.hashCode = -1;
+
+	@Continuator
+	public int PersistingElement.hashCode() {
+<span class="fc bfc" id="L78" title="All 2 branches covered.">		if (this.hashCode == -1) {</span>
+<span class="fc" id="L79">			this.hashCode = this.getFullIdentifier().hashCode();</span>
+		}
+<span class="fc" id="L81">		return this.hashCode;</span>
+	}
+	
+	public int PersistingElement.compareTo(PersistingElement rhs) {
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">		if (rhs == null)</span>
+<span class="nc" id="L86">			return 1;</span>
+<span class="fc" id="L87">		int clsCmp = this.getClass().getName().compareTo(rhs.getClass().getName());</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">		if (clsCmp != 0)</span>
+<span class="fc" id="L89">			return clsCmp;</span>
+		
+<span class="fc" id="L91">		return this.getIdentifier().compareTo(((PersistingElement)rhs).getIdentifier());</span>
+	}
+	
+	public String identifierToString(String ident) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">		if (ident == null)</span>
+<span class="nc" id="L96">			return &quot;unset&quot;;</span>
+
+<span class="fc" id="L98">		ident = ident.replace(KeyManagement.KEY_SEPARATOR, &quot;:&quot;);</span>
+<span class="fc" id="L99">		ident = ident.replace(KeyManagement.KEY_END_SEPARATOR, &quot;}&quot;);</span>
+<span class="fc" id="L100">		ident = ident.replace(KeyManagement.ARRAY_SEPARATOR, &quot;;&quot;);</span>
+		
+<span class="fc" id="L102">		return ident;</span>
+	}
+	
+	private transient String PersistingElement.stringRep = null;
+	public String PersistingElement.toString() {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">		if (this.stringRep != null ) {</span>
+<span class="fc" id="L108">			return this.stringRep;</span>
+		}
+		
+		String ret;
+<span class="fc" id="L112">		StringBuffer sb = new StringBuffer();</span>
+<span class="fc" id="L113">		sb.append(this.getClass().getName());</span>
+<span class="fc" id="L114">		String ident = this.getIdentifier();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">		if (ident == null) {</span>
+<span class="fc" id="L116">			sb.append(&quot; with no key yet (missing some key values)&quot;);</span>
+<span class="fc" id="L117">			ret = sb.toString();</span>
+		} else {
+<span class="fc" id="L119">			sb.append(&quot; with key &quot; + PersistingMixin.getInstance().identifierToString(ident));</span>
+<span class="fc" id="L120">			ret = sb.toString();</span>
+<span class="fc" id="L121">			this.stringRep = ret;</span>
+		}
+		
+<span class="fc" id="L124">		return ret;</span>
+	}
+	
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

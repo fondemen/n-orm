@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>IncrementManagement.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">IncrementManagement.aj</span></div><h1>IncrementManagement.aj</h1><pre class="source lang-java linenums"><span class="pc bpc" id="L1" title="3 of 4 branches missed.">package com.googlecode.n_orm;</span>
+
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.aspectj.lang.reflect.FieldSignature;
+
+import com.googlecode.n_orm.IncrementException;
+import com.googlecode.n_orm.IncrementManagement;
+import com.googlecode.n_orm.Incrementing;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.Incrementing.Mode;
+import com.googlecode.n_orm.PropertyManagement.PropertyFamily;
+import com.googlecode.n_orm.cf.MapColumnFamily;
+
+
+<span class="pc" id="L19">public aspect IncrementManagement {</span>
+	private static IncrementManagement INSTANCE;
+
+	public static IncrementManagement getInstance() {
+<span class="fc bfc" id="L23" title="All 2 branches covered.">		if (INSTANCE == null)</span>
+<span class="fc" id="L24">			INSTANCE = aspectOf();</span>
+<span class="fc" id="L25">		return INSTANCE;</span>
+	}
+	
+	declare error: set(@Incrementing (!long &amp;&amp; !int &amp;&amp; !short &amp;&amp; !byte
+										&amp;&amp; !MapColumnFamily &amp;&amp; !Map) *.*)
+			: &quot;Only naturals or maps of naturals may be incremented&quot;;
+	declare warning: set(@Incrementing @Key * *.*): &quot;Keys (that identify a persisting element) should not be incremented&quot;;
+	
+<span class="fc" id="L33">	private static volatile boolean immedatePropertyCheck = true;</span>
+	
+	/**
+	 * Whether setting a property marked as {@link Incrementing} immediately triggers an check that might throw an {@link IncrementException}.
+	 */
+	public static boolean isImmedatePropertyCheck() {
+<span class="nc" id="L39">		return immedatePropertyCheck;</span>
+	}
+
+	/**
+	 * Whether setting a property marked as {@link Incrementing} immediately triggers an check that might throw an {@link IncrementException}.
+	 */
+	public static void setImmedatePropertyCheck(boolean _immedatePropertyCheck) {
+<span class="fc" id="L46">		immedatePropertyCheck = _immedatePropertyCheck;</span>
+<span class="fc" id="L47">	}</span>
+	
+	private transient Map&lt;String, Number&gt; PersistingElement.increments;
+	
+	Map&lt;String, Number&gt; PersistingElement.getIncrements() {
+		// increments is transient, it should be initialized somewhere
+<span class="fc bfc" id="L53" title="All 2 branches covered.">		if(this.increments == null)</span>
+		{
+<span class="fc" id="L55">			 this.increments = new HashMap&lt;String, Number&gt;();</span>
+		}
+<span class="fc" id="L57">		return this.increments;</span>
+	}
+
+	public Number getActualIncrement(Number val,
+			Number oldVal, Number previousIncrement, Field prop) throws IncrementException {
+<span class="fc" id="L62">		long value = toLong(val, prop);</span>
+<span class="fc" id="L63">		long oldValue = toLong(oldVal, prop);</span>
+<span class="fc" id="L64">		checkIncrement(prop, value, oldValue);</span>
+<span class="fc" id="L65">		Number increment = previousIncrement;</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">		if (increment == null)</span>
+<span class="fc" id="L67">			increment = 0l;</span>
+<span class="fc" id="L68">		long inc = increment.longValue()+value-oldValue;</span>
+<span class="fc" id="L69">		return toNumber(((Number)val).getClass(), inc);</span>
+	}
+
+	private void checkIncrement(Field prop, long value, long oldValue) {
+<span class="fc" id="L73">		Incrementing inca = prop.getAnnotation(Incrementing.class);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">		if (inca != null) {</span>
+<span class="fc bfc" id="L75" title="All 4 branches covered.">			if (inca.mode().equals(Mode.IncrementOnly) &amp;&amp; oldValue &gt; value)</span>
+<span class="fc" id="L76">				throw new IncrementException(prop, true, oldValue-value);</span>
+
+<span class="fc bfc" id="L78" title="All 4 branches covered.">			if (inca.mode().equals(Mode.DecrementOnly) &amp;&amp; oldValue &lt; value)</span>
+<span class="fc" id="L79">				throw new IncrementException(prop, false, value-oldValue);</span>
+		}
+<span class="fc" id="L81">	}</span>
+
+	protected long toLong(Object val, Field prop) {
+		long value;
+<span class="fc bfc" id="L85" title="All 2 branches covered.">		if (val == null)</span>
+<span class="fc" id="L86">			value = 0;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">		else if (val instanceof Long)</span>
+<span class="fc" id="L88">			value = (Long) val;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">		else if (val instanceof Integer)</span>
+<span class="fc" id="L90">			value = (Integer) val;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">		else if (val instanceof Short)</span>
+<span class="fc" id="L92">			value = (Short) val;</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">		else if (val instanceof Byte)</span>
+<span class="fc" id="L94">			value = (Byte) val;</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">		else if (prop != null)</span>
+<span class="nc" id="L96">			throw new IllegalArgumentException(&quot;Cannot annotate non natural field &quot; + prop + &quot; with &quot; + Incrementing.class);</span>
+		else
+<span class="nc" id="L98">			value = 0;</span>
+<span class="fc" id="L99">		return value;</span>
+	}
+	
+	protected Number toNumber(Class&lt;? extends Number&gt; clazz, long l) {
+<span class="pc bpc" id="L103" title="1 of 4 branches missed.">		if (clazz.equals(Byte.class) || clazz.equals(byte.class))</span>
+<span class="fc" id="L104">			return (byte)l;</span>
+<span class="pc bpc" id="L105" title="1 of 4 branches missed.">		else if (clazz.equals(Short.class) || clazz.equals(short.class))</span>
+<span class="fc" id="L106">			return (short)l;</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">		else if (clazz.equals(Integer.class) || clazz.equals(int.class))</span>
+<span class="fc" id="L108">			return (int)l;</span>
+		else
+<span class="fc" id="L110">			return l;</span>
+	}
+	
+	after(PropertyFamily pf): execution(void PropertyFamily.clearChanges()) &amp;&amp; this(pf) {
+<span class="fc" id="L114">		pf.getOwner().getIncrements().clear();</span>
+<span class="fc" id="L115">	}</span>
+	
+	before(PersistingElement self, Object newValue): set(@Incrementing (Number+||long||int||short||byte) PersistingElement+.*) &amp;&amp; target(self) &amp;&amp; args(newValue) &amp;&amp; if(immedatePropertyCheck) {
+<span class="fc" id="L118">		Field f = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();</span>
+<span class="fc" id="L119">		Incrementing inc = f.getAnnotation(Incrementing.class);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">		if (Mode.Free.equals(inc.mode()))</span>
+<span class="fc" id="L121">			return;</span>
+<span class="fc" id="L122">		this.checkIncrement(f, toLong((Number)newValue, f), toLong((Number)PropertyManagement.getInstance().candideReadValue(self, f), f));</span>
+<span class="fc" id="L123">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

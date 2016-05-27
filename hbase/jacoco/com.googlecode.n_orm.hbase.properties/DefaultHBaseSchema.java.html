@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>DefaultHBaseSchema.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.properties</a> &gt; <span class="el_source">DefaultHBaseSchema.java</span></div><h1>DefaultHBaseSchema.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.properties;
+
+import java.lang.annotation.Annotation;
+
+import com.googlecode.n_orm.hbase.HBaseSchema;
+
+<span class="fc" id="L7">public class DefaultHBaseSchema implements HBaseSchema {</span>
+	@HBaseSchema
+<span class="nc" id="L9">	static class DummyClass {</span>
+	}
+
+	private static HBaseSchema defaultHbaseSchema;
+
+	static {
+<span class="fc" id="L15">		defaultHbaseSchema = DummyClass.class.getAnnotation(HBaseSchema.class);</span>
+<span class="fc" id="L16">	}</span>
+
+<span class="fc" id="L18">	private Class&lt;? extends Annotation&gt; annotationType = defaultHbaseSchema</span>
+			.annotationType();
+<span class="fc" id="L20">	private SettableBoolean forceCompression = defaultHbaseSchema</span>
+			.forceCompression();
+<span class="fc" id="L22">	private String compression = defaultHbaseSchema.compression();</span>
+<span class="fc" id="L23">	private int scanCaching = defaultHbaseSchema.scanCaching();</span>
+<span class="fc" id="L24">	private SettableBoolean forceInMemory = defaultHbaseSchema.forceInMemory();</span>
+<span class="fc" id="L25">	private SettableBoolean inMemory = defaultHbaseSchema.inMemory();</span>
+<span class="fc" id="L26">	private SettableBoolean forceTimeToLive = defaultHbaseSchema</span>
+			.forceTimeToLive();
+<span class="fc" id="L28">	private int timeToLiveInSeconds = defaultHbaseSchema.timeToLiveInSeconds();</span>
+<span class="fc" id="L29">	private SettableBoolean forceMaxVersions = defaultHbaseSchema</span>
+			.forceMaxVersions();
+<span class="fc" id="L31">	private int maxVersions = defaultHbaseSchema.maxVersions();</span>
+<span class="fc" id="L32">	private SettableBoolean forceBloomFilterType = defaultHbaseSchema</span>
+			.forceBloomFilterType();
+<span class="fc" id="L34">	private String bloomFilterType = defaultHbaseSchema.bloomFilterType();</span>
+<span class="fc" id="L35">	private SettableBoolean forceBlockCacheEnabled = defaultHbaseSchema</span>
+			.forceBlockCacheEnabled();
+<span class="fc" id="L37">	private SettableBoolean blockCacheEnabled = defaultHbaseSchema</span>
+			.blockCacheEnabled();
+<span class="fc" id="L39">	private SettableBoolean forceBlockSize = defaultHbaseSchema</span>
+			.forceBlockSize();
+<span class="fc" id="L41">	private int blockSize = defaultHbaseSchema.blockSize();</span>
+<span class="fc" id="L42">	private SettableBoolean forceReplicationScope = defaultHbaseSchema</span>
+			.forceReplicationScope();
+<span class="fc" id="L44">	private int replicationScope = defaultHbaseSchema.replicationScope();</span>
+<span class="fc" id="L45">	private SettableBoolean deferredLogFlush = defaultHbaseSchema</span>
+			.deferredLogFlush();
+<span class="fc" id="L47">	private SettableBoolean forceDeferredLogFlush = defaultHbaseSchema</span>
+			.forceDeferredLogFlush();
+<span class="fc" id="L49">	private WALWritePolicy writeToWAL = defaultHbaseSchema.writeToWAL();</span>
+
+	@Override
+	public Class&lt;? extends Annotation&gt; annotationType() {
+<span class="nc" id="L53">		return this.annotationType;</span>
+	}
+
+	@Override
+	public SettableBoolean forceCompression() {
+<span class="nc" id="L58">		return this.forceCompression;</span>
+	}
+
+	@Override
+	public String compression() {
+<span class="fc" id="L63">		return this.compression;</span>
+	}
+
+	@Override
+	public int scanCaching() {
+<span class="nc" id="L68">		return this.scanCaching;</span>
+	}
+
+	@Override
+	public SettableBoolean forceInMemory() {
+<span class="nc" id="L73">		return this.forceInMemory;</span>
+	}
+
+	@Override
+	public SettableBoolean inMemory() {
+<span class="fc" id="L78">		return this.inMemory;</span>
+	}
+
+	@Override
+	public SettableBoolean forceTimeToLive() {
+<span class="nc" id="L83">		return this.forceTimeToLive;</span>
+	}
+
+	@Override
+	public int timeToLiveInSeconds() {
+<span class="fc" id="L88">		return this.timeToLiveInSeconds;</span>
+	}
+
+	@Override
+	public SettableBoolean forceMaxVersions() {
+<span class="nc" id="L93">		return this.forceMaxVersions;</span>
+	}
+
+	@Override
+	public int maxVersions() {
+<span class="fc" id="L98">		return this.maxVersions;</span>
+	}
+
+	@Override
+	public SettableBoolean forceBloomFilterType() {
+<span class="nc" id="L103">		return this.forceBloomFilterType;</span>
+	}
+
+	@Override
+	public String bloomFilterType() {
+<span class="fc" id="L108">		return this.bloomFilterType;</span>
+	}
+
+	@Override
+	public SettableBoolean forceBlockCacheEnabled() {
+<span class="nc" id="L113">		return this.forceBlockCacheEnabled;</span>
+	}
+
+	@Override
+	public SettableBoolean blockCacheEnabled() {
+<span class="fc" id="L118">		return this.blockCacheEnabled;</span>
+	}
+
+	@Override
+	public SettableBoolean forceBlockSize() {
+<span class="nc" id="L123">		return this.forceBlockSize;</span>
+	}
+
+	@Override
+	public int blockSize() {
+<span class="fc" id="L128">		return this.blockSize;</span>
+	}
+
+	@Override
+	public SettableBoolean forceReplicationScope() {
+<span class="nc" id="L133">		return this.forceReplicationScope;</span>
+	}
+
+	@Override
+	public int replicationScope() {
+<span class="fc" id="L138">		return this.replicationScope;</span>
+	}
+
+	@Override
+	public SettableBoolean deferredLogFlush() {
+<span class="fc" id="L143">		return this.deferredLogFlush;</span>
+	}
+
+	@Override
+	public SettableBoolean forceDeferredLogFlush() {
+<span class="fc" id="L148">		return this.forceDeferredLogFlush;</span>
+	}
+
+	@Override
+	public WALWritePolicy writeToWAL() {
+<span class="nc" id="L153">		return this.writeToWAL;</span>
+	}
+
+	public void setAnnotationType(Class&lt;? extends Annotation&gt; annotationType) {
+<span class="nc" id="L157">		this.annotationType = annotationType;</span>
+<span class="nc" id="L158">	}</span>
+
+	public void setForceCompression(SettableBoolean forceCompression) {
+<span class="nc" id="L161">		this.forceCompression = forceCompression;</span>
+<span class="nc" id="L162">	}</span>
+
+	public void setCompression(String compression) {
+<span class="fc" id="L165">		this.compression = compression;</span>
+<span class="fc" id="L166">	}</span>
+
+	public void setScanCaching(int scanCaching) {
+<span class="nc" id="L169">		this.scanCaching = scanCaching;</span>
+<span class="nc" id="L170">	}</span>
+
+	public void setForceInMemory(SettableBoolean forceInMemory) {
+<span class="nc" id="L173">		this.forceInMemory = forceInMemory;</span>
+<span class="nc" id="L174">	}</span>
+
+	public void setInMemory(SettableBoolean inMemory) {
+<span class="nc" id="L177">		this.inMemory = inMemory;</span>
+<span class="nc" id="L178">	}</span>
+
+	public void setForceTimeToLive(SettableBoolean forceTimeToLive) {
+<span class="nc" id="L181">		this.forceTimeToLive = forceTimeToLive;</span>
+<span class="nc" id="L182">	}</span>
+
+	public void setTimeToLiveInSeconds(int timeToLiveInSeconds) {
+<span class="fc" id="L185">		this.timeToLiveInSeconds = timeToLiveInSeconds;</span>
+<span class="fc" id="L186">	}</span>
+
+	public void setForceMaxVersions(SettableBoolean forceMaxVersions) {
+<span class="nc" id="L189">		this.forceMaxVersions = forceMaxVersions;</span>
+<span class="nc" id="L190">	}</span>
+
+	public void setMaxVersions(int maxVersions) {
+<span class="nc" id="L193">		this.maxVersions = maxVersions;</span>
+<span class="nc" id="L194">	}</span>
+
+	public void setForceBloomFilterType(SettableBoolean forceBloomFilterType) {
+<span class="nc" id="L197">		this.forceBloomFilterType = forceBloomFilterType;</span>
+<span class="nc" id="L198">	}</span>
+
+	public void setBloomFilterType(String bloomFilterType) {
+<span class="nc" id="L201">		this.bloomFilterType = bloomFilterType;</span>
+<span class="nc" id="L202">	}</span>
+
+	public void setForceBlockCacheEnabled(SettableBoolean forceBlockCacheEnabled) {
+<span class="nc" id="L205">		this.forceBlockCacheEnabled = forceBlockCacheEnabled;</span>
+<span class="nc" id="L206">	}</span>
+
+	public void setBlockCacheEnabled(SettableBoolean blockCacheEnabled) {
+<span class="nc" id="L209">		this.blockCacheEnabled = blockCacheEnabled;</span>
+<span class="nc" id="L210">	}</span>
+
+	public void setForceBlockSize(SettableBoolean forceBlockSize) {
+<span class="nc" id="L213">		this.forceBlockSize = forceBlockSize;</span>
+<span class="nc" id="L214">	}</span>
+
+	public void setBlockSize(int blockSize) {
+<span class="nc" id="L217">		this.blockSize = blockSize;</span>
+<span class="nc" id="L218">	}</span>
+
+	public void setForceReplicationScope(SettableBoolean forceReplicationScope) {
+<span class="nc" id="L221">		this.forceReplicationScope = forceReplicationScope;</span>
+<span class="nc" id="L222">	}</span>
+
+	public void setReplicationScope(int replicationScope) {
+<span class="nc" id="L225">		this.replicationScope = replicationScope;</span>
+<span class="nc" id="L226">	}</span>
+
+	public void setDeferredLogFlush(SettableBoolean deferredLogFlush) {
+<span class="nc" id="L229">		this.deferredLogFlush = deferredLogFlush;</span>
+<span class="nc" id="L230">	}</span>
+
+	public void setForceDeferredLogFlush(SettableBoolean forceDeferredLogFlush) {
+<span class="nc" id="L233">		this.forceDeferredLogFlush = forceDeferredLogFlush;</span>
+<span class="nc" id="L234">	}</span>
+
+	public void setWriteToWAL(WALWritePolicy writeToWAL) {
+<span class="nc" id="L237">		this.writeToWAL = writeToWAL;</span>
+<span class="nc" id="L238">	}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

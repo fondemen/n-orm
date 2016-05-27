@@ -1,0 +1,1345 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>WriteRetentionStore.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.cache.write</a> &gt; <span class="el_source">WriteRetentionStore.java</span></div><h1>WriteRetentionStore.java</h1><pre class="source lang-java linenums"><span class="fc" id="L1">package com.googlecode.n_orm.cache.write;</span>
+
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingMixin;
+import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.Transient;
+import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.DelegatingStore;
+import com.googlecode.n_orm.storeapi.MetaInformation;
+import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+import com.googlecode.n_orm.utils.LongAdder;
+
+/**
+ * A {@link DelegatingStore} that retains all writes
+ * ({@link #storeChanges(MetaInformation, String, String, ColumnFamilyData, Map, Map)}
+ * and {@link #delete(MetaInformation, String, String)}, that is {@link PersistingElement#store()} and
+ * {@link PersistingElement#delete()}) during a certain amount of time. This kind of store is obviously
+ * thread safe, and interesting in case rows are often updated by dramatically lowering the number of
+ * write requests on the {@link #getActualStore() actual store}.
+ * &lt;p&gt;Writes are actually issued to the {@link #getActualStore() actual store} after a
+ * {@link #getWriteRetentionMs() given time}. If other writes for the same persisting element occur during
+ * this period, they are merged with retained write for this persisting element and eventually sent.
+ * As an example, if a persisting element is stored at time t1, changed and stored again at time t2
+ * such that t2-t1 is less than the {@link #getWriteRetentionMs() retention time}, only one store request
+ * is issued to the {@link #getActualStore() actual store}, after t1+{@link #getWriteRetentionMs() retention time}.&lt;/p&gt;
+ * &lt;p&gt;Reads (as {@link #get(MetaInformation, String, String, Set)}, {@link PersistingElement#activate(String...)})
+ * do not explore data &quot;retended&quot; here. As a example, activating, changing, storing, and then
+ * activating again a persisting element using this kind of store can re-activate it as it was before the change.
+ * Same remark holds for testing an element of existence, counting element, or getting a list of elements
+ * that match criteria.&lt;/p&gt;
+ * &lt;p&gt;This store can be deactivated ; in the latter case, it merely acts as a delegating store with no delay.
+ * To en/de-activate, use {@link #setEnabledByDefault(boolean)}. A thread can anyway be authorized to activate for
+ * itself (and only itself) any de-activated write retention store if calling before
+ * {@link #setEnabledForCurrentThread(boolean)}.&lt;/p&gt;
+ * &lt;p&gt;This store can be supervised using {@link #getPendingRequests()}. To grab more metrics (such as the number of
+ * requests {{@link #getRequestsIn()} in}, {@link #getRequestsOut() out},
+ * {@link #getAverageLatencyMs() time between a request should be sent and is sent}...), you need to enable
+ * {@link #setCapureHitRatio(boolean)} to true, which is not the case by default as it introduces some overhead.
+ * It is possible to enable and then disable addtional capture on a regular basis to get metrics samples.
+ * In this latter case, older metrics can be {@link #resetCapureHitRatioMetrics() reseted}.&lt;/p&gt;
+ * &lt;p&gt;This store can be activated using {@link Persisting#writeRetentionMs() the @Persisting annotation} on a class
+ * or by setting the {@link StoreSelector#STORE_WRITE_RETENTION with-write-retention} property on the
+ * storage.properties file.&lt;/p&gt;
+ */
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">public class WriteRetentionStore extends DelegatingStore {</span>
+<span class="fc" id="L80">	public static final Logger logger = Logger.getLogger(DelegatingStore.class.getName()); </span>
+
+<span class="fc" id="L82">	private static final byte[] DELETED_VALUE = new byte[0];</span>
+<span class="fc" id="L83">	private static final byte[] NULL_VALUE = new byte[0];</span>
+	
+	/**
+	 * Event queue
+	 */
+<span class="fc" id="L88">	private static final DelayQueue&lt;StoreRequest&gt; writeQueue = new DelayQueue&lt;StoreRequest&gt;();</span>
+	
+	/**
+	 * Whether write retention should be enabled for a given thread
+	 */
+<span class="fc" id="L93">	private static ThreadLocal&lt;Boolean&gt; enabled = new ThreadLocal&lt;Boolean&gt;();</span>
+	
+	/**
+	 * Number of requests currently being sending
+	 */
+<span class="fc" id="L98">	private static final AtomicLong requestsBeingSending = new AtomicLong();</span>
+	
+	/**
+	 * Whether or not hit ratio should be captured
+	 */
+<span class="fc" id="L103">	private static boolean captureHitRatio = false;</span>
+
+	/**
+	 * Number of requests asked
+	 */
+<span class="fc" id="L108">	private static final LongAdder requestsIn = new LongAdder();</span>
+	
+	/**
+	 * Number of requests sent
+	 */
+<span class="fc" id="L113">	private static final LongAdder requestsOut = new LongAdder();</span>
+	
+	/**
+	 * Cumulative latencies
+	 */
+<span class="fc" id="L118">	private static final LongAdder requestsCumulativeLatency = new LongAdder();</span>
+	
+	/**
+	 * Number of latencies accumulated into {@link #requestsCumulativeLatency}
+	 */
+<span class="fc" id="L123">	private static final LongAdder requestsLatencySamples = new LongAdder();</span>
+	
+	/**
+	 * Whether we are being stopping (JVM shutdown)
+	 */
+<span class="fc" id="L128">	private static volatile boolean shutdown = false;</span>
+
+	/**
+	 * Thread responsible for dequeue
+	 */
+<span class="fc" id="L133">	private static final AtomicReference&lt;EvictionThread&gt; evictionThread = new AtomicReference&lt;EvictionThread&gt;();</span>
+	
+	/**
+	 * Maximum global number of threads used for sending requests to store
+	 */
+<span class="fc" id="L138">	private static volatile int MAX_SENDER_THREADS = 20;</span>
+	
+	/**
+	 * Known stores
+	 */
+<span class="fc" id="L143">	private static final Map&lt;Integer, Collection&lt;WriteRetentionStore&gt;&gt; knownStores = new HashMap&lt;Integer, Collection&lt;WriteRetentionStore&gt;&gt;();</span>
+	
+	// One should find the same WriteRetentionStore given a write retention time and a target store
+	/**
+	 * Returns a {@link WriteRetentionStore} with s as {@link DelegatingStore#getActualStore() delegate} ;
+	 * in case s is already a {@link WriteRetentionStore} with a different {@link #getWriteRetentionMs()},
+	 * returns another {@link WriteRetentionStore} with same {@link DelegatingStore#getActualStore() delegate}
+	 * as s.
+	 * @param writeRetentionMs time during which updates are retended to delegate store
+	 * @param s the actual store, or a {@link WriteRetentionStore} with delegating to the actual store
+	 * @throws IllegalArgumentException if s is a delegation chain that already contains a {@link WriteRetentionStore}
+	 */
+	public static WriteRetentionStore getWriteRetentionStore(long writeRetentionMs, Store s) {
+		
+<span class="fc bfc" id="L157" title="All 2 branches covered.">		if (s instanceof WriteRetentionStore) {</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">			if (((WriteRetentionStore)s).getWriteRetentionMs() == writeRetentionMs)</span>
+<span class="fc" id="L159">				return (WriteRetentionStore) s;</span>
+			
+<span class="fc" id="L161">			s = ((WriteRetentionStore)s).getActualStore();</span>
+		}
+		
+		//Checking whether a WriteRetentionStore exists in the delegating chain
+<span class="fc" id="L165">		Store schk = s;</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">		while (schk instanceof DelegatingStore) {</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">			if (schk instanceof WriteRetentionStore)</span>
+<span class="nc" id="L168">				throw new IllegalArgumentException(s.toString() + &quot; is already a write-retention store as it already delegates to &quot; + schk + &quot; ; cannot create write-retention store above it&quot;);</span>
+<span class="fc" id="L169">			schk = ((DelegatingStore)schk).getActualStore();</span>
+		}
+		
+		Collection&lt;WriteRetentionStore&gt; res;
+		// Return candidate if not exists
+<span class="fc" id="L174">		WriteRetentionStore ret = new WriteRetentionStore(writeRetentionMs, s);</span>
+<span class="fc" id="L175">		int h = ret.hashCode();</span>
+		
+		// Getting existing stores for this hash
+<span class="pc" id="L178">		synchronized(knownStores) {</span>
+<span class="fc" id="L179">			res = knownStores.get(h);</span>
+			
+			// No known store for this hash
+<span class="fc bfc" id="L182" title="All 2 branches covered.">			if (res == null) {</span>
+<span class="fc" id="L183">				res = new LinkedList&lt;WriteRetentionStore&gt;();</span>
+<span class="fc" id="L184">				knownStores.put(h, res);</span>
+			}
+		}
+		
+		// Getting proper store from the set of known stores
+		// or referencing the candidate if not found
+<span class="pc" id="L190">		synchronized(res) {</span>
+			// Checking for existing store for this hash
+<span class="fc bfc" id="L192" title="All 2 branches covered.">			for (WriteRetentionStore kwrs : res) {</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">				if (kwrs.equals(ret))</span>
+<span class="fc" id="L194">					return kwrs;</span>
+			}
+			
+			// No store found ; referencing and then returning ret
+<span class="fc" id="L198">			res.add(ret);</span>
+<span class="fc" id="L199">			return ret;</span>
+		}
+	}
+
+	/**
+	 * Whether write retention should be enabled for this thread even for
+	 * {@link #setEnabledByDefault(boolean) de-activated} write-retention stores.
+	 */
+	public static boolean isEnabledForCurrentThread() {
+<span class="fc" id="L208">		Boolean ret = enabled.get();</span>
+<span class="fc bfc" id="L209" title="All 4 branches covered.">		return ret != null &amp;&amp; ret;</span>
+	}
+
+	/**
+	 * Whether write retention should be enabled for this thread even for
+	 * {@link #setEnabledByDefault(boolean) de-activated} write-retention stores.
+	 */
+	public static void setEnabledForCurrentThread(boolean enabled) {
+<span class="fc" id="L217">		WriteRetentionStore.enabled.set(enabled);</span>
+<span class="fc" id="L218">	}</span>
+
+	/**
+	 * Maximum global number of threads used for sending requests to store ; default is 40.
+	 */
+	public static int getMaxSenderThreads() {
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">		assert MAX_SENDER_THREADS &gt; 0;</span>
+<span class="fc" id="L225">		return MAX_SENDER_THREADS;</span>
+	}
+
+	/**
+	 * Maximum global number of threads used for sending requests to store
+	 */
+	public static void setMaxSenderThreads(int maxSenderThreads) {
+<span class="fc bfc" id="L232" title="All 2 branches covered.">		if (maxSenderThreads &lt;= 0)</span>
+<span class="fc" id="L233">			throw new IllegalArgumentException();</span>
+<span class="fc" id="L234">		MAX_SENDER_THREADS = maxSenderThreads;</span>
+<span class="fc" id="L235">	}</span>
+
+	// For test purpose
+	/**
+	 * The approximate number of sending threads.
+	 * This number can be above {@link #getMaxSenderThreads()} in case it was recently set to a lower value.
+	 * @see ThreadPoolExecutor#getActiveCount()
+	 */
+	public static int getActiveSenderThreads() {
+<span class="fc" id="L244">		EvictionThread et = evictionThread.get();</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">		return et == null ? 0 : et.sender.getActiveCount();</span>
+	}
+
+	/**
+	 * The approximate number of pending write requests.
+	 */
+	public static int getPendingRequests() {
+<span class="fc" id="L252">		return writeQueue.size() + requestsBeingSending.intValue();</span>
+	}
+	
+	/**
+	 * Whether hit ratio metrics should be captured
+	 */
+	public static boolean isCapureHitRatio() {
+<span class="nc" id="L259">		return WriteRetentionStore.captureHitRatio;</span>
+	}
+	
+	/**
+	 * Whether hit ratio metrics should be captured
+	 */
+	public static void setCapureHitRatio(boolean captureHitRatio) {
+<span class="fc" id="L266">		WriteRetentionStore.captureHitRatio = captureHitRatio;</span>
+<span class="fc" id="L267">	}</span>
+	
+	/**
+	 * Resets any hit-ratio-related metrics {@link #getHitRatio()}, {@link #getRequestsIn()}, {@link #getRequestsOut()}, and {@link #getAverageLatencyMs()}
+	 */
+	public static void resetCapureHitRatioMetrics() {
+<span class="nc" id="L273">		requestsLatencySamples.reset();</span>
+<span class="nc" id="L274">		requestsCumulativeLatency.reset();</span>
+<span class="nc" id="L275">		requestsIn.reset();</span>
+<span class="nc" id="L276">		requestsIn.add(getPendingRequests());</span>
+<span class="nc" id="L277">		requestsOut.reset();</span>
+<span class="nc" id="L278">	}</span>
+
+	/**
+	 * Number of requests asked ; {@link #isCapureHitRatio()} should be on to capture this metric
+	 */
+	public static long getRequestsIn() {
+<span class="fc" id="L284">		return requestsIn.longValue();</span>
+	}
+
+	/**
+	 * Number of requests sent ; {@link #isCapureHitRatio()} should be on to capture this metric
+	 */
+	public static long getRequestsOut() {
+<span class="fc" id="L291">		return requestsOut.longValue();</span>
+	}
+	
+	/**
+	 * The hit ratio (requests asked / requests (to be)sent ; {@link #isCapureHitRatio()} should be on to capture this metric
+	 */
+	public static double getHitRatio() {
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">		if (getRequestsIn() == 0)</span>
+<span class="nc" id="L299">			return Double.NaN;</span>
+<span class="fc" id="L300">		long in = getRequestsIn();</span>
+<span class="fc" id="L301">		return (double)(in - getRequestsOut() - getPendingRequests()) / (double)(in);</span>
+	}
+	
+	/**
+	 * The cumulative latency (ms) between time at which a request should have been sent and the time it is actually sent
+	 */
+	public static long getCumulativeLatencyMs() {
+<span class="fc" id="L308">		return requestsCumulativeLatency.longValue();</span>
+	}
+	
+	/**
+	 * Number of latencies accumulated by {@link #getCumulativeLatencyMs()}
+	 */
+	public static long getLatencySamples() {
+<span class="fc" id="L315">		return requestsLatencySamples.longValue();</span>
+	}
+	
+	/**
+	 * The average latency (ms) between time at which a request should have been sent and the time it is actually sent
+	 */
+	public static long getAverageLatencyMs() {
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">		if (getLatencySamples() == 0)</span>
+<span class="nc" id="L323">			return 0;</span>
+<span class="fc" id="L324">		return getCumulativeLatencyMs() / getLatencySamples();</span>
+	}
+
+	/**
+	 * Thrown when attempting to merge to a dead request, i.e. removed from known requests
+	 */
+<span class="fc" id="L330">	private static class RequestIsOutException extends Exception {</span>
+		private static final long serialVersionUID = 4904072123077338091L;
+	}
+
+	/**
+	 * Hash for finding a request according to the element to update
+	 */
+	private static class RowInTable implements Comparable&lt;RowInTable&gt; {
+		private final String table, id;
+		private final int h;
+
+		public RowInTable(String table, String id) {
+<span class="fc" id="L342">			super();</span>
+<span class="pc bpc" id="L343" title="2 of 4 branches missed.">			if (id == null || table == null)</span>
+<span class="nc" id="L344">				throw new IllegalArgumentException();</span>
+<span class="fc" id="L345">			this.table = table;</span>
+<span class="fc" id="L346">			this.id = id;</span>
+<span class="fc" id="L347">			this.h = this.computeHashCode();</span>
+<span class="fc" id="L348">		}</span>
+
+		@Override
+		public int hashCode() {
+<span class="fc" id="L352">			return this.h;</span>
+		}
+
+		private int computeHashCode() {
+<span class="fc" id="L356">			final int prime = 31;</span>
+<span class="fc" id="L357">			int result = 1;</span>
+<span class="fc" id="L358">			result = prime * result + id.hashCode();</span>
+<span class="fc" id="L359">			result = prime * result + table.hashCode();</span>
+<span class="fc" id="L360">			return result;</span>
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">			if (this == obj)</span>
+<span class="nc" id="L366">				return true;</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">			if (obj == null)</span>
+<span class="nc" id="L368">				return false;</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">			if (getClass() != obj.getClass())</span>
+<span class="nc" id="L370">				return false;</span>
+<span class="fc" id="L371">			RowInTable other = (RowInTable) obj;</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">			if (h != other.h)</span>
+<span class="nc" id="L373">				return false;</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">			if (!id.equals(other.id))</span>
+<span class="nc" id="L375">				return false;</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">			if (!table.equals(other.table))</span>
+<span class="nc" id="L377">				return false;</span>
+<span class="fc" id="L378">			return true;</span>
+		}
+
+		@Override
+		public int compareTo(RowInTable o) {
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">			if (o == null)</span>
+<span class="nc" id="L384">				return 1;</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">			if (this == o)</span>
+<span class="nc" id="L386">				return 0;</span>
+<span class="fc" id="L387">			int ret = this.h - o.h;</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">			if (ret != 0)</span>
+<span class="fc" id="L389">				return ret;</span>
+<span class="fc" id="L390">			return this.table.compareTo(o.table) + this.id.compareTo(o.id);</span>
+		}
+		
+		@Override
+		public String toString() {
+<span class="fc" id="L395">			return &quot;element &quot; + PersistingMixin.getInstance().identifierToString(this.id) + &quot; in table &quot; + this.table;</span>
+		}
+	}
+
+	/**
+	 * Summarize requests for a given row in a given table. Thread-safely merges
+	 * with another request.
+	 */
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">	private class StoreRequest implements Delayed {</span>
+
+		/**
+		 * A merged datum is stored with a transaction index
+		 */
+<span class="fc" id="L408">		private final AtomicLong transactionDistributor = new AtomicLong(</span>
+<span class="fc" id="L409">				Long.MIN_VALUE);</span>
+		
+		/**
+		 * Last transaction that was sent, be it completed or not ; negative if not sent yet
+		 */
+<span class="fc" id="L414">		private volatile Long lastSentTransaction = null;</span>
+		
+		/**
+		 * Whether this element is being sending
+		 */
+<span class="fc" id="L419">		private volatile boolean sending = false;</span>
+
+		/**
+		 * Whether this request was sent and this request object must not be used anymore
+		 */
+<span class="fc" id="L424">		private volatile boolean dead = false;</span>
+
+		/**
+		 * A lock to ensure this request is not updated while it's sent
+		 */
+<span class="fc" id="L429">		private final ReentrantReadWriteLock sendLock = new ReentrantReadWriteLock();</span>
+
+		/**
+		 * The epoch date in nanoseconds at which this request should be sent to
+		 * the data store ; -1 in case request is not planned
+		 */
+<span class="fc" id="L435">		private final AtomicLong outDateMs = new AtomicLong(-1);</span>
+		
+		/**
+		 * Merged meta information
+		 */
+<span class="fc" id="L440">		private final AtomicReference&lt;MetaInformation&gt; meta = new AtomicReference&lt;MetaInformation&gt;();</span>
+		
+		/**
+		 * The updated row (table and id)
+		 */
+		private final RowInTable row;
+		
+		/**
+		 * A map storing request data according to transaction number. Column
+		 * can be a {@link byte[]}, a {@link WriteRetentionStore#DELETED_VALUE
+		 * delete marker}, or a {@link Number}. If {@link byte[]} or
+		 * {@link WriteRetentionStore#DELETED_VALUE delete marker}, only latest
+		 * value is valid; if {@link Number}, datum corresponds to an increment
+		 * and all values for all transactions should be summed to get the actual
+		 * increment.
+		 */
+		@Transient private volatile ConcurrentMap&lt;
+			String /* family */,
+			ConcurrentMap&lt;
+				String /* column */,
+				ConcurrentNavigableMap&lt;
+					Long /* transaction id */,
+					Object /* byte[] || Long (increment) || DELETED_VALUE */
+<span class="fc" id="L463">		&gt;&gt;&gt; elements = new ConcurrentHashMap&lt;String, ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt;&gt;();</span>
+
+		/**
+		 * When this element was last deleted.
+		 */
+<span class="fc" id="L468">		@Transient private volatile ConcurrentSkipListSet&lt;Long&gt; deletions = new ConcurrentSkipListSet&lt;Long&gt;();</span>
+		
+<span class="fc" id="L470">		private StoreRequest(RowInTable row) {</span>
+<span class="fc" id="L471">			super();</span>
+<span class="fc" id="L472">			this.row = row;</span>
+<span class="fc" id="L473">		}</span>
+
+		/**
+		 * Starts an update ; {@link #doneUpdate()} must absolutely be
+		 * eventually called.
+		 * 
+		 * @return transaction number
+		 * @throws RequestIsOutException
+		 *             in case this request is {@link #dead}
+		 */
+		private long startUpdate() throws RequestIsOutException {
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">			if (this.dead) {</span>
+<span class="nc" id="L485">				throw new RequestIsOutException();</span>
+			}
+			
+<span class="fc" id="L488">			this.sendLock.readLock().lock();</span>
+
+<span class="fc bfc" id="L490" title="All 2 branches covered.">			if (this.dead) {</span>
+<span class="fc" id="L491">				this.sendLock.readLock().unlock();</span>
+<span class="fc" id="L492">				throw new RequestIsOutException();</span>
+			}
+
+<span class="fc" id="L495">			long ret = this.transactionDistributor.incrementAndGet();</span>
+			
+<span class="pc bpc" id="L497" title="2 of 6 branches missed.">			assert this.lastSentTransaction == null || ret &gt; this.lastSentTransaction;</span>
+
+<span class="fc" id="L499">			return ret;</span>
+		}
+
+		/**
+		 * Declares an update end.
+		 * 
+		 * @throws RequestIsOutException
+		 */
+		private void doneUpdate(long transaction) throws RequestIsOutException {
+<span class="pc bpc" id="L508" title="2 of 6 branches missed.">			assert this.lastSentTransaction == null || transaction &gt; this.lastSentTransaction;</span>
+			
+<span class="fc" id="L510">			this.sendLock.readLock().unlock();</span>
+<span class="fc" id="L511">		}</span>
+
+		/**
+		 * Marks this request as a delete.
+		 * 
+		 * @throws RequestIsOutException
+		 *             in case this request is {@link #dead}
+		 */
+		public void delete(MetaInformation meta) throws RequestIsOutException {
+<span class="fc" id="L520">			long transaction = this.startUpdate();</span>
+			try {
+<span class="fc" id="L522">				this.addMeta(meta);</span>
+				
+<span class="fc" id="L524">				this.deletions.add(transaction);</span>
+
+				// Cleaning up memory from all merged data before this transaction
+<span class="fc" id="L527">				this.deletions.headSet(transaction, false).clear();</span>
+<span class="fc bfc" id="L528" title="All 2 branches covered.">				for (Entry&lt;String, ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt;&gt; fam : this.elements.entrySet()) {</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">					for (Entry&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt; col : fam.getValue().entrySet()) {</span>
+<span class="fc" id="L530">						col.getValue().headMap(transaction, false).clear();</span>
+					}
+				}
+<span class="nc" id="L533">			} finally {</span>
+<span class="pc" id="L534">				this.doneUpdate(transaction);</span>
+<span class="nc" id="L535">			}</span>
+<span class="fc" id="L536">		}</span>
+
+		/**
+		 * Thread-safe merge with new data.
+		 * 
+		 * @throws RequestIsOutException
+		 *             in case this request is {@link #dead}
+		 */
+		public void update(MetaInformation meta, ColumnFamilyData changed,
+				Map&lt;String, Set&lt;String&gt;&gt; removed,
+				Map&lt;String, Map&lt;String, Number&gt;&gt; increments)
+				throws RequestIsOutException {
+
+<span class="fc" id="L549">			long transactionId = this.startUpdate();</span>
+			try {
+<span class="fc" id="L551">				addMeta(meta);</span>
+				
+				// Adding changes
+<span class="fc bfc" id="L554" title="All 2 branches covered.">				if (changed != null) {</span>
+<span class="fc bfc" id="L555" title="All 2 branches covered.">					for (Entry&lt;String, Map&lt;String, byte[]&gt;&gt; famChanges : changed</span>
+<span class="fc" id="L556">							.entrySet()) {</span>
+<span class="fc" id="L557">						ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt; famData = this</span>
+<span class="fc" id="L558">								.getFamilyData(famChanges.getKey());</span>
+<span class="fc bfc" id="L559" title="All 2 branches covered.">						for (Entry&lt;String, byte[]&gt; colChange : famChanges</span>
+<span class="fc" id="L560">								.getValue().entrySet()) {</span>
+<span class="fc" id="L561">							ConcurrentNavigableMap&lt;Long, Object&gt; columnData = this</span>
+<span class="fc" id="L562">									.getColumnData(famChanges.getKey(),</span>
+<span class="fc" id="L563">											famData, colChange.getKey());</span>
+<span class="fc" id="L564">							byte[] chval = colChange.getValue();</span>
+<span class="fc" id="L565">							Object old = columnData.put(transactionId,</span>
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">									chval == null ? NULL_VALUE : chval);</span>
+							// There must not have a previous put for the same transaction
+<span class="pc bpc" id="L568" title="2 of 4 branches missed.">							assert old == null;		</span>
+							
+							// Cleaning up memory from overridden values
+<span class="fc" id="L571">							columnData.headMap(transactionId, false).clear();</span>
+						}
+					}
+				}
+
+				// Adding increments
+<span class="fc bfc" id="L577" title="All 2 branches covered.">				if (increments != null) {</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">					for (Entry&lt;String, Map&lt;String, Number&gt;&gt; famincrements : increments</span>
+<span class="fc" id="L579">							.entrySet()) {</span>
+<span class="fc" id="L580">						ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt; famData = this</span>
+<span class="fc" id="L581">								.getFamilyData(famincrements.getKey());</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">						for (Entry&lt;String, Number&gt; colIncrements : famincrements</span>
+<span class="fc" id="L583">								.getValue().entrySet()) {</span>
+<span class="fc" id="L584">							ConcurrentNavigableMap&lt;Long, Object&gt; columnData = this</span>
+<span class="fc" id="L585">									.getColumnData(famincrements.getKey(),</span>
+<span class="fc" id="L586">											famData, colIncrements.getKey());</span>
+<span class="fc" id="L587">							Object old = columnData.put(transactionId,</span>
+<span class="fc" id="L588">									colIncrements.getValue());</span>
+							// There must not have a previous put for the same transaction
+<span class="pc bpc" id="L590" title="2 of 4 branches missed.">							assert old == null;</span>
+							
+							// NOT cleaning up memory as actual increment is the sum of all transactions
+						}
+					}
+				}
+
+				// Adding deletion markers
+<span class="fc bfc" id="L598" title="All 2 branches covered.">				if (removed != null) {</span>
+<span class="fc bfc" id="L599" title="All 2 branches covered.">					for (Entry&lt;String, Set&lt;String&gt;&gt; famRemoves : removed</span>
+<span class="fc" id="L600">							.entrySet()) {</span>
+<span class="fc" id="L601">						ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt; famData = this</span>
+<span class="fc" id="L602">								.getFamilyData(famRemoves.getKey());</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">						for (String colRemoved : famRemoves.getValue()) {</span>
+<span class="fc" id="L604">							ConcurrentNavigableMap&lt;Long, Object&gt; columnData = this</span>
+<span class="fc" id="L605">									.getColumnData(famRemoves.getKey(),</span>
+<span class="fc" id="L606">											famData, colRemoved);</span>
+<span class="fc" id="L607">							Object old = columnData.put(transactionId,</span>
+<span class="fc" id="L608">									DELETED_VALUE);</span>
+							// There must not have a previous put for the same transaction
+<span class="pc bpc" id="L610" title="2 of 4 branches missed.">							assert old == null;</span>
+							
+							// Cleaning up memory from overridden values
+<span class="fc" id="L613">							columnData.headMap(transactionId, false).clear();</span>
+						}
+					}
+				}
+<span class="nc" id="L617">			} finally {</span>
+<span class="pc" id="L618">				this.doneUpdate(transactionId);</span>
+<span class="nc" id="L619">			}</span>
+<span class="fc" id="L620">		}</span>
+
+		/**
+		 * Merging meta information
+		 */
+		private void addMeta(MetaInformation meta) {
+<span class="fc bfc" id="L626" title="All 4 branches covered.">			if (meta != null &amp;&amp; !this.meta.compareAndSet(null, meta)) {</span>
+				// Or integrate it if it already exists
+<span class="fc" id="L628">				this.meta.get().integrate(meta);</span>
+			}
+<span class="fc" id="L630">		}</span>
+
+		/**
+		 * Gets family data for this object. Creates and integrates it if
+		 * necessary. Thread-safe.
+		 */
+		private ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt; getFamilyData(
+				String family) {
+<span class="fc" id="L638">			ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt; ret = this.elements</span>
+<span class="fc" id="L639">					.get(family);</span>
+<span class="fc bfc" id="L640" title="All 2 branches covered.">			if (ret == null) {</span>
+<span class="fc" id="L641">				ret = new ConcurrentHashMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt;();</span>
+<span class="fc" id="L642">				ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt; put = this.elements</span>
+<span class="fc" id="L643">						.putIfAbsent(family, ret);</span>
+<span class="fc bfc" id="L644" title="All 2 branches covered.">				if (put != null)</span>
+<span class="fc" id="L645">					ret = put;</span>
+			}
+<span class="fc" id="L647">			return ret;</span>
+		}
+
+		/**
+		 * Gets column data for this object. Creates and integrates it if
+		 * necessary. Thread-safe.
+		 */
+		private ConcurrentNavigableMap&lt;Long, Object&gt; getColumnData(
+				String family,
+				ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt; familyData,
+				String column) {
+<span class="pc bpc" id="L658" title="2 of 4 branches missed.">			assert this.elements.get(family) == familyData;</span>
+<span class="fc" id="L659">			ConcurrentNavigableMap&lt;Long, Object&gt; ret = familyData.get(column);</span>
+<span class="fc bfc" id="L660" title="All 2 branches covered.">			if (ret == null) {</span>
+<span class="fc" id="L661">				ret = new ConcurrentSkipListMap&lt;Long, Object&gt;();</span>
+<span class="fc" id="L662">				ConcurrentNavigableMap&lt;Long, Object&gt; put = familyData</span>
+<span class="fc" id="L663">						.putIfAbsent(column, ret);</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">				if (put != null)</span>
+<span class="nc" id="L665">					ret = put;</span>
+			}
+<span class="fc" id="L667">			return ret;</span>
+		}
+		
+		@Override
+		public int compareTo(Delayed d) {
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">			if (this == d)</span>
+<span class="nc" id="L673">				return 0;</span>
+<span class="fc" id="L674">			StoreRequest o = (StoreRequest) d;</span>
+<span class="fc" id="L675">			long thisOut = this.outDateMs.get(), oOut = o.outDateMs.get();</span>
+<span class="fc bfc" id="L676" title="All 2 branches covered.">			if (thisOut == oOut) {</span>
+<span class="fc" id="L677">				return this.row.compareTo(o.row);</span>
+<span class="fc bfc" id="L678" title="All 2 branches covered.">			} else if (thisOut &lt; oOut)</span>
+<span class="fc" id="L679">				return -1;</span>
+			else // if (thisOut &gt; oOut)
+<span class="fc" id="L681">				return 1;</span>
+		}
+
+		@Override
+		public long getDelay(TimeUnit unit) {
+<span class="fc" id="L686">			return unit.convert(this.outDateMs.get() - System.currentTimeMillis(),</span>
+<span class="fc" id="L687">					TimeUnit.MILLISECONDS);</span>
+		}
+
+		/**
+		 * Sending this request. Waits for current updates to be done.
+		 * 
+		 * @param sender
+		 *            the executor for sending the request
+		 * @param counter
+		 *            a counter to be decremented when the request is sent
+		 * @param flushing
+		 *            whether this send is a normal operation of a flush operation
+		 */
+		public void send(ExecutorService sender, final boolean flushing) {
+			// Not sending this request before delay is expired unless we flush
+<span class="pc bpc" id="L702" title="2 of 6 branches missed.">			assert flushing || this.outDateMs.get() &lt;= System.currentTimeMillis();</span>
+			long lastTransactionTmp;
+			Long lastSentTransaction;
+			long outDateTmp;
+			// A copy of the elements, deletes and meta to be sent now
+			ConcurrentMap&lt;String, ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt;&gt; elements;
+			ConcurrentSkipListSet&lt;Long&gt; deletions;
+			MetaInformation metaTmp;
+<span class="fc" id="L710">			this.sendLock.writeLock().lock();</span>
+			try {
+				// This code cannot be executed concurrently with an update or another send start/stop
+				
+<span class="fc" id="L714">				outDateTmp = this.outDateMs.get();</span>
+<span class="fc bfc" id="L715" title="All 2 branches covered.">				if (!flushing)</span>
+<span class="fc" id="L716">					this.outDateMs.set(-1);</span>
+
+<span class="fc" id="L718">				lastTransactionTmp = transactionDistributor.get();</span>
+<span class="fc" id="L719">				boolean shouldLeave = false;</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">				if (this.sending) {</span>
+					// Already sending ? (e.g. long flush just before) =&gt; giving up
+<span class="fc" id="L722">					shouldLeave = true;</span>
+				
+				} else {
+					// Newer transaction was sent, giving up
+<span class="fc bfc" id="L726" title="All 4 branches covered.">					if (this.lastSentTransaction != null &amp;&amp; lastTransactionTmp &lt;= this.lastSentTransaction) {</span>
+<span class="fc" id="L727">						shouldLeave = true;</span>
+					}
+				}
+				
+<span class="fc bfc" id="L731" title="All 2 branches covered.">				if (shouldLeave) {</span>
+<span class="fc bfc" id="L732" title="All 2 branches covered.">					if (! flushing) {</span>
+						// Replanning
+						try {
+<span class="fc" id="L735">							this.plan();</span>
+<span class="fc" id="L736">						} catch (RequestIsOutException x) {</span>
+<span class="pc bpc" id="L737" title="5 of 8 branches missed.">							assert this.lastSentTransaction == null ? this.transactionDistributor.get() == Long.MIN_VALUE : this.lastSentTransaction == this.transactionDistributor.get();</span>
+						}
+					}
+<span class="fc" id="L740">					return;</span>
+				}
+				
+				// As from this line, there MUST be a send request
+<span class="fc" id="L744">				this.sending = true;</span>
+				
+<span class="fc" id="L746">				lastSentTransaction = this.lastSentTransaction;</span>
+<span class="fc" id="L747">				this.lastSentTransaction = lastTransactionTmp;</span>
+
+				// This request should be the one for this row
+<span class="pc bpc" id="L750" title="2 of 4 branches missed.">				assert this == writesByRows.get(this.row);</span>
+				// Preparing this request to be used while current status is being sent by resetting all
+<span class="fc" id="L752">				elements = this.elements;</span>
+<span class="fc" id="L753">				this.elements = new ConcurrentHashMap&lt;String, ConcurrentMap&lt;String,ConcurrentNavigableMap&lt;Long,Object&gt;&gt;&gt;();</span>
+<span class="fc" id="L754">				deletions = this.deletions;</span>
+<span class="fc" id="L755">				this.deletions = new ConcurrentSkipListSet&lt;Long&gt;();</span>
+<span class="fc" id="L756">				metaTmp = this.meta.getAndSet(null);</span>
+<span class="fc" id="L757">				requestsBeingSending.incrementAndGet();</span>
+				
+<span class="nc" id="L759">			} finally {</span>
+<span class="pc" id="L760">				this.sendLock.writeLock().unlock();</span>
+<span class="nc" id="L761">			}</span>
+<span class="fc" id="L762">			final MetaInformation meta = metaTmp;</span>
+<span class="fc" id="L763">			final long lastTransaction = lastTransactionTmp;</span>
+<span class="fc" id="L764">			final long outDate = outDateTmp;</span>
+
+			// The action to be ran for sending this request
+			Runnable action;				
+			try {
+				
+				// As from this line, we are not considering transactions later than lastTransaction
+				// If a new transaction happens, request will be planned again once sent
+				
+<span class="fc bfc" id="L773" title="All 2 branches covered.">				Long lastDeletion = deletions.isEmpty() ? null : deletions.last();</span>
+<span class="pc bpc" id="L774" title="3 of 6 branches missed.">				if (lastDeletion != null &amp;&amp; lastSentTransaction != null &amp;&amp; lastDeletion &lt; lastSentTransaction) {</span>
+<span class="nc bnc" id="L775" title="All 2 branches missed.">					assert false;</span>
+<span class="nc" id="L776">					lastDeletion = null;</span>
+				}
+				// Last no-delete update in order to know whether this element should be deleted or not
+<span class="fc" id="L779">				long lastStore = Long.MIN_VALUE;</span>
+	
+				// Grabbing changed values.
+<span class="fc" id="L782">				final ColumnFamilyData changes = new DefaultColumnFamilyData();</span>
+<span class="fc" id="L783">				final Map&lt;String, Set&lt;String&gt;&gt; removed = new TreeMap&lt;String, Set&lt;String&gt;&gt;();</span>
+<span class="fc" id="L784">				final Map&lt;String, Map&lt;String, Number&gt;&gt; increments = new TreeMap&lt;String, Map&lt;String, Number&gt;&gt;();</span>
+<span class="fc bfc" id="L785" title="All 2 branches covered.">				for (Entry&lt;String, ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt;&gt; famData : elements</span>
+<span class="fc" id="L786">						.entrySet()) {</span>
+<span class="fc bfc" id="L787" title="All 2 branches covered.">					for (Entry&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt; colData : famData</span>
+<span class="fc" id="L788">							.getValue().entrySet()) {</span>
+<span class="fc" id="L789">						Entry&lt;Long, Object&gt; lastEntry = colData.getValue()</span>
+<span class="fc" id="L790">								.lastEntry();</span>
+						// There can be no entry in case of a row delete after a column update
+<span class="fc bfc" id="L792" title="All 2 branches covered.">						if (lastEntry == null)</span>
+<span class="fc" id="L793">							continue;</span>
+<span class="fc" id="L794">						Long transaction = lastEntry.getKey();</span>
+<span class="pc bpc" id="L795" title="1 of 4 branches missed.">						if (lastSentTransaction != null &amp;&amp; transaction &lt; lastSentTransaction) {</span>
+<span class="nc bnc" id="L796" title="All 2 branches missed.">							assert false;</span>
+							continue;
+						}
+<span class="fc" id="L799">						lastStore = Math.max(lastStore, transaction);</span>
+						// Considering only those values after last deletion
+<span class="pc bpc" id="L801" title="1 of 4 branches missed.">						if (lastDeletion == null || lastDeletion &lt; transaction) {</span>
+<span class="fc" id="L802">							Object latest = lastEntry.getValue();</span>
+<span class="fc bfc" id="L803" title="All 2 branches covered.">							if (latest instanceof byte[]) {</span>
+<span class="fc bfc" id="L804" title="All 2 branches covered.">								if (latest == DELETED_VALUE) {</span>
+									// Column should be deleted
+<span class="fc" id="L806">									Set&lt;String&gt; remCols = removed.get(famData</span>
+<span class="fc" id="L807">											.getKey());</span>
+<span class="pc bpc" id="L808" title="1 of 2 branches missed.">									if (remCols == null) {</span>
+<span class="fc" id="L809">										remCols = new TreeSet&lt;String&gt;();</span>
+<span class="fc" id="L810">										removed.put(famData.getKey(), remCols);</span>
+									}
+<span class="fc" id="L812">									remCols.add(colData.getKey());</span>
+								} else {
+									// Column should be changed
+<span class="fc" id="L815">									Map&lt;String, byte[]&gt; chgCols = changes</span>
+<span class="fc" id="L816">											.get(famData.getKey());</span>
+<span class="fc bfc" id="L817" title="All 2 branches covered.">									if (chgCols == null) {</span>
+<span class="fc" id="L818">										chgCols = new TreeMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L819">										changes.put(famData.getKey(), chgCols);</span>
+									}
+<span class="pc bpc" id="L821" title="1 of 2 branches missed.">									chgCols.put(colData.getKey(), latest == null ? null : (byte[]) latest);</span>
+								}
+							} else {
+<span class="pc bpc" id="L824" title="2 of 4 branches missed.">								assert latest instanceof Number;</span>
+								// Column should be incremented
+								// Summing all values to know the actual increment
+<span class="fc" id="L827">								long sum = 0;</span>
+<span class="fc bfc" id="L828" title="All 2 branches covered.">								for (Entry&lt;Long, Object&gt; incr : colData.getValue()</span>
+<span class="fc" id="L829">										.entrySet()) {</span>
+<span class="fc" id="L830">									Object val = incr.getValue();</span>
+									try {
+<span class="fc" id="L832">										sum += ((Number) val).longValue();</span>
+<span class="nc" id="L833">									} catch (ClassCastException x) {</span>
+										// Just in case datum was updated (not incremented) meanwhile
+										// This is robustness code as it's not likely to happen
+<span class="nc bnc" id="L836" title="All 2 branches missed.">										if (val == DELETED_VALUE)</span>
+<span class="nc" id="L837">											sum = 0;</span>
+										else // if (val instanceof byte[]) 
+<span class="nc" id="L839">											sum = ConversionTools.convert(Long.class, (byte[])val).longValue();</span>
+									}
+								}
+	
+<span class="fc" id="L843">								Map&lt;String, Number&gt; incCols = increments</span>
+<span class="fc" id="L844">										.get(famData.getKey());</span>
+<span class="pc bpc" id="L845" title="1 of 2 branches missed.">								if (incCols == null) {</span>
+<span class="fc" id="L846">									incCols = new TreeMap&lt;String, Number&gt;();</span>
+<span class="fc" id="L847">									increments.put(famData.getKey(), incCols);</span>
+								}
+<span class="fc" id="L849">								incCols.put(colData.getKey(), sum);</span>
+							}
+						}
+					}
+				}
+	
+<span class="pc bpc" id="L855" title="2 of 6 branches missed.">				assert lastDeletion == null || lastTransaction &gt;= lastDeletion;</span>
+<span class="pc bpc" id="L856" title="2 of 4 branches missed.">				assert lastTransaction &gt;= lastStore;</span>
+				
+				// Sending using the executor
+				// Checking whether it's a store or a delete
+<span class="fc bfc" id="L860" title="All 4 branches covered.">				if (lastDeletion == null || lastDeletion &lt; lastStore) {</span>
+					
+					// A delete resets all columns ;
+					// cannot simulate that just using a store
+<span class="fc bfc" id="L864" title="All 2 branches covered.">					final boolean shouldDelete = lastDeletion != null;</span>
+					
+<span class="fc" id="L866">					action = new Runnable() {</span>
+	
+						@Override
+						public void run() {
+							try {
+								try {
+<span class="pc bpc" id="L872" title="1 of 4 branches missed.">									if (!flushing &amp;&amp; outDate != -1) {</span>
+<span class="fc" id="L873">										requestsLatencySamples.increment();</span>
+<span class="fc" id="L874">										long delay = System.currentTimeMillis()-outDate;</span>
+<span class="pc bpc" id="L875" title="1 of 4 branches missed.">										assert delay &gt; 0;</span>
+<span class="fc" id="L876">										requestsCumulativeLatency.add(delay);</span>
+									}
+<span class="fc" id="L878">								} finally {</span>
+								
+									// Deleting all cells if necessary
+<span class="pc bpc" id="L881" title="1 of 4 branches missed.">									if (shouldDelete)</span>
+<span class="pc" id="L882">										getActualStore().delete(meta, row.table, row.id);</span>
+									
+<span class="fc" id="L884">									getActualStore().storeChanges(meta, row.table, row.id,</span>
+<span class="fc" id="L885">											changes, removed, increments);</span>
+<span class="fc" id="L886">								}</span>
+								
+<span class="nc" id="L888">							} catch (RuntimeException x) {</span>
+<span class="nc" id="L889">								logger.log(Level.WARNING, &quot;Catched problem while updating &quot; + StoreRequest.this + &quot; ; some data might have been lost: &quot; + x.getMessage(), x);</span>
+<span class="nc" id="L890">								throw x;</span>
+<span class="fc" id="L891">							} finally {</span>
+<span class="fc" id="L892">								requestSent(flushing, lastTransaction);</span>
+<span class="fc" id="L893">							}</span>
+<span class="fc" id="L894">						}</span>
+					};
+				} else {
+<span class="fc" id="L897">					action = new Runnable() {</span>
+	
+						@Override
+						public void run() {
+							try {
+								try {
+<span class="pc bpc" id="L903" title="1 of 4 branches missed.">									if (!flushing &amp;&amp; outDate != -1) {</span>
+<span class="fc" id="L904">										requestsLatencySamples.increment();</span>
+<span class="fc" id="L905">										long delay = System.currentTimeMillis()-outDate;</span>
+<span class="pc bpc" id="L906" title="2 of 4 branches missed.">										assert delay &gt; 0;</span>
+<span class="fc" id="L907">										requestsCumulativeLatency.add(delay);</span>
+									}
+<span class="nc" id="L909">								} finally {</span>
+								
+<span class="pc" id="L911">									getActualStore().delete(meta, row.table, row.id);</span>
+<span class="nc" id="L912">								}</span>
+<span class="nc" id="L913">							} catch (RuntimeException x) {</span>
+<span class="nc" id="L914">								logger.log(Level.WARNING, &quot;Catched problem while deleting &quot; + StoreRequest.this + &quot; ; some data might have been be lost: &quot; + x.getMessage(), x);</span>
+<span class="nc" id="L915">								throw x;</span>
+<span class="nc" id="L916">							} finally {</span>
+<span class="pc" id="L917">								requestSent(flushing, lastTransaction);</span>
+<span class="nc" id="L918">							}</span>
+<span class="fc" id="L919">						}</span>
+					};
+				}
+			
+<span class="nc" id="L923">			} catch (Throwable r) {</span>
+<span class="nc" id="L924">				requestsBeingSending.decrementAndGet();</span>
+<span class="nc bnc" id="L925" title="All 2 branches missed.">				throw r instanceof RuntimeException ? (RuntimeException)r : new RuntimeException(r);</span>
+			}
+			
+<span class="fc bfc" id="L928" title="All 2 branches covered.">			if (sender == null)</span>
+<span class="fc" id="L929">				action.run();</span>
+			else {
+<span class="fc" id="L931">				sender.submit(action);</span>
+			}
+<span class="fc" id="L933">		}</span>
+		
+		/**
+		 * Called once request was actually sent
+		 * @param lastTransactionBeforeSending the sent transaction
+		 * @param expectedOutDate time at which request was planned ; null in case of a flush
+		 */
+		private void requestSent(boolean afterFlush, long lastTransactionBeforeSending) {
+<span class="fc" id="L941">			long rbs = requestsBeingSending.decrementAndGet();</span>
+<span class="fc bfc" id="L942" title="All 2 branches covered.">			if (captureHitRatio)</span>
+<span class="fc" id="L943">				requestsOut.increment();</span>
+<span class="pc bpc" id="L944" title="2 of 4 branches missed.">			assert this.lastSentTransaction == lastTransactionBeforeSending;</span>
+<span class="pc bpc" id="L945" title="2 of 4 branches missed.">			assert this.sending;</span>
+<span class="fc" id="L946">			this.sendLock.writeLock().lock();</span>
+			try {
+<span class="fc" id="L948">				this.sending = false;</span>
+
+				// No update can happen when executing this section
+<span class="fc bfc" id="L951" title="All 2 branches covered.">				if (this.transactionDistributor.get() &gt; this.lastSentTransaction) {</span>
+					// This request is THE only request for its row
+<span class="pc bpc" id="L953" title="2 of 4 branches missed.">					assert this == writesByRows.get(this.row);</span>
+					
+<span class="fc bfc" id="L955" title="All 2 branches covered.">					if (!afterFlush) {</span>
+						// A transaction happened while sending ; re-planning
+						try {
+<span class="fc" id="L958">							this.plan();</span>
+<span class="fc" id="L959">							logger.fine(this.toString() + &quot; sent on &quot; + new Date(System.currentTimeMillis()) + &quot; replanned for &quot; + new Date(this.outDateMs.get()));</span>
+<span class="nc" id="L960">						} catch (RequestIsOutException x) {</span>
+							// We are the only process authorized to try to plan at this point
+							// (indeed, this store request is still indexed by writesByRows)
+<span class="nc bnc" id="L963" title="All 2 branches missed.">							assert false;</span>
+						}
+					}
+				} else {
+					// No transaction happened ; killing this object and releasing memory
+<span class="fc" id="L968">					this.close();</span>
+				}
+				
+<span class="nc" id="L971">			} finally {</span>
+<span class="pc" id="L972">				this.sendLock.writeLock().unlock();</span>
+<span class="pc" id="L973">				EvictionThread et = evictionThread.get();</span>
+<span class="pc bpc" id="L974" title="8 of 12 branches missed.">				if (et != null &amp;&amp; et.waiting &amp;&amp; rbs &lt; getMaxSenderThreads())</span>
+<span class="pc" id="L975">					synchronized(et) {</span>
+<span class="pc bpc" id="L976" title="6 of 8 branches missed.">						if (et.waiting &amp;&amp; rbs &lt; getMaxSenderThreads())</span>
+<span class="pc" id="L977">							et.notify();</span>
+					}
+<span class="nc" id="L979">			}</span>
+<span class="fc" id="L980">		}</span>
+		
+		/**
+		 * Closing request definitively ; MUST be invoked within a write lock
+		 */
+		private void close() {
+<span class="pc bpc" id="L986" title="2 of 4 branches missed.">			assert this.sendLock.writeLock().isHeldByCurrentThread();</span>
+<span class="fc" id="L987">			this.dead = true;</span>
+<span class="fc" id="L988">			StoreRequest s = writesByRows.remove(this.row);</span>
+			// This request was THE only request for its row
+<span class="pc bpc" id="L990" title="2 of 4 branches missed.">			assert this == s;</span>
+<span class="fc" id="L991">			logger.fine(this.toString() + &quot; sent on &quot; + new Date(System.currentTimeMillis()) + &quot; and not replanned&quot;);</span>
+<span class="fc" id="L992">		}</span>
+
+		/**
+		 * Computing next update and registering in the delay queue
+		 */
+		private void plan() throws RequestIsOutException {
+			// Cannot plan if this request is out of indexed requests
+<span class="fc bfc" id="L999" title="All 2 branches covered.">			if (this.dead)</span>
+<span class="fc" id="L1000">				throw new RequestIsOutException();</span>
+
+<span class="fc" id="L1002">			long nextExecutionDate = WriteRetentionStore.this.writeRetentionMs + System.currentTimeMillis();</span>
+			
+			// Placing this request in the to-do list
+<span class="fc" id="L1005">			boolean shouldSubmit = this.outDateMs.compareAndSet(-1, nextExecutionDate);</span>
+<span class="pc bpc" id="L1006" title="1 of 2 branches missed.">			if (shouldSubmit) {</span>
+<span class="fc" id="L1007">				writeQueue.put(this);</span>
+			} else {
+				// Request should already be planned
+				// Checking this only in case of assertion as it's costly
+<span class="nc bnc" id="L1011" title="All 4 branches missed.">				assert writeQueue.contains(this);</span>
+			}
+			
+			// Enforcing that an eviction thread is running
+			boolean done;
+<span class="nc bnc" id="L1016" title="All 2 branches missed.">			do {</span>
+				EvictionThread et;
+				
+<span class="pc bpc" id="L1019" title="1 of 4 branches missed.">				while ((et = evictionThread.get()) == null || !et.running) {</span>
+					// No thread found, creating one
+<span class="fc" id="L1021">					EvictionThread newEt = new EvictionThread();</span>
+<span class="pc bpc" id="L1022" title="1 of 2 branches missed.">					if (evictionThread.compareAndSet(null, newEt)) {</span>
+<span class="fc" id="L1023">						et = newEt;</span>
+<span class="fc" id="L1024">						et.start();</span>
+					}
+				}
+				
+<span class="fc" id="L1028">				done = et.running;</span>
+<span class="pc bpc" id="L1029" title="1 of 2 branches missed.">			} while (!done &amp;&amp; !this.dead);</span>
+			// Not necessary to continue if this request is already out...
+			
+<span class="pc bpc" id="L1032" title="4 of 6 branches missed.">			assert evictionThread.get() != null || writeQueue.isEmpty();</span>
+<span class="fc" id="L1033">		}</span>
+		
+		@Override
+		public String toString() {
+<span class="fc" id="L1037">			return &quot;write-cached &quot;</span>
+<span class="fc bfc" id="L1038" title="All 2 branches covered.">					+ (this.dead ? &quot;sent&quot; : &quot;&quot;)</span>
+<span class="fc" id="L1039">					+ &quot; request for &quot;</span>
+<span class="fc" id="L1040">					+ this.row</span>
+<span class="fc bfc" id="L1041" title="All 2 branches covered.">					+ (this.dead ? </span>
+<span class="fc" id="L1042">							&quot;&quot; :</span>
+<span class="fc" id="L1043">							&quot;planned for &quot; +</span>
+<span class="fc" id="L1044">								new Date(this.outDateMs.get()) +</span>
+<span class="fc" id="L1045">								&quot; (in &quot; +</span>
+<span class="fc" id="L1046">								(this.outDateMs.get()-System.currentTimeMillis()) +</span>
+<span class="fc" id="L1047">								&quot;ms)&quot;);</span>
+		}
+	}
+
+	/**
+	 * Code for the thread responsible for reading {@link WriteRetentionStore#writeQueue the queue} and
+	 * {@link StoreRequest#send(ExecutorService, LongAdder) sending requests}. Only one thread should 
+	 * live. A shutdown hook sends all pending requests.
+	 */
+<span class="pc bpc" id="L1056" title="1 of 2 branches missed.">	private static class EvictionThread extends Thread {</span>
+<span class="fc" id="L1057">		private final ThreadPoolExecutor sender = new ThreadPoolExecutor(1, Integer.MAX_VALUE,</span>
+<span class="fc" id="L1058">                5L, TimeUnit.SECONDS, new SynchronousQueue&lt;Runnable&gt;(), new ThreadFactory() {</span>
+			
+			@Override
+			public Thread newThread(Runnable r) {
+<span class="fc" id="L1062">				int cps = sender.getCorePoolSize();</span>
+<span class="pc bpc" id="L1063" title="2 of 4 branches missed.">				assert cps &lt;= WriteRetentionStore.getMaxSenderThreads() :</span>
+<span class="nc" id="L1064">					&quot;Too many sender threads running (found &quot; + cps + &quot; instead of &quot; + WriteRetentionStore.getMaxSenderThreads() + ')';</span>
+				
+<span class="fc" id="L1066">				Thread ret = new Thread(r, &quot;n-orm write cache sender #&quot; + cps);</span>
+<span class="fc" id="L1067">				ret.setDaemon(false);</span>
+				
+<span class="fc" id="L1069">				return ret;</span>
+			}
+		});
+
+<span class="fc" id="L1073">		private volatile boolean alreadyStarted = false;</span>
+<span class="fc" id="L1074">		private volatile boolean running = true;</span>
+<span class="fc" id="L1075">		private volatile boolean waiting = true;</span>
+		
+		private EvictionThread() {
+<span class="fc" id="L1078">			super(&quot;n-orm write cache eviction thread&quot;);</span>
+<span class="fc" id="L1079">			this.setDaemon(true);</span>
+<span class="fc" id="L1080">			this.setPriority(Thread.MAX_PRIORITY);</span>
+<span class="fc" id="L1081">		}</span>
+
+		@Override
+		public synchronized void start() {
+<span class="pc bpc" id="L1085" title="1 of 2 branches missed.">			if (this.alreadyStarted)</span>
+<span class="nc" id="L1086">				return;</span>
+<span class="fc" id="L1087">			this.alreadyStarted = true;</span>
+<span class="fc" id="L1088">			super.start();</span>
+<span class="fc" id="L1089">		}</span>
+
+		@Override
+		public void run() {
+			// While this thread is the &quot;official&quot; eviction thread
+<span class="fc bfc" id="L1094" title="All 2 branches covered.">			while (evictionThread.get() == this) {</span>
+<span class="fc" id="L1095">				StoreRequest r = null;</span>
+				try {
+<span class="fc bfc" id="L1097" title="All 2 branches covered.">					while (requestsBeingSending.get() &gt;= getMaxSenderThreads()) {</span>
+<span class="pc" id="L1098">						synchronized(this) {</span>
+<span class="pc bpc" id="L1099" title="1 of 2 branches missed.">							if (requestsBeingSending.get() &gt;= getMaxSenderThreads()) {</span>
+<span class="fc" id="L1100">								this.waiting = true;</span>
+<span class="fc" id="L1101">								this.wait(100);</span>
+<span class="fc" id="L1102">								this.waiting = false;</span>
+							}
+						}
+					}
+					
+<span class="fc" id="L1107">					r = writeQueue.poll(3, TimeUnit.SECONDS);</span>
+					
+<span class="fc bfc" id="L1109" title="All 2 branches covered.">					if (r == null) {</span>
+<span class="pc bpc" id="L1110" title="3 of 6 branches missed.">						if (writeQueue.isEmpty() &amp;&amp; requestsBeingSending.get() == 0 &amp;&amp; writeQueue.isEmpty()) {</span>
+							// Preparing this thread to stop and stating a new one should be started
+<span class="fc" id="L1112">							evictionThread.compareAndSet(this, null);</span>
+<span class="pc bpc" id="L1113" title="2 of 4 branches missed.">							if (!writeQueue.isEmpty() || requestsBeingSending.get() != 0)</span>
+<span class="nc" id="L1114">								evictionThread.compareAndSet(null, this);</span>
+						}
+					} else {
+					
+						// Requests in preparation of sending are marked twice so that a &quot;0&quot; is
+						// a bit less likely to be a false 0
+<span class="fc" id="L1120">						requestsBeingSending.incrementAndGet();</span>
+<span class="fc" id="L1121">						r.send(this.sender, false);</span>
+<span class="fc" id="L1122">						requestsBeingSending.decrementAndGet();</span>
+					}
+					
+<span class="nc" id="L1125">				} catch (InterruptedException e) {</span>
+<span class="nc" id="L1126">					break;</span>
+<span class="nc" id="L1127">				} catch (Throwable e) {</span>
+<span class="nc bnc" id="L1128" title="All 2 branches missed.">					if (r == null) {</span>
+<span class="nc" id="L1129">						logger.log(Level.WARNING, &quot;Problem waiting for request out of write cache: &quot; + e.getMessage(), e);</span>
+					} else {
+<span class="nc" id="L1131">						logger.log(Level.SEVERE, &quot;Problem while sending request out of write cache ; request &quot; + r + &quot; lost: &quot; + e.getMessage(), e);</span>
+					}
+				}
+			}
+			
+			// Stopping
+<span class="fc" id="L1137">			this.running = false;</span>
+<span class="fc" id="L1138">			this.sender.shutdown();</span>
+			try {
+<span class="fc" id="L1140">				this.sender.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L1141">			} catch (InterruptedException e) {</span>
+<span class="nc" id="L1142">				logger.log(Level.SEVERE, &quot;Problem while shutting down n-orm write retention cache: &quot; + e.getMessage(), e);</span>
+			}
+<span class="fc" id="L1144">		}</span>
+
+	}
+
+<span class="fc" id="L1148">	private abstract static class Operation {</span>
+		public abstract void run(StoreRequest req) throws RequestIsOutException;
+	}
+	
+	static {
+<span class="pc bpc" id="L1153" title="1 of 2 branches missed.">		if (DELETED_VALUE == new byte[0])</span>
+<span class="pc" id="L1154">			throw new Error(&quot;JVM problem : &quot; + WriteRetentionStore.class.getSimpleName() + &quot; requires that new byte[0] != new byte[0]&quot;);</span>
+	}
+	
+	/**
+	 * Index for requests according to the row
+	 */
+	@Transient
+<span class="fc" id="L1161">	private final ConcurrentMap&lt;RowInTable, StoreRequest&gt; writesByRows = new ConcurrentHashMap&lt;RowInTable, StoreRequest&gt;();</span>
+	
+	/**
+	 * Whether this store was already started
+	 */
+<span class="fc" id="L1166">	private AtomicBoolean started = new AtomicBoolean(false);</span>
+
+	/**
+	 * Time before request is sent
+	 */
+	private long writeRetentionMs;
+	
+	/**
+	 * Whether write retention should be enabled by default
+	 */
+<span class="fc" id="L1176">	private boolean enabledByDefault = true;</span>
+	
+	private WriteRetentionStore(long writeRetentionMs, Store s) {
+<span class="fc" id="L1179">		super(s);</span>
+<span class="fc" id="L1180">		this.writeRetentionMs = writeRetentionMs;</span>
+<span class="fc" id="L1181">	}</span>
+
+	/**
+	 * Minimum time in ms during which and update (i.e. a
+	 * {@link Store#storeChanges(MetaInformation, String, String, ColumnFamilyData, Map, Map)
+	 * store} or a {@link Store#delete(MetaInformation, String, String) delete})
+	 * are retained before being sent to the {@link #getActualStore() actual
+	 * store}. During this time, updates are merged to dramatically reduce
+	 * number of updates on a same row.
+	 */
+	public long getWriteRetentionMs() {
+<span class="fc" id="L1192">		return writeRetentionMs;</span>
+	}
+
+	/**
+	 * Whether write retention is enabled by default for thread that did not call {@link #setEnabledForCurrentThread(boolean)}.
+	 */
+	public boolean isEnabledByDefault() {
+<span class="fc" id="L1199">		return this.enabledByDefault;</span>
+	}
+
+
+	/**
+	 * Whether write retention is enabled by default for thread that did not call {@link #setEnabledForCurrentThread(boolean)}.
+	 */
+	public void setEnabledByDefault(boolean enabled) {
+<span class="fc" id="L1207">		this.enabledByDefault = enabled;</span>
+<span class="fc" id="L1208">	}</span>
+
+	@Override
+	public void start() throws DatabaseNotReachedException {
+<span class="fc bfc" id="L1212" title="All 2 branches covered.">		if (started.compareAndSet(false, true)) {</span>
+<span class="fc" id="L1213">			super.start();</span>
+		}
+<span class="fc" id="L1215">	}</span>
+	
+	/**
+	 * Sends immediately planned requests for the given element.
+	 * @param table the table of the element
+	 * @param identifier the identifier of the element
+	 * @return whether some requests were found regarding this element
+	 */
+	public boolean flush(String table, String identifier) {
+<span class="fc" id="L1224">		RowInTable row = new RowInTable(table, identifier);</span>
+<span class="fc" id="L1225">		StoreRequest req = this.writesByRows.get(row);</span>
+<span class="pc bpc" id="L1226" title="1 of 2 branches missed.">		if (req != null) {</span>
+<span class="fc" id="L1227">			req.send(null, true);</span>
+<span class="fc" id="L1228">			return true;</span>
+		} else
+<span class="nc" id="L1230">			return false;</span>
+	}
+
+	@Override
+	public void delete(final MetaInformation meta, String table, String id)
+			throws DatabaseNotReachedException {
+<span class="fc bfc" id="L1236" title="All 2 branches covered.">		if (!isRetending()) {</span>
+<span class="fc" id="L1237">			this.getActualStore().delete(meta, table, id);</span>
+<span class="fc" id="L1238">			return;</span>
+		}
+
+<span class="fc" id="L1241">		this.runLater(table, id, new Operation() {</span>
+
+			@Override
+			public void run(StoreRequest req) throws RequestIsOutException {
+<span class="fc" id="L1245">				req.delete(meta);</span>
+<span class="fc" id="L1246">			}</span>
+		});
+<span class="fc" id="L1248">	}</span>
+
+	@Override
+	public void storeChanges(final MetaInformation meta, String table,
+			String id, final ColumnFamilyData changed,
+			final Map&lt;String, Set&lt;String&gt;&gt; removed,
+			final Map&lt;String, Map&lt;String, Number&gt;&gt; increments)
+			throws DatabaseNotReachedException {
+<span class="fc bfc" id="L1256" title="All 2 branches covered.">		if (!isRetending()) {</span>
+<span class="fc" id="L1257">			this.getActualStore().storeChanges(meta, table, id, changed,</span>
+<span class="fc" id="L1258">					removed, increments);</span>
+<span class="fc" id="L1259">			return;</span>
+		}
+
+<span class="fc" id="L1262">		this.runLater(table, id, new Operation() {</span>
+
+			@Override
+			public void run(StoreRequest req) throws RequestIsOutException {
+<span class="fc" id="L1266">				req.update(meta, changed, removed, increments);</span>
+<span class="fc" id="L1267">			}</span>
+		});
+<span class="fc" id="L1269">	}</span>
+
+	/**
+	 * Whether this store is actually retending writes.
+	 * It will return true if JVM is not in a shutdown process and if store is
+	 * {@link #setEnabledByDefault(boolean) enabled} or thread is
+	 * {@link #setEnabledForCurrentThread(boolean) enabled}.
+	 */
+	private boolean isRetending() {
+<span class="pc bpc" id="L1278" title="1 of 6 branches missed.">		return !shutdown &amp;&amp; (this.isEnabledByDefault() || isEnabledForCurrentThread());</span>
+	}
+
+	/**
+	 * Plans a request sending. Sends immediately in case this thread in case we
+	 * are about to shutdown.
+	 * 
+	 * @param table
+	 *            table of the element
+	 * @param id
+	 *            id of the element
+	 * @param r
+	 *            the operation to be performed
+	 */
+	private void runLater(String table, String id, Operation r) {
+<span class="fc bfc" id="L1293" title="All 2 branches covered.">		if (captureHitRatio)</span>
+<span class="fc" id="L1294">			requestsIn.increment();</span>
+<span class="fc" id="L1295">		RowInTable element = new RowInTable(table, id);</span>
+<span class="fc" id="L1296">		while(true) {</span>
+<span class="fc" id="L1297">			StoreRequest req = new StoreRequest(element);</span>
+<span class="fc" id="L1298">			StoreRequest tmp = writesByRows.putIfAbsent(element, req);</span>
+			try {
+<span class="fc bfc" id="L1300" title="All 2 branches covered.">				if (tmp == null) {</span>
+					// req was added ; should also be put in the delay queue
+<span class="fc" id="L1302">					req.plan();</span>
+<span class="fc" id="L1303">					logger.fine(&quot;Request planned for &quot; + table + ':' + id + &quot; on &quot; + System.currentTimeMillis() + &quot; by &quot; + req);</span>
+				} else {
+					// Another thread added request for this element before us
+<span class="fc" id="L1306">					req = tmp;</span>
+				}
+<span class="fc" id="L1308">				r.run(req);</span>
+				// Request is planned and merged ; leaving the infinite loop
+<span class="fc" id="L1310">				break;</span>
+<span class="fc" id="L1311">			} catch (RequestIsOutException x) {</span>
+				// We've tried to update a request that went out meanwhile
+			}
+			// retrying eventually
+<span class="fc" id="L1315">			Thread.yield();</span>
+		}
+<span class="fc" id="L1317">	}</span>
+
+	@Override
+	public int hashCode() {
+<span class="fc" id="L1321">		final int prime = 31;</span>
+<span class="fc" id="L1322">		int result = 1;</span>
+<span class="fc" id="L1323">		result = prime * result + this.getActualStore().hashCode();</span>
+<span class="fc" id="L1324">		result = prime * result</span>
+<span class="fc" id="L1325">				+ (int) (writeRetentionMs ^ (writeRetentionMs &gt;&gt;&gt; 32));</span>
+<span class="fc" id="L1326">		return result;</span>
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+<span class="pc bpc" id="L1331" title="1 of 2 branches missed.">		if (this == obj)</span>
+<span class="nc" id="L1332">			return true;</span>
+<span class="pc bpc" id="L1333" title="1 of 2 branches missed.">		if (obj == null)</span>
+<span class="nc" id="L1334">			return false;</span>
+<span class="pc bpc" id="L1335" title="1 of 2 branches missed.">		if (getClass() != obj.getClass())</span>
+<span class="nc" id="L1336">			return false;</span>
+<span class="fc" id="L1337">		WriteRetentionStore other = (WriteRetentionStore) obj;</span>
+<span class="pc bpc" id="L1338" title="1 of 2 branches missed.">		if (writeRetentionMs != other.writeRetentionMs)</span>
+<span class="nc" id="L1339">			return false;</span>
+<span class="pc bpc" id="L1340" title="1 of 2 branches missed.">		if (!this.getActualStore().equals(other.getActualStore()))</span>
+<span class="nc" id="L1341">			return false;</span>
+<span class="fc" id="L1342">		return true;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

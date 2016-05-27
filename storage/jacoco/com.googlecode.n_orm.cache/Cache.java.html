@@ -1,0 +1,489 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Cache.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.cache</a> &gt; <span class="el_source">Cache.java</span></div><h1>Cache.java</h1><pre class="source lang-java linenums"><span class="nc" id="L1">package com.googlecode.n_orm.cache;</span>
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.googlecode.n_orm.PersistingElement;
+
+/**
+ * A cache for temporarily storing {@link PersistingElement}s.&lt;br&gt;
+ * There is a cache per thread, so that cached elements are thread safe unless explicitly shared across threads.
+ * Only thread owning a cache is allowed to use this cache.&lt;br&gt;
+ * To get a cache, use {@link #getCache()} within the using thread.&lt;br&gt;
+ * Caches are limited in size (see {@link #getMaxElementsInCache()}).
+ * Cached elements are removed as soon as they have not been accessed since a certain amount of time (see {@link #getTimeToLiveSeconds()}).&lt;br&gt;
+ * Caches for dead thread are recycled, but in case they have not been used during a certain amount of time (see {@link #getTimeToLiveSeconds()}), they are dropped.
+ * @author fondemen
+ *
+ */
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">public class Cache {</span>
+	
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">	private static class CleanerThread extends Thread {</span>
+
+		@Override
+		public void run() {
+<span class="nc" id="L30">			while (true) {</span>
+				try {
+<span class="fc" id="L32">					Thread.sleep(periodBetweenCacheCleanupMS);</span>
+<span class="fc" id="L33">					this.step();</span>
+<span class="nc" id="L34">				} catch (Throwable e) {</span>
+<span class="nc" id="L35">					logger.log(Level.WARNING, &quot;Problem while waiting next cache cleanup.&quot;, e);</span>
+				}
+			}
+		}
+
+		public void step() {
+			
+			try {
+<span class="fc" id="L43">				long now = System.currentTimeMillis();</span>
+<span class="fc" id="L44">				LIFO&lt;Cache&gt; available = new LIFO&lt;Cache&gt;();</span>
+				
+				try {
+					
+					Thread[] threads;
+<span class="pc" id="L49">					synchronized(perThreadCaches) {</span>
+<span class="fc" id="L50">						Set&lt;Thread&gt; threadsSet = perThreadCaches.keySet();</span>
+<span class="fc" id="L51">						threads = threadsSet.toArray(new Thread[threadsSet.size()]);</span>
+					}
+<span class="fc bfc" id="L53" title="All 2 branches covered.">					for(Thread t : threads) {</span>
+						Cache cache;
+<span class="fc bfc" id="L55" title="All 2 branches covered.">						if (!isValid(t)) {</span>
+<span class="pc" id="L56">							synchronized(perThreadCaches) {</span>
+<span class="fc" id="L57">								cache = perThreadCaches.remove(t);</span>
+							}
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">							if (cache != null) {</span>
+<span class="fc" id="L60">								available.push(cache);</span>
+<span class="fc" id="L61">								cache.stopped = now;</span>
+							}
+						} else {
+<span class="fc" id="L64">							cache = perThreadCaches.get(t);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">							if (cache == null) {</span>
+								//Nothing to do ; cache is gone
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">							} else if (cache.cache != null &amp;&amp; cache.stopped == -1) {</span>
+<span class="fc" id="L68">								cache.shouldCleanup = true;</span>
+							} else {
+<span class="nc bnc" id="L70" title="All 2 branches missed.">								assert false;</span>
+<span class="nc" id="L71">								synchronized(perThreadCaches) {</span>
+<span class="nc" id="L72">									perThreadCaches.remove(t);</span>
+								}
+							}
+						}
+					}
+<span class="nc" id="L77">				} catch (RuntimeException x) {</span>
+<span class="nc" id="L78">					logger.log(Level.WARNING, &quot;Problem while checking cache.&quot;, x);</span>
+				}
+				
+<span class="pc" id="L81">				synchronized(availableCaches) {</span>
+					try {
+<span class="fc" id="L83">						availableCaches.pushAll(available);</span>
+<span class="nc" id="L84">					} catch (RuntimeException x) {</span>
+<span class="nc" id="L85">						logger.log(Level.WARNING, &quot;Problem while checking cache.&quot;, x);</span>
+					}
+<span class="fc" id="L87">					available.clear();</span>
+				}
+				
+				try {
+<span class="fc" id="L91">					Iterator&lt;Cache&gt; ai = availableCaches.iterator();</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">availableCachesCheck:while (ai.hasNext()) {</span>
+<span class="fc" id="L93">						Cache cache = ai.next();</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">						if (cache == null) {</span>
+<span class="nc" id="L95">							logger.warning(&quot;Invalid state: got an empty object while iterating over available caches.&quot;);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">							if (ai.hasNext()) {</span>
+<span class="nc" id="L97">								cache = ai.next();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">								if (cache == null) {</span>
+									String cachesStr;
+									try {
+<span class="nc" id="L101">										cachesStr = availableCaches.toString();</span>
+<span class="nc" id="L102">										logger.severe(&quot;Invalid state: cannot continue iterating over available caches &quot; + cachesStr);</span>
+<span class="nc" id="L103">									} catch (Throwable t) {</span>
+<span class="nc" id="L104">										logger.log(Level.SEVERE, &quot;It seems that available caches are lost. No mean to recover, resetting.&quot;, t);</span>
+<span class="nc" id="L105">										availableCaches.clear();</span>
+									}
+<span class="nc" id="L107">									break availableCachesCheck;</span>
+								}
+							} else
+								break availableCachesCheck;
+						}
+<span class="pc" id="L112">						synchronized(cache) {</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">							if ((cache.stopped+(timeToLiveSeconds*1000)) &lt; now) {</span>
+<span class="fc" id="L114">								ai.remove();</span>
+<span class="fc" id="L115">								cache.close();</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">							} else if (cache.isClosed()) {</span>
+<span class="nc" id="L117">								ai.remove();</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">							} else if (isValid(cache.thread)) {</span>
+<span class="nc" id="L119">								ai.remove();</span>
+<span class="nc bnc" id="L120" title="All 4 branches missed.">								assert perThreadCaches.get(cache.thread) == cache;</span>
+							}
+						}
+					}
+<span class="nc" id="L124">				} catch (RuntimeException x) {</span>
+<span class="nc" id="L125">					logger.log(Level.WARNING, &quot;Problem while checking cache.&quot;, x);</span>
+				}
+<span class="nc" id="L127">			} finally {</span>
+			
+<span class="pc" id="L129">				synchronized(this) {</span>
+<span class="pc" id="L130">					this.notifyAll();</span>
+				}
+<span class="nc" id="L132">			}</span>
+<span class="fc" id="L133">		}</span>
+	}
+
+<span class="fc" id="L136">	private static Logger logger = Logger.getLogger(Cache.class.getName());</span>
+
+<span class="fc" id="L138">	private static int periodBetweenCacheCleanupMS = 1000;</span>
+<span class="fc" id="L139">	private static int timeToLiveSeconds = 10;</span>
+<span class="fc" id="L140">	private static int maxElementsInCache = 10000;</span>
+
+	
+	private static final HashMap&lt;Thread, Cache&gt; perThreadCaches;
+	private static final LIFO&lt;Cache&gt; availableCaches;
+	private static final Thread cacheCleaner;
+	
+	static {
+<span class="fc" id="L148">		perThreadCaches = new HashMap&lt;Thread, Cache&gt;();</span>
+<span class="fc" id="L149">		availableCaches = new LIFO&lt;Cache&gt;();</span>
+<span class="fc" id="L150">		cacheCleaner = new CleanerThread();</span>
+<span class="fc" id="L151">		cacheCleaner.setDaemon(true);</span>
+<span class="fc" id="L152">		cacheCleaner.start();</span>
+<span class="fc" id="L153">		logger.info(&quot;Per-thread caching system started.&quot;);</span>
+	}
+	
+	private static boolean isValid(Thread thread) {
+<span class="pc bpc" id="L157" title="2 of 6 branches missed.">		return thread != null &amp;&amp; thread.isAlive() &amp;&amp; thread.getThreadGroup() != null;</span>
+	}
+	
+	/**
+	 * Time during which a element is kept in the cache (10s by default).
+	 * If an element is accessed (e.g. by storing or activating it), its time to live is reseted.
+	 * A cache is also kept during this time once its corresponding thread is over, so that it can be reused by another thread.
+	 * @return time to live in seconds
+	 */
+	public static int getTimeToLiveSeconds() {
+<span class="fc" id="L167">		return timeToLiveSeconds;</span>
+	}
+
+	/**
+	 * Sets time during which a element is kept in the cache.
+	 * If an element is accessed (e.g. by storing or activating it), its time to live is reseted.
+	 * A cache is also kept during this time once its corresponding thread is over, so that it can be reused by another thread.
+	 * @param timeToLiveSeconds time to live in seconds
+	 */
+	public static void setTimeToLiveSeconds(int timeToLiveSeconds) {
+<span class="fc" id="L177">		Cache.timeToLiveSeconds = timeToLiveSeconds;</span>
+<span class="fc" id="L178">	}</span>
+
+	/**
+	 * The maximum number of elements that can be kept in a (per-thread) cache (10 000 by default).
+	 */
+	public static int getMaxElementsInCache() {
+<span class="fc" id="L184">		return maxElementsInCache;</span>
+	}
+
+	/**
+	 * Sets the maximum number of elements that can be kept in a (per-thread) cache.
+	 */
+	public static void setMaxElementsInCache(int maxElementsInCache) {
+<span class="fc" id="L191">		Cache.maxElementsInCache = maxElementsInCache;</span>
+<span class="fc" id="L192">	}</span>
+
+	/**
+	 * The time between two cache cleanups (1s by default).
+	 * Caches with alive thread are asked to cleanup at next access: all elements that have not been accessed since their time to live are discarded.
+	 * Caches with dead threads are checked for time to live and discarded if this period is over, otherwise their elements are immediately checked for time to live.
+	 * @return period between two cache cleanups in milliseconds
+	 */
+	public static int getPeriodBetweenCacheCleanupMS() {
+<span class="fc" id="L201">		return periodBetweenCacheCleanupMS;</span>
+	}
+
+	/**
+	 * The time between two cache cleanups.
+	 * Caches with alive thread are asked to cleanup at next access: all elements that have not been accessed since their time to live are discarded.
+	 * Caches with dead threads are checked for time to live and discarded if this period is over, otherwise their elements are immediately checked for time to live.
+	 * @param periodBetweenCacheCleanupMS period between two cache cleanups in milliseconds
+	 */
+	public static void setPeriodBetweenCacheCleanupMS(
+			int periodBetweenCacheCleanupMS) {
+<span class="fc" id="L212">		Cache.periodBetweenCacheCleanupMS = periodBetweenCacheCleanupMS;</span>
+<span class="fc" id="L213">	}</span>
+
+	static void waitNextCleanup() throws InterruptedException {
+<span class="pc" id="L216">		synchronized(cacheCleaner) {</span>
+<span class="fc" id="L217">			cacheCleaner.wait();</span>
+		}
+<span class="fc" id="L219">	}</span>
+	
+	static boolean knowsCache(Thread thread) {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">		return findCache(thread)!= null;</span>
+	}
+	
+	static void cleanRecyclableCaches() {
+<span class="pc" id="L226">		synchronized(availableCaches) {</span>
+<span class="fc" id="L227">			availableCaches.clear();</span>
+		}
+<span class="fc" id="L229">	}</span>
+	
+	public static Cache findCache(Thread thread) {
+<span class="pc" id="L232">		synchronized(perThreadCaches) {</span>
+<span class="fc" id="L233">			return perThreadCaches.get(thread);</span>
+		}
+	}
+	
+	/**
+	 * Gives a cache to the current thread.
+	 * In case this cache does not already exists, creates it.
+	 */
+	public static Cache getCache() {
+<span class="fc" id="L242">		Cache res = findCache(Thread.currentThread());</span>
+		
+<span class="fc bfc" id="L244" title="All 2 branches covered.">		if (res == null) {</span>
+<span class="fc" id="L245">			res = (Cache) availableCaches.pop(); //Most recent in the queue ; if closed, all the others in availableCaches should be closed...</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">			if (res != null) {</span>
+<span class="pc" id="L247">				synchronized(res) {</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">					if (res.isClosed())</span>
+<span class="nc" id="L249">						res = null;</span>
+					else {
+<span class="fc" id="L251">						res.init();</span>
+<span class="fc" id="L252">						res.cleanInvalidElements();</span>
+<span class="fc" id="L253">						logger.finer(&quot;Reusing existing cache for thread &quot; + res.thread);</span>
+					}
+				}
+			}
+		}
+		
+<span class="fc bfc" id="L259" title="All 2 branches covered.">		if (res == null) {</span>
+<span class="fc" id="L260">			res = new Cache();</span>
+		}
+		
+<span class="pc bpc" id="L263" title="2 of 4 branches missed.">		assert isValid(res.thread);</span>
+<span class="pc bpc" id="L264" title="2 of 4 branches missed.">		assert !res.isClosed();</span>
+<span class="pc bpc" id="L265" title="2 of 4 branches missed.">		assert !availableCaches.contains(res);</span>
+<span class="pc bpc" id="L266" title="2 of 4 branches missed.">		assert perThreadCaches.get(Thread.currentThread()) == res;</span>
+		
+<span class="fc" id="L268">		return res;</span>
+	}
+	
+	/**
+	 * A string identifier for the thread.
+	 */
+	public static String getThreadId(Thread thread) {
+<span class="fc" id="L275">		return Long.toHexString(thread.getId());</span>
+	}
+	
+	private static class Element {
+		private long lastAccessDate;
+		private PersistingElement element;
+		public Element(PersistingElement element) {
+<span class="fc" id="L282">			super();</span>
+<span class="fc" id="L283">			this.element = element;</span>
+<span class="fc" id="L284">			this.lastAccessDate = System.currentTimeMillis();</span>
+<span class="fc" id="L285">		}</span>
+		
+		public PersistingElement getElement() {
+<span class="fc" id="L288">			this.update();</span>
+<span class="fc" id="L289">			return element;</span>
+		}
+		
+		public void setElement(PersistingElement element) {
+<span class="fc" id="L293">			this.update();</span>
+<span class="fc" id="L294">			this.element = element;</span>
+<span class="fc" id="L295">		}</span>
+		
+		public void update() {
+<span class="fc" id="L298">			this.lastAccessDate = System.currentTimeMillis();</span>
+<span class="fc" id="L299">		}</span>
+		
+		public boolean isValid() {
+<span class="fc bfc" id="L302" title="All 2 branches covered.">			return (this.lastAccessDate+(timeToLiveSeconds*1000)) &gt; System.currentTimeMillis();</span>
+		}
+	}
+	
+	private Map&lt;String, Element&gt; cache;
+	private Thread thread;
+	private String threadId;
+	private volatile boolean shouldCleanup;
+<span class="fc" id="L310">	private volatile long stopped = -1;</span>
+
+<span class="fc" id="L312">	private Cache() {</span>
+<span class="fc" id="L313">		this.init();</span>
+<span class="fc" id="L314">	}</span>
+	
+	private synchronized void init() {
+<span class="fc" id="L317">		this.thread = Thread.currentThread();</span>
+<span class="fc" id="L318">		this.threadId = getThreadId(this.thread);</span>
+		
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">		this.cache = new HashMap&lt;String, Cache.Element&gt;();</span>
+<span class="fc" id="L321">		this.stopped = -1;</span>
+		
+<span class="pc" id="L323">		synchronized(perThreadCaches) {</span>
+<span class="fc" id="L324">			perThreadCaches.put(this.thread, this);</span>
+		}
+<span class="fc" id="L326">		logger.fine(&quot;Cache started for &quot; + this.thread + &quot; with id &quot; + this.threadId);</span>
+<span class="fc" id="L327">	}</span>
+	
+	protected void checkState() {
+<span class="pc bpc" id="L330" title="2 of 4 branches missed.">		assert !this.isClosed();</span>
+<span class="fc" id="L331">		Thread cur = Thread.currentThread();</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">		if (this.thread != cur)</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">			throw new IllegalStateException(cur.toString() + &quot; with id &quot; + cur.getId() + &quot; is not allowed to acccess cache for &quot; + (this.thread.isAlive() ? &quot;alive&quot; : &quot;dead&quot;) + &quot; &quot; + this.thread + &quot; with id &quot; + this.thread.getId());</span>
+<span class="fc" id="L334">		this.cleanIfNecessary();</span>
+<span class="fc" id="L335">	}</span>
+	
+	private void cleanIfNecessary() {
+<span class="fc bfc" id="L338" title="All 2 branches covered.">		if (this.shouldCleanup)</span>
+<span class="fc" id="L339">			this.cleanInvalidElements();</span>
+<span class="fc" id="L340">	}</span>
+	
+	/**
+	 * @return the element with the eldest last usage (null if cache is empty)
+	 */
+	private synchronized Element cleanInvalidElements() {
+<span class="fc" id="L346">		this.shouldCleanup = false;</span>
+<span class="fc" id="L347">		Element eldest = null;</span>
+<span class="fc" id="L348">		Iterator&lt;Entry&lt;String, Element&gt;&gt; it = cache.entrySet().iterator();</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">		while (it.hasNext()) {</span>
+<span class="fc" id="L350">			Element elt = it.next().getValue();</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">			if (!elt.isValid()) {</span>
+<span class="fc" id="L352">				it.remove();</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">			} else if (eldest == null) {</span>
+<span class="fc" id="L354">				eldest = elt;</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">			} else if (eldest.lastAccessDate &gt; elt.lastAccessDate) {</span>
+<span class="fc" id="L356">				eldest = elt;</span>
+			}
+		}
+<span class="fc" id="L359">		logger.fine(&quot;Cleaned cache for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
+<span class="fc" id="L360">		return eldest;</span>
+	}
+	
+	/**
+	 * Registers an element in the cache.&lt;br&gt;
+	 * Only thread for this cache has access to this method.&lt;br&gt;
+	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).&lt;br&gt;
+	 * In case the maximum number of cacheable elements is reached, element with the eldest access id removed from the cache (see {@link #setMaxElementsInCache(int)})
+	 * @param element the element to be cached (during {@link #getTimeToLiveSeconds()})
+	 * @throws IllegalStateException in case this thread is not the thread for this cache
+	 */
+	public void register(PersistingElement element) throws IllegalStateException {
+<span class="fc" id="L372">		this.checkState();</span>
+		
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">		if (element == null)</span>
+<span class="nc" id="L375">			return;</span>
+<span class="fc" id="L376">		String id = element.getFullIdentifier();</span>
+<span class="fc" id="L377">		Element cached = this.cache.get(id);</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">		if (cached == null) {</span>
+<span class="fc" id="L379">			cached = new Element(element);</span>
+<span class="fc" id="L380">			this.cache.put(id, cached);</span>
+		} else {
+<span class="fc" id="L382">			cached.setElement(element);</span>
+		}
+<span class="fc bfc" id="L384" title="All 2 branches covered.">		while (this.cache.size() &gt; maxElementsInCache) //Should happen only once</span>
+<span class="fc" id="L385">			this.cache.remove(this.cleanInvalidElements().getElement().getFullIdentifier());</span>
+<span class="fc" id="L386">		logger.finer(&quot;Registered element &quot; + element + &quot; for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
+<span class="fc" id="L387">	}</span>
+	
+	/**
+	 * Removes an element in the cache.&lt;br&gt;
+	 * Only thread for this cache has access to this method.&lt;br&gt;
+	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).&lt;br&gt;
+	 * @param element the element to be uncached
+	 * @throws IllegalStateException in case this thread is not the thread for this cache
+	 */
+	public void unregister(PersistingElement element) throws IllegalStateException {
+<span class="fc" id="L397">		this.checkState();</span>
+		
+<span class="fc bfc" id="L399" title="All 2 branches covered.">		if (this.cache.remove(element.getFullIdentifier()) != null) {</span>
+<span class="fc" id="L400">			logger.finer(&quot;Unregistered element with &quot; + element + &quot; for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
+		}
+<span class="fc" id="L402">	}</span>
+	
+	/**
+	 * Finds an element in the cache according to its full identifier.&lt;br&gt;
+	 * Only thread for this cache has access to this method.&lt;br&gt;
+	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).&lt;br&gt;
+	 * @param fullIdentifier the full identifier of the element to be cached; null if not found
+	 * @throws IllegalStateException in case this thread is not the thread for this cache
+	 * @see PersistingElement#getFullIdentifier()
+	 */
+	public PersistingElement getKnownPersistingElement(String fullIdentifier) {
+<span class="fc" id="L413">		this.checkState();</span>
+<span class="fc" id="L414">		Element res = (Element) this.cache.get(fullIdentifier);</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">		if (res == null)</span>
+<span class="fc" id="L416">			return null;</span>
+		else {
+<span class="fc" id="L418">			PersistingElement ret = res.getElement();</span>
+<span class="fc" id="L419">			logger.finest(&quot;Found element &quot; + ret + &quot; from cache for thread &quot; + this.thread + &quot; with id &quot; + this.threadId);</span>
+<span class="fc" id="L420">			return ret;</span>
+		}
+	}
+
+	/**
+	 * Finds an element in the cache according to its identifier.&lt;br&gt;
+	 * Only thread for this cache has access to this method.&lt;br&gt;
+	 * In case this cache is marked for cleanup, elements are checked for their time to live (see {@link #setTimeToLiveSeconds(int)}).&lt;br&gt;
+	 * @param identifier the full identifier of the element to be cached; null if not found
+	 * @param clazz the class that the element instantiates (see {@link Object#getClass())}; null if not found
+	 * @throws IllegalStateException in case this thread is not the thread for this cache
+	 * @see PersistingElement#getIdentifier()
+	 */
+	public PersistingElement getKnownPersistingElement(String identifier, Class&lt;? extends PersistingElement&gt; clazz) {
+<span class="nc" id="L434">		return this.getKnownPersistingElement(identifier + clazz.getName());</span>
+	}
+	
+	/**
+	 * The size of the cache.
+	 * This method checks elements for their time to live regardless the cache is marked for that or not.
+	 * @return
+	 */
+	public int size() {
+<span class="fc" id="L443">		this.cleanInvalidElements();</span>
+<span class="fc" id="L444">		return this.cache.size();</span>
+	}
+	
+	/**
+	 * Clears the cache.
+	 */
+	public void reset() {
+<span class="fc" id="L451">		this.cache.clear();</span>
+<span class="fc" id="L452">		logger.finer(&quot;Reseted cache for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
+<span class="fc" id="L453">	}</span>
+	
+	/**
+	 * Checks if this cache can be used or not.
+	 * A cache cannot be used if its thread is dead and if its time to live is over.
+	 * A closed cache must not be used in any case (necessary resources were released)
+	 * @return whether this cache has bee closed
+	 * @see #close()
+	 */
+	public synchronized boolean isClosed() {
+<span class="pc bpc" id="L463" title="1 of 4 branches missed.">		return this.cache == null || this.thread == null;</span>
+	}
+	
+	/**
+	 * Closes the cache.
+	 * This method is automatically invoked on caches for dead threads and whose time to live is over.
+	 * A closed cache cannot be used anymore.
+	 * @see #isClosed()
+	 */
+	protected synchronized void close() {
+<span class="fc bfc" id="L473" title="All 2 branches covered.">		if (this.isClosed())</span>
+<span class="fc" id="L474">			return;</span>
+		
+<span class="fc" id="L476">		this.reset();</span>
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">		this.cache = null;</span>
+<span class="fc" id="L478">		this.thread = null;</span>
+<span class="fc" id="L479">		this.stopped = System.currentTimeMillis();</span>
+<span class="fc" id="L480">		logger.fine(&quot;Cache stopped for thread &quot; + this.thread + &quot; with id &quot; + this.threadId);</span>
+<span class="fc" id="L481">	}</span>
+
+	@Override
+	protected void finalize() throws Throwable {
+<span class="fc" id="L485">		this.close();</span>
+<span class="fc" id="L486">		super.finalize();</span>
+<span class="fc" id="L487">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.5.9.201207120123</span></div></body></html>

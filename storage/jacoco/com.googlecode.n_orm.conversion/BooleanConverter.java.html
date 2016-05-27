@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>BooleanConverter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">BooleanConverter.java</span></div><h1>BooleanConverter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+class BooleanConverter extends PrimitiveConverter&lt;Boolean&gt; {
+	public static final String TRUE = &quot;1&quot;;
+	public static final String FALSE = &quot;0&quot;;
+	public BooleanConverter() {
+<span class="fc" id="L7">		super(Boolean.class, boolean.class, 1, 1, 1, 1, Boolean.FALSE);</span>
+<span class="fc" id="L8">	}</span>
+
+	@Override
+	public Boolean fromString(String rep, Class&lt;?&gt; expected) {
+<span class="fc bfc" id="L12" title="All 2 branches covered.">		if (rep.equals(TRUE))</span>
+<span class="fc" id="L13">			return Boolean.TRUE;</span>
+<span class="pc bpc" id="L14" title="1 of 2 branches missed.">		else if (rep.equals(FALSE))</span>
+<span class="fc" id="L15">			return Boolean.FALSE;</span>
+
+<span class="nc" id="L17">		throw new IllegalArgumentException(&quot;Cannot convert &quot; + rep + &quot; to a boolean.&quot;);</span>
+	}
+
+	@Override
+	public String toString(Boolean obj) {
+<span class="fc bfc" id="L22" title="All 2 branches covered.">		return obj.booleanValue() ? TRUE : FALSE;</span>
+	}
+
+	@Override
+	protected boolean canConvert(byte[] obj) {
+<span class="fc bfc" id="L27" title="All 2 branches covered.">		return obj.length == 1;</span>
+	}
+
+	@Override
+	public Boolean fromBytes(byte[] rep, Class&lt;?&gt; expected) {
+<span class="fc bfc" id="L32" title="All 2 branches covered.">	      return rep[0] != (byte)0;</span>
+	}
+
+	@Override
+	public byte[] toBytes(Boolean obj) {
+<span class="fc" id="L37">	    byte [] rep = new byte[1];</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">	    rep[0] = obj.booleanValue() ? (byte)-1: (byte)0;</span>
+<span class="fc" id="L39">	    return rep;</span>
+	}
+
+	@Override
+	public Boolean revert(Boolean obj) {
+<span class="fc bfc" id="L44" title="All 2 branches covered.">		return obj ? Boolean.FALSE : Boolean.TRUE;</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

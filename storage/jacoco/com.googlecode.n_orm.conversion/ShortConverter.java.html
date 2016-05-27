@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ShortConverter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">ShortConverter.java</span></div><h1>ShortConverter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+class ShortConverter extends NaturalConverter&lt;Short&gt; {
+	public ShortConverter() {
+<span class="fc" id="L5">		super(Short.class, short.class, Short.SIZE/Byte.SIZE, (short)0);</span>
+<span class="fc" id="L6">	}</span>
+
+	@Override
+	public Short fromString(String rep, Class&lt;?&gt; expected) {
+<span class="fc" id="L10">		return (short) this.parseString(rep);</span>
+	}
+
+	@Override
+	public String toString(Short obj) {
+<span class="fc" id="L15">		return this.unparseString(obj);</span>
+	}
+
+	@Override
+	public Short fromBytes(byte[] rep, Class&lt;?&gt; expected) {
+<span class="fc" id="L20">		return (short) this.parseBytes(rep);</span>
+	}
+
+	@Override
+	public byte[] toBytes(Short obj) {
+<span class="fc" id="L25">		return this.unparseBytes(obj);</span>
+	}
+
+	@Override
+	public Short revert(Short obj) {
+<span class="fc" id="L30">		return (short) -obj;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

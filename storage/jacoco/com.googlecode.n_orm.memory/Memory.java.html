@@ -1,0 +1,720 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Memory.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.memory</a> &gt; <span class="el_source">Memory.java</span></div><h1>Memory.java</h1><pre class="source lang-java linenums"><span class="pc" id="L1">package com.googlecode.n_orm.memory;</span>
+
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.EmptyCloseableIterator;
+import com.googlecode.n_orm.Transient;
+import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.memory.Memory.Table.Row;
+import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily;
+import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily.ByteValue;
+import com.googlecode.n_orm.memory.Memory.Table.Row.ColumnFamily.Value;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+import com.googlecode.n_orm.storeapi.SimpleStore;
+
+/**
+ * Reference implementation for a store based on {@link ConcurrentSkipListMap}.
+ * This store entirely resides into memory, and is only available for the current JVM.
+ * It is well suited for testing.
+ * This store is thread-safe.
+ * This store does not supports mixing incrementing and absolute values.
+ */
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">public class Memory implements SimpleStore {</span>
+<span class="fc" id="L39">	public static final Memory INSTANCE = new Memory();</span>
+	
+	/**
+	 * Utility method used internally to find a sub-map with inclusive nullable start and stop keys.
+	 * @param map the map to be searched-in
+	 * @param fromIncl the start key ; can be null to state the start of the map
+	 * @param toIncl the last key ; can be null to state the end of the map
+	 * @return a sub-map (can be map or a view on map)
+	 */
+	protected static &lt;T&gt; NavigableMap&lt;String, T&gt; subMap(NavigableMap&lt;String, T&gt; map, String fromIncl, String toIncl) {
+<span class="pc bpc" id="L49" title="1 of 9 branches missed.">		switch ((fromIncl == null ? 0 : 2) + (toIncl == null ? 0 : 1)) {</span>
+		case 0: //no filter
+<span class="fc" id="L51">			return map;</span>
+		case 1: //toIncl only
+<span class="fc" id="L53">			return map.headMap(toIncl, true);</span>
+		case 2: //fromIncl only
+<span class="fc" id="L55">			return map.tailMap(fromIncl, true);</span>
+		case 3: //two keys
+<span class="fc" id="L57">			return map.subMap(fromIncl, true, toIncl, true);</span>
+		default:
+<span class="nc bnc" id="L59" title="All 2 branches missed.">			assert false;</span>
+<span class="nc" id="L60">			return map;</span>
+		}
+		
+	}
+
+	/**
+	 * A map that creates necessary keys as soon as they are requested by {@link #get(String)}.
+	 * Use {@link #getNoCreate(String)} to avoid creating a new element lazily.
+	 * Keys are all {@link String}.
+	 * @param &lt;T&gt; the kind of elements owned by the map.
+	 */
+	private abstract class LazyMap&lt;T&gt; {
+		
+		/**
+		 * The actual map owning elements.
+		 */
+		@Transient //Only here to avoid AspectJ weaving
+		protected ConcurrentMap&lt;String, T&gt; map;
+		
+		/**
+		 * @param sorted whether this map needs to be sorted according to keys natural order
+		 */
+<span class="fc" id="L82">		protected LazyMap(boolean sorted) {</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">			this.map = sorted ?  new ConcurrentSkipListMap&lt;String,T&gt;() : new ConcurrentHashMap&lt;String, T&gt;();</span>
+<span class="fc" id="L84">		}</span>
+		
+		/**
+		 * The actual map casted to NavigableMap.
+		 * Can throw an exception if this map was not declared as sorted.
+		 */
+		@SuppressWarnings(&quot;unchecked&quot;)
+		protected NavigableMap&lt;String, T&gt; getNavigableMap() {
+<span class="fc" id="L92">			return (NavigableMap&lt;String, T&gt;)this.map;</span>
+		}
+		
+		/**
+		 * Called by {@link #get(String)} when no value is found
+		 * @param key the key for the newly created element
+		 * @return the created element that is not in this map yet
+		 */
+		protected abstract T newElement(String key);
+
+		/**
+		 * Whether this key is known by this map
+		 * @param key the key to search (cannot be null)
+		 */
+		public boolean contains(String key) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">			if (key == null)</span>
+<span class="nc" id="L108">				throw new NullPointerException();</span>
+<span class="fc" id="L109">			return map.containsKey(key);</span>
+		}
+
+		/**
+		 * Returns the value to the element stored with a given key.
+		 * In case this element does not exists, a new one is created using {@link #newElement(String)}, stored in the map and returned.
+		 * @param key the non-null key of the (possibly new) element
+		 * @return the (possibly newly created) element stored under key key
+		 */
+		public T get(String key) {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">			if (key == null)</span>
+<span class="nc" id="L120">				throw new NullPointerException();</span>
+<span class="fc" id="L121">			T ret = this.getNoCreate(key);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">			if (ret == null) {</span>
+<span class="fc" id="L123">				T newT = this.newElement(key);</span>
+<span class="fc" id="L124">				T oldT = this.map.putIfAbsent(key, newT);</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">				ret = oldT == null ? newT : oldT;</span>
+			}
+<span class="fc" id="L127">			return ret;</span>
+		}
+		
+		/**
+		 * Returns the value to the element stored with a given key.
+		 * @param key the non-null key of the (not new) element
+		 * In case this element does not exists, returns null.
+		 */
+		protected T getNoCreate(String key) {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">			if (key == null)</span>
+<span class="nc" id="L137">				throw new NullPointerException();</span>
+<span class="fc" id="L138">			return map.get(key);</span>
+		}
+
+		/**
+		 * Puts an element in the map.
+		 * @param key the non-null key of the element
+		 * @param value must not be null; use {@link #remove(String)} to remove an element
+		 */
+		public T put(String key, T value) {
+<span class="nc bnc" id="L147" title="All 2 branches missed.">			if (key == null)</span>
+<span class="nc" id="L148">				throw new NullPointerException();</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">			if (value == null)</span>
+<span class="nc" id="L150">				throw new NullPointerException();</span>
+<span class="nc" id="L151">			return map.put(key, value);</span>
+		}
+
+
+		/**
+		 * Removes an element from the map.
+		 * @param key the non-null key of the element
+		 * @param value must not be null; use {@link #remove(String)} to remove an element
+		 * @return the previous value for the map
+		 */
+		public  T remove(String key) {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">			if (key == null)</span>
+<span class="nc" id="L163">				throw new NullPointerException();</span>
+<span class="fc" id="L164">			return map.remove(key);</span>
+		}
+
+
+		/**
+		 * Removes elements from the map according to their keys.
+		 * @param key the non-null key of the element
+		 * @param value must not be null; use {@link #remove(String)} to remove an element
+		 */
+		public void removeAll(Set&lt;String&gt; keys) {
+<span class="nc bnc" id="L174" title="All 2 branches missed.">			if (keys == null)</span>
+<span class="nc" id="L175">				throw new NullPointerException();</span>
+<span class="nc" id="L176">			map.keySet().removeAll(keys);</span>
+<span class="nc" id="L177">		}</span>
+
+		/**
+		 * Vacuums this map.
+		 */
+		public void clear() {
+<span class="fc" id="L183">			this.map.clear();</span>
+<span class="fc" id="L184">		}</span>
+	}
+
+	/**
+	 * A value to state that a {@link ByteValue} is deleted
+	 */
+<span class="fc" id="L190">	private static final byte[] DELETED_VALUE = new byte[0];</span>
+	
+	/**
+	 * A value to state that a {@link ByteValue} is null
+	 */
+<span class="fc" id="L195">	private static final byte[] NULL_VALUE = new byte[0];</span>
+	
+<span class="fc" id="L197">	private static final ExecutorService ColumnRemover = Executors.newSingleThreadExecutor();</span>
+	
+	/**
+	 * An map to store rows within tables.
+	 * Rows are indexed according to their keys.
+	 * Rows are sorted within a table according to their key value so that range search can be fast.
+	 */
+	public class Table extends LazyMap&lt;Table.Row&gt; {
+		
+		/**
+		 * The name for this table
+		 */
+		public final String name;
+		
+<span class="fc" id="L211">		public Table(String name) {</span>
+<span class="fc" id="L212">			super(true);</span>
+<span class="fc" id="L213">			this.name = name;</span>
+<span class="fc" id="L214">		}</span>
+
+		/**
+		 * Creates a new {@link Row} with the given key
+		 */
+		protected Row newElement(String key) {
+<span class="fc" id="L220">			return new Row(key);</span>
+		}
+		
+		/**
+		 * Creates an {@link Iterator} over the {@link Row}s owned by this table starting from row with the given qualifier.
+		 * @param fromKeyIncl the qualifier of the first row ; if a row with this qualifier does not exist, takes the row with the lowest key greater than fromKeyIncl
+		 * @see Memory#subMap(NavigableMap, String, String)
+		 */
+		public Iterator&lt;Row&gt; getRowIterator(String fromKeyIncl) {
+<span class="fc" id="L229">			return subMap(this.getNavigableMap(), fromKeyIncl, null).values().iterator();</span>
+		}
+		
+		/**
+		 * A row owning a set of Column families.
+		 * Column families are created lazily as soon as they are requested by {@link #get(String)}.
+		 */
+		public class Row extends LazyMap&lt;Row.ColumnFamily&gt; implements com.googlecode.n_orm.storeapi.Row {
+			/**
+			 * The identifier for this row
+			 */
+			public final String key;
+			
+			/**
+			 * The next transaction number.
+			 * Should increment over time.
+			 */
+<span class="fc" id="L246">			private AtomicLong nextTransactionId = new AtomicLong(Long.MIN_VALUE);</span>
+			
+<span class="fc" id="L248">			public Row(String key) {</span>
+<span class="fc" id="L249">				super(false);</span>
+<span class="fc" id="L250">				this.key = key;</span>
+<span class="fc" id="L251">			}</span>
+
+			/**
+			 * Creates a column family according to its name.
+			 */
+			@Override
+			protected ColumnFamily newElement(String name) {
+<span class="fc" id="L258">				return new ColumnFamily(name);</span>
+			}
+
+			/**
+			 * The key for this row.
+			 */
+			@Override
+			public String getKey() {
+<span class="fc" id="L266">				return key;</span>
+			}
+
+			@Override
+			public ColumnFamilyData getValues() {
+<span class="fc" id="L271">				ColumnFamilyData ret = new DefaultColumnFamilyData();</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">				for (Entry&lt;String, ColumnFamily&gt; element : map.entrySet()) {</span>
+<span class="fc" id="L273">					ret.put(element.getKey(), element.getValue().getValues(null, null));</span>
+				}
+<span class="fc" id="L275">				return ret;</span>
+			}
+			
+			public long createTransaction() {
+<span class="fc" id="L279">				return this.nextTransactionId.incrementAndGet();</span>
+			}
+
+			/**
+			 * A column family owning values.
+			 * Values are sorted according to their qualifier so that rage search can be fast.
+			 */
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">			public class ColumnFamily extends LazyMap&lt;ColumnFamily.Value&lt;?&gt;&gt; {</span>
+				/**
+				 * The name for this column family
+				 */
+				public final String name;
+				
+<span class="fc" id="L292">				public ColumnFamily(String name) {</span>
+<span class="fc" id="L293">					super(true);</span>
+<span class="fc" id="L294">					this.name = name;</span>
+<span class="fc" id="L295">				}</span>
+
+				/**
+				 * Creates a byte value
+				 */
+				@Override
+				protected Value&lt;?&gt; newElement(String qualifier) {
+<span class="fc" id="L302">					return new ByteValue(qualifier);</span>
+				}
+
+				/**
+				 * Increments the value at the given key.
+				 * @param qualifier the qualifier of the incremented value
+				 * @param increment the non-null increment to be applied
+				 */
+				public void incr(String qualifier, Number increment) {
+<span class="pc bpc" id="L311" title="2 of 4 branches missed.">					assert increment.longValue() != 0 : &quot;Received a 0 increment for table&quot; + Table.this.name + &quot;, row &quot; + Row.this.key + &quot;, family &quot; + this.name + &quot;, qualifier &quot; + key; </span>
+<span class="fc" id="L312">					IncrementingValue newVal = new IncrementingValue(qualifier, increment.longValue());</span>
+<span class="fc" id="L313">					Value&lt;?&gt; oldVal = this.map.putIfAbsent(qualifier, newVal);</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">					if (oldVal == null)</span>
+<span class="fc" id="L315">						return;</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">					else if (! (oldVal instanceof IncrementingValue))</span>
+<span class="nc" id="L317">						throw new IllegalStateException(&quot;Cannot increment a byte array value (value for &quot; + qualifier + &quot; in family &quot; + this.name + &quot; fro row &quot; + Row.this.key + &quot; in table &quot; + Table.this.name + &quot; is already set a non incrementing way&quot;);</span>
+<span class="fc" id="L318">					((IncrementingValue)oldVal).increment(increment.longValue());</span>
+<span class="fc" id="L319">				}</span>
+				
+				/**
+				 * The set of values in this column family mapped according to their qualifier.
+				 * Qualifiers must be included between fromQualifierIncl and toQualifierIcl
+				 */
+				public Map&lt;String, byte[]&gt; getValues(String fromQualifierIncl, String toQualifierIcl) {
+<span class="fc" id="L326">					Map&lt;String, byte[]&gt; ret = new TreeMap&lt;String,byte[]&gt;();</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">					for (Entry&lt;String, Value&lt;?&gt;&gt; element : subMap(this.getNavigableMap(), fromQualifierIncl, toQualifierIcl).entrySet()) {</span>
+<span class="fc" id="L328">						byte[] val = element.getValue().getBytes();</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">						if (val != DELETED_VALUE)</span>
+<span class="fc" id="L330">							ret.put(element.getKey(), val);</span>
+					}
+<span class="fc" id="L332">					return ret;</span>
+				}
+				
+				@Override
+				public final Value&lt;?&gt; remove(String key) {
+<span class="nc" id="L337">					throw new IllegalStateException(&quot;Cannot remove a column without a transaction number&quot;);</span>
+				}
+
+				@Override
+				public final void removeAll(Set&lt;String&gt; keys) {
+<span class="nc" id="L342">					throw new IllegalStateException(&quot;Cannot remove a column without a transaction number&quot;);</span>
+				}
+
+				public abstract class Value&lt;T&gt; {
+					/**
+					 * The qualifier for this value
+					 */
+					public final String qualifier;
+					
+					/**
+					 * Creates a value that cannot be incremented
+					 */
+<span class="fc" id="L354">					public Value(String qualifier) {</span>
+<span class="fc" id="L355">						this.qualifier = qualifier;</span>
+<span class="fc" id="L356">					}</span>
+					
+					/**
+					 * The byte array representation for this value.
+					 */
+					public abstract byte[] getBytes();
+				}
+				
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">				public class ByteValue extends Value&lt;byte[]&gt; {</span>
+					
+					/**
+					 * The actual value for this value.
+					 * Stored in a map according to transaction ids.
+					 * Last entry holds the actual value.
+					 */
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">					protected NavigableMap&lt;Long /* last change */, byte[]&gt; value = new ConcurrentSkipListMap&lt;Long, byte[]&gt;();</span>
+					
+<span class="fc" id="L373">					protected ReentrantReadWriteLock deletionLock = new ReentrantReadWriteLock();</span>
+
+<span class="fc" id="L375">					public ByteValue(String qualifier) {</span>
+<span class="fc" id="L376">						super(qualifier);</span>
+<span class="fc" id="L377">						this.value.put(Long.MIN_VALUE, DELETED_VALUE);</span>
+<span class="fc" id="L378">					}</span>
+					
+					public byte[] getValue() {
+<span class="fc" id="L381">						Entry&lt;Long, byte[]&gt; lastEntry = this.value.lastEntry();</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">						if (lastEntry == null)</span>
+<span class="nc" id="L383">							return DELETED_VALUE;</span>
+<span class="fc" id="L384">						byte[] ret = lastEntry.getValue();</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">						return ret == null ? NULL_VALUE : ret;</span>
+					}
+					
+					public void setValue(byte[] value, long transaction) {
+<span class="fc bfc" id="L389" title="All 2 branches covered.">						if (value == null) value = NULL_VALUE;</span>
+<span class="fc" id="L390">						deletionLock.readLock().lock();</span>
+						try {
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">							if (this.value.isEmpty()) {</span>
+								// We've been deleted by a checkRemove ; retrying operation
+<span class="nc" id="L394">								ByteValue newVal = (ByteValue)ColumnFamily.this.get(this.qualifier);</span>
+<span class="nc bnc" id="L395" title="All 4 branches missed.">								assert newVal != this;</span>
+<span class="nc" id="L396">								newVal.setValue(value, transaction);</span>
+							} else {
+<span class="fc" id="L398">								this.value.put(transaction, value);</span>
+							}
+<span class="nc" id="L400">						} finally {</span>
+<span class="pc" id="L401">							deletionLock.readLock().unlock();</span>
+<span class="nc" id="L402">						}</span>
+<span class="fc" id="L403">						this.value.pollFirstEntry();</span>
+						
+<span class="fc bfc" id="L405" title="All 2 branches covered.">						if (this.getValue() == DELETED_VALUE) {</span>
+							// Deleting this column ASAP
+<span class="fc" id="L407">							ColumnRemover.submit(new Runnable() {</span>
+
+								@Override
+								public void run() {
+<span class="fc" id="L411">									checkRemove();</span>
+<span class="fc" id="L412">								}</span>
+								
+							});
+						}
+<span class="fc" id="L416">					}</span>
+
+					private void checkRemove() {
+						// Should we remove this column ?
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">						if (this.getValue() == DELETED_VALUE) {</span>
+							// Value is a delete so it deserves to be lock-checked
+<span class="fc" id="L422">							deletionLock.writeLock().lock();</span>
+							try {
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">								if (this.getValue() == DELETED_VALUE) {</span>
+<span class="fc" id="L425">									ColumnFamily.this.map.remove(this.qualifier);</span>
+<span class="fc" id="L426">									this.value.clear();</span>
+								}
+<span class="nc" id="L428">							} finally {</span>
+<span class="pc" id="L429">								deletionLock.writeLock().unlock();</span>
+<span class="nc" id="L430">							}</span>
+						}
+<span class="fc" id="L432">					}</span>
+
+					@Override
+					public byte[] getBytes() {
+<span class="fc" id="L436">						return this.getValue();</span>
+					}
+				}
+				
+				public class IncrementingValue extends Value&lt;Long&gt; {
+					
+					/**
+					 * The actual value for this value
+					 */
+					protected final AtomicLong value;
+
+<span class="fc" id="L447">					public IncrementingValue(String qualifier, Long value) {</span>
+<span class="fc" id="L448">						super(qualifier);</span>
+<span class="fc" id="L449">						this.value = new AtomicLong(value);</span>
+<span class="fc" id="L450">					}</span>
+					
+					public long getValue() {
+<span class="nc" id="L453">						return this.value.get();</span>
+					}
+					
+					/**
+					 * Atomically increments this value.
+					 * @param increment can be negatve or positive
+					 */
+					public void increment(long increment) {
+<span class="fc" id="L461">						this.value.getAndAdd(increment);</span>
+<span class="fc" id="L462">					}</span>
+					
+					@Override
+					public byte[] getBytes() {
+<span class="fc" id="L466">						return ConversionTools.convert(this.value.get());</span>
+					}
+				}
+			}
+
+		}
+		
+	}
+	
+	/**
+	 * The set of tables in this store
+	 */
+<span class="fc" id="L478">	private LazyMap&lt;Table&gt; tables = new LazyMap&lt;Table&gt;(false) {</span>
+
+		/**
+		 * Creates a table according to its name
+		 */
+		@Override
+		protected Table newElement(String name) {
+<span class="fc" id="L485">			return new Table(name);</span>
+		}
+		
+	};
+	
+<span class="fc" id="L490">	private Memory() {}</span>
+
+	@Override
+	public void start() {
+<span class="fc" id="L494">	}</span>
+	
+	/**
+	 * Returns the in-memory table.
+	 * @param table the name of the expected table
+	 * @param createIfNecessary whether to create the table if it does not exist
+	 * @return the table ; can be null if createIfNecessary is set to false and the table does not exist
+	 */
+	public Table getTable(String table, boolean createIfNecessary) {
+<span class="fc bfc" id="L503" title="All 2 branches covered.">		return createIfNecessary ? this.tables.get(table) : this.tables.getNoCreate(table);</span>
+	}
+	
+	/**
+	 * Returns the in-memory row (compatible with {@link com.googlecode.n_orm.storeapi.Row}) from a table.
+	 * @param table the name of the table in which to find the row
+	 * @param id the unique identifier for the row within the table
+	 * @param createIfNecessary whether to create the row if it does not exist (including in case table does not exists)
+	 * @return the row ; can be null if createIfNecessary is set to false and the row or the table does not exist
+	 */
+	public Row getRow(String table, String id, boolean createIfNecessary) {
+<span class="fc" id="L514">		Table t = this.getTable(table, createIfNecessary);</span>
+<span class="fc bfc" id="L515" title="All 4 branches covered.">		return createIfNecessary ? t.get(id) : (t == null ? null : t.getNoCreate(id));</span>
+	}
+
+	/**
+	 * Returns the in-memory column family for a given row from a table.
+	 * @param table the name of the table in which to find the column family for the row
+	 * @param id the unique identifier for the row within the table
+	 * @param family the name of the column family to be found within the row
+	 * @param createIfNecessary whether to create the row if it does not exist (including in case table or row does not exists)
+	 * @return the row ; can be null if createIfNecessary is set to false and the column family or the row or the table does not exist
+	 */
+	public ColumnFamily getFamily(String table, String id, String family, boolean createIfNecessary) {
+<span class="fc" id="L527">		Row r = this.getRow(table, id, createIfNecessary);</span>
+<span class="pc bpc" id="L528" title="1 of 4 branches missed.">		return createIfNecessary ? r.get(family) : r == null ? null : r.getNoCreate(family);</span>
+	}
+
+	@Override
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException {
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">		return this.tables.contains(tableName);</span>
+	}
+
+	@Override
+	public byte[] get(String table, String id, String family, String qualifer) {
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">		ColumnFamily fam = this.getFamily(table, id, family, false);</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">		Value&lt;?&gt; val = fam == null ? null : fam.getNoCreate(qualifer);</span>
+<span class="fc bfc" id="L540" title="All 2 branches covered.">		byte[] ret = val == null ? null : val.getBytes();</span>
+<span class="pc bpc" id="L541" title="1 of 4 branches missed.">		return ret == null || ret == DELETED_VALUE ? null : ret;</span>
+	}
+
+	@Override
+	public Map&lt;String, byte[]&gt; get(String table, String id, String family) {
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">		ColumnFamily fam = this.getFamily(table, id, family, false);</span>
+<span class="pc bfc" id="L547" title="All 2 branches covered.">		return fam == null ? null : fam.getValues(null, null);</span>
+	}
+	
+	@Override
+	public Map&lt;String, byte[]&gt; get(String table, String id, String family,
+			Constraint c) throws DatabaseNotReachedException {
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">		ColumnFamily fam = this.getFamily(table, id, family, false);</span>
+<span class="pc bpc" id="L554" title="2 of 6 branches missed.">		return fam == null ? null : fam.getValues(c == null ? null : c.getStartKey(), c == null ? null : c.getEndKey());</span>
+	}
+
+	@Override
+	public void storeChanges(String table, String id,
+			ColumnFamilyData changed,
+			Map&lt;String, Set&lt;String&gt;&gt; removed,
+			Map&lt;String, Map&lt;String, Number&gt;&gt; incremented) {
+		
+<span class="fc bfc" id="L563" title="All 2 branches covered.">		IllegalArgumentException x = null;</span>
+		
+<span class="fc" id="L565">		Row r = this.getRow(table, id, true);</span>
+<span class="fc" id="L566">		long transaction = r.createTransaction();</span>
+		
+<span class="pc bpc" id="L568" title="1 of 2 branches missed.">		if (changed != null)</span>
+<span class="fc bfc" id="L569" title="All 2 branches covered.">			for (Entry&lt;String, Map&lt;String, byte[]&gt;&gt; change : changed.entrySet()) {</span>
+<span class="fc" id="L570">				ColumnFamily f = r.get(change.getKey());</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">				for (Entry&lt;String, byte[]&gt; value : change.getValue().entrySet()) {</span>
+<span class="fc" id="L572">					Value&lt;?&gt; val = f.get(value.getKey());</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">					if (val instanceof ByteValue) {</span>
+<span class="fc" id="L574">						((ByteValue)val).setValue(value.getValue(), transaction);</span>
+					} else {
+<span class="nc" id="L576">						x = new IllegalArgumentException(&quot;Cannot set an incrementing value &quot; + value.getKey() + &quot; in family &quot; + change.getKey() + &quot; for row &quot; + id + &quot; in table &quot; + table);</span>
+					}
+				}
+			}
+		
+<span class="fc bfc" id="L581" title="All 2 branches covered.">		if (removed != null)</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">			for (Entry&lt;String, Set&lt;String&gt;&gt; remove : removed.entrySet()) {</span>
+<span class="fc" id="L583">				ColumnFamily f = r.getNoCreate(remove.getKey());</span>
+<span class="fc bfc" id="L584" title="All 2 branches covered.">				if (f != null) {</span>
+<span class="fc bfc" id="L585" title="All 2 branches covered.">					for (String qual : remove.getValue()) {</span>
+<span class="fc" id="L586">						Value&lt;?&gt; val = f.getNoCreate(qual);</span>
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">						if (val instanceof ByteValue) {</span>
+<span class="fc" id="L588">							((ByteValue)val).setValue(DELETED_VALUE, transaction);</span>
+						} else {
+<span class="nc" id="L590">							x = new IllegalArgumentException(&quot;Cannot remove an incrementing value &quot; + qual + &quot; in family &quot; + remove.getKey() + &quot; for row &quot; + id + &quot; in table &quot; + table);</span>
+						}
+					}
+				}
+			}
+		
+<span class="fc bfc" id="L596" title="All 2 branches covered.">		if (incremented != null)</span>
+<span class="fc bfc" id="L597" title="All 2 branches covered.">			for (Entry&lt;String, Map&lt;String, Number&gt;&gt; incr : incremented.entrySet()) {</span>
+<span class="fc" id="L598">				ColumnFamily f = r.get(incr.getKey());</span>
+<span class="fc bfc" id="L599" title="All 2 branches covered.">				for (Entry&lt;String, Number&gt; entry : incr.getValue().entrySet()) {</span>
+<span class="fc" id="L600">					f.incr(entry.getKey(), entry.getValue());</span>
+				}
+			}
+		
+<span class="pc bpc" id="L604" title="1 of 2 branches missed.">		if (x != null)</span>
+<span class="nc" id="L605">			throw x;</span>
+<span class="pc" id="L606">	}</span>
+
+	@Override
+	public long count(String table, Constraint c)
+			throws DatabaseNotReachedException {
+<span class="fc bfc" id="L611" title="All 2 branches covered.">		Table t = this.getTable(table, false);</span>
+<span class="pc bpc" id="L612" title="1 of 6 branches missed.">		return t == null ? 0 : subMap(t.getNavigableMap(), c == null ? null : c.getStartKey(), c == null ? null : c.getEndKey()).size();</span>
+	}
+	
+	public void reset() {
+<span class="fc" id="L616">		this.tables.clear();</span>
+<span class="fc" id="L617">	}</span>
+
+	@Override
+	public void delete(String table, String id) {
+<span class="fc bfc" id="L621" title="All 2 branches covered.">		Table t = this.getTable(table, false);</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">		if (t != null)</span>
+<span class="fc" id="L623">			t.remove(id);</span>
+<span class="pc" id="L624">	}</span>
+
+	@Override
+	public boolean exists(String table, String row, String family)
+			throws DatabaseNotReachedException {
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">		ColumnFamily fam = this.getFamily(table, row, family, false);</span>
+<span class="pc bpc" id="L630" title="1 of 4 branches missed.">		return fam != null &amp;&amp; !fam.getValues(null, null).isEmpty();</span>
+	}
+
+	@Override
+	public boolean exists(String table, String row)
+			throws DatabaseNotReachedException {
+<span class="fc bfc" id="L636" title="All 4 branches covered.">		if (!this.tables.contains(table))</span>
+<span class="fc" id="L637">			return false;</span>
+<span class="pc bfc" id="L638" title="All 2 branches covered.">		return this.getRow(table, row, false) != null;</span>
+	}
+
+	@Override
+	public ColumnFamilyData get(String table, String id, Set&lt;String&gt; families) throws DatabaseNotReachedException {
+<span class="fc bfc" id="L643" title="All 2 branches covered.">		Row row = this.getRow(table, id, false);</span>
+<span class="fc bfc" id="L644" title="All 2 branches covered.">		if (row == null)</span>
+<span class="fc" id="L645">			return null;</span>
+		
+<span class="fc" id="L647">		ColumnFamilyData ret = new DefaultColumnFamilyData();</span>
+		
+<span class="fc bfc" id="L649" title="All 2 branches covered.">		for (String family : families) {</span>
+<span class="fc" id="L650">			ColumnFamily fam = row.getNoCreate(family);</span>
+<span class="fc bfc" id="L651" title="All 2 branches covered.">			if (fam != null) {</span>
+<span class="fc" id="L652">				ret.put(family, fam.getValues(null, null));</span>
+			}
+		}
+		
+<span class="pc" id="L656">		return ret;</span>
+	}
+
+	@Override
+	public CloseableKeyIterator get(final String table, Constraint c, final int limit, Set&lt;String&gt; families)
+			throws DatabaseNotReachedException {
+<span class="fc bfc" id="L662" title="All 2 branches covered.">		Table t = this.getTable(table, false);</span>
+<span class="fc bfc" id="L663" title="All 2 branches covered.">		if (t == null)</span>
+<span class="fc" id="L664">			return new EmptyCloseableIterator();</span>
+<span class="fc bfc" id="L665" title="All 2 branches covered.">		final String endKey = c == null ? null : c.getEndKey();</span>
+<span class="fc bfc" id="L666" title="All 2 branches covered.">		final Iterator&lt;Row&gt; ret = t.getRowIterator(c == null ? null : c.getStartKey());</span>
+<span class="pc" id="L667">		return new CloseableKeyIterator() {</span>
+<span class="fc" id="L668">			private int count = 0;</span>
+<span class="fc" id="L669">			private Row next = null;</span>
+			private boolean done;
+			
+			private Row updateNext() {
+<span class="fc bfc" id="L673" title="All 2 branches covered.">				if (next != null)</span>
+<span class="fc" id="L674">					return next;</span>
+				
+<span class="pc bpc" id="L676" title="1 of 2 branches missed.">				if (done) {</span>
+<span class="nc" id="L677">					return next = null;</span>
+				}
+				
+<span class="fc bfc" id="L680" title="All 2 branches covered.">				if (++count &gt; limit) {</span>
+<span class="fc" id="L681">					done = true;</span>
+<span class="fc" id="L682">					return next = null;</span>
+				}
+				
+<span class="fc bfc" id="L685" title="All 2 branches covered.">				next = ret.hasNext() ? ret.next() : null;</span>
+				
+<span class="fc bfc" id="L687" title="All 2 branches covered.">				if (next == null</span>
+<span class="fc bfc" id="L688" title="All 4 branches covered.">						|| (endKey != null &amp;&amp; next.getKey().compareTo(endKey) &gt; 0) ) {</span>
+<span class="fc" id="L689">					done = true;</span>
+<span class="fc" id="L690">					next = null;</span>
+				}
+					
+<span class="fc" id="L693">				return next;</span>
+			}	
+			
+			@Override
+			public void remove() {
+<span class="nc" id="L698">				throw new UnsupportedOperationException();</span>
+			}
+			
+			@Override
+			public com.googlecode.n_orm.storeapi.Row next() {
+<span class="fc" id="L703">				com.googlecode.n_orm.storeapi.Row ret = updateNext();</span>
+<span class="fc" id="L704">				next = null;</span>
+<span class="fc" id="L705">				return ret;</span>
+			}
+			
+			@Override
+			public boolean hasNext() {
+<span class="fc bfc" id="L710" title="All 2 branches covered.">				return this.updateNext() != null;</span>
+			}
+			
+			@Override
+			public void close() {
+<span class="fc" id="L715">			}</span>
+		}; 
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

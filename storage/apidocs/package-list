@@ -1,0 +1,12 @@
+com.googlecode.n_orm
+com.googlecode.n_orm.cache.perthread
+com.googlecode.n_orm.cache.read
+com.googlecode.n_orm.cache.write
+com.googlecode.n_orm.cf
+com.googlecode.n_orm.consoleannotations
+com.googlecode.n_orm.conversion
+com.googlecode.n_orm.memory
+com.googlecode.n_orm.operations
+com.googlecode.n_orm.query
+com.googlecode.n_orm.storeapi
+com.googlecode.n_orm.utils

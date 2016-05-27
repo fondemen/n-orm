@@ -1,0 +1,32 @@
+-classpath
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm.redis/target/classes:/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm.redis/target/test-classes:/home/stefrd/.m2/repository/cglib/cglib-nodep/2.2/cglib-nodep-2.2.jar:/home/stefrd/.m2/repository/org/objenesis/objenesis/1.2/objenesis-1.2.jar:/home/stefrd/.m2/repository/redis/clients/jedis/2.0.0/jedis-2.0.0.jar:/home/stefrd/.m2/repository/org/aspectj/aspectjrt/1.6.12/aspectjrt-1.6.12.jar:/home/stefrd/.m2/repository/com/googlecode/n_orm/storage/0.0.1-SNAPSHOT/storage-0.0.1-SNAPSHOT.jar:/home/stefrd/.m2/repository/junit/junit/4.8.2/junit-4.8.2.jar:/home/stefrd/.m2/repository/org/easymock/easymock/3.0/easymock-3.0.jar:/home/stefrd/.m2/repository/commons-beanutils/commons-beanutils-core/1.8.3/commons-beanutils-core-1.8.3.jar:/home/stefrd/.m2/repository/commons-logging/commons-logging/1.1.1/commons-logging-1.1.1.jar:/home/stefrd/.m2/repository/org/codehaus/plexus/plexus-utils/2.1/plexus-utils-2.1.jar:/home/stefrd/.m2/repository/com/googlecode/n_orm/storage/0.0.1-SNAPSHOT/storage-0.0.1-SNAPSHOT-tests.jar:/home/stefrd/.m2/repository/commons-pool/commons-pool/1.5.5/commons-pool-1.5.5.jar:/home/stefrd/.m2/repository/commons-codec/commons-codec/1.4/commons-codec-1.4.jar'
+-encoding
+'UTF-8'
+-protected
+-sourcepath
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm.redis/src/test/java'
+-author
+-bottom
+'Copyright &#169; 2013. All Rights Reserved.'
+-charset
+'UTF-8'
+-d
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm.redis/target/site/testapidocs'
+-docencoding
+'UTF-8'
+-doctitle
+'Redis driver for n-orm jedis-2.0.0-n-orm-0.0.1-SNAPSHOT Test API'
+-link
+'../apidocs'
+-link
+'http://java.sun.com/javase/6/docs/api'
+-linkoffline
+'http://n-orm.googlecode.com/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/storage/target/site/testapidocs'
+-linkoffline
+'http://n-orm.googlecode.com/console/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/console/target/site/testapidocs'
+-linkoffline
+'http://n-orm.googlecode.com/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/hbase/target/site/testapidocs'
+-use
+-version
+-windowtitle
+'Redis driver for n-orm jedis-2.0.0-n-orm-0.0.1-SNAPSHOT Test API'

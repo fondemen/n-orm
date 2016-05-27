@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>MongoRow.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">mongoDB driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.mongo</a> &gt; <span class="el_source">MongoRow.java</span></div><h1>MongoRow.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.mongo;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.bson.types.ObjectId;
+
+import com.googlecode.n_orm.KeyManagement;
+import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row;
+import com.mongodb.DBObject;
+
+
+class MongoRow implements Row {
+
+	static final String ROW_ENTRY_NAME = &quot;_id&quot;;
+	static final String ROW_ENTRY_EXISTS = &quot;x&quot;;
+	
+<span class="fc" id="L23">	static final Set&lt;String&gt; NON_FAMILIES_ROWS = new TreeSet&lt;String&gt;(Arrays.asList(ROW_ENTRY_NAME, ROW_ENTRY_EXISTS));</span>
+	
+	static boolean isSpecialProperty(String family) {
+<span class="fc" id="L26">		return NON_FAMILIES_ROWS.contains(family);</span>
+	}
+
+	private final String key;
+	private final ColumnFamilyData values;
+
+<span class="fc" id="L32">	public MongoRow(DBObject llRow) {</span>
+		
+<span class="fc" id="L34">		Object id = llRow.get(ROW_ENTRY_NAME);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">		if (id instanceof String) {</span>
+<span class="fc" id="L36">			key = MongoNameSanitizer.dirty((String)id);</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">		} else if (id instanceof ObjectId) {</span>
+<span class="nc" id="L38">			key = ((ObjectId)id).toStringMongod() + KeyManagement.KEY_END_SEPARATOR;</span>
+		} else {
+<span class="nc" id="L40">			throw new IllegalStateException(&quot;Row &quot; + llRow + &quot; has unexpected id &quot; + id);</span>
+		}
+		
+<span class="fc" id="L43">		values = new DefaultColumnFamilyData();</span>
+
+<span class="fc bfc" id="L45" title="All 2 branches covered.">		for (String family : llRow.keySet()) {</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">			if (isSpecialProperty(family))</span>
+<span class="fc" id="L47">				continue;</span>
+			
+<span class="fc" id="L49">			Map&lt;String, byte[]&gt; map = new HashMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L50">			DBObject columns = (DBObject) llRow.get(family);</span>
+
+<span class="fc bfc" id="L52" title="All 2 branches covered.">			for (String k : columns.keySet()) {</span>
+<span class="fc" id="L53">				map.put(</span>
+					MongoNameSanitizer.dirty(k),
+					ConversionTools.convert(columns.get(k))
+				);
+<span class="fc" id="L57">			}</span>
+
+<span class="fc" id="L59">			values.put(</span>
+				MongoNameSanitizer.dirty(family),
+				map
+			);
+<span class="fc" id="L63">		}</span>
+<span class="fc" id="L64">	}</span>
+
+	@Override
+	public String getKey() {
+<span class="fc" id="L68">		return key;</span>
+	}
+
+	@Override
+	public ColumnFamilyData getValues() {
+<span class="fc" id="L73">		return values;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

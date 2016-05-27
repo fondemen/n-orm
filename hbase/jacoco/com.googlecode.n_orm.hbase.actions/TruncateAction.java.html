@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TruncateAction.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.actions</a> &gt; <span class="el_source">TruncateAction.java</span></div><h1>TruncateAction.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.actions;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.mapreduce.Job;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.hbase.Store;
+import com.googlecode.n_orm.hbase.mapreduce.Truncator;
+
+public class TruncateAction extends Action&lt;Void&gt; {
+	private final Store store;
+	private final Scan scan;
+
+	public TruncateAction(Store store, Scan scan) {
+<span class="fc" id="L23">		super();</span>
+<span class="fc" id="L24">		this.store = store;</span>
+<span class="fc" id="L25">		this.scan = scan;</span>
+<span class="fc" id="L26">	}</span>
+
+	@Override
+	public Void perform() throws Exception {
+<span class="fc bfc" id="L30" title="All 2 branches covered.">		if (this.store.isTruncateMapRed())</span>
+<span class="fc" id="L31">			this.truncateMapReduce();</span>
+		else
+<span class="fc" id="L33">			this.truncateSimple();</span>
+<span class="fc" id="L34">		return null;</span>
+	}
+	
+	protected void truncateSimple() throws IOException  {
+<span class="fc" id="L38">		ResultScanner r = null;</span>
+
+		try {
+<span class="fc" id="L41">			r = this.getTable().getScanner(this.scan);</span>
+<span class="fc" id="L42">			final int nbRows = 100;</span>
+<span class="fc" id="L43">			List&lt;Delete&gt; dels = new ArrayList&lt;Delete&gt;(nbRows);</span>
+<span class="fc" id="L44">			Result [] res = r.next(nbRows);</span>
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">			while (res != null &amp;&amp; res.length != 0) {</span>
+<span class="fc" id="L46">				dels.clear();</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">				for (Result result : res) {</span>
+<span class="fc" id="L48">					dels.add(new Delete(result.getRow()));</span>
+				}
+<span class="fc" id="L50">				getTable().delete(dels);</span>
+<span class="fc" id="L51">				res = r.next(nbRows);</span>
+			}
+		} finally {
+<span class="pc bpc" id="L54" title="3 of 4 branches missed.">			if (r != null)</span>
+<span class="pc" id="L55">				r.close();</span>
+		}
+<span class="fc" id="L57">	}</span>
+	
+	protected void truncateMapReduce() throws IOException, InterruptedException, ClassNotFoundException  {
+<span class="fc" id="L60">		String tableName = Bytes.toString(getTable().getTableName());</span>
+<span class="fc" id="L61">		Job count = Truncator.createSubmittableJob(this.store, tableName, this.scan);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">		if(!count.waitForCompletion(false)) {</span>
+<span class="nc" id="L63">			throw new DatabaseNotReachedException(&quot;Could not truncate table with map/reduce &quot; + tableName);</span>
+		}
+<span class="fc" id="L65">	}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

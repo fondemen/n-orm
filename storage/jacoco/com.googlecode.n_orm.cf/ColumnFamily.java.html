@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ColumnFamily.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.cf</a> &gt; <span class="el_source">ColumnFamily.java</span></div><h1>ColumnFamily.java</h1><pre class="source lang-java linenums"><span class="nc" id="L1">package com.googlecode.n_orm.cf;</span>
+
+import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+import com.googlecode.n_orm.AddOnly;
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.IncrementException;
+import com.googlecode.n_orm.IncrementManagement;
+import com.googlecode.n_orm.Incrementing;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.MetaInformation;
+
+
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">public abstract class ColumnFamily&lt;T&gt; implements Comparable&lt;ColumnFamily&lt;T&gt;&gt; {</span>
+<span class="fc" id="L26">	public static enum ChangeKind {SET, DELETE};</span>
+	
+	protected final Class&lt;T&gt; clazz;
+	protected final Field property;
+	protected final String name;
+	protected final PersistingElement owner;
+
+<span class="fc" id="L33">	protected final Map&lt;String, T&gt; collection = new TreeMap&lt;String, T&gt;();</span>
+
+	protected boolean allChanged;
+	protected Map&lt;String, ChangeKind&gt; changes;
+	protected final Map&lt;String, Number&gt; increments;
+	protected final boolean addOnly;
+	
+<span class="fc" id="L40">	protected long lastActivation = -1;</span>
+	
+<span class="fc" id="L42">	public ColumnFamily() { //For compile-time purpose only ; should be replaced by Around of ColumnFamilyManagement</span>
+<span class="fc" id="L43">		this.clazz = null;</span>
+<span class="fc" id="L44">		this.property = null;</span>
+<span class="fc" id="L45">		this.name = null;</span>
+<span class="fc" id="L46">		this.owner = null;</span>
+<span class="fc" id="L47">		this.increments = null;</span>
+<span class="fc" id="L48">		this.addOnly = false;</span>
+<span class="fc" id="L49">	}</span>
+
+	public ColumnFamily(Class&lt;T&gt; clazz, Field property, String name, PersistingElement owner) {
+<span class="fc" id="L52">		super();</span>
+<span class="fc" id="L53">		this.clazz = clazz;</span>
+<span class="fc" id="L54">		this.property = property;</span>
+<span class="fc" id="L55">		this.name = name;</span>
+<span class="fc" id="L56">		this.owner = owner;</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">		this.addOnly = property != null &amp;&amp; property.isAnnotationPresent(AddOnly.class);</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">		if (property != null &amp;&amp; property.isAnnotationPresent(Incrementing.class)) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">			if (!Number.class.isAssignableFrom(clazz))</span>
+<span class="nc" id="L60">				throw new IllegalArgumentException(&quot;Only number types may be incrementing, which is not the case of elements of &quot; + property);</span>
+<span class="fc" id="L61">			this.increments = new TreeMap&lt;String, Number&gt;();</span>
+<span class="fc" id="L62">			this.changes = null;</span>
+		} else {
+<span class="fc" id="L64">			this.changes = new TreeMap&lt;String, ChangeKind&gt;();</span>
+<span class="fc" id="L65">			this.increments = null;</span>
+		}
+<span class="fc" id="L67">	}</span>
+	
+	public abstract Serializable getSerializableVersion();
+	protected abstract void updateFromPOJO(Object pojoVersion);
+	protected abstract void storeToPOJO(Object pojoVersion);
+	protected abstract void addToPOJO(Object pojoVersion, String key, T element);
+
+	@Override
+	public int compareTo(ColumnFamily&lt;T&gt; rhs) {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">		return this == rhs ? 0 : this.owner.compareTo(rhs.owner) + this.name.compareTo(rhs.name);</span>
+	}
+	
+	public String getName() {
+<span class="fc" id="L80">		return name;</span>
+	}
+	
+	public Class&lt;T&gt; getClazz() {
+<span class="fc" id="L84">		return clazz;</span>
+	}
+
+	/**
+	 * @return the property corresponding to that column family ; may be null, e.g. for the properties or increments column families
+	 */
+	public Field getProperty() {
+<span class="fc" id="L91">		return property;</span>
+	}
+
+	public PersistingElement getOwner() {
+<span class="fc" id="L95">		return owner;</span>
+	}
+
+	public boolean isAddOnly() {
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">		return this.addOnly || this.increments != null;</span>
+	}
+
+	public boolean isActivated() {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">		return this.lastActivation &gt; 0;</span>
+	}
+
+	/**
+	 * Whether this column family was activated during the last &lt;code&gt;timeout&lt;/code&gt; period.
+	 * @param timeout negative value means at any time ; {@link Long#MAX_VALUE} bypasses clock read
+	 */
+	public boolean isActivated(long timeout) {
+<span class="pc bpc" id="L111" title="1 of 8 branches missed.">		return this.lastActivation &gt; 0 &amp;&amp; (timeout &lt; 0 ? true : (timeout == Long.MAX_VALUE || System.currentTimeMillis() - timeout &lt; this.lastActivation));</span>
+	}
+
+	public void setActivated() {
+<span class="fc" id="L115">		this.lastActivation = System.currentTimeMillis();</span>
+<span class="fc" id="L116">	}</span>
+	
+	/**
+	 * The date (epoch) at which the column familu was last activated.
+	 */
+	public long getActivationDate() {
+<span class="nc" id="L122">		return this.lastActivation;</span>
+	}
+	
+	public void assertIsActivated(String messageToDescribeTheContextOfTheCheck) throws IllegalStateException {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">		if (! this.isActivated())</span>
+<span class="nc" id="L127">			throw new IllegalStateException(&quot;Column family &quot; + this.getName() + &quot; should be activated on &quot; + this.getOwner() + &quot; while &quot; + messageToDescribeTheContextOfTheCheck);</span>
+<span class="fc" id="L128">	}</span>
+	
+	@Continuator
+	public void activate() throws DatabaseNotReachedException {
+<span class="fc" id="L132">		this.activate(null);</span>
+<span class="fc" id="L133">	}</span>
+	
+	public abstract void activate(Object from, Object to) throws DatabaseNotReachedException;
+
+	//@Continuator
+	public void activate(String fromIndex, String toIndex) throws DatabaseNotReachedException {
+<span class="fc" id="L139">		this.activate(new Constraint(fromIndex, toIndex));</span>
+<span class="fc" id="L140">	}</span>
+	
+	public void activate(Constraint c) throws DatabaseNotReachedException {
+<span class="fc" id="L143">		this.owner.checkIsValid();</span>
+<span class="fc" id="L144">		String id = this.owner.getIdentifier();</span>
+<span class="pc bpc" id="L145" title="2 of 4 branches missed.">		assert id != null;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">		Map&lt;String, byte[]&gt; elements = c == null ?</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">					this.owner.getStore().get(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), id, this.name)</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">				:	this.owner.getStore().get(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), id, this.name, c);</span>
+<span class="fc" id="L149">		this.rebuild(elements);</span>
+<span class="fc" id="L150">	}</span>
+
+	public void rebuild(Map&lt;String, byte[]&gt; rawData) throws DatabaseNotReachedException {
+<span class="fc" id="L153">		this.collection.clear();</span>
+<span class="fc" id="L154">		this.clearChanges();</span>
+<span class="fc" id="L155">		String id = this.owner.getIdentifier();</span>
+<span class="pc bpc" id="L156" title="2 of 4 branches missed.">		assert id != null;</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">		if (rawData != null)</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">			for (Entry&lt;String, byte[]&gt; entry : rawData.entrySet()) {</span>
+<span class="fc" id="L159">				this.collection.put(entry.getKey(), this.preparePut(entry.getKey(), entry.getValue()));</span>
+			}
+<span class="fc" id="L161">		setActivated();</span>
+<span class="fc" id="L162">		this.storeToPOJO();</span>
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">		assert ! this.hasChanged();</span>
+<span class="fc" id="L164">	}</span>
+
+	protected T preparePut(String key, byte [] rep) {
+<span class="fc" id="L167">		return ConversionTools.convert(this.clazz, rep);</span>
+	}
+
+	/**
+	 * Returns the number of activated elements.
+	 */
+	@Continuator
+	public int size() {
+<span class="fc" id="L175">		return this.collection.size();</span>
+	}
+	
+//	Given up ; not efficient way to do that in HBase 0.20.6
+//	/**
+//	 * Returns the number of elements in the data store.
+//	 */
+//	public int sizeInStore() throws DatabaseNotReachedException {
+//		return this.getOwner().getStore().count(this.ownerTable, this.getOwner().getIdentifier(), this.getName());
+//	}
+
+	/**
+	 * Checks whether this column family is empty.
+	 * If no element is cached, requests the data store.
+	 */
+	public boolean isEmpty() {
+<span class="fc" id="L191">		return this.collection.isEmpty();</span>
+	}
+
+	/**
+	 * Checks whether this column family is empty in the data store.
+	 */
+	public boolean isEmptyInStore() throws DatabaseNotReachedException {
+<span class="fc bfc" id="L198" title="All 4 branches covered.">		return !this.getOwner().getStore().exists(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), this.getOwner().getIdentifier(), this.getName());</span>
+	}
+
+	@Continuator
+	public boolean containsKey(String key) {
+<span class="fc bfc" id="L203" title="All 2 branches covered.">		if (this.collection.containsKey(key))</span>
+<span class="fc" id="L204">			return true;</span>
+		
+<span class="pc bpc" id="L206" title="1 of 4 branches missed.">		if (this.changes != null &amp;&amp; this.changes.containsKey(key)) {</span>
+<span class="pc bpc" id="L207" title="2 of 4 branches missed.">			assert this.changes.get(key).equals(ChangeKind.DELETE);</span>
+<span class="fc" id="L208">			return false;</span>
+		}
+		
+<span class="pc bpc" id="L211" title="4 of 6 branches missed.">		assert this.increments == null || !this.increments.containsKey(key);</span>
+		
+<span class="fc" id="L213">		return false;</span>
+	}
+
+	public void putElement(String key, T element) throws IncrementException {
+<span class="fc bfc" id="L217" title="All 4 branches covered.">		if (key == null || element == null)</span>
+<span class="fc" id="L218">			throw new NullPointerException();</span>
+<span class="fc" id="L219">		T old = this.collection.put(key, element);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">		if (this.increments != null) {</span>
+<span class="fc" id="L221">			Number oVal = (Number) old;</span>
+<span class="fc" id="L222">			Number nVal = (Number) element;</span>
+<span class="fc" id="L223">			this.increments.put(key, IncrementManagement.getInstance().getActualIncrement(nVal, oVal, this.getIncrement(key), this.getProperty()));</span>
+		} else {
+<span class="fc bfc" id="L225" title="All 4 branches covered.">			if (old == null || this.hasChanged(key, old, element))</span>
+<span class="fc" id="L226">				this.changes.put(key, ChangeKind.SET);</span>
+		}
+<span class="fc" id="L228">	}</span>
+	
+	protected boolean hasChanged(String key, T lhs, T rhs) {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">		if(lhs == rhs)</span>
+<span class="fc" id="L232">			return false;</span>
+		
+<span class="fc bfc" id="L234" title="All 2 branches covered.">		return !Arrays.equals(ConversionTools.convert(lhs, this.clazz), ConversionTools.convert(rhs, this.clazz));</span>
+	}
+	
+	/**
+	 * The set of identifiers for activated elements.
+	 */
+	@Continuator
+	public Set&lt;String&gt; getKeys() {
+<span class="fc" id="L242">		return this.collection.keySet();</span>
+	}
+
+	/**
+	 * Removes an element to the column family given its key.
+	 * For this element not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
+	 */
+	@Continuator
+	public void removeKey(String key) {
+<span class="fc bfc" id="L251" title="All 2 branches covered.">		if (this.isAddOnly())</span>
+<span class="fc" id="L252">			throw new IllegalStateException(&quot;This collection does not accepts removal.&quot;);</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">		if (this.collection.containsKey(key)) {</span>
+<span class="fc" id="L254">			this.collection.remove(key);</span>
+<span class="pc bpc" id="L255" title="3 of 6 branches missed.">			assert this.changes != null &amp;&amp; this.increments == null;</span>
+<span class="fc" id="L256">			this.changes.put(key, ChangeKind.DELETE);</span>
+		}
+<span class="fc" id="L258">	}</span>
+
+
+	/**
+	 * Finds an cached element according to its key.
+	 */
+	@Continuator
+	public T getElement(String key) {
+		T ret;
+		try {
+<span class="fc" id="L268">			ret = this.collection.get(key);</span>
+<span class="fc" id="L269">		} catch (Exception x) {</span>
+<span class="fc" id="L270">			return null;</span>
+		}
+<span class="fc bfc" id="L272" title="All 2 branches covered.">		if (ret != null)</span>
+<span class="fc" id="L273">			return ret;</span>
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">		if (this.changes != null &amp;&amp; this.changes.containsKey(key)) {</span>
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">			assert this.changes.get(key).equals(ChangeKind.DELETE);</span>
+<span class="fc" id="L276">			return null;</span>
+		}
+<span class="pc bpc" id="L278" title="4 of 6 branches missed.">		assert this.increments == null || !this.increments.containsKey(key);</span>
+<span class="fc" id="L279">		return null;</span>
+	}
+
+
+	/**
+	 * Finds an element according to its key.
+	 * If the element is not in the cache, attempts to get it from the data store.
+	 * The found element goes into the cache.
+	 */
+	@Continuator
+	public T getFromStore(String key) throws DatabaseNotReachedException {
+		//First, tries from the cache
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">		if (this.collection.containsKey(key))</span>
+<span class="nc" id="L292">			return this.collection.get(key);</span>
+<span class="pc bpc" id="L293" title="2 of 4 branches missed.">		if (this.changes != null &amp;&amp; this.changes.containsKey(key)) {</span>
+<span class="nc bnc" id="L294" title="All 4 branches missed.">			assert this.changes.get(key).equals(ChangeKind.DELETE);</span>
+<span class="nc" id="L295">			return null;</span>
+		}
+<span class="pc bpc" id="L297" title="4 of 6 branches missed.">		assert this.increments == null || !this.increments.containsKey(key);</span>
+		
+<span class="fc bfc" id="L299" title="All 2 branches covered.">		byte[] res = this.owner.getStore().get(new MetaInformation().forElement(this.owner).forProperty(this.property), this.owner.getTable(), this.owner.getIdentifier(), this.name, key);</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">		if (res == null)</span>
+<span class="fc" id="L301">			return null;</span>
+<span class="fc" id="L302">		T element = this.preparePut(key, res);</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">		if (this.changes != null)</span>
+<span class="fc" id="L304">			this.changes.remove(key);</span>
+<span class="fc" id="L305">		this.collection.put(key, element);</span>
+<span class="fc" id="L306">		this.addToPOJO(this.getPOJO(true), key, element);</span>
+<span class="fc" id="L307">		return element;</span>
+	}
+
+	@Continuator
+	public Set&lt;String&gt; changedKeySet() {
+<span class="fc bfc" id="L312" title="All 2 branches covered.">		if (this.allChanged ) return this.getKeys();</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">		return this.changes == null ? new TreeSet&lt;String&gt;() : this.changes.keySet();</span>
+	}
+
+	@Continuator
+	public Set&lt;String&gt; incrementedKeySet() {
+<span class="fc bfc" id="L318" title="All 2 branches covered.">		return this.increments == null ? new TreeSet&lt;String&gt;() : this.increments.keySet();</span>
+	}
+
+	@Continuator
+	public boolean hasChanged() {
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">		return this.allChanged</span>
+<span class="fc bfc" id="L324" title="All 4 branches covered.">				|| (this.changes != null &amp;&amp; !this.changes.isEmpty())</span>
+<span class="pc bpc" id="L325" title="1 of 4 branches missed.">				|| (this.increments != null &amp;&amp; !this.increments.isEmpty());</span>
+	}
+
+	@Continuator
+	public boolean wasChanged(String key) {
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">		return this.allChanged</span>
+<span class="pc bpc" id="L331" title="5 of 6 branches missed.">				|| (this.changes != null &amp;&amp; this.changes.containsKey(key)&amp;&amp; this.changes.get(key).equals(ChangeKind.SET))</span>
+<span class="pc bpc" id="L332" title="2 of 4 branches missed.">				|| (this.increments != null &amp;&amp; this.increments.containsKey(key));</span>
+	}
+
+	@Continuator
+	public boolean wasDeleted(String key) {
+<span class="pc bpc" id="L337" title="1 of 8 branches missed.">		return !this.allChanged &amp;&amp; this.changes != null &amp;&amp; this.changes.containsKey(key)&amp;&amp; this.changes.get(key).equals(ChangeKind.DELETE);</span>
+	}
+
+	@Continuator
+	public Number getIncrement(String key) {
+<span class="pc bpc" id="L342" title="1 of 4 branches missed.">		return this.increments == null ? null : this.increments.containsKey(key) ? this.increments.get(key) : null;</span>
+	}
+
+	public void setAllChanged() {
+<span class="fc" id="L346">		this.allChanged = true;</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">		if (this.changes != null)</span>
+<span class="fc" id="L348">			this.changes.clear();</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">		if (this.increments != null)</span>
+<span class="nc" id="L350">		this.increments.clear();</span>
+<span class="fc" id="L351">	}</span>
+	
+	public void clearChanges() {
+<span class="fc" id="L354">		this.allChanged = false;</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">		if (this.changes != null)</span>
+<span class="fc" id="L356">			this.changes.clear();</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">		if (this.increments != null)</span>
+<span class="fc" id="L358">			this.increments.clear();</span>
+<span class="fc" id="L359">	}</span>
+	
+	public Object getPOJO(boolean createIfNull) {
+<span class="fc" id="L362">		Object pojo = PropertyManagement.getInstance().candideReadValue(this.getOwner(), this.getProperty());</span>
+<span class="pc bpc" id="L363" title="3 of 4 branches missed.">		if (pojo == null &amp;&amp; createIfNull) {</span>
+<span class="nc" id="L364">			pojo = this.getSerializableVersion();</span>
+<span class="nc" id="L365">			PropertyManagement.getInstance().candideSetValue(this.getOwner(), this.getProperty(), pojo);</span>
+		}
+		
+<span class="fc" id="L368">		return pojo;</span>
+	}
+	
+	public void updateFromPOJO() {
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">		if (this.getProperty() == null) {</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">			assert false : &quot;Shouldn't update column family &quot; + this.getName();</span>
+<span class="nc" id="L374">			return;</span>
+		}
+
+<span class="fc" id="L377">		Object pojo = this.getPOJO(false);</span>
+<span class="pc bpc" id="L378" title="1 of 4 branches missed.">		if (pojo != null &amp;&amp; pojo != this) {</span>
+<span class="fc" id="L379">			this.updateFromPOJO(pojo);</span>
+		}
+<span class="fc" id="L381">	}</span>
+	
+	public void storeToPOJO() {
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">		if (this.getProperty() == null) {</span>
+<span class="nc bnc" id="L385" title="All 2 branches missed.">			assert false : &quot;Shouldn't store column family &quot; + this.getName();</span>
+<span class="nc" id="L386">			return;</span>
+		}
+
+<span class="fc" id="L389">		Object pojo = this.getPOJO(true);</span>
+<span class="pc bpc" id="L390" title="1 of 4 branches missed.">		if (pojo != null &amp;&amp; pojo != this) {</span>
+<span class="fc" id="L391">			this.storeToPOJO(pojo);</span>
+		}
+<span class="fc" id="L393">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

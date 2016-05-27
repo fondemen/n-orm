@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>DateConverter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">DateConverter.java</span></div><h1>DateConverter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+import java.util.Date;
+
+class DateConverter extends SimpleConverter&lt;Date&gt; {
+
+	public DateConverter() {
+<span class="fc" id="L8">		super(Date.class);</span>
+<span class="fc" id="L9">	}</span>
+
+	@Override
+	public Date getDefaultValue(Class&lt;?&gt; type) {
+<span class="fc" id="L13">		return null;</span>
+	}
+
+	@Override
+	public Date fromString(String rep, Class&lt;?&gt; expected) {
+<span class="fc" id="L18">		return new Date(ConversionTools.longConverter.parseString(rep));</span>
+	}
+
+	@Override
+	public String toString(Date obj) {
+<span class="fc" id="L23">		return ConversionTools.longConverter.unparseString(obj.getTime());</span>
+	}
+	
+	@Override
+	public Object fromStringReverted(String rep, Class&lt;?&gt; type) {
+<span class="fc" id="L28">		return new Date(-ConversionTools.longConverter.parseString(rep));</span>
+	}
+
+	@Override
+	public String toStringReverted(Date obj, Class&lt;? extends Date&gt; expected) {
+<span class="fc" id="L33">		return ConversionTools.longConverter.unparseString(-obj.getTime());</span>
+	}
+
+	@Override
+	public Date fromBytes(byte[] rep, Class&lt;? extends Object&gt; expected) {
+<span class="fc" id="L38">		return new Date(ConversionTools.longConverter.parseBytes(rep));</span>
+	}
+
+	@Override
+	public byte[] toBytes(Date obj) {
+<span class="fc" id="L43">		return ConversionTools.longConverter.unparseBytes(obj.getTime());</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

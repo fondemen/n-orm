@@ -1,0 +1,8 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+mongoDB driver for n-orm,com.googlecode.n_orm.mongo,MongoStore.MSQuery,0,3,0,0,0,1,0,1,0,1
+mongoDB driver for n-orm,com.googlecode.n_orm.mongo,CloseableIterator,7,34,0,2,1,11,1,6,1,5
+mongoDB driver for n-orm,com.googlecode.n_orm.mongo,MongoRow,32,100,3,7,3,20,2,8,0,5
+mongoDB driver for n-orm,com.googlecode.n_orm.mongo,MongoNameSanitizer,3,32,2,2,1,10,3,2,1,2
+mongoDB driver for n-orm,com.googlecode.n_orm.mongo,SimpleMongoStore,10,85,0,0,3,18,2,14,2,14
+mongoDB driver for n-orm,com.googlecode.n_orm.mongo,MongoStore,302,1526,19,125,69,334,29,93,11,39
+mongoDB driver for n-orm,com.googlecode.n_orm.mongo,Mongo,3,5,0,0,1,2,1,1,1,1

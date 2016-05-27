@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>AggregatingIterator.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.utils</a> &gt; <span class="el_source">AggregatingIterator.java</span></div><h1>AggregatingIterator.java</h1><pre class="source lang-java linenums"><span class="pc" id="L1">package com.googlecode.n_orm.utils;</span>
+
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+import com.googlecode.n_orm.CloseableIterator;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingMixin;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Row;
+
+/**
+ * An {@link CloseableIterator} composite able to iterate over a set of
+ * {@link CloseableIterator}s. Elements are selected from composed iterators
+ * so that they are iterated
+ * {@link PersistingElement#compareTo(PersistingElement) in an ordered way}.
+ * In case an element with same id is found from different iterators, an
+ * {@link IllegalStateException exception} is thrown, unless
+ * {@link #merge(Row, CloseableKeyIterator, Row, CloseableKeyIterator)}
+ * is overridden.
+ */
+<span class="fc" id="L23">public class AggregatingIterator implements CloseableKeyIterator {</span>
+
+	/**
+	 * A pointer on a composed iterator..
+	 */
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">	private class IteratorStatus {</span>
+		/**
+		 * The result of an iterated element. The iterated element is
+		 * considered as iterated over only when
+		 * {@link ResultReadyToGo#getResult()} is called.
+		 */
+<span class="fc" id="L34">		private class ResultReadyToGo {</span>
+
+			/**
+			 * Get the iterated row and marks it as iterated over, that is
+			 * iterator pointed by {@link IteratorStatus} will be called
+			 * {@link Iterator#next()} in order to know what is the next
+			 * element to be iterated, instead of returning this element
+			 * again.
+			 * 
+			 * @return the iterated row
+			 */
+			public Row getResult() {
+<span class="fc" id="L46">				Row ret = IteratorStatus.this.next;</span>
+<span class="fc" id="L47">				IteratorStatus.this.next = null;</span>
+<span class="fc" id="L48">				return ret;</span>
+			}
+
+			/**
+			 * The key of the result. This methods leave the element as the
+			 * next element to be iterated.
+			 * 
+			 * @return
+			 */
+			private String getKey() {
+<span class="fc" id="L58">				return IteratorStatus.this.next.getKey();</span>
+			}
+			
+			/**
+			 * The {@link IteratorStatus} to which this result belongs
+			 * @return
+			 */
+			private IteratorStatus getIteratorStatus() {
+<span class="fc" id="L66">				return IteratorStatus.this;</span>
+			}
+		}
+
+		/**
+		 * The pointed iterator
+		 */
+		private final CloseableKeyIterator it;
+		/**
+		 * The next row to be iterated
+		 */
+<span class="fc" id="L77">		private Row next = null;</span>
+		/**
+		 * Whether pointed iterator is empty and closed
+		 */
+<span class="fc" id="L81">		private boolean done = false;</span>
+
+<span class="fc" id="L83">		public IteratorStatus(CloseableKeyIterator it) {</span>
+<span class="fc" id="L84">			this.it = it;</span>
+<span class="fc" id="L85">		}</span>
+
+		/**
+		 * Grabs the next element to be iterated if no known yet.
+		 */
+		private void prepareNext() {
+			try {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">				if (this.done)</span>
+<span class="fc" id="L93">					return;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">				if (this.next == null) {</span>
+					// First call or last result was iterated using
+					// ResultReadyToGo.getResult()
+<span class="fc bfc" id="L97" title="All 2 branches covered.">					if (this.it.hasNext()) {</span>
+<span class="fc" id="L98">						this.next = this.it.next();</span>
+					} else {
+						// No more elements in this iterator ; closing
+<span class="fc" id="L101">						this.close();</span>
+					}
+				}
+<span class="nc" id="L104">			} finally {</span>
+<span class="pc bpc" id="L105" title="11 of 18 branches missed.">				assert this.done == (this.next == null);</span>
+<span class="nc" id="L106">			}</span>
+<span class="fc" id="L107">		}</span>
+
+		/**
+		 * @see CloseableKeyIterator#hasNext()
+		 */
+		public boolean hasNext() {
+<span class="fc" id="L113">			this.prepareNext();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">			return this.next != null;</span>
+		}
+
+		/**
+		 * Returns the next element to be iterated if this element is lower
+		 * than parameter. Lower means with a lower key as can be found by
+		 * {@link ResultReadyToGo#getKey()}.
+		 * 
+		 * @param r
+		 *            null or a previously iterated key
+		 * @return r if it is null or lower than the next element of this
+		 *         iterator or the row to be removed from this iterator in
+		 *         case {@link ResultReadyToGo#getResult()} is called
+		 * @see CloseableKeyIterator#next()
+		 */
+		public ResultReadyToGo getNextIfLower(ResultReadyToGo r) {
+<span class="fc" id="L130">			this.prepareNext();</span>
+
+<span class="fc bfc" id="L132" title="All 2 branches covered.">			if (this.done)</span>
+<span class="fc" id="L133">				return r;</span>
+
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">			assert this.next != null;</span>
+
+<span class="fc bfc" id="L137" title="All 2 branches covered.">			if (r == null) {</span>
+<span class="fc" id="L138">				return new ResultReadyToGo();</span>
+			} else {
+<span class="fc" id="L140">				int cmp = this.next.getKey().compareTo(r.getKey());</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">				if (cmp == 0) {</span>
+					try {
+<span class="fc" id="L143">						this.next = AggregatingIterator.this.merge(this.next, this.it, r.getResult(), r.getIteratorStatus().it);</span>
+<span class="fc" id="L144">					} catch (RuntimeException x) {</span>
+<span class="fc" id="L145">						throw x;</span>
+<span class="nc" id="L146">					} catch (Exception x) {</span>
+<span class="nc" id="L147">						throw new RuntimeException(x);</span>
+					}
+<span class="fc" id="L149">					r.getIteratorStatus().next = null;</span>
+<span class="fc" id="L150">					return new ResultReadyToGo();</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">				} else if (cmp &lt; 0) {</span>
+<span class="fc" id="L152">					return new ResultReadyToGo();</span>
+				} else /*if (cmp &gt; 0)*/ {
+<span class="fc" id="L154">					return r;</span>
+				}
+			}
+		}
+
+		/**
+		 * @see CloseableIterator#close()
+		 */
+		public void close() {
+<span class="fc bfc" id="L163" title="All 2 branches covered.">			if (!this.done) {</span>
+<span class="fc" id="L164">				this.it.close();</span>
+<span class="fc" id="L165">				this.done = true;</span>
+			}
+<span class="fc" id="L167">		}</span>
+	}
+
+	/**
+	 * The composed iterators.
+	 */
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">	private Set&lt;IteratorStatus&gt; status = new LinkedHashSet&lt;IteratorStatus&gt;();</span>
+	/**
+	 * Whether iteration has started.
+	 */
+<span class="fc" id="L177">	private boolean started = false;</span>
+
+	/**
+	 * Adds an iterator to the list of iterators to be explored.
+	 * 
+	 * @throws IllegalStateException
+	 *             in case the iteration has started using
+	 *             {@link #hasNext()} or {@link #next()}.
+	 */
+	public void addIterator(CloseableKeyIterator it) {
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">		if (this.started)</span>
+<span class="nc" id="L188">			throw new IllegalStateException(</span>
+<span class="nc" id="L189">					&quot;Cannot add a new iterator when iteration has started&quot;);</span>
+<span class="fc" id="L190">		this.status.add(new IteratorStatus(it));</span>
+<span class="fc" id="L191">	}</span>
+
+	@Override
+	public void close() {
+<span class="fc bfc" id="L195" title="All 2 branches covered.">		for (IteratorStatus is : this.status) {</span>
+<span class="fc" id="L196">			is.close();</span>
+		}
+<span class="fc" id="L198">	}</span>
+
+	@Override
+	public boolean hasNext() {
+<span class="fc" id="L202">		this.started = true;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">		for (IteratorStatus is : this.status) {</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">			if (is.hasNext())</span>
+<span class="fc" id="L205">				return true;</span>
+		}
+<span class="fc" id="L207">		return false;</span>
+	}
+
+	@Override
+	public Row next() {
+<span class="fc" id="L212">		this.started = true;</span>
+<span class="fc" id="L213">		IteratorStatus.ResultReadyToGo ret = null;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">		for (IteratorStatus is : this.status) {</span>
+<span class="fc" id="L215">			ret = is.getNextIfLower(ret);</span>
+		}
+<span class="fc" id="L217">		return ret.getResult();</span>
+	}
+
+	/**
+	 * @throws UnsupportedOperationException
+	 *             in any case
+	 */
+	@Override
+	public void remove() {
+<span class="nc" id="L226">		throw new UnsupportedOperationException();</span>
+	}
+	
+	public Row merge(Row r1, CloseableKeyIterator it1, Row r2, CloseableKeyIterator it2) throws Exception {
+<span class="fc" id="L230">		throw new IllegalStateException(&quot;Found element with same key &quot;</span>
+<span class="fc" id="L231">				+ PersistingMixin.getInstance().identifierToString(r1.getKey())</span>
+<span class="fc" id="L232">				+ &quot; from different iterators: &quot;</span>
+<span class="fc" id="L233">				+ it1.toString()</span>
+<span class="fc" id="L234">				+ &quot; and &quot; + it2.toString());</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

@@ -1,0 +1,545 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>MapColumnFamily.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.cf</a> &gt; <span class="el_source">MapColumnFamily.java</span></div><h1>MapColumnFamily.java</h1><pre class="source lang-java linenums"><span class="pc" id="L1">package com.googlecode.n_orm.cf;</span>
+
+import java.io.Serializable;
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+import com.googlecode.n_orm.conversion.ConversionTools;
+
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">public class MapColumnFamily&lt;K, T&gt; extends ColumnFamily&lt;T&gt; implements Map&lt;K, T&gt; {</span>
+	protected final Class&lt;K&gt; keyClazz;
+	protected final boolean keyIsString;
+<span class="pc bpc" id="L22" title="2 of 4 branches missed.">	private Set&lt;Map.Entry&lt;K, T&gt;&gt; entries = null;</span>
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">	private Set&lt;K&gt; keys = null;</span>
+
+<span class="fc" id="L25">	public MapColumnFamily() {</span>
+<span class="fc" id="L26">		keyClazz = null;</span>
+<span class="fc" id="L27">		keyIsString = false;</span>
+<span class="fc" id="L28">	}</span>
+
+	public MapColumnFamily(Class&lt;K&gt; keyClazz, Class&lt;T&gt; valueClazz,
+			Field property, String name, PersistingElement owner) {
+<span class="fc" id="L32">		super(valueClazz, property, name, owner);</span>
+<span class="fc" id="L33">		this.keyClazz = keyClazz;</span>
+<span class="fc" id="L34">		this.keyIsString = this.keyClazz.equals(String.class);</span>
+<span class="fc" id="L35">	}</span>
+
+	@Override
+	public Serializable getSerializableVersion() {
+<span class="fc" id="L39">		HashMap&lt;K, T&gt; ret = new HashMap&lt;K, T&gt;();</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">		for (Map.Entry&lt;K, T&gt; kv : this.entrySet()) {</span>
+<span class="nc" id="L41">			ret.put(kv.getKey(), kv.getValue());</span>
+		}
+<span class="fc" id="L43">		return ret;</span>
+	}
+
+	protected String toKey(K key) {
+<span class="fc bfc" id="L47" title="All 2 branches covered.">		return this.keyIsString ? (String) key : ConversionTools</span>
+<span class="fc" id="L48">				.convertToString(key, this.keyClazz);</span>
+	}
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	protected K fromKey(String key) {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">		return this.keyIsString ? (K) key : ConversionTools.convertFromString(</span>
+<span class="fc" id="L54">				this.keyClazz, key);</span>
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">		return this == obj</span>
+<span class="fc bfc" id="L60" title="All 4 branches covered.">				|| (obj != null &amp;&amp; (obj instanceof Map) &amp;&amp; this.entrySet()</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">						.equals(((Map&lt;?, ?&gt;) obj).entrySet()));</span>
+	}
+
+	@Override
+	public int hashCode() {
+<span class="fc" id="L66">		int h = 0;</span>
+<span class="fc" id="L67">		Iterator&lt;Map.Entry&lt;K,T&gt;&gt; i = entrySet().iterator();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">		while (i.hasNext())</span>
+<span class="fc" id="L69">			h += i.next().hashCode();</span>
+<span class="fc" id="L70">		return h;</span>
+	}
+
+	@Override
+	@Continuator
+	public void clear() {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">		for (String key : new TreeSet&lt;String&gt;(this.getKeys())) {</span>
+<span class="fc" id="L77">			this.removeKey(key);</span>
+		}
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">		assert this.size() == 0;</span>
+<span class="fc" id="L80">	}</span>
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	@Override
+	@Continuator
+	public boolean containsKey(Object key) {
+<span class="fc" id="L86">		return super.containsKey(this.toKey((K) key));</span>
+	}
+
+	@Override
+	@Continuator
+	public boolean containsValue(Object value) {
+<span class="fc" id="L92">		return this.collection.containsValue(value);</span>
+	}
+
+	@Override
+	public Set&lt;K&gt; keySet() {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">		if (this.keys == null) {</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">			this.keys = new Set&lt;K&gt;() {</span>
+
+				@Override
+				public boolean add(K e) {
+<span class="fc" id="L102">					throw new UnsupportedOperationException();</span>
+				}
+
+				@Override
+				public boolean addAll(Collection&lt;? extends K&gt; c) {
+<span class="fc" id="L107">					throw new UnsupportedOperationException();</span>
+				}
+
+				@Override
+				public void clear() {
+<span class="fc" id="L112">					MapColumnFamily.this.clear();</span>
+<span class="fc" id="L113">				}</span>
+
+				@Override
+				public boolean contains(Object o) {
+<span class="fc" id="L117">					return MapColumnFamily.this.containsKey(o);</span>
+				}
+
+				@Override
+				public boolean containsAll(Collection&lt;?&gt; c) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">					for (Object k : c) {</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">						if (!this.contains(k))</span>
+<span class="fc" id="L124">							return false;</span>
+					}
+<span class="fc" id="L126">					return true;</span>
+				}
+
+				@Override
+				public boolean isEmpty() {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">					return this.size() == 0;</span>
+				}
+
+				@Override
+				public Iterator&lt;K&gt; iterator() {
+<span class="fc" id="L136">					final Iterator&lt;String&gt; it = collection.keySet().iterator();</span>
+<span class="fc" id="L137">					return new Iterator&lt;K&gt;() {</span>
+
+						@Override
+						public boolean hasNext() {
+<span class="fc" id="L141">							return it.hasNext();</span>
+						}
+
+						@Override
+						public K next() {
+<span class="fc" id="L146">							return fromKey(it.next());</span>
+						}
+
+						@Override
+						public void remove() {
+<span class="fc" id="L151">							throw new UnsupportedOperationException();</span>
+						}
+					};
+				}
+
+				@Override
+				public boolean remove(Object o) {
+<span class="fc bfc" id="L158" title="All 2 branches covered.">					if (!this.contains(o))</span>
+<span class="fc" id="L159">						return false;</span>
+<span class="fc" id="L160">					MapColumnFamily.this.remove(o);</span>
+<span class="fc" id="L161">					return true;</span>
+				}
+
+				@Override
+				public boolean removeAll(Collection&lt;?&gt; c) {
+<span class="fc" id="L166">					boolean ret = false;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">					for (Object k : c) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">						if (this.remove(k))</span>
+<span class="fc" id="L169">							ret = true;</span>
+					}
+<span class="fc" id="L171">					return ret;</span>
+				}
+
+				@Override
+				public boolean retainAll(Collection&lt;?&gt; c) {
+<span class="fc" id="L176">					boolean ret = false;</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">					for (K key : new HashSet&lt;K&gt;(this)) {</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">						if (!c.contains(key)) {</span>
+<span class="fc" id="L179">							this.remove(key);</span>
+<span class="fc" id="L180">							ret = true;</span>
+						}
+					}
+<span class="fc" id="L183">					return ret;</span>
+				}
+
+				@Override
+				public int size() {
+<span class="fc" id="L188">					return MapColumnFamily.this.size();</span>
+				}
+
+				@Override
+				public Object[] toArray() {
+<span class="fc" id="L193">					return this.toArray(new Object[this.size()]);</span>
+				}
+
+				@SuppressWarnings(&quot;unchecked&quot;)
+				@Override
+				public &lt;U&gt; U[] toArray(U[] a) {
+<span class="fc bfc" id="L199" title="All 2 branches covered.">					if (a.length &lt; this.size())</span>
+<span class="fc" id="L200">						a = (U[]) Array.newInstance(a.getClass().getComponentType(), this.size());</span>
+<span class="fc" id="L201">					int i = 0;</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">					for (K element : this) {</span>
+<span class="fc" id="L203">						a[i] = (U) element;</span>
+<span class="fc" id="L204">						i++;</span>
+					}
+<span class="fc bfc" id="L206" title="All 2 branches covered.">					if (a.length &gt; i)</span>
+<span class="fc" id="L207">						a[i] = null;</span>
+<span class="fc" id="L208">					return a;</span>
+				}
+
+				@Override
+				public boolean equals(Object obj) {
+<span class="pc bpc" id="L213" title="1 of 4 branches missed.">					return obj != null &amp;&amp; (obj instanceof Set)</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">							&amp;&amp; this.hashCode() == obj.hashCode();</span>
+				}
+
+				@Override
+				public int hashCode() {
+<span class="fc" id="L219">					int h = 0;</span>
+<span class="fc" id="L220">					Iterator&lt;K&gt; i = iterator();</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">					while (i.hasNext()) {</span>
+<span class="fc" id="L222">						K obj = i.next();</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">						if (obj != null)</span>
+<span class="fc" id="L224">							h += obj.hashCode();</span>
+					}
+<span class="fc" id="L226">					return h;</span>
+				}
+
+			};
+		}
+<span class="fc" id="L231">		return this.keys;</span>
+	}
+
+	@Override
+	public Set&lt;Map.Entry&lt;K, T&gt;&gt; entrySet() {
+<span class="fc bfc" id="L236" title="All 2 branches covered.">		if (this.entries == null) {</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">			this.entries = new Set&lt;Map.Entry&lt;K, T&gt;&gt;() {</span>
+
+				@Override
+				public boolean add(Map.Entry&lt;K, T&gt; e) {
+<span class="fc bfc" id="L241" title="All 2 branches covered.">					return ! e.getValue().equals(put(e.getKey(), e.getValue()));</span>
+				}
+
+				@Override
+				public boolean addAll(
+						Collection&lt;? extends Map.Entry&lt;K, T&gt;&gt; es) {
+<span class="fc" id="L247">					boolean ret = false;</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">					for (Map.Entry&lt;K, T&gt; entry : es) {</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">						if (this.add(entry))</span>
+<span class="fc" id="L250">							ret = true;</span>
+					}
+<span class="fc" id="L252">					return ret;</span>
+				}
+
+				@Override
+				public void clear() {
+<span class="fc" id="L257">					MapColumnFamily.this.clear();</span>
+<span class="fc" id="L258">				}</span>
+
+				@Override
+				public boolean contains(Object rhs) {
+<span class="pc bpc" id="L262" title="2 of 4 branches missed.">					if (rhs == null || !(rhs instanceof Map.Entry))</span>
+<span class="nc" id="L263">						return false;</span>
+<span class="fc" id="L264">					Object key = ((Map.Entry&lt;?,?&gt;) rhs).getKey();</span>
+<span class="fc" id="L265">					Object val = ((Map.Entry&lt;?,?&gt;) rhs).getValue();</span>
+<span class="fc" id="L266">					T elt = MapColumnFamily.this.get(key);</span>
+<span class="pc bpc" id="L267" title="1 of 6 branches missed.">					return elt != null &amp;&amp; val != null &amp;&amp; elt.equals(val);</span>
+				}
+
+				@Override
+				public boolean containsAll(Collection&lt;?&gt; entries) {
+<span class="fc bfc" id="L272" title="All 2 branches covered.">					for (Object entry : entries) {</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">						if (!this.contains(entry))</span>
+<span class="fc" id="L274">							return false;</span>
+					}
+<span class="fc" id="L276">					return true;</span>
+				}
+
+				@Override
+				public boolean isEmpty() {
+<span class="fc" id="L281">					return MapColumnFamily.this.isEmpty();</span>
+				}
+
+				@Override
+				public Iterator&lt;Map.Entry&lt;K, T&gt;&gt; iterator() {
+<span class="fc" id="L286">					final Iterator&lt;Map.Entry&lt;String, T&gt;&gt; it = MapColumnFamily.this.collection</span>
+<span class="fc" id="L287">							.entrySet().iterator();</span>
+<span class="fc" id="L288">					return new Iterator&lt;Map.Entry&lt;K, T&gt;&gt;() {</span>
+
+						@Override
+						public boolean hasNext() {
+<span class="fc" id="L292">							return it.hasNext();</span>
+						}
+
+						@Override
+						public Map.Entry&lt;K, T&gt; next() {
+<span class="fc" id="L297">							final Map.Entry&lt;String, T&gt; entry = it.next();</span>
+<span class="fc" id="L298">							return new Map.Entry&lt;K, T&gt;() {</span>
+
+								@Override
+								public K getKey() {
+<span class="fc" id="L302">									return MapColumnFamily.this.fromKey(entry</span>
+<span class="fc" id="L303">											.getKey());</span>
+								}
+
+								@Override
+								public T getValue() {
+<span class="fc" id="L308">									return entry.getValue();</span>
+								}
+
+								@Override
+								public T setValue(T value) {
+<span class="fc bfc" id="L313" title="All 2 branches covered.">									if (this.equals(value))</span>
+<span class="fc" id="L314">										throw new IllegalArgumentException();</span>
+<span class="fc" id="L315">									return MapColumnFamily.this.put(getKey(), value);</span>
+								}
+
+								public int hashCode() {
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">									return (getKey() == null ? 0 : getKey()</span>
+<span class="fc" id="L320">											.hashCode())</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">											^ (getValue() == null ? 0</span>
+<span class="fc" id="L322">													: getValue().hashCode());</span>
+								}
+
+								@Override
+								public boolean equals(Object obj) {
+<span class="fc bfc" id="L327" title="All 2 branches covered.">									return obj == this</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">											|| (obj != null</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">													&amp;&amp; (obj instanceof Map.Entry&lt;?, ?&gt;)</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">													&amp;&amp; (getKey() == null ? ((Map.Entry&lt;?, ?&gt;) obj)</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">															.getKey() == null</span>
+<span class="fc" id="L332">															: getKey()</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">																	.equals(((Map.Entry&lt;?, ?&gt;) obj)</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">																			.getKey())) &amp;&amp; (getValue() == null ? ((Map.Entry&lt;?, ?&gt;) obj)</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">													.getValue() == null</span>
+<span class="fc" id="L336">													: getValue()</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">															.equals(((Map.Entry&lt;?, ?&gt;) obj)</span>
+<span class="fc" id="L338">																	.getValue())));</span>
+								}
+
+								@Override
+								public String toString() {
+<span class="fc" id="L343">									return this.getKey().toString() + '='</span>
+<span class="fc" id="L344">											+ this.getValue().toString();</span>
+								}
+							};
+						}
+
+						@Override
+						public void remove() {
+<span class="fc" id="L351">							throw new UnsupportedOperationException();</span>
+						}
+					};
+				}
+
+				@Override
+				public boolean remove(Object elt) {
+<span class="fc bfc" id="L358" title="All 2 branches covered.">					if (this.contains(elt)) {</span>
+<span class="fc" id="L359">						MapColumnFamily.this.remove(((Map.Entry&lt;?,?&gt;) elt).getKey());</span>
+<span class="fc" id="L360">						return true;</span>
+					}
+<span class="fc" id="L362">					return false;</span>
+				}
+
+				@Override
+				public boolean removeAll(Collection&lt;?&gt; elts) {
+<span class="fc" id="L367">					boolean ret = false;</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">					for (Object entry : elts) {</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">						if (this.remove(entry))</span>
+<span class="fc" id="L370">							ret = true;</span>
+					}
+<span class="fc" id="L372">					return ret;</span>
+				}
+
+				@Override
+				public boolean retainAll(Collection&lt;?&gt; elts) {
+<span class="nc" id="L377">					throw new UnsupportedOperationException();</span>
+				}
+
+				@Override
+				public int size() {
+<span class="fc" id="L382">					return MapColumnFamily.this.size();</span>
+				}
+
+				@Override
+				public Object[] toArray() {
+<span class="fc" id="L387">					return this.toArray(new Object[this.size()]);</span>
+				}
+
+				@SuppressWarnings(&quot;unchecked&quot;)
+				@Override
+				public &lt;U&gt; U[] toArray(U[] ret) {
+<span class="fc bfc" id="L393" title="All 2 branches covered.">					if (ret.length &lt; this.size())</span>
+<span class="fc" id="L394">						ret = (U[]) Array.newInstance(ret.getClass().getComponentType(), this.size());</span>
+<span class="fc" id="L395">					int i = 0;</span>
+<span class="fc" id="L396">					Iterator&lt;Map.Entry&lt;K, T&gt;&gt; it = this.iterator();</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">					while (it.hasNext()) {</span>
+<span class="fc" id="L398">						ret[i] = (U) it.next();</span>
+<span class="fc" id="L399">						i++;</span>
+					}
+<span class="fc bfc" id="L401" title="All 2 branches covered.">					if (ret.length &gt; i)</span>
+<span class="fc" id="L402">						ret[i] = null;</span>
+<span class="fc" id="L403">					return ret;</span>
+				}
+
+				@Override
+				public boolean equals(Object obj) {
+<span class="fc bfc" id="L408" title="All 2 branches covered.">					if (obj == this)</span>
+<span class="fc" id="L409">						return true;</span>
+<span class="pc bpc" id="L410" title="1 of 4 branches missed.">					if (obj == null || !(obj instanceof Set))</span>
+<span class="fc" id="L411">						return false;</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">					return this.hashCode() == obj.hashCode();</span>
+				}
+
+				@Override
+				public int hashCode() {
+<span class="fc" id="L417">					int h = 0;</span>
+<span class="fc" id="L418">					Iterator&lt;Map.Entry&lt;K, T&gt;&gt; i = iterator();</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">					while (i.hasNext()) {</span>
+<span class="fc" id="L420">						Map.Entry&lt;K, T&gt; obj = i.next();</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">						if (obj != null)</span>
+<span class="fc" id="L422">							h += obj.hashCode();</span>
+					}
+<span class="fc" id="L424">					return h;</span>
+				}
+				
+				@Override
+				public String toString() {
+<span class="fc" id="L429">					StringBuffer ret = new StringBuffer();</span>
+<span class="fc" id="L430">					ret.append('[');</span>
+<span class="fc" id="L431">					boolean fst = true;</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">					for (Map.Entry&lt;K, T&gt; e : this) {</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">						if (fst)</span>
+<span class="fc" id="L434">							fst = false;</span>
+						else
+<span class="fc" id="L436">							ret.append(',');</span>
+<span class="fc" id="L437">						ret.append(e.toString());</span>
+					}
+<span class="fc" id="L439">					ret.append(']');</span>
+<span class="fc" id="L440">					return ret.toString();</span>
+				}
+
+			};
+		}
+<span class="fc" id="L445">		return this.entries;</span>
+	}
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	@Override
+	@Continuator
+	public T get(Object key) {
+		try {
+<span class="fc" id="L453">			return this.getElement(this.toKey((K) key));</span>
+<span class="nc" id="L454">		} catch (IllegalArgumentException x) {</span>
+<span class="nc" id="L455">			return null;</span>
+		}
+	}
+
+	@Override
+	@Continuator
+	public T put(K key, T value) {
+<span class="fc" id="L462">		String sKey = this.toKey(key);</span>
+<span class="fc" id="L463">		T ret = this.get(key);</span>
+<span class="fc" id="L464">		this.putElement(sKey, value);</span>
+<span class="fc" id="L465">		return ret;</span>
+	}
+
+	@Override
+	public void putAll(Map&lt;? extends K, ? extends T&gt; m) {
+<span class="fc bfc" id="L470" title="All 2 branches covered.">		for (Map.Entry&lt;? extends K, ? extends T&gt; element : m</span>
+<span class="fc" id="L471">				.entrySet()) {</span>
+<span class="fc" id="L472">			this.put(element.getKey(), element.getValue());</span>
+		}
+<span class="fc" id="L474">	}</span>
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	@Override
+	@Continuator
+	public T remove(Object key) {
+<span class="fc" id="L480">		T ret = this.get(key);</span>
+<span class="fc" id="L481">		this.removeKey(this.toKey((K) key));</span>
+<span class="fc" id="L482">		return ret;</span>
+	}
+
+	@Override
+	@Continuator
+	public Collection&lt;T&gt; values() {
+<span class="fc" id="L488">		return this.collection.values();</span>
+	}
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	@Override
+	public void activate(Object from, Object to)
+			throws DatabaseNotReachedException {
+<span class="nc bnc" id="L495" title="All 2 branches missed.">		if (!this.keyClazz.isInstance(from))</span>
+<span class="nc" id="L496">			throw new IllegalArgumentException(from.toString()</span>
+<span class="nc" id="L497">					+ &quot; is not compatible with &quot; + this.keyClazz);</span>
+<span class="nc bnc" id="L498" title="All 2 branches missed.">		if (!this.keyClazz.isInstance(to))</span>
+<span class="nc" id="L499">			throw new IllegalArgumentException(to.toString()</span>
+<span class="nc" id="L500">					+ &quot; is not compatible with &quot; + this.keyClazz);</span>
+<span class="nc" id="L501">		super.activate(this.toKey((K) from), this.toKey((K) to));</span>
+<span class="nc" id="L502">	}</span>
+
+	@Override
+	protected void updateFromPOJO(Object pojo) {
+<span class="fc" id="L506">		Set&lt;String&gt; keys = new TreeSet&lt;String&gt;(this.getKeys());</span>
+
+		@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L509">		Map&lt;K, T&gt; pojoM = (Map&lt;K, T&gt;) pojo;</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">		for (Map.Entry&lt;K, T&gt; element : pojoM.entrySet()) {</span>
+<span class="fc" id="L511">			String key = this.toKey(element.getKey());</span>
+<span class="fc bfc" id="L512" title="All 2 branches covered.">			if (keys.remove(key)) {</span>
+<span class="fc" id="L513">				T known = this.getElement(key);</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">				if (known == null</span>
+<span class="fc bfc" id="L515" title="All 2 branches covered.">						|| this.hasChanged(key, known, element.getValue())) // New</span>
+<span class="fc" id="L516">					this.putElement(key, element.getValue());</span>
+			} else {
+<span class="fc" id="L518">				this.putElement(key, element.getValue());</span>
+			}
+		}
+
+<span class="fc bfc" id="L522" title="All 2 branches covered.">		for (String key : keys) {</span>
+<span class="fc" id="L523">			this.removeKey(key);</span>
+		}
+<span class="fc" id="L525">	}</span>
+
+	@Override
+	protected void storeToPOJO(Object pojo) {
+		@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L530">		Map&lt;K, T&gt; pojoM = (Map&lt;K, T&gt;) pojo;</span>
+
+<span class="fc" id="L532">		pojoM.clear();</span>
+<span class="fc" id="L533">		pojoM.putAll(this);</span>
+<span class="fc" id="L534">	}</span>
+
+	@Override
+	protected void addToPOJO(Object pojo, String key, T element) {
+		@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L539">		Map&lt;K, T&gt; pojoM = (Map&lt;K, T&gt;) pojo;</span>
+
+<span class="fc" id="L541">		pojoM.put(this.fromKey(key), element);</span>
+<span class="fc" id="L542">	}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

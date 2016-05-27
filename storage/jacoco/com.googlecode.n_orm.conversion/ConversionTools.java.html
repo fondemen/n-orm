@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ConversionTools.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">ConversionTools.java</span></div><h1>ConversionTools.java</h1><pre class="source lang-java linenums"><span class="pc" id="L1">package com.googlecode.n_orm.conversion;</span>
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import com.googlecode.n_orm.PropertyManagement;
+
+
+<span class="pc" id="L11">public class ConversionTools {</span>
+
+<span class="fc" id="L13">	private static enum ConversionKind {</span>
+<span class="fc" id="L14">		FromBytes, ToBytes, FromString, ToString, FromStringReverted, ToStringReverted, Default</span>
+	};
+
+	private static final Converter&lt;?&gt;[] converters;
+	static final StringConverter stringConverter;
+	static final LongConverter longConverter;
+	static final IntegerConverter intConverter;
+	static final ByteConverter byteConverter;
+
+<span class="fc" id="L23">	private static final Map&lt;Class&lt;?&gt;, Set&lt;Converter&lt;?&gt;&gt;&gt; knownConverters = new HashMap&lt;Class&lt;?&gt;, Set&lt;Converter&lt;?&gt;&gt;&gt;();</span>
+
+	static {
+<span class="fc" id="L26">		stringConverter = new StringConverter();</span>
+<span class="fc" id="L27">		longConverter = new LongConverter();</span>
+<span class="fc" id="L28">		intConverter = new IntegerConverter();</span>
+<span class="fc" id="L29">		byteConverter = new ByteConverter();</span>
+<span class="fc" id="L30">		converters = new Converter&lt;?&gt;[] { stringConverter,</span>
+<span class="fc" id="L31">				new PersistingConverter(), new EnumConverter(),</span>
+<span class="fc" id="L32">				new DateConverter(), new BooleanConverter(),</span>
+<span class="fc" id="L33">				new CharacterConverter(), byteConverter,</span>
+<span class="fc" id="L34">				new ShortConverter(), intConverter,</span>
+<span class="fc" id="L35">				longConverter, new FloatConverter(),</span>
+<span class="fc" id="L36">				new DoubleConverter(), new ArrayConverter(), new KeyedElementConverter() };</span>
+	}
+
+	private static boolean test(Converter&lt;?&gt; conv, Object o, Class&lt;?&gt; type,
+			ConversionKind kind) {
+<span class="pc bpc" id="L41" title="1 of 6 branches missed.">		switch (kind) {</span>
+		case FromBytes:
+<span class="fc" id="L43">			return conv.canConvertFromBytes((byte[]) o, type);</span>
+		case ToBytes:
+<span class="fc" id="L45">			return conv.canConvertToBytes(o);</span>
+		case FromString:
+		case FromStringReverted:
+<span class="fc" id="L48">			return conv.canConvertFromString((String) o, type);</span>
+		case ToString:
+		case ToStringReverted:
+<span class="fc" id="L51">			return conv.canConvertToString(o);</span>
+		case Default:
+<span class="fc" id="L53">			return conv.canConvert(type);</span>
+
+		default:
+<span class="nc" id="L56">			throw new IllegalArgumentException(&quot;Unknown conversion kind: &quot;</span>
+<span class="nc" id="L57">					+ kind.name());</span>
+		}
+	}
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	private static &lt;T&gt; Object convert(Converter&lt;T&gt; conv, Object o,
+			Class&lt;?&gt; type, ConversionKind kind) {
+<span class="pc bpc" id="L64" title="1 of 8 branches missed.">		switch (kind) {</span>
+		case FromBytes:
+<span class="fc" id="L66">			return conv.fromBytes((byte[]) o, type);</span>
+		case ToBytes:
+<span class="fc" id="L68">			return conv.toBytes((T) o, (Class&lt;? extends T&gt;) type);</span>
+		case FromString:
+<span class="fc" id="L70">			return conv.fromString((String) o, type);</span>
+		case ToString:
+<span class="fc" id="L72">			return conv.toString((T) o, (Class&lt;? extends T&gt;) type);</span>
+		case FromStringReverted:
+<span class="fc" id="L74">			return conv.fromStringReverted((String) o, type);</span>
+		case ToStringReverted:
+<span class="fc" id="L76">			return conv.toStringReverted((T) o, (Class&lt;? extends T&gt;) type);</span>
+		case Default:
+<span class="fc" id="L78">			return conv.getDefaultValue((Class&lt;? extends T&gt;) type);</span>
+		default:
+<span class="nc" id="L80">			throw new IllegalArgumentException(&quot;Unknown conversion kind: &quot;</span>
+<span class="nc" id="L81">					+ kind.name());</span>
+		}
+	}
+	
+	public static boolean canConvert(Class&lt;?&gt; clazz) {
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">		if (clazz == null)</span>
+<span class="nc" id="L87">			return false;</span>
+		
+<span class="fc bfc" id="L89" title="All 2 branches covered.">		if (knownConverters.containsKey(clazz))</span>
+<span class="fc" id="L90">			return true;</span>
+		
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">		for (Converter&lt;?&gt; conv : converters) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">			if (conv.canConvert(clazz)) {</span>
+<span class="fc" id="L94">				registerConverter(clazz, conv);</span>
+<span class="fc" id="L95">				return true;</span>
+			}
+		}
+		
+<span class="nc" id="L99">		return false;</span>
+	}
+
+	private static Object convertInternal(Object o, Class&lt;?&gt; type,
+			ConversionKind kind, String errorMessage) {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">		Class&lt;?&gt; clazz = type == null ? o.getClass() : type;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">		if (knownConverters.containsKey(clazz)) {</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">			for (Converter&lt;?&gt; conv : knownConverters.get(clazz)) {</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">				if (test(conv, o, type, kind))</span>
+<span class="fc" id="L108">					return convert(conv, o, type, kind);</span>
+			}
+		}
+
+<span class="fc bfc" id="L112" title="All 2 branches covered.">		for (Converter&lt;?&gt; conv : converters)</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">			if (test(conv, o, type, kind)) {</span>
+<span class="fc" id="L114">				Object ret = convert(conv, o, type, kind);</span>
+<span class="fc" id="L115">				registerConverter(clazz, conv);</span>
+<span class="fc" id="L116">				return ret;</span>
+			}
+<span class="fc" id="L118">		throw new IllegalArgumentException(errorMessage);</span>
+	}
+
+	private static void registerConverter(Class&lt;?&gt; clazz, Converter&lt;?&gt; conv) {
+<span class="fc" id="L122">		Set&lt;Converter&lt;?&gt;&gt; cachedConverters = knownConverters.get(clazz);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">		if (cachedConverters == null) {</span>
+<span class="fc" id="L124">			cachedConverters = new HashSet&lt;Converter&lt;?&gt;&gt;();</span>
+<span class="fc" id="L125">			knownConverters.put(clazz, cachedConverters);</span>
+		}
+<span class="fc" id="L127">		cachedConverters.add(conv);</span>
+<span class="fc" id="L128">	}</span>
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	public static &lt;U&gt; U convert(Class&lt;U&gt; type, byte[] representation) {
+
+<span class="fc bfc" id="L133" title="All 2 branches covered.">		if (representation == null)</span>
+<span class="fc" id="L134">			return null;</span>
+
+<span class="fc" id="L136">		return (U) convertInternal(</span>
+<span class="fc" id="L137">				representation,</span>
+<span class="fc" id="L138">				type,</span>
+<span class="fc" id="L139">				ConversionKind.FromBytes,</span>
+<span class="fc" id="L140">				&quot;Cannot create a &quot;</span>
+<span class="fc" id="L141">						+ type</span>
+<span class="fc" id="L142">						+ &quot; from byte array &quot;</span>
+<span class="fc" id="L143">						+ stringConverter.fromBytes(representation,</span>
+<span class="fc" id="L144">								String.class));</span>
+
+	}
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	public static &lt;U&gt; U convertFromString(Class&lt;U&gt; type, String representation) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">		if (representation == null)</span>
+<span class="nc" id="L151">			return null;</span>
+
+<span class="fc" id="L153">		return (U) convertInternal(representation, type,</span>
+<span class="fc" id="L154">				ConversionKind.FromString, &quot;Cannot create a &quot; + type</span>
+<span class="fc" id="L155">						+ &quot; from string &quot; + representation);</span>
+	}
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	public static &lt;U&gt; U convertFromStringReverted(Class&lt;U&gt; type, String representation) {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">		if (representation == null)</span>
+<span class="nc" id="L161">			return null;</span>
+
+<span class="fc" id="L163">		return (U) convertInternal(representation, type,</span>
+<span class="fc" id="L164">				ConversionKind.FromStringReverted, &quot;Cannot create a &quot; + type</span>
+<span class="fc" id="L165">						+ &quot; from reverted string &quot; + representation);</span>
+	}
+	
+	public static  byte[] convert(Object o) {
+<span class="fc bfc" id="L169" title="All 2 branches covered.">		return convert(o, o == null ? Object.class : o.getClass());</span>
+	}
+
+	public static  byte[] convert(Object o, Class&lt;?&gt; expected) {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">		if (o instanceof PropertyManagement.Property)</span>
+<span class="fc" id="L174">			o = ((PropertyManagement.Property) o).getValue();</span>
+
+<span class="fc bfc" id="L176" title="All 2 branches covered.">		if (o == null)</span>
+<span class="fc" id="L177">			return null;</span>
+		
+<span class="fc" id="L179">		return (byte[]) convertInternal(o, expected, ConversionKind.ToBytes,</span>
+<span class="fc" id="L180">				&quot;Cannot create a binary representation for &quot; + o + &quot; of class &quot; + o.getClass() + &quot; while expecting &quot; + expected.getName());</span>
+	}
+	
+	public static String convertToString(Object o) {
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">		return convertToString(o, o == null ? Object.class : o.getClass());</span>
+	}
+
+	public static String convertToString(Object o, Class&lt;?&gt; expected) {
+
+<span class="fc bfc" id="L189" title="All 2 branches covered.">		if (o == null)</span>
+<span class="fc" id="L190">			return null;</span>
+
+<span class="fc" id="L192">		return (String) convertInternal(o, expected, ConversionKind.ToString,</span>
+<span class="fc" id="L193">				&quot;Cannot create a string representation for &quot; + o);</span>
+	}
+
+	public static String convertToStringReverted(Object o, Class&lt;?&gt; expected) {
+
+<span class="fc bfc" id="L198" title="All 2 branches covered.">		if (o == null)</span>
+<span class="fc" id="L199">			return null;</span>
+
+<span class="fc" id="L201">		return (String) convertInternal(o, expected, ConversionKind.ToStringReverted,</span>
+<span class="fc" id="L202">				&quot;Cannot create a reverted string representation for &quot; + o);</span>
+	}
+	
+	@SuppressWarnings(&quot;unchecked&quot;)
+	public static &lt;T&gt; T getDefaultValue(Class&lt;T&gt; expected) {
+<span class="fc" id="L207">		return (T) convertInternal(null, expected, ConversionKind.Default, null);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>UnmodifiableOverridingMap.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.utils</a> &gt; <span class="el_source">UnmodifiableOverridingMap.java</span></div><h1>UnmodifiableOverridingMap.java</h1><pre class="source lang-java linenums"><span class="fc" id="L1">package com.googlecode.n_orm.utils;</span>
+
+import java.util.AbstractMap;
+import java.util.AbstractSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+
+import com.googlecode.n_orm.Transient;
+
+/**
+ * A stack of maps overriding each other.
+ * Adding a new map on the to of the stack is possible by using the thread-safe {@link #override(Map)} method.
+ * 
+ * @param &lt;K&gt; Key for the held maps
+ * @param &lt;V&gt; Value for the held maps
+ */
+<span class="fc" id="L22">public class UnmodifiableOverridingMap&lt;K, V&gt; extends AbstractMap&lt;K, V&gt; implements Map&lt;K, V&gt; {</span>
+	
+<span class="fc" id="L24">	private static final Object O = new Object();</span>
+
+	private class MapStack {
+		@Transient public final Map&lt;K, V&gt; map;
+		public final MapStack previous;
+<span class="fc" id="L29">		private MapStack(Map&lt;K, V&gt; map, MapStack previous) {</span>
+<span class="fc" id="L30">			super();</span>
+<span class="fc" id="L31">			this.map = Collections.unmodifiableMap(map);</span>
+<span class="fc" id="L32">			this.previous = previous;</span>
+<span class="fc" id="L33">		}</span>
+		
+		public boolean containsValue(Object value) {
+<span class="pc bpc" id="L36" title="2 of 6 branches missed.">			return this.map.containsValue(value) || (this.previous != null &amp;&amp; this.previous.containsValue(value));</span>
+		}
+		
+		public V getValue(Object key) {
+<span class="fc bfc" id="L40" title="All 2 branches covered.">			if (this.map.containsKey(key))</span>
+<span class="fc" id="L41">				return this.map.get(key);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">			else if (this.previous != null)</span>
+<span class="fc" id="L43">				return this.previous.getValue(key);</span>
+			else
+<span class="nc" id="L45">				return null;</span>
+		}
+	}
+	
+<span class="fc" id="L49">	private final AtomicReference&lt;MapStack&gt; maps = new AtomicReference&lt;MapStack&gt;();</span>
+	
+<span class="fc" id="L51">	@Transient private Map&lt;K, Object&gt; keys = new ConcurrentHashMap&lt;K, Object&gt;();</span>
+
+	/**
+	 * Thread-safe mean to add new values by overriding existing ones.
+	 */
+	public void override(Map&lt;K, V&gt; overridingMap) {
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">		if (overridingMap == null)</span>
+<span class="nc" id="L58">			return;</span>
+		MapStack newMs;
+<span class="fc bfc" id="L60" title="All 2 branches covered.">		do {</span>
+<span class="fc" id="L61">			newMs = new MapStack(overridingMap, this.maps.get());</span>
+<span class="fc" id="L62">		} while (!this.maps.compareAndSet(newMs.previous, newMs));</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">		for (K key : overridingMap.keySet()) {</span>
+<span class="fc" id="L64">			this.keys.put(key, O);</span>
+		}
+<span class="fc" id="L66">	}</span>
+
+	@Override
+	public int size() {
+<span class="fc" id="L70">		return this.keys.size();</span>
+	}
+
+	@Override
+	public boolean isEmpty() {
+<span class="fc" id="L75">		return this.keys.isEmpty();</span>
+	}
+
+	@Override
+	public boolean containsKey(Object key) {
+<span class="fc" id="L80">		return this.keys.containsKey(key);</span>
+	}
+
+	@Override
+	public boolean containsValue(Object value) {
+<span class="fc" id="L85">		MapStack m = this.maps.get();</span>
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">		return m != null &amp;&amp; m.containsValue(value);</span>
+	}
+
+	@Override
+	public V get(Object key) {
+<span class="fc" id="L91">		MapStack m = this.maps.get();</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">		return m == null ? null : m.getValue(key);</span>
+	}
+
+	@Override
+	public V put(K key, V value) {
+<span class="fc" id="L97">		throw new UnsupportedOperationException();</span>
+	}
+
+	@Override
+	public V remove(Object key) {
+<span class="fc" id="L102">		throw new UnsupportedOperationException();</span>
+	}
+
+	@Override
+	public void putAll(Map&lt;? extends K, ? extends V&gt; m) {
+<span class="fc" id="L107">		throw new UnsupportedOperationException();</span>
+	}
+
+	@Override
+	public void clear() {
+<span class="fc" id="L112">		throw new UnsupportedOperationException();</span>
+	}
+
+	@Override
+	public Set&lt;K&gt; keySet() {
+<span class="fc" id="L117">		return Collections.unmodifiableSet(this.keys.keySet());</span>
+	}
+
+	@Override
+	public Set&lt;java.util.Map.Entry&lt;K, V&gt;&gt; entrySet() {
+<span class="fc" id="L122">		return new AbstractSet&lt;Map.Entry&lt;K,V&gt;&gt;() {</span>
+
+			@Override
+			public int size() {
+<span class="fc" id="L126">				return UnmodifiableOverridingMap.this.size();</span>
+			}
+
+			@Override
+			public boolean isEmpty() {
+<span class="fc" id="L131">				return UnmodifiableOverridingMap.this.isEmpty();</span>
+			}
+
+			@Override
+			public boolean contains(Object o) {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">				if (!(o instanceof java.util.Map.Entry))</span>
+<span class="nc" id="L137">					return false;</span>
+<span class="fc" id="L138">				Entry&lt;?, ?&gt; e = (Entry&lt;?, ?&gt;)o;</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">				if (!UnmodifiableOverridingMap.this.containsKey(e.getKey()))</span>
+<span class="nc" id="L140">					return false;</span>
+<span class="fc" id="L141">				V val = UnmodifiableOverridingMap.this.get(e.getKey());</span>
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">				return val == null ? e.getValue() == null : val.equals(e.getValue());</span>
+			}
+
+			@Override
+			public Iterator&lt;java.util.Map.Entry&lt;K, V&gt;&gt; iterator() {
+<span class="fc" id="L147">				return new Iterator&lt;Map.Entry&lt;K,V&gt;&gt;() {</span>
+<span class="fc" id="L148">					Iterator&lt;K&gt; it = UnmodifiableOverridingMap.this.keys.keySet().iterator();</span>
+
+					@Override
+					public boolean hasNext() {
+<span class="fc" id="L152">						return it.hasNext();</span>
+					}
+
+					@Override
+					public java.util.Map.Entry&lt;K, V&gt; next() {
+<span class="fc" id="L157">						final K key = it.next();</span>
+<span class="fc" id="L158">						return new Entry&lt;K, V&gt;() {</span>
+							
+							@Override
+							public K getKey() {
+<span class="fc" id="L162">								return key;</span>
+							}
+
+							@Override
+							public V getValue() {
+<span class="fc" id="L167">								return UnmodifiableOverridingMap.this.get(key);</span>
+							}
+
+							@Override
+							public V setValue(V value) {
+<span class="nc" id="L172">								throw new UnsupportedOperationException();</span>
+							}
+							
+							@Override
+							public boolean equals(Object o) {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">								return this==o || (</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">										o != null &amp;&amp;</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">										(o instanceof Entry) &amp;&amp;</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">										((Entry&lt;?,?&gt;)o).getKey().equals(this.getKey()) &amp;&amp;</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">										((Entry&lt;?,?&gt;)o).getValue().equals(this.getValue())</span>
+										);
+							}
+
+							@Override
+					        public final int hashCode() {
+<span class="fc" id="L187">								V value = this.getValue();</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">					            return (key == null   ? 0 : key.hashCode()) ^</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">					                   (value == null ? 0 : value.hashCode());</span>
+					        }
+						};
+					}
+
+					@Override
+					public void remove() {
+<span class="fc" id="L196">						throw new UnsupportedOperationException();</span>
+					}
+				};
+			}
+
+			@Override
+			public boolean add(java.util.Map.Entry&lt;K, V&gt; e) {
+<span class="nc" id="L203">				throw new UnsupportedOperationException();</span>
+			}
+
+			@Override
+			public boolean remove(Object o) {
+<span class="nc" id="L208">				throw new UnsupportedOperationException();</span>
+			}
+
+			@Override
+			public boolean addAll(
+					Collection&lt;? extends java.util.Map.Entry&lt;K, V&gt;&gt; c) {
+<span class="nc" id="L214">				throw new UnsupportedOperationException();</span>
+			}
+
+			@Override
+			public boolean retainAll(Collection&lt;?&gt; c) {
+<span class="nc" id="L219">				throw new UnsupportedOperationException();</span>
+			}
+
+			@Override
+			public boolean removeAll(Collection&lt;?&gt; c) {
+<span class="nc" id="L224">				throw new UnsupportedOperationException();</span>
+			}
+
+			@Override
+			public void clear() {
+<span class="nc" id="L229">				throw new UnsupportedOperationException();</span>
+			}
+		};
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

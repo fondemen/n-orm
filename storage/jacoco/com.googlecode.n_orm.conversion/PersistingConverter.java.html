@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PersistingConverter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">PersistingConverter.java</span></div><h1>PersistingConverter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+import com.googlecode.n_orm.KeyManagement;
+import com.googlecode.n_orm.PersistingElement;
+
+class PersistingConverter extends Converter&lt;PersistingElement&gt; {
+<span class="fc" id="L7">	private final KeyManagement keyManager = KeyManagement.getInstance();</span>
+	
+	public PersistingConverter() {
+<span class="fc" id="L10">		super(PersistingElement.class);</span>
+<span class="fc" id="L11">	}</span>
+
+	@Override
+	public PersistingElement getDefaultValue(Class&lt;?&gt; type) {
+<span class="fc" id="L15">		return null;</span>
+	}
+
+	@Override
+	public PersistingElement fromString(String rep, Class&lt;?&gt; expected) {
+<span class="fc" id="L20">		return (PersistingElement) keyManager.createElement(expected, rep);</span>
+	}
+
+	@Override
+	public String toString(PersistingElement obj, Class&lt;? extends PersistingElement&gt; expected) {
+<span class="fc bfc" id="L25" title="All 2 branches covered.">		return obj.getClass().equals(expected) ? obj.getIdentifier() : keyManager.createIdentifier(obj, expected);</span>
+	}
+
+	@Override
+	public PersistingElement fromBytes(byte[] rep, Class&lt;?&gt; expected) {
+<span class="fc" id="L30">		return this.fromString(ConversionTools.stringConverter.fromBytes(rep, String.class), expected);</span>
+	}
+
+	@Override
+	public byte[] toBytes(PersistingElement obj, Class&lt;? extends PersistingElement&gt; expected) {
+<span class="fc" id="L35">		return ConversionTools.stringConverter.toBytes(this.toString(obj, expected));</span>
+	}
+
+	@Override
+	public boolean canConvert(Class&lt;?&gt; type) {
+<span class="fc" id="L40">		return this.getClazz().isAssignableFrom(type);</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

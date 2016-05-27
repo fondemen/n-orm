@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>CloseableIterator.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase</a> &gt; <span class="el_source">CloseableIterator.java</span></div><h1>CloseableIterator.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase;
+
+import java.lang.reflect.Field;
+import java.util.Iterator;
+import java.util.Map;
+
+import org.apache.hadoop.hbase.UnknownScannerException;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.ScannerTimeoutException;
+import org.apache.hadoop.hbase.util.Bytes;
+
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.MetaInformation;
+import com.googlecode.n_orm.storeapi.Row;
+
+final class CloseableIterator implements CloseableKeyIterator {
+	private ResultScanner result;
+	private Iterator&lt;Result&gt; iterator;
+	private final boolean sendValues;
+	private final Class&lt;? extends PersistingElement&gt; clazz;
+	private final MangledTableName table;
+	private final String tablePostfix;
+	private Constraint constraint;
+	private int limit;
+	private final Map&lt;String, Field&gt; families;
+	private final Store store;
+<span class="fc" id="L30">	private boolean reCreated = false;</span>
+	
+<span class="fc" id="L32">	private byte[] currentKey = null;</span>
+
+<span class="fc" id="L34">	CloseableIterator(Store store, Class&lt;? extends PersistingElement&gt; clazz, MangledTableName table, String tablePostfix, Constraint constraint, int limit, Map&lt;String, Field&gt; families, ResultScanner res, boolean sendValues) {</span>
+<span class="fc" id="L35">		this.store = store;</span>
+<span class="fc" id="L36">		this.sendValues = sendValues;</span>
+<span class="fc" id="L37">		this.clazz = clazz;</span>
+<span class="fc" id="L38">		this.table = table;</span>
+<span class="fc" id="L39">		this.tablePostfix = tablePostfix;</span>
+<span class="fc" id="L40">		this.constraint = constraint;</span>
+<span class="fc" id="L41">		this.limit = limit;</span>
+<span class="fc" id="L42">		this.families = families;</span>
+<span class="fc" id="L43">		this.setResult(res);</span>
+<span class="fc" id="L44">	}</span>
+	
+	private void setResult(ResultScanner result) {
+		//Trying to close existing scanner
+<span class="fc bfc" id="L48" title="All 2 branches covered.">		if (this.result != null) {</span>
+<span class="fc" id="L49">			final ResultScanner res = this.result;</span>
+<span class="fc" id="L50">			new Thread(){</span>
+				@Override
+				public void run() {
+<span class="fc" id="L53">					res.close();</span>
+<span class="fc" id="L54">				}</span>
+			}.start();
+		}
+<span class="fc" id="L57">		this.result = result;</span>
+<span class="fc" id="L58">		this.iterator = result.iterator();</span>
+<span class="fc" id="L59">	}</span>
+
+	protected void handleProblem(RuntimeException x) {
+		//Failure handling
+		//Only one failure per scan accepted
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">		if (this.reCreated)</span>
+<span class="nc" id="L65">			throw x;</span>
+<span class="fc" id="L66">		this.reCreated = true;</span>
+		//Creating the iterator again, starting after the last scanned key
+<span class="fc bfc" id="L68" title="All 2 branches covered.">		if (this.currentKey != null) {</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">			this.constraint = new Constraint(Bytes.toString(currentKey) + Character.MIN_VALUE, this.constraint == null ? null : this.constraint.getEndKey());</span>
+		}
+<span class="pc bpc" id="L71" title="4 of 8 branches missed.">		if ((x.getCause() instanceof ScannerTimeoutException) || x.getMessage().contains(ScannerTimeoutException.class.getSimpleName())</span>
+				|| (x.getCause() instanceof UnknownScannerException) || x.getMessage().contains(UnknownScannerException.class.getSimpleName())) {
+<span class="nc" id="L73">			Store.logger.warning(&quot;Got exception &quot; + x.getMessage() + &quot; ; consider lowering scanCahing or improve scanner timeout at the HBase level&quot;);</span>
+		} else {
+<span class="fc" id="L75">			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);</span>
+		}
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">		CloseableIterator newResult = (CloseableIterator) store.get(new MetaInformation().forClass(clazz).withColumnFamilies(families), table, constraint, limit, families == null ? null : families.keySet());</span>
+<span class="fc" id="L78">		this.setResult(newResult.result);</span>
+<span class="fc" id="L79">	}</span>
+
+	@Override
+	public boolean hasNext() {
+		try {
+<span class="fc" id="L84">			boolean ret = iterator.hasNext();</span>
+<span class="fc" id="L85">			this.reCreated = false;</span>
+<span class="fc" id="L86">			return ret;</span>
+<span class="fc" id="L87">		} catch (RuntimeException x) {</span>
+<span class="fc" id="L88">			this.handleProblem(x);</span>
+<span class="fc" id="L89">			return hasNext();</span>
+		}
+	}
+
+	@Override
+	public Row next() {
+		try {
+<span class="fc" id="L96">			Result current = iterator.next();</span>
+<span class="fc" id="L97">			this.currentKey = current.getRow();</span>
+<span class="fc" id="L98">			this.limit--;</span>
+<span class="fc" id="L99">			this.reCreated = false;</span>
+<span class="fc" id="L100">			return new RowWrapper(current, this.sendValues);</span>
+<span class="nc" id="L101">		} catch (RuntimeException x) {</span>
+<span class="nc" id="L102">			this.handleProblem(x);</span>
+<span class="nc" id="L103">			return next();</span>
+		}
+	}
+
+	@Override
+	public void remove() {
+<span class="nc" id="L109">		throw new IllegalStateException(</span>
+				&quot;Cannot remove key from a result set.&quot;);
+	}
+
+	@Override
+	protected void finalize() throws Throwable {
+<span class="fc" id="L115">		this.close();</span>
+<span class="fc" id="L116">		super.finalize();</span>
+<span class="fc" id="L117">	}</span>
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see org.norm.hbase.CloseableIterator#close()
+	 */
+	@Override
+	public void close() {
+		try {
+<span class="fc" id="L127">			result.close();</span>
+<span class="nc" id="L128">		} catch (RuntimeException x) {</span>
+<span class="nc" id="L129">			store.handleProblem(x, this.clazz, table, tablePostfix, this.families);</span>
+<span class="fc" id="L130">		}</span>
+<span class="fc" id="L131">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

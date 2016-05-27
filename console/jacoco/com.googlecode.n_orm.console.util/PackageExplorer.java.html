@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PackageExplorer.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm console</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.console.util</a> &gt; <span class="el_source">PackageExplorer.java</span></div><h1>PackageExplorer.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.console.util;
+
+import java.io.File;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+
+import org.apache.commons.beanutils.ConvertUtils;
+
+<span class="nc" id="L20">public class PackageExplorer</span>
+{	
+	private static Collection&lt;String&gt; cpLocations;
+	
+	static {
+		// Get all the entries from the CLASSPATH
+<span class="fc" id="L26">		String [] entries = System.getProperty(&quot;java.class.path&quot;).split(System.getProperty(&quot;path.separator&quot;));</span>
+<span class="fc" id="L27">		cpLocations = new ArrayList&lt;String&gt;(entries.length);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">		for (String cpEntry : entries) {</span>
+<span class="fc" id="L29">			cpLocations.add(cpEntry);</span>
+		}
+<span class="fc" id="L31">	}</span>
+	
+	public static void addSearchEntry(String classPathEntry) {
+<span class="nc" id="L34">		File f = new File(classPathEntry);</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">		if (!f.exists()) {</span>
+<span class="nc" id="L36">			System.err.println(classPathEntry + &quot; is not a source location&quot;);</span>
+<span class="nc" id="L37">			return;</span>
+<span class="nc bnc" id="L38" title="All 6 branches missed.">		} else if (!f.isDirectory() &amp;&amp; (f.isFile() &amp;&amp; !classPathEntry.endsWith(&quot;.jar&quot;))) {</span>
+<span class="nc" id="L39">			System.err.println(classPathEntry + &quot; is neither a directory nor a JAR file&quot;);</span>
+<span class="nc" id="L40">			return;</span>
+		}
+			
+<span class="nc" id="L43">		cpLocations.add(classPathEntry);</span>
+<span class="nc" id="L44">		Class&lt;URLClassLoader&gt; sysclass = URLClassLoader.class;</span>
+<span class="nc" id="L45">		URLClassLoader sysloader = (URLClassLoader) ClassLoader.getSystemClassLoader();</span>
+		try {
+<span class="nc" id="L47">			Method method = sysclass</span>
+					.getDeclaredMethod(&quot;addURL&quot;, new Class[] { URL.class });
+<span class="nc" id="L49">			method.setAccessible(true);</span>
+<span class="nc" id="L50">			method.invoke(sysloader, new Object[] { f.toURI().toURL() });</span>
+<span class="nc" id="L51">		} catch (Throwable t) {</span>
+<span class="nc" id="L52">			System.err.println(&quot;Warning: could not add source location &quot; + classPathEntry);</span>
+<span class="nc" id="L53">		}</span>
+<span class="nc" id="L54">	}</span>
+	
+	public static Set&lt;String&gt; getLocations() {
+<span class="fc" id="L57">		return new TreeSet&lt;String&gt;(cpLocations);</span>
+	}
+	
+	/**
+	 * This method allows us to list all the classes of a package (and sub packages)
+	 * 
+	 * @param pckgName The name of the package to explore
+	 * @return The list of the classes contained
+	 */
+	@SuppressWarnings(&quot;rawtypes&quot;)
+	public static List&lt;Class&gt; getClasses(String pckgName)
+	{
+		// Create the result list
+<span class="fc" id="L70">		ArrayList&lt;Class&gt; classes = new ArrayList&lt;Class&gt;();</span>
+		
+		// For each entry, check if this is a directory or a jar
+<span class="fc bfc" id="L73" title="All 2 branches covered.">		for (String cpLocation : cpLocations)</span>
+		{
+<span class="fc bfc" id="L75" title="All 2 branches covered.">			if (cpLocation.endsWith(&quot;.jar&quot;))</span>
+<span class="fc" id="L76">				classes.addAll(treatJar(cpLocation, pckgName));</span>
+			else
+<span class="fc" id="L78">				classes.addAll(treatDirectory(cpLocation, pckgName));</span>
+<span class="fc" id="L79">		}</span>
+	 
+<span class="fc" id="L81">		return classes;</span>
+	}
+	 
+	/**
+	 * This method returns the list of the classes present
+	 * in a directory of the classpath in a specified package
+	 * 
+	 * @param directory The directory where to look for classes
+	 * @param pckgName The name of the package
+	 * @return The list of the classes
+	 */
+	@SuppressWarnings(&quot;rawtypes&quot;)
+	private static Collection&lt;Class&gt; treatDirectory(String directory, String pckgName)
+	{
+<span class="fc" id="L95">		ArrayList&lt;Class&gt; classes = new ArrayList&lt;Class&gt;();</span>
+<span class="fc" id="L96">		String fileSeparator = System.getProperty(&quot;file.separator&quot;);</span>
+		
+		// Generation of the absolute path of the package
+<span class="fc" id="L99">		StringBuffer sb = new StringBuffer(directory);</span>
+<span class="fc" id="L100">		String[] repsPkg = pckgName.split(&quot;\\.&quot;);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">		for (int i = 0; i &lt; repsPkg.length; i++)</span>
+		{
+<span class="fc" id="L103">			sb.append(fileSeparator + repsPkg[i]);</span>
+		}
+<span class="fc" id="L105">		File dir = new File(sb.toString());</span>
+		
+		// If the path exists and if it is a directory, we list it
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">		if (dir.exists() &amp;&amp; dir.isDirectory())</span>
+		{
+<span class="fc" id="L110">			addClassesToListForDirectory(classes, dir, pckgName);</span>
+		}
+	 
+<span class="fc" id="L113">		return classes;</span>
+	}
+	
+	@SuppressWarnings(&quot;rawtypes&quot;)
+	private static void addClassesToListForDirectory(List&lt;Class&gt; classes, File dir, String pckgName)
+	{
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">		if (pckgName.length() &gt; 0 &amp;&amp; !pckgName.endsWith(&quot;.&quot;))</span>
+<span class="fc" id="L120">			pckgName = pckgName + &quot;.&quot;;</span>
+		
+<span class="fc bfc" id="L122" title="All 2 branches covered.">		for (File f : dir.listFiles())</span>
+		{
+<span class="fc bfc" id="L124" title="All 2 branches covered.">			if (f.isDirectory())</span>
+<span class="fc" id="L125">				addClassesToListForDirectory(classes, f, pckgName + f.getName());</span>
+		}
+		
+		// We filter entries
+<span class="fc" id="L129">		FilenameFilter filter = new DotClassFilter();</span>
+<span class="fc" id="L130">		File[] list = dir.listFiles(filter);</span>
+		
+		// We add each class of the package to the list
+<span class="fc bfc" id="L133" title="All 2 branches covered.">		for (int i = 0; i &lt; list.length; i++)</span>
+		{
+			try
+			{
+<span class="fc" id="L137">				classes.add((Class) ConvertUtils.convert(pckgName + list[i].getName().split(&quot;\\.&quot;)[0], Class.class));</span>
+			}
+<span class="pc" id="L139">			catch (Exception e) { }</span>
+		}
+<span class="fc" id="L141">	}</span>
+	 
+	/**
+	 * This method returns the list of the classes present
+	 * in a jar file of the classpath in a specified package
+	 *
+	 * @param jar The jar where to look for classes
+	 * @param pckgName The name of the package
+	 * @return The list of the classes
+	 */
+	@SuppressWarnings(&quot;rawtypes&quot;)
+	private static Collection&lt;Class&gt; treatJar(String jar, String pckgName)
+	{
+<span class="fc" id="L154">		ArrayList&lt;Class&gt; classes = new ArrayList&lt;Class&gt;();</span>
+		
+		try
+		{
+<span class="fc" id="L158">			JarFile jFile = new JarFile(jar);</span>
+<span class="fc" id="L159">			String pkgPath = pckgName.replace(&quot;.&quot;, &quot;/&quot;);</span>
+			
+			// For each entry of the Jar
+<span class="fc bfc" id="L162" title="All 2 branches covered.">			for (Enumeration&lt;JarEntry&gt; entries = jFile.entries(); entries.hasMoreElements(); )</span>
+			{
+				try
+				{
+<span class="fc" id="L166">					JarEntry element = entries.nextElement();</span>
+					// If the name of the entry start with the package path and ends with .class
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">					if (element.getName().startsWith(pkgPath) &amp;&amp; element.getName().endsWith(&quot;.class&quot;))</span>
+					{
+<span class="fc" id="L170">						String nomFichier = element.getName();</span>
+<span class="fc" id="L171">						nomFichier = nomFichier.substring(0, nomFichier.length()-6);</span>
+<span class="fc" id="L172">						nomFichier = nomFichier.replace(&quot;/&quot;, &quot;.&quot;);</span>
+<span class="fc" id="L173">						classes.add((Class) ConvertUtils.convert(nomFichier, Class.class));</span>
+					}
+				}
+<span class="fc" id="L176">				catch (Exception e) { }</span>
+			}
+<span class="pc" id="L178">		} catch (IOException e) { }</span>
+	 
+<span class="fc" id="L180">		return classes;</span>
+	}
+	 
+	/**
+	 * This class allows to filter the files of a directory. It accepts only .class files.
+	 */
+<span class="pc" id="L186">	private static class DotClassFilter implements FilenameFilter</span>
+	{
+		public boolean accept(File arg0, String arg1)
+		{
+<span class="fc" id="L190">			return arg1.endsWith(&quot;.class&quot;);</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

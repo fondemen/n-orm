@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Launcher.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm console</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.console</a> &gt; <span class="el_source">Launcher.java</span></div><h1>Launcher.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.console;
+
+import java.io.IOException;
+import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.console.shell.Shell;
+import com.googlecode.n_orm.console.util.PackageExplorer;
+import com.googlecode.n_orm.operations.ImportExport;
+
+<span class="nc" id="L9">public class Launcher</span>
+{
+	public static void main(String[] args) throws IOException
+	{	
+<span class="nc bnc" id="L13" title="All 2 branches missed.">		if (args.length == 0)</span>
+<span class="nc" id="L14">			System.out.println(&quot;Note: you can add parameters describing locations for jar files and class source directories as parameters so that persistring classes can be found&quot;);</span>
+
+<span class="nc bnc" id="L16" title="All 2 branches missed.">		for (String string : args) {</span>
+<span class="nc" id="L17">			PackageExplorer.addSearchEntry(string);</span>
+		}
+		
+<span class="nc" id="L20">		Shell shell = new Shell();</span>
+<span class="nc" id="L21">		shell.putEntryMapCommand(StorageManagement.class.getName(), StorageManagement.aspectOf());</span>
+<span class="nc" id="L22">		shell.putEntryMapCommand(ImportExport.class.getName(), ImportExport.class);</span>
+<span class="nc" id="L23">		shell.launch();</span>
+<span class="nc" id="L24">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

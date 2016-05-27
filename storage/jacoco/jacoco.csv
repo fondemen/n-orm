@@ -1,0 +1,177 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+n-orm core,com.googlecode.n_orm.cache.read,CacheException,16,0,0,0,8,0,4,0,4,0
+n-orm core,com.googlecode.n_orm.cache.read,CachedStore,151,241,21,27,34,54,22,18,6,10
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore.new WriteRetentionStore.Operation() {...},0,30,0,0,0,4,0,2,0,2
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore.new WriteRetentionStore.Operation() {...},0,15,0,0,0,4,0,2,0,2
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore,76,476,16,46,16,121,18,42,2,27
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore.EvictionThread.new ThreadFactory() {...},17,33,2,2,1,7,2,2,0,2
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore.RowInTable,20,117,10,12,9,27,10,7,0,6
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore.RequestIsOutException,0,3,0,0,0,1,0,1,0,1
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore.StoreRequest.new Runnable() {...},52,67,3,5,7,10,3,3,0,2
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore.StoreRequest.new Runnable() {...},35,144,3,9,3,17,3,5,0,2
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore.Operation,0,3,0,0,0,1,0,1,0,1
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore.StoreRequest,229,1128,88,160,25,248,72,68,0,16
+n-orm core,com.googlecode.n_orm.cache.write,WriteRetentionStore.EvictionThread,59,144,10,14,10,34,9,7,0,4
+n-orm core,com.googlecode.n_orm,PropertyManagement.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm,KeyManagement,248,627,18,74,20,126,17,53,1,23
+n-orm core,com.googlecode.n_orm,UnknownColumnFamily,26,0,0,0,6,0,3,0,3,0
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.FederatedTableManagement.2.FederatedTableManagement.new AggregatingIterator() {...},50,182,17,19,9,35,17,3,0,2
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.FederatedTableManagement.2.FederatedTableManagement.new AggregatingIterator() {...},7,36,0,0,1,8,0,2,0,2
+n-orm core,com.googlecode.n_orm,StoreSelector.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm,StoreSelector.AjcClosure3,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm,StoreSelector.AjcClosure5,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm,WaitingCallBack,13,21,1,1,6,9,3,3,2,3
+n-orm core,com.googlecode.n_orm,FederatedTableManagement,484,637,72,88,94,121,65,58,13,29
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.CloseableKeyIteratorWithTable,6,58,1,1,2,14,2,7,1,7
+n-orm core,com.googlecode.n_orm,IncrementException,9,40,0,4,3,5,3,3,3,1
+n-orm core,com.googlecode.n_orm,StoreSelector,369,871,36,87,30,160,36,50,3,21
+n-orm core,com.googlecode.n_orm,KeyManagement.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.FederatedTableManagement.2.FederatedTableManagement.1.FederatedTableManagement.new Row() {...},0,18,0,0,0,4,0,3,0,3
+n-orm core,com.googlecode.n_orm,PropertyManagement,97,358,9,51,23,82,9,41,1,19
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.GlobalAction,43,127,5,13,11,26,4,9,0,4
+n-orm core,com.googlecode.n_orm,StorageManagement.SearchResultIterator.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm,PropertyManagement.PropertyFamily,74,263,14,30,5,51,11,20,1,8
+n-orm core,com.googlecode.n_orm,KeyManagement.DecomposableString,140,347,8,34,10,85,7,26,0,12
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.RowWithTable,0,26,0,0,0,9,0,5,0,5
+n-orm core,com.googlecode.n_orm,PropertyManagement.PropertyFamily.PropertyManagement.new TreeMap() {...},0,22,0,2,0,5,0,3,0,2
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.ConstraintWithPostfix,3,24,0,4,1,6,1,4,1,2
+n-orm core,com.googlecode.n_orm,StorageManagement.SearchResultIterator,41,97,2,12,5,27,3,11,1,6
+n-orm core,com.googlecode.n_orm,DatabaseNotReachedException,21,11,0,0,4,2,2,1,2,1
+n-orm core,com.googlecode.n_orm,StorageManagement,425,1556,85,187,64,267,73,104,11,30
+n-orm core,com.googlecode.n_orm,Incrementing.Mode,5,55,0,0,0,2,1,3,1,3
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.AjcClosure1,0,17,0,0,0,1,0,2,0,2
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.AjcClosure3,0,17,0,0,0,1,0,2,0,2
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.AjcClosure5,0,17,0,0,0,1,0,2,0,2
+n-orm core,com.googlecode.n_orm,ProcessException.Problem,3,18,0,0,1,7,1,3,1,3
+n-orm core,com.googlecode.n_orm,ColumnFamiliyManagement,209,376,30,58,18,73,22,43,3,18
+n-orm core,com.googlecode.n_orm,PersistingMixin,36,230,7,25,4,52,7,23,1,13
+n-orm core,com.googlecode.n_orm,ProcessException,20,133,1,7,5,25,4,6,3,3
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.GlobalAction.FederatedTableManagement.new Callable() {...},24,40,0,0,2,6,0,2,0,2
+n-orm core,com.googlecode.n_orm,ReadWrite,8,70,0,0,1,8,2,4,2,4
+n-orm core,com.googlecode.n_orm,EventManagement,29,172,8,26,3,37,8,22,1,12
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.TableAlternatives,34,230,7,23,6,54,7,14,0,6
+n-orm core,com.googlecode.n_orm,StoreSelector.StoreProperties,32,20,1,1,1,5,2,2,1,2
+n-orm core,com.googlecode.n_orm,PropertyManagement.Property,152,342,31,47,16,83,30,29,4,16
+n-orm core,com.googlecode.n_orm,Consistency,17,55,4,0,5,4,5,3,2,3
+n-orm core,com.googlecode.n_orm,PropertyManagement.Property.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm,TimeoutCanceller,60,20,3,1,4,6,4,3,2,3
+n-orm core,com.googlecode.n_orm,IncrementManagement,36,234,11,35,4,52,11,27,2,13
+n-orm core,com.googlecode.n_orm,PropertyManagement.PropertyFamily.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm,DefaultPersistingElementListener,7,0,0,0,5,0,5,0,5,0
+n-orm core,com.googlecode.n_orm,FederatedMode,16,327,1,5,1,66,2,10,1,7
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.FederatedTableManagement.new FederatedTableManagement.GlobalAction() {...},3,45,0,0,1,6,1,3,1,3
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.FederatedTableManagement.new FederatedTableManagement.GlobalAction() {...},6,101,1,5,2,16,2,5,1,3
+n-orm core,com.googlecode.n_orm,PersistingElement,0,80,0,0,0,7,0,1,0,1
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.FederatedTableManagement.new FederatedTableManagement.GlobalAction() {...},4,58,0,0,2,6,2,2,2,2
+n-orm core,com.googlecode.n_orm,StoreSelector.StoreProperties.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm,FederatedTableManagement.GlobalAction.FederatedTableManagement.new ThreadFactory() {...},0,9,0,0,0,3,0,2,0,2
+n-orm core,com.googlecode.n_orm,EmptyCloseableIterator,3,6,0,0,2,3,2,3,2,3
+n-orm core,com.googlecode.n_orm,StoreSelector.FileFormat,5,45,0,0,0,3,1,3,1,3
+n-orm core,com.googlecode.n_orm.utils,AggregatingIterator.IteratorStatus,39,150,14,28,4,36,11,16,0,6
+n-orm core,com.googlecode.n_orm.utils,Striped64.ThreadHashCode,0,7,0,0,0,2,0,2,0,2
+n-orm core,com.googlecode.n_orm.utils,AggregatingIterator.IteratorStatus.ResultReadyToGo,0,24,0,0,0,6,0,4,0,4
+n-orm core,com.googlecode.n_orm.utils,LongAdder,73,113,8,16,24,26,12,15,7,8
+n-orm core,com.googlecode.n_orm.utils,Striped64.HashCode,2,16,1,1,0,6,1,2,0,2
+n-orm core,com.googlecode.n_orm.utils,Striped64.new PrivilegedExceptionAction() {...},0,15,0,0,0,6,0,2,0,2
+n-orm core,com.googlecode.n_orm.utils,Striped64,101,231,32,24,27,60,24,11,0,7
+n-orm core,com.googlecode.n_orm.utils,Striped64.Cell,6,25,0,0,2,7,0,3,0,3
+n-orm core,com.googlecode.n_orm.utils,UnmodifiableOverridingMap.MapStack,4,46,3,7,1,10,3,5,0,3
+n-orm core,com.googlecode.n_orm.utils,AggregatingIterator,35,120,2,10,3,25,3,11,1,7
+n-orm core,com.googlecode.n_orm.utils,UnmodifiableOverridingMap,1,124,2,10,1,24,2,18,0,14
+n-orm core,com.googlecode.n_orm.utils,UnmodifiableOverridingMap.1.1.new Map.Entry() {...},32,37,11,3,6,7,8,5,2,4
+n-orm core,com.googlecode.n_orm.utils,AggregatingIterator.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.utils,UnmodifiableOverridingMap.1.new Iterator() {...},0,31,0,0,0,7,0,4,0,4
+n-orm core,com.googlecode.n_orm.utils,UnmodifiableOverridingMap.new AbstractSet() {...},30,49,3,5,8,10,9,6,6,5
+n-orm core,com.googlecode.n_orm.operations,ImportExport,49,170,1,15,13,47,3,11,2,4
+n-orm core,com.googlecode.n_orm.operations,Process,170,286,33,31,9,41,20,15,1,2
+n-orm core,com.googlecode.n_orm.operations,ImportExport.ExportReport,3,12,0,0,1,5,1,2,1,2
+n-orm core,com.googlecode.n_orm.operations,ImportExport.ProcessReadException,23,0,0,0,6,0,3,0,3,0
+n-orm core,com.googlecode.n_orm.operations,ImportExport.ReadException,23,0,0,0,4,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.operations,Process.ProcessRunnable.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.operations,Process.ProcessReport,8,80,4,10,3,19,4,10,0,7
+n-orm core,com.googlecode.n_orm.operations,Process.ProcessRunnable,26,57,1,1,0,14,1,3,0,3
+n-orm core,com.googlecode.n_orm.operations,Process.new Thread() {...},8,55,3,1,3,6,2,2,0,2
+n-orm core,com.googlecode.n_orm.operations,Process.ProcessReport.AjcClosure1,18,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.operations,ImportExport.Element.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.operations,ImportExport.new Process() {...},0,6,0,0,0,4,0,2,0,2
+n-orm core,com.googlecode.n_orm.operations,ImportExport.Element,41,123,6,10,4,25,6,7,1,4
+n-orm core,com.googlecode.n_orm.cache.perthread,LIFO,13,147,7,23,1,39,7,18,0,10
+n-orm core,com.googlecode.n_orm.cache.perthread,Cache,171,540,23,53,9,126,25,44,3,28
+n-orm core,com.googlecode.n_orm.cache.perthread,LIFO.LIFOIterator,57,97,7,9,8,28,6,7,0,5
+n-orm core,com.googlecode.n_orm.cache.perthread,Cache.Element,0,38,0,2,0,12,0,6,0,5
+n-orm core,com.googlecode.n_orm.cache.perthread,LIFO.Node,0,12,0,0,0,5,0,1,0,1
+n-orm core,com.googlecode.n_orm.cache.perthread,LIFO.new LIFO.Criterium() {...},0,10,0,2,0,3,0,3,0,2
+n-orm core,com.googlecode.n_orm.cache.perthread,Cache.CleanerThread,129,164,18,16,27,35,13,8,0,4
+n-orm core,com.googlecode.n_orm.cache.perthread,LIFO.new LIFO.Criterium() {...},0,10,0,0,0,3,0,2,0,2
+n-orm core,com.googlecode.n_orm.cache.perthread,Cache.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.cache.perthread,Cache.AjcClosure3,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.memory,Memory.new Memory.LazyMap() {...},0,15,0,0,0,3,0,2,0,2
+n-orm core,com.googlecode.n_orm.memory,Memory.new CloseableKeyIterator() {...},9,98,1,15,2,21,2,12,1,5
+n-orm core,com.googlecode.n_orm.memory,Memory,152,677,19,96,5,81,18,64,0,23
+n-orm core,com.googlecode.n_orm.memory,Memory.Table.Row.ColumnFamily.ByteValue,67,126,11,11,8,28,9,8,0,6
+n-orm core,com.googlecode.n_orm.memory,Memory.Table.Row.ColumnFamily.ByteValue.new Runnable() {...},0,10,0,0,0,4,0,2,0,2
+n-orm core,com.googlecode.n_orm.memory,Memory.Table.Row.ColumnFamily.IncrementingValue,4,27,0,0,1,7,1,3,1,3
+n-orm core,com.googlecode.n_orm.memory,Memory.Table.Row.ColumnFamily.ByteValue.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.memory,QueryCounter,17,70,4,8,0,18,4,14,1,11
+n-orm core,com.googlecode.n_orm.memory,Memory.Table,0,25,0,0,0,6,0,3,0,3
+n-orm core,com.googlecode.n_orm.memory,Memory.Table.Row,0,62,0,2,0,12,0,6,0,5
+n-orm core,com.googlecode.n_orm.memory,Memory.LazyMap,48,71,11,9,13,19,10,9,2,7
+n-orm core,com.googlecode.n_orm.memory,Memory.Table.Row.ColumnFamily.Value,0,9,0,0,0,3,0,1,0,1
+n-orm core,com.googlecode.n_orm.memory,Memory.Table.Row.ColumnFamily,74,97,4,10,3,20,6,8,2,5
+n-orm core,com.googlecode.n_orm.conversion,KeyedElementConverter,0,41,0,0,0,9,0,7,0,7
+n-orm core,com.googlecode.n_orm.conversion,FloatConverter,5,31,0,0,1,5,1,4,1,4
+n-orm core,com.googlecode.n_orm.conversion,PrimitiveConverter,8,121,4,16,1,25,5,19,1,13
+n-orm core,com.googlecode.n_orm.conversion,ByteConverter,0,40,0,0,0,7,0,6,0,6
+n-orm core,com.googlecode.n_orm.conversion,BooleanConverter,13,68,1,13,1,13,1,13,0,7
+n-orm core,com.googlecode.n_orm.conversion,ShortConverter,0,40,0,0,0,7,0,6,0,6
+n-orm core,com.googlecode.n_orm.conversion,CharacterConverter,0,88,0,0,0,18,0,5,0,5
+n-orm core,com.googlecode.n_orm.conversion,EnumConverter,2,59,1,3,1,11,1,9,0,8
+n-orm core,com.googlecode.n_orm.conversion,IntegerConverter,0,37,0,0,0,7,0,6,0,6
+n-orm core,com.googlecode.n_orm.conversion,Converter,18,52,1,7,4,11,4,12,3,9
+n-orm core,com.googlecode.n_orm.conversion,SimpleConverter,0,45,0,2,0,9,0,5,0,4
+n-orm core,com.googlecode.n_orm.conversion,DateConverter,0,44,0,0,0,9,0,8,0,8
+n-orm core,com.googlecode.n_orm.conversion,ConversionTools.ConversionKind,5,95,0,0,0,3,1,3,1,3
+n-orm core,com.googlecode.n_orm.conversion,DoubleConverter,5,28,0,0,1,5,1,4,1,4
+n-orm core,com.googlecode.n_orm.conversion,NaturalConverter,4,292,2,24,1,52,2,19,0,8
+n-orm core,com.googlecode.n_orm.conversion,ArrayConverter,33,333,8,34,4,69,8,23,0,10
+n-orm core,com.googlecode.n_orm.conversion,UnreversibleTypeException,67,0,0,0,13,0,5,0,5,0
+n-orm core,com.googlecode.n_orm.conversion,LongConverter,5,28,0,0,1,6,1,5,1,5
+n-orm core,com.googlecode.n_orm.conversion,StringConverter,10,38,2,2,6,13,2,6,0,6
+n-orm core,com.googlecode.n_orm.conversion,PersistingConverter,0,50,0,2,0,9,0,8,0,7
+n-orm core,com.googlecode.n_orm.conversion,ConversionTools,40,446,8,46,8,87,9,39,1,15
+n-orm core,com.googlecode.n_orm.storeapi,MetaInformation,196,244,58,46,35,64,46,23,5,12
+n-orm core,com.googlecode.n_orm.storeapi,Constraint,112,510,24,78,18,94,18,47,1,13
+n-orm core,com.googlecode.n_orm.storeapi,ProcessWrapper.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.storeapi,DelegatingStore,64,75,6,2,13,18,10,10,6,10
+n-orm core,com.googlecode.n_orm.storeapi,DefaultColumnFamilyData,4,7,0,0,2,4,1,2,1,2
+n-orm core,com.googlecode.n_orm.storeapi,SimpleStoreWrapper,52,124,2,2,9,28,3,16,2,15
+n-orm core,com.googlecode.n_orm.storeapi,ProcessWrapper,62,0,2,0,9,0,5,0,4,0
+n-orm core,com.googlecode.n_orm.query,ClassConstraintBuilder,166,168,19,25,9,39,17,18,1,12
+n-orm core,com.googlecode.n_orm.query,LimitConstraintBuilder,0,17,0,0,0,6,0,2,0,2
+n-orm core,com.googlecode.n_orm.query,SearchableKeyConstraintBuilder,0,30,0,0,0,6,0,5,0,5
+n-orm core,com.googlecode.n_orm.query,KeyConstraintBuilder,5,54,1,1,1,14,1,7,0,7
+n-orm core,com.googlecode.n_orm.query,RangeKeyConstraintBuilder,0,23,0,0,0,7,0,2,0,2
+n-orm core,com.googlecode.n_orm.query,ClassConstraintBuilder.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.query,SearchableRangeKeyConstraintBuilder,0,11,0,0,0,3,0,2,0,2
+n-orm core,com.googlecode.n_orm.query,InnerClassConstraintBuilder,19,47,6,2,4,11,4,6,0,6
+n-orm core,com.googlecode.n_orm.query,SearchableClassConstraintBuilder,159,305,8,24,24,66,11,33,4,24
+n-orm core,com.googlecode.n_orm.query,InnerKeyConstraintBuilder,10,20,0,0,2,4,2,3,2,3
+n-orm core,com.googlecode.n_orm.query,InnerRangeKeyConstraintBuilder,0,11,0,0,0,3,0,2,0,2
+n-orm core,com.googlecode.n_orm.query,ConstraintBuilder,0,8,0,0,0,2,0,2,0,2
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.AjcClosure1,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.AjcClosure7,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.AjcClosure9,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.AjcClosure3,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.AjcClosure5,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.cf,SetColumnFamily.SetColumnFamilyIterator,0,44,0,2,0,11,0,5,0,4
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.2.new Iterator() {...},0,28,0,0,0,6,0,4,0,4
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.1.new Iterator() {...},0,26,0,0,0,5,0,4,0,4
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.new Set() {...},6,278,5,43,2,66,6,35,1,16
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.new Set() {...},0,207,2,30,0,49,2,30,0,16
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.2.1.new Map.Entry() {...},14,101,10,14,2,24,8,11,0,7
+n-orm core,com.googlecode.n_orm.cf,ConcurentAccessOnColumnFamily,85,10,11,1,18,2,8,3,2,3
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily,227,374,15,41,11,71,14,36,1,21
+n-orm core,com.googlecode.n_orm.cf,ColumnFamily,183,902,66,136,13,148,57,84,1,39
+n-orm core,com.googlecode.n_orm.cf,MapColumnFamily.AjcClosure11,22,0,0,0,1,0,2,0,2,0
+n-orm core,com.googlecode.n_orm.cf,ColumnFamily.ChangeKind,21,29,0,0,1,1,2,2,2,2
+n-orm core,com.googlecode.n_orm.cf,SetColumnFamily,138,420,22,58,21,102,17,50,0,27

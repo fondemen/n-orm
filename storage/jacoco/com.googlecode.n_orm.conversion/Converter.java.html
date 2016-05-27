@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Converter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">Converter.java</span></div><h1>Converter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+abstract class Converter&lt;T&gt; implements
+		Comparable&lt;Converter&lt;?&gt;&gt; {
+	private final Class&lt;T&gt; clazz;
+
+<span class="fc" id="L7">	public Converter(Class&lt;T&gt; clazz) {</span>
+<span class="fc" id="L8">		this.clazz = clazz;</span>
+<span class="fc" id="L9">	}</span>
+
+	public Class&lt;T&gt; getClazz() {
+<span class="fc" id="L12">		return this.clazz;</span>
+	}
+
+	public abstract T fromString(String rep, Class&lt;?&gt; expected);
+	
+	public abstract String toString(T obj, Class&lt;? extends T&gt; expected);
+
+	public abstract T fromBytes(byte[] rep, Class&lt;?&gt; type);
+
+	public abstract byte[] toBytes(T obj, Class&lt;? extends T&gt; expected);
+
+	public boolean canConvertToBytes(Object obj) {
+<span class="fc" id="L24">		return this.canConvert(obj.getClass());</span>
+	}
+
+	public boolean canConvertToString(Object obj) {
+<span class="fc" id="L28">		return this.canConvert(obj.getClass());</span>
+	}
+	
+	public boolean canConvert(Class&lt;?&gt; type) {
+<span class="fc" id="L32">		return this.getClazz().equals(type);</span>
+	}
+	
+	protected boolean canConvert(byte [] obj) {
+<span class="fc" id="L36">		return true;</span>
+	}
+	
+	protected boolean canConvert(String obj) {
+<span class="fc" id="L40">		return true;</span>
+	}
+
+	public boolean canConvertFromBytes(byte [] obj, Class&lt;?&gt; expected) {
+<span class="fc bfc" id="L44" title="All 4 branches covered.">		return this.canConvert(obj) &amp;&amp; this.canConvert(expected);</span>
+	}
+
+	public boolean canConvertFromString(String obj, Class&lt;?&gt; expected) {
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">		return this.canConvert(obj) &amp;&amp; this.canConvert(expected);</span>
+	}
+
+	@Override
+	public int compareTo(Converter&lt;?&gt; rhs) {
+<span class="nc" id="L53">		return this.getClazz().getName()</span>
+<span class="nc" id="L54">				.compareTo(rhs.getClazz().getName());</span>
+	}
+
+	public abstract T getDefaultValue(Class&lt;?&gt; type);
+
+	public Object fromStringReverted(String rep, Class&lt;?&gt; type) {
+<span class="nc" id="L60">		throw new UnreversibleTypeException(type);</span>
+	}
+
+	public String toStringReverted(T obj, Class&lt;? extends T&gt; expected) {
+<span class="nc" id="L64">		throw new UnreversibleTypeException(expected);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

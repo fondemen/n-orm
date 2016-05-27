@@ -1,0 +1,563 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ShellProcessor.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm console</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.console.shell</a> &gt; <span class="el_source">ShellProcessor.java</span></div><h1>ShellProcessor.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.console.shell;
+
+import java.beans.PropertyDescriptor;
+import java.io.Closeable;
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.Stack;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.beanutils.ConvertUtils;
+import org.apache.commons.beanutils.PropertyUtils;
+import org.apache.commons.beanutils.converters.DateConverter;
+import org.apache.commons.beanutils.converters.DateTimeConverter;
+
+import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+import com.googlecode.n_orm.consoleannotations.Trigger;
+import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
+
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">public class ShellProcessor</span>
+{
+	private static Set&lt;Method&gt; additionalMethods, keyMethods;
+	
+	static {
+<span class="fc" id="L39">		DateTimeConverter converter = new DateConverter();</span>
+<span class="fc" id="L40">		converter.setPatterns(new String[] {&quot;yyyy-MM-dd_HH:mm:ss.SSS&quot;, &quot;dow mon dd hh:mm:ss zzz yyyy&quot;});</span>
+<span class="fc" id="L41">		converter.setLocale(Locale.getDefault());</span>
+<span class="fc" id="L42">		ConvertUtils.register(converter, Date.class);</span>
+		
+<span class="fc" id="L44">		additionalMethods = new HashSet&lt;Method&gt;();</span>
+		try {
+<span class="fc" id="L46">			additionalMethods.add(Object.class.getMethod(&quot;equals&quot;, Object.class));</span>
+<span class="fc" id="L47">			additionalMethods.add(Object.class.getMethod(&quot;hashCode&quot;));</span>
+<span class="fc" id="L48">			additionalMethods.add(Object.class.getMethod(&quot;toString&quot;));</span>
+<span class="fc" id="L49">			additionalMethods.add(Comparable.class.getMethod(&quot;compareTo&quot;, Object.class));</span>
+<span class="fc" id="L50">			additionalMethods.add(Collection.class.getMethod(&quot;add&quot;, Object.class));</span>
+<span class="fc" id="L51">			additionalMethods.add(Collection.class.getMethod(&quot;remove&quot;, Object.class));</span>
+<span class="fc" id="L52">			additionalMethods.add(Collection.class.getMethod(&quot;clear&quot;));</span>
+<span class="fc" id="L53">			additionalMethods.add(Collection.class.getMethod(&quot;contains&quot;, Object.class));</span>
+<span class="fc" id="L54">			additionalMethods.add(Collection.class.getMethod(&quot;iterator&quot;));</span>
+<span class="fc" id="L55">			additionalMethods.add(Collection.class.getMethod(&quot;size&quot;));</span>
+<span class="fc" id="L56">			additionalMethods.add(Iterator.class.getMethod(&quot;hasNext&quot;));</span>
+<span class="fc" id="L57">			additionalMethods.add(Iterator.class.getMethod(&quot;next&quot;));</span>
+<span class="fc" id="L58">			additionalMethods.add(Iterator.class.getMethod(&quot;remove&quot;));</span>
+<span class="fc" id="L59">			additionalMethods.add(Closeable.class.getMethod(&quot;close&quot;));</span>
+<span class="fc" id="L60">			additionalMethods.add(List.class.getMethod(&quot;get&quot;, int.class));</span>
+<span class="fc" id="L61">			additionalMethods.add(Map.class.getMethod(&quot;get&quot;, Object.class));</span>
+<span class="fc" id="L62">			additionalMethods.add(Map.class.getMethod(&quot;remove&quot;, Object.class));</span>
+<span class="fc" id="L63">			additionalMethods.add(Map.class.getMethod(&quot;size&quot;));</span>
+<span class="fc" id="L64">			additionalMethods.add(Map.class.getMethod(&quot;put&quot;, Object.class, Object.class));</span>
+<span class="fc" id="L65">			additionalMethods.add(Map.class.getMethod(&quot;entrySet&quot;));</span>
+<span class="fc" id="L66">			additionalMethods.add(Map.class.getMethod(&quot;values&quot;));</span>
+<span class="fc" id="L67">			additionalMethods.add(Map.class.getMethod(&quot;keySet&quot;));</span>
+<span class="fc" id="L68">			additionalMethods.add(Map.class.getMethod(&quot;clear&quot;));</span>
+<span class="fc" id="L69">			additionalMethods.add(Map.Entry.class.getMethod(&quot;getKey&quot;));</span>
+<span class="fc" id="L70">			additionalMethods.add(Map.Entry.class.getMethod(&quot;getValue&quot;));</span>
+<span class="nc" id="L71">		} catch (SecurityException e) {</span>
+<span class="nc" id="L72">			e.printStackTrace();</span>
+<span class="nc" id="L73">		} catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L74">			e.printStackTrace();</span>
+<span class="pc" id="L75">		}</span>
+		
+<span class="fc" id="L77">		keyMethods = new HashSet&lt;Method&gt;();</span>
+		try {
+<span class="fc" id="L79">			keyMethods.add(SearchableClassConstraintBuilder.class.getMethod(&quot;withKey&quot;, String.class));</span>
+<span class="fc" id="L80">			keyMethods.add(SearchableClassConstraintBuilder.class.getMethod(&quot;andWithKey&quot;, String.class));</span>
+<span class="nc" id="L81">		} catch (SecurityException e) {</span>
+<span class="nc" id="L82">			e.printStackTrace();</span>
+<span class="nc" id="L83">		} catch (NoSuchMethodException e) {</span>
+<span class="nc" id="L84">			e.printStackTrace();</span>
+<span class="pc" id="L85">		}</span>
+<span class="fc" id="L86">	}</span>
+	
+	private final class ContextElement {
+		public final Object element;
+		public final String command;
+<span class="fc" id="L91">		public ContextElement(Object element, String command) {</span>
+<span class="fc" id="L92">			super();</span>
+<span class="fc" id="L93">			this.element = element;</span>
+<span class="fc" id="L94">			this.command = command;</span>
+<span class="fc" id="L95">		}</span>
+	}
+	
+	static boolean isKeyMethod(Method m) {
+<span class="fc" id="L99">		return keyMethods.contains(m);</span>
+	}
+		
+	// Fields
+	private Shell shell;
+	private Map&lt;String, Object&gt; mapCommands;
+	private Map&lt;String, Method&gt; processorCommands;
+	private Map&lt;String, Object&gt; mapShellVariables;
+<span class="fc" id="L107">	private String escapeCommand = &quot;quit&quot;;</span>
+<span class="fc" id="L108">	private String zeroCommand = &quot;zero&quot;;</span>
+<span class="fc" id="L109">	private String resetCommand = &quot;reset&quot;;</span>
+<span class="fc" id="L110">	private String upCommand = &quot;up&quot;;</span>
+<span class="fc" id="L111">	private String showCommand = &quot;show&quot;;</span>
+<span class="fc" id="L112">	private String newCommand = &quot;new&quot;;</span>
+<span class="fc" id="L113">	private String affectationCommand = &quot;&gt;&quot;;</span>
+<span class="fc" id="L114">	private Stack&lt;ContextElement&gt; context = new Stack&lt;ContextElement&gt;();</span>
+	
+	public ShellProcessor(Shell shell)
+<span class="fc" id="L117">	{</span>
+<span class="fc" id="L118">		this.shell = shell;</span>
+<span class="fc" id="L119">		this.mapCommands = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L120">		this.mapShellVariables = new HashMap&lt;String, Object&gt;();</span>
+		
+<span class="fc" id="L122">		this.updateProcessorCommands();</span>
+<span class="fc" id="L123">	}</span>
+	
+	public Object getContextElement() {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">		if (this.context.isEmpty())</span>
+<span class="fc" id="L127">			return null;</span>
+<span class="fc" id="L128">		return this.context.peek().element;</span>
+	}
+	
+	public void updateProcessorCommands()
+	{
+<span class="fc" id="L133">		processorCommands = new HashMap&lt;String, Method&gt;();</span>
+		// List all variables
+<span class="fc" id="L135">		Iterator&lt;Entry&lt;String, Object&gt;&gt; it = mapShellVariables.entrySet().iterator();</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">		while (it.hasNext())</span>
+<span class="nc" id="L137">			processorCommands.put(it.next().getKey(), null);</span>
+		
+<span class="fc" id="L139">		Object contextElement = this.getContextElement();</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">		if (contextElement == null)</span>
+		{
+			// List all Trigger annotated methods
+<span class="fc bfc" id="L143" title="All 2 branches covered.">			for (Object o : mapCommands.values())</span>
+			{
+<span class="pc bpc" id="L145" title="1 of 4 branches missed.">				for (Method m : (o instanceof Class ? (Class&lt;?&gt;)o : o.getClass()).getDeclaredMethods())</span>
+				{
+<span class="fc bfc" id="L147" title="All 2 branches covered.">					if (m.getAnnotation(Trigger.class) != null)</span>
+<span class="fc" id="L148">						processorCommands.put(m.getName(), m);</span>
+				}
+<span class="fc" id="L150">			}</span>
+		}
+		else
+		{
+			// List all Continuator annotated methods
+<span class="fc bfc" id="L155" title="All 2 branches covered.">			for (Method m : contextElement.getClass().getDeclaredMethods())</span>
+			{
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">				if (m.getAnnotation(Continuator.class) != null)</span>
+<span class="nc" id="L158">					processorCommands.put(m.getName(), m);</span>
+			}
+			//Adding additional methods if necessary
+<span class="fc bfc" id="L161" title="All 2 branches covered.">			for (Method m : additionalMethods) {</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">				if (m.getDeclaringClass().isInstance(contextElement))</span>
+<span class="fc" id="L163">					processorCommands.put(m.getName(), m);</span>
+<span class="fc" id="L164">			}</span>
+			
+			// List all properties of the context and add them as Continuators
+<span class="fc bfc" id="L167" title="All 2 branches covered.">			for (PropertyDescriptor pd : PropertyUtils.getPropertyDescriptors(contextElement))</span>
+			{
+				try
+				{
+<span class="fc" id="L171">					Method m = PropertyUtils.getReadMethod(pd);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">					if (m != null)</span>
+<span class="fc" id="L173">						processorCommands.put(m.getName(), m);</span>
+<span class="fc" id="L174">					m = PropertyUtils.getWriteMethod(pd);</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">					if (m != null)</span>
+<span class="nc" id="L176">						processorCommands.put(m.getName(), m);</span>
+				}
+<span class="pc" id="L178">				catch (Exception e) { }</span>
+			}
+		}
+<span class="fc" id="L181">	}</span>
+
+	public String getEscapeCommand()
+	{
+<span class="fc" id="L185">		return this.escapeCommand;</span>
+	}
+	
+	public String getZeroCommand()
+	{
+<span class="fc" id="L190">		return zeroCommand;</span>
+	}
+	
+	public String getResetCommand()
+	{
+<span class="fc" id="L195">		return resetCommand;</span>
+	}
+	
+	public String getUpCommand()
+	{
+<span class="fc" id="L200">		return upCommand;</span>
+	}
+	
+	public String getShowCommand()
+	{
+<span class="fc" id="L205">		return showCommand;</span>
+	}
+	
+	public String getNewCommand()
+	{
+<span class="fc" id="L210">		return newCommand;</span>
+	}
+	
+	public Map&lt;String, Object&gt; getMapCommands()
+	{
+<span class="fc" id="L215">		return mapCommands;</span>
+	}
+
+	public void setMapCommands(Map&lt;String, Object&gt; mapCommands)
+	{
+<span class="fc" id="L220">		this.mapCommands = mapCommands;</span>
+<span class="fc" id="L221">	}</span>
+	
+	public void putEntryMapCommand(String key, Object value)
+	{
+<span class="fc" id="L225">		this.mapCommands.put(key, value);</span>
+<span class="fc" id="L226">		shell.updateProcessorCommands();</span>
+<span class="fc" id="L227">	}</span>
+	
+	public Map&lt;String, Object&gt; getMapShellVariables()
+	{
+<span class="fc" id="L231">		return mapShellVariables;</span>
+	}
+
+	public void setMapShellVariables(Map&lt;String, Object&gt; mapShellVariables)
+	{
+<span class="fc" id="L236">		this.mapShellVariables = mapShellVariables;</span>
+<span class="fc" id="L237">	}</span>
+
+	public List&lt;String&gt; getCommandsAsString()
+	{
+<span class="fc" id="L241">		ArrayList&lt;String&gt; result = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L242">		result.add(this.escapeCommand);</span>
+<span class="fc" id="L243">		result.add(this.zeroCommand);</span>
+<span class="fc" id="L244">		result.add(this.resetCommand);</span>
+<span class="fc" id="L245">		result.add(this.upCommand);</span>
+<span class="fc" id="L246">		result.add(this.showCommand);</span>
+<span class="fc" id="L247">		result.add(this.newCommand);</span>
+<span class="fc" id="L248">		result.addAll(processorCommands.keySet());</span>
+<span class="fc" id="L249">		return result;</span>
+	}
+	
+	public List&lt;Method&gt; getCommandsAsMethod()
+	{
+<span class="fc" id="L254">		ArrayList&lt;Method&gt; result = new ArrayList&lt;Method&gt;();</span>
+<span class="fc" id="L255">		result.addAll(processorCommands.values());</span>
+<span class="fc" id="L256">		return result;</span>
+	}
+	
+	public void treatLine(String text)
+	{
+<span class="fc" id="L261">		String textToTreat = text.replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L262">		String firstCommand = textToTreat.split(&quot; &quot;)[0];</span>
+		
+<span class="fc bfc" id="L264" title="All 2 branches covered.">		if (firstCommand.equals(escapeCommand))</span>
+<span class="fc" id="L265">			shell.doStop();</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">		else if (firstCommand.equals(zeroCommand))</span>
+<span class="fc" id="L267">			this.doZero();</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">		else if (firstCommand.equals(resetCommand))</span>
+<span class="fc" id="L269">			this.doReset();</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">		else if (firstCommand.equals(upCommand))</span>
+<span class="fc" id="L271">			this.doUp();</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">		else if (firstCommand.equals(showCommand))</span>
+<span class="fc" id="L273">			this.doShow(textToTreat);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">		else if (firstCommand.equals(newCommand))</span>
+<span class="fc" id="L275">			this.doNew(textToTreat);</span>
+		else
+<span class="fc" id="L277">			executeQuery(textToTreat);</span>
+<span class="fc" id="L278">	}</span>
+
+	private void executeQuery(String query)
+	{
+<span class="fc" id="L282">		String[] tokens = getTokens(query);</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">		if (tokens.length == 0)</span>
+<span class="nc" id="L284">			return;</span>
+			
+<span class="fc" id="L286">		int currentTokenIndex = 0;</span>
+		
+<span class="fc" id="L288">		Object lastResult = this.getContextElement();</span>
+		
+		// Execute every commands in the query
+<span class="fc bfc" id="L291" title="All 2 branches covered.">		while (currentTokenIndex &lt; tokens.length)</span>
+		{
+			// Get the command
+<span class="fc" id="L294">			String command = tokens[currentTokenIndex];</span>
+<span class="fc" id="L295">			currentTokenIndex++;</span>
+			
+			// Check if this is a command on an object or on the shell (variable affectation, etc)
+<span class="fc bfc" id="L298" title="All 2 branches covered.">			if (command.equals(affectationCommand))</span>
+			{
+<span class="fc" id="L300">				mapShellVariables.put(tokens[currentTokenIndex], lastResult);</span>
+<span class="fc" id="L301">				currentTokenIndex++;</span>
+				// Update the completors
+<span class="fc" id="L303">				this.shell.updateProcessorCommands();</span>
+			}
+<span class="fc bfc" id="L305" title="All 2 branches covered.">			else if (mapShellVariables.containsKey(command)) // If this is an action on a variable of the shell</span>
+			{
+<span class="fc bfc" id="L307" title="All 2 branches covered.">				if (mapShellVariables.get(command) != null)</span>
+				{
+<span class="fc" id="L309">					lastResult = mapShellVariables.get(command);</span>
+<span class="fc" id="L310">					shell.println(lastResult.toString());</span>
+<span class="fc" id="L311">					this.context.clear();</span>
+<span class="fc" id="L312">					this.context.add(new ContextElement(lastResult, command));</span>
+					
+					// Change the prompt of the shell and update the completors
+<span class="fc" id="L315">					updatePrompt();</span>
+				}
+				else
+<span class="fc" id="L318">					shell.println(command + &quot; is null&quot;);</span>
+			}
+<span class="fc bfc" id="L320" title="All 2 branches covered.">			else if (processorCommands.containsKey(command)) // The command must be registered in the processor</span>
+			{
+				try {
+<span class="fc" id="L323">					Method m = processorCommands.get(command);</span>
+<span class="fc" id="L324">					Class&lt;?&gt;[] parameterTypes = m.getParameterTypes();</span>
+					// Find parameters of the command
+<span class="fc" id="L326">					Object[] params = new Object[parameterTypes.length];</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">					if (parameterTypes.length &gt; 0) {</span>
+<span class="fc" id="L328">						boolean lastParamIsArray = parameterTypes[parameterTypes.length-1].isArray();</span>
+						// Check the format of the command and get the parameters ; ellipsis might allow ignoring last one
+<span class="fc bfc" id="L330" title="All 4 branches covered.">						if (tokens.length - currentTokenIndex &lt; parameterTypes.length - (lastParamIsArray ? 1 : 0)) {</span>
+<span class="fc" id="L331">							shell.println(&quot;Command format error: &quot; + m.toString().substring(</span>
+									m.toString().substring(0, m.toString().lastIndexOf(&quot;(&quot;)).lastIndexOf(&quot;.&quot;) + 1, // Last &quot;.&quot; before parameters
+									m.toString().length())
+									);
+<span class="fc" id="L335">							break;</span>
+						} else {
+<span class="fc bfc" id="L337" title="All 2 branches covered.">							for (int i = 0; i &lt; parameterTypes.length; i++) {</span>
+<span class="fc" id="L338">								Class&lt;?&gt; type = parameterTypes[i];</span>
+								String s;
+								try {
+<span class="fc" id="L341">									s = tokens[currentTokenIndex + i];</span>
+									
+<span class="fc" id="L343">									boolean isArray = type.isArray();</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">									if (isArray) { // Array not supported</span>
+<span class="fc" id="L345">										type = type.getComponentType();</span>
+									}
+									
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">									if (this.mapShellVariables.containsKey(s))</span>
+<span class="nc" id="L349">										params[i] = this.mapShellVariables.get(s);</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">									else if (&quot;null&quot;.equals(s))</span>
+<span class="fc" id="L351">										params[i] = null;</span>
+									else
+<span class="fc" id="L353">										params[i] = ConvertUtils.convert(s, type);</span>
+									
+<span class="pc bpc" id="L355" title="1 of 4 branches missed.">									if (isArray &amp;&amp; !params[i].getClass().isArray()) {</span>
+<span class="fc" id="L356">										Object array = Array.newInstance(type, 1);</span>
+<span class="fc" id="L357">										Array.set(array, 0, params[i]);</span>
+<span class="fc" id="L358">										params[i] = array;</span>
+									}
+<span class="fc" id="L360">								} catch (ArrayIndexOutOfBoundsException x) {</span>
+									// We might be facing an ellipsis
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">									if (lastParamIsArray) {</span>
+<span class="pc bpc" id="L363" title="2 of 4 branches missed.">										assert type.isArray();</span>
+<span class="fc" id="L364">										type = type.getComponentType();</span>
+<span class="fc" id="L365">										params[i] = Array.newInstance(type, 0);</span>
+									} else {
+<span class="nc" id="L367">										throw x;</span>
+									}
+<span class="fc" id="L369">								}</span>
+							}
+							
+<span class="fc" id="L372">							currentTokenIndex += parameterTypes.length;</span>
+						}
+					}
+					
+					// Execute the command
+<span class="fc bfc" id="L377" title="All 2 branches covered.">					if (this.context.isEmpty())</span>
+<span class="fc" id="L378">						lastResult = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);</span>
+					else
+<span class="fc" id="L380">						lastResult = m.invoke(this.getContextElement(), params);</span>
+					
+					// Print the result on the shell (if there is a result)
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">					if (lastResult == null) // Zero the shell in this case</span>
+<span class="nc" id="L384">						shell.println(&quot;method result: null&quot;);</span>
+					else {
+						// In the case where we just display a result, we don't change the context
+<span class="pc bpc" id="L387" title="1 of 6 branches missed.">						if (!(lastResult instanceof String) &amp;&amp; !(lastResult instanceof Number) &amp;&amp; !(lastResult instanceof Boolean))</span>
+						{
+							// Change the prompt of the shell and update the completors
+<span class="fc" id="L390">							this.context.push(new ContextElement(lastResult, command));</span>
+<span class="fc" id="L391">							updatePrompt();</span>
+						}
+<span class="fc" id="L393">						shell.println(&quot;method result: &quot; + lastResult.toString());</span>
+					}
+				}
+<span class="fc" id="L396">				catch (Exception e)</span>
+				{
+<span class="fc" id="L398">					shell.println(&quot;n-orm: &quot; + e.getMessage() + &quot;: command error&quot;);</span>
+<span class="fc" id="L399">					e.printStackTrace();</span>
+<span class="fc" id="L400">				}</span>
+			}
+			else // The command is unknown, move to the next one in case we know it
+			{
+<span class="fc" id="L404">				shell.println(&quot;n-orm: &quot; + command + &quot;: command not found&quot;);</span>
+<span class="fc" id="L405">				currentTokenIndex++;</span>
+			}
+<span class="fc" id="L407">		}</span>
+<span class="fc" id="L408">	}</span>
+
+	private void updatePrompt() {
+<span class="fc" id="L411">		String cmd = &quot;&quot;;</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">		for (ContextElement c : this.context) {</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">			if (cmd.length() == 0)</span>
+<span class="fc" id="L414">				cmd = &quot;:&quot; + c.command;</span>
+			else
+<span class="fc" id="L416">				cmd = cmd + '.' + c.command;</span>
+<span class="fc" id="L417">		}</span>
+<span class="fc" id="L418">		this.shell.updateProcessorCommands();</span>
+<span class="fc" id="L419">		this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + cmd + Shell.DEFAULT_PROMPT_END);</span>
+<span class="fc" id="L420">	}</span>
+	
+	private void doZero()
+	{
+<span class="fc" id="L424">		this.context.clear();</span>
+<span class="fc" id="L425">		this.shell.updateProcessorCommands();</span>
+<span class="fc" id="L426">		this.shell.setPrompt(Shell.DEFAULT_PROMPT_START + Shell.DEFAULT_PROMPT_END);</span>
+<span class="fc" id="L427">	}</span>
+	
+	private void doReset()
+	{
+<span class="fc" id="L431">		this.mapShellVariables.clear();</span>
+<span class="fc" id="L432">		doZero();</span>
+<span class="fc" id="L433">	}</span>
+	
+	private void doUp()
+	{
+<span class="fc bfc" id="L437" title="All 2 branches covered.">		if (this.context.isEmpty())</span>
+<span class="fc" id="L438">			return;</span>
+<span class="fc" id="L439">		this.context.pop();</span>
+<span class="fc" id="L440">		Object newContext = this.getContextElement();</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">		if (newContext != null)</span>
+<span class="fc" id="L442">		shell.println(newContext.toString());</span>
+<span class="fc" id="L443">		this.updatePrompt();</span>
+<span class="fc" id="L444">	}</span>
+	
+	@SuppressWarnings(&quot;rawtypes&quot;)
+	private void doShow(String textToTreat)
+	{
+<span class="fc" id="L449">		String[] args = getTokens(textToTreat.replaceFirst(this.showCommand + &quot; &quot;, &quot;&quot;));</span>
+		
+<span class="pc bpc" id="L451" title="2 of 4 branches missed.">		if (args.length &gt; 0 &amp;&amp; mapShellVariables.containsKey(args[0]))</span>
+		{
+<span class="fc" id="L453">			Object localContext = mapShellVariables.get(args[0]);</span>
+<span class="fc" id="L454">			ArrayList&lt;String&gt; values = new ArrayList&lt;String&gt;();</span>
+			
+			// List all properties of the context and add them as Continuators
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">			if (localContext instanceof Collection)</span>
+			{
+<span class="fc" id="L459">				Collection c = (Collection)localContext;</span>
+<span class="fc" id="L460">				Iterator it = c.iterator();</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">				while (it.hasNext())</span>
+				{
+<span class="fc" id="L463">					Object o = it.next();</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">					if (o.getClass().getAnnotation(Persisting.class) != null)</span>
+					{
+<span class="fc" id="L466">						values.add(&quot;Variable type: &quot; + o.getClass().getName());</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">						for (Field p : o.getClass().getDeclaredFields())</span>
+						{
+							try
+							{
+<span class="fc" id="L471">								Method m = PropertyUtils.getReadMethod(PropertyUtils.getPropertyDescriptor(o, p.getName()));</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">								if (m != null)</span>
+								{
+<span class="fc" id="L474">									Object result = m.invoke(ConvertUtils.convert(o, o.getClass()));</span>
+<span class="fc bfc" id="L475" title="All 2 branches covered.">									values.add(p.getName() + &quot;: &quot; + (result == null ? &quot;null&quot; : result.toString()));</span>
+								}
+							}
+<span class="fc" id="L478">							catch (Exception e) { }</span>
+						}
+<span class="fc" id="L480">						values.add(&quot;&quot;);</span>
+					}
+<span class="fc" id="L482">				}</span>
+			}
+			
+			// Print on the shell
+<span class="fc bfc" id="L486" title="All 2 branches covered.">			for (String s : values)</span>
+<span class="fc" id="L487">				shell.println(s);</span>
+		}
+<span class="fc" id="L489">	}</span>
+	
+	@SuppressWarnings(&quot;rawtypes&quot;)
+	private void doNew(String textToTreat)
+	{
+<span class="fc" id="L494">		String[] args = getTokens(textToTreat.replaceFirst(this.newCommand + &quot; &quot;, &quot;&quot;));</span>
+		
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">		if (args.length &gt; 0)</span>
+		{
+<span class="fc" id="L498">			int offset = 0;</span>
+<span class="pc bpc" id="L499" title="1 of 4 branches missed.">			if (args.length &gt; 2 &amp;&amp; args[args.length - 2].equals(this.affectationCommand))</span>
+			{
+<span class="fc" id="L501">				offset = 2;</span>
+			}
+			try
+			{
+				// The first argument must be the name of the class
+<span class="fc" id="L506">				Class clazz = (Class) ConvertUtils.convert(args[0], Class.class);</span>
+				
+<span class="fc bfc" id="L508" title="All 2 branches covered.">				for (Constructor c : clazz.getConstructors())</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">					if (c.getParameterTypes().length == args.length - 1 - offset)</span>
+					{
+<span class="fc" id="L511">						Object[] params = new Object[c.getParameterTypes().length];</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">						for (int i = 1; i &lt; args.length - offset; i++)</span>
+<span class="nc" id="L513">							params[i - 1] = ConvertUtils.convert(args[i], c.getParameterTypes()[i - 1]);</span>
+						
+<span class="fc" id="L515">						this.context.push(new ContextElement(c.newInstance(params), &quot;new &quot; + clazz.getSimpleName()));</span>
+<span class="fc" id="L516">						shell.println(&quot;n-orm: &quot; + args[0] + &quot; created successfully&quot;);</span>
+<span class="fc" id="L517">						this.updatePrompt();</span>
+					}
+				
+				// Check if there is an affectation
+<span class="fc bfc" id="L521" title="All 2 branches covered.">				if (offset != 0)</span>
+				{
+<span class="fc" id="L523">					mapShellVariables.put(args[args.length - 1], this.getContextElement());</span>
+<span class="fc" id="L524">					this.updatePrompt();</span>
+				}
+<span class="fc" id="L526">			} catch (Exception e)</span>
+			{
+<span class="fc" id="L528">				shell.println(&quot;n-orm: &quot; + args[0] + &quot;: constructor error&quot;);</span>
+<span class="fc" id="L529">				e.printStackTrace();</span>
+<span class="fc" id="L530">			}</span>
+		}
+<span class="fc" id="L532">	}</span>
+	
+	private String[] getTokens(String query)
+	{
+		// Pay attention on the string with multiple words delimited by quotes
+<span class="fc" id="L537">		String tmpString = &quot; #########&quot;;</span>
+<span class="fc" id="L538">		Pattern pattern = Pattern.compile(&quot;\&quot;([^\&quot;]*)\&quot;&quot;);</span>
+<span class="fc" id="L539">		Matcher matcher = pattern.matcher(query);</span>
+		
+<span class="fc" id="L541">		HashMap&lt;String, String&gt; tmpMap = new HashMap&lt;String, String&gt;();</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">		while (matcher.find())</span>
+		{
+<span class="fc" id="L544">			String betweenQuotes = matcher.group(1);</span>
+<span class="fc" id="L545">			String replacement = tmpString + tmpMap.size() + &quot; &quot;;</span>
+<span class="fc" id="L546">			tmpMap.put(replacement.trim(), betweenQuotes);</span>
+<span class="fc" id="L547">			query = query.replaceFirst(&quot;\&quot;&quot; + betweenQuotes + &quot;\&quot;&quot;, replacement);</span>
+<span class="fc" id="L548">		}</span>
+		
+		// Get all the tokens of the query
+<span class="fc" id="L551">		query = query.replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L552">		String[] tokens = query.split(&quot; &quot;);</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">		for (int i = 0; i &lt; tokens.length; i++)</span>
+		{
+<span class="fc bfc" id="L555" title="All 2 branches covered.">			for (String s : tmpMap.keySet())</span>
+<span class="fc bfc" id="L556" title="All 2 branches covered.">				if (tokens[i].contains(s))</span>
+<span class="fc" id="L557">					tokens[i] = tokens[i].replaceFirst(s, tmpMap.get(s));</span>
+		}
+		
+<span class="fc" id="L560">		return tokens;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

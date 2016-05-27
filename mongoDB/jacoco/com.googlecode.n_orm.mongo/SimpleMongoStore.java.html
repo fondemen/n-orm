@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>SimpleMongoStore.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">mongoDB driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.mongo</a> &gt; <span class="el_source">SimpleMongoStore.java</span></div><h1>SimpleMongoStore.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.mongo;
+
+import java.util.Map;
+import java.util.Set;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+import com.googlecode.n_orm.storeapi.SimpleStore;
+
+
+<span class="fc" id="L13">public class SimpleMongoStore implements SimpleStore</span>
+{
+<span class="fc" id="L15">	private static MongoStore store = new MongoStore();</span>
+
+	public void start() {
+<span class="fc" id="L18">		store.start();</span>
+<span class="fc" id="L19">	}</span>
+
+	public void setDB(String dbname)
+	{
+<span class="fc" id="L23">		store.setDB(dbname);</span>
+<span class="fc" id="L24">	}</span>
+
+	public void dropTable(String table)
+	{
+<span class="fc" id="L28">		store.dropTable(table);</span>
+<span class="fc" id="L29">	}</span>
+
+
+	public boolean hasTable(String tableName)
+		throws DatabaseNotReachedException
+	{
+<span class="nc" id="L35">		return store.hasTable(tableName);</span>
+	}
+
+
+	public void delete(String table, String id)
+		throws DatabaseNotReachedException
+	{
+<span class="nc" id="L42">		store.delete(null, table, id);</span>
+<span class="nc" id="L43">	}</span>
+
+
+	public boolean exists(String table, String row)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L49">		return store.exists(null, table, row);</span>
+	}
+
+
+	public boolean exists(String table, String row, String family)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L56">		return store.exists(null, table, row, family);</span>
+	}
+
+
+	public CloseableKeyIterator get(
+			 String table,
+			 Constraint c, int limit, Set&lt;String&gt; families
+	) throws DatabaseNotReachedException
+	{
+<span class="fc" id="L65">		return store.get(null, table, c, limit, families);</span>
+	}
+
+
+	public byte [] get(String table, String row, String family, String key)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L72">		return store.get(null, table, row, family, key);</span>
+	}
+
+
+	public Map&lt;String, byte[]&gt; get(String table, String id, String family)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L79">		return store.get(null, table, id, family);</span>
+	}
+
+
+	public Map&lt;String, byte[]&gt; get(String table, String id, String family, Constraint c)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L86">		return store.get(null, table, id, family, c);</span>
+	}
+
+
+	public ColumnFamilyData get(String table, String id, Set&lt;String&gt; families)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L93">		return store.get(null, table, id, families);</span>
+	}
+
+
+	public void storeChanges(
+		String table, String id,
+		ColumnFamilyData changed,
+		Map&lt;String, Set&lt;String&gt;&gt; removed,
+		Map&lt;String, Map&lt;String, Number&gt;&gt; increments
+	) throws DatabaseNotReachedException
+	{
+<span class="fc" id="L104">		store.storeChanges(null, table, id, changed, removed, increments);</span>
+<span class="fc" id="L105">	}</span>
+
+
+	public long count(String table, Constraint c)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L111">		return store.count(null, table, c);</span>
+	}
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

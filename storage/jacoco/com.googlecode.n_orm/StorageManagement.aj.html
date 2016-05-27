@@ -1,0 +1,739 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>StorageManagement.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">StorageManagement.aj</span></div><h1>StorageManagement.aj</h1><pre class="source lang-java linenums"><span class="pc bnc" id="L1" title="All 4 branches missed.">package com.googlecode.n_orm;</span>
+
+import java.lang.reflect.Field;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.ImplicitActivation;
+import com.googlecode.n_orm.KeyManagement;
+import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingMixin;
+import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.DelegatingStore;
+import com.googlecode.n_orm.storeapi.MetaInformation;
+import com.googlecode.n_orm.storeapi.Row;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Store;
+import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.cache.write.WriteRetentionStore;
+import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+import com.googlecode.n_orm.consoleannotations.Trigger;
+import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.query.ConstraintBuilder;
+import com.googlecode.n_orm.storeapi.Constraint;
+
+<span class="pc" id="L41">public aspect StorageManagement {</span>
+	//Dangerous: a subclass would need to store one more column family (i.e. alter the data store metadata) which may be long even if this information is never read
+//	public static final String CLASS_COLUMN_FAMILY = &quot;class&quot;;
+//	public static final String CLASS_COLUMN = &quot;&quot;;
+	
+	transient Boolean PersistingElement.exists = null;
+	private transient boolean PersistingElement.isStoring = false;
+	private transient Collection&lt;Class&lt;? extends PersistingElement&gt;&gt; PersistingElement.persistingSuperClasses = null;
+	
+	/**
+	 * General-purpose properties.
+	 * First intent is to help data stores.
+	 */
+	private transient AtomicReference&lt;Map&lt;String, Object&gt;&gt; PersistingElement.additionalProperties = null;
+	
+	public boolean PersistingElement.isKnownAsExistingInStore() {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">		return this.exists == Boolean.TRUE;</span>
+	}
+	
+	public boolean PersistingElement.isKnownAsNotExistingInStore() {
+<span class="nc bnc" id="L61" title="All 2 branches missed.">		return this.exists == Boolean.FALSE;</span>
+	}
+	
+	private AtomicReference&lt;Map&lt;String, Object&gt;&gt; PersistingElement.getAdditionalProperties() {
+<span class="nc bnc" id="L65" title="All 2 branches missed.">		if (this.additionalProperties == null) {</span>
+<span class="nc" id="L66">			synchronized(this) {</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">				if (this.additionalProperties == null) {</span>
+<span class="nc" id="L68">					this.additionalProperties = new AtomicReference&lt;Map&lt;String, Object&gt;&gt;();</span>
+				}
+			}
+		}
+<span class="nc" id="L72">		return this.additionalProperties;</span>
+	}
+	
+	/**
+	 * A general purpose property attached to this persisting element.
+	 * Primarily designed to help building data store drivers.
+	 * Thread-safe using copy-on-write.
+	 * @param key the key of the inserted element
+	 * @param o the inserted value on this persisting element with the given key
+	 * @param checkIfExists if set to true, given value o will be inserted if and only if
+	 *  no existing value with the same key exists
+	 * @return The object inserted as an additional property
+	 * 	or the previously existing value for the key in case checkIfExists was set to true
+	 * @throws NullPointerException if key or o is null
+	 */
+	public Object PersistingElement.addAdditionalProperty(String key, Object o, boolean checkIfExists) {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">		if (key == null)</span>
+<span class="nc" id="L89">			throw new NullPointerException(&quot;Key for additional attibute for &quot; + this + &quot; cannot be null.&quot;);</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">		if (o == null)</span>
+<span class="nc" id="L91">			throw new NullPointerException(&quot;Value for additional attibute &quot; + key + &quot; for &quot; + this + &quot; cannot be null.&quot;);</span>
+<span class="nc" id="L92">		AtomicReference&lt;Map&lt;String, Object&gt;&gt; ap = this.getAdditionalProperties();</span>
+		while (true) {
+<span class="nc" id="L94">			Map&lt;String, Object&gt; oldProps = ap.get(), newProps;</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">			if (oldProps == null) {</span>
+<span class="nc" id="L96">				newProps = new HashMap&lt;String, Object&gt;();</span>
+			} else {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">				if (checkIfExists) {</span>
+<span class="nc" id="L99">					Object old = oldProps.get(key);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">					if (old != null) {</span>
+<span class="nc" id="L101">						return old;</span>
+					}
+				}
+<span class="nc" id="L104">				newProps = new HashMap&lt;String, Object&gt;();</span>
+			}
+<span class="nc" id="L106">			newProps.put(key, o);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">			if (ap.compareAndSet(oldProps, Collections.unmodifiableMap(newProps))) {</span>
+<span class="nc" id="L108">				return o;</span>
+			}
+		}
+		
+	}
+	
+	/**
+	 * A general purpose property attached to this persisting element.
+	 * Primarily designed to help building data store drivers.
+	 */
+	public Object PersistingElement.getAdditionalProperty(String name) {
+<span class="nc bnc" id="L119" title="All 2 branches missed.">		if (this.additionalProperties == null)</span>
+<span class="nc" id="L120">			return null;</span>
+<span class="nc" id="L121">		Map&lt;String, Object&gt; props = this.additionalProperties.get();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">		return props == null ? null : props.get(name);</span>
+	}
+
+	@Continuator
+	public void PersistingElement.flush() {
+<span class="fc" id="L127">		Store s = this.getStore();</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">		while (s instanceof DelegatingStore) {</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">			if (s instanceof WriteRetentionStore) {</span>
+<span class="fc" id="L130">				WriteRetentionStore writeCache = (WriteRetentionStore)s;</span>
+				// There should have only one write cache in the stack
+<span class="fc" id="L132">				writeCache.flush(this.getTable(), this.getIdentifier());</span>
+				// Handling superclasses
+<span class="fc" id="L134">				Collection&lt;Class&lt;? extends PersistingElement&gt;&gt; persistingSuperClasses = this.getPersistingSuperClasses();</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">				if (!persistingSuperClasses.isEmpty()) {</span>
+<span class="nc" id="L136">					PersistingMixin px = PersistingMixin.getInstance();</span>
+<span class="nc" id="L137">					String ident = this.getFullIdentifier();</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">					for (Class&lt;? extends PersistingElement&gt; sc : persistingSuperClasses) {</span>
+<span class="nc" id="L139">						writeCache.flush(px.getTable(sc), ident);</span>
+					}
+				}
+<span class="fc" id="L142">				return;</span>
+			}
+<span class="nc" id="L144">			s = ((DelegatingStore)s).getActualStore();</span>
+		}
+<span class="nc" id="L146">	}</span>
+	
+	@Continuator
+	public void PersistingElement.deleteNoCache() throws DatabaseNotReachedException {
+		// Performing delete request
+<span class="fc" id="L151">		this.delete();</span>
+		
+		// Flushing write cache in case it exists
+<span class="fc" id="L154">		this.flush();</span>
+<span class="fc" id="L155">	}</span>
+
+	@Continuator
+	public void PersistingElement.delete() throws DatabaseNotReachedException {
+<span class="fc" id="L159">		Store s = this.getStore();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">		s.delete(new MetaInformation().forElement(this), this.getTable(), this.getIdentifier());</span>
+<span class="fc" id="L161">		Collection&lt;Class&lt;? extends PersistingElement&gt;&gt; psc = this.getPersistingSuperClasses();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">		if (!psc.isEmpty()) {</span>
+<span class="fc" id="L163">			PersistingMixin px = PersistingMixin.getInstance();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">			for (Class&lt;? extends PersistingElement&gt; cls : psc) {</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">				this.getStore().delete(new MetaInformation().forElement(this).forClass(cls), px.getTable(cls), this.getFullIdentifier());</span>
+			}
+		}
+<span class="fc" id="L168">		this.exists= Boolean.FALSE;</span>
+<span class="pc bpc" id="L169" title="2 of 6 branches missed.">		assert ((s instanceof DelegatingStore) &amp;&amp; ((DelegatingStore)s).getActualStore(WriteRetentionStore.class) != null)</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">			|| !this.existsInStore() : &quot;delete for &quot; + this + &quot; failed: still found in data store&quot;;</span>
+<span class="fc" id="L171">	}</span>
+	
+	@Continuator
+	public void PersistingElement.storeNoCache() throws DatabaseNotReachedException {
+		// Performing store request
+<span class="fc" id="L176">		this.store();</span>
+		
+		// Flushing write cache in case it exists
+<span class="fc" id="L179">		this.flush();</span>
+<span class="fc" id="L180">	}</span>
+	
+	@Continuator
+	public void PersistingElement.store() throws DatabaseNotReachedException {
+<span class="fc" id="L184">		this.checkIsValid();</span>
+		
+<span class="pc" id="L186">		synchronized(this) {</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">			if (this.isStoring)</span>
+<span class="fc" id="L188">				return;</span>
+<span class="pc bpc" id="L189" title="3 of 4 branches missed.">			isStoring = true;</span>
+		}
+		try {
+<span class="fc" id="L192">			this.updateFromPOJO();</span>
+			
+<span class="fc" id="L194">			Persisting annotation = this.getClass().getAnnotation(Persisting.class);</span>
+			
+<span class="fc" id="L196">			PropertyManagement pm = PropertyManagement.getInstance();</span>
+<span class="fc" id="L197">			Map&lt;String, Field&gt; changedFields = new TreeMap&lt;String, Field&gt;();</span>
+<span class="fc" id="L198">			ColumnFamilyData changed = new DefaultColumnFamilyData(), localChanges;</span>
+<span class="fc" id="L199">			Map&lt;String, Set&lt;String&gt;&gt; deleted = new TreeMap&lt;String, Set&lt;String&gt;&gt;();</span>
+<span class="fc" id="L200">			Map&lt;String, Map&lt;String, Number&gt;&gt; increments = new TreeMap&lt;String, Map&lt;String,Number&gt;&gt;();</span>
+			
+<span class="fc" id="L202">			Map&lt;String,Number&gt; propsIncrs = this.getIncrements();</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">			if (!propsIncrs.isEmpty()) {</span>
+<span class="fc" id="L204">				Map&lt;String,Number&gt; realPropsIncrs = new TreeMap&lt;String, Number&gt;();</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">				for (Entry&lt;String, Number&gt; incr : propsIncrs.entrySet()) {</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">					if (incr.getValue().longValue() != 0) {</span>
+<span class="fc" id="L207">						realPropsIncrs.put(incr.getKey(), incr.getValue());</span>
+<span class="fc" id="L208">						changedFields.put(incr.getKey(), pm.getProperty(this.getClass(), incr.getKey()));</span>
+					}
+				}
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">				if (!realPropsIncrs.isEmpty())</span>
+<span class="fc" id="L212">					increments.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, realPropsIncrs);</span>
+			}
+			
+<span class="fc" id="L215">			Collection&lt;ColumnFamily&lt;?&gt;&gt; families = this.getColumnFamilies();</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">			for (ColumnFamily&lt;?&gt; family : families) {</span>
+<span class="fc" id="L217">				Field cfField = family.getProperty();</span>
+<span class="fc" id="L218">				Set&lt;String&gt; changedKeys = family.changedKeySet();</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">				if (!changedKeys.isEmpty()) {</span>
+<span class="fc" id="L220">					Map&lt;String, byte[]&gt; familyChanges = new TreeMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L221">					Set&lt;String&gt; familyDeleted = new TreeSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">					if (cfField != null)</span>
+<span class="fc" id="L223">						changedFields.put(cfField.getName(), cfField);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">					for (String key : changedKeys) {</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">						if (family.wasDeleted(key)) {</span>
+<span class="fc" id="L226">							familyDeleted.add(key);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">							if (cfField == null) { //It's a property</span>
+<span class="fc" id="L228">								Field propField = pm.getProperty(this.getClass(), key);</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">								if (propField != null)</span>
+<span class="fc" id="L230">									changedFields.put(propField.getName(), propField);</span>
+								else
+<span class="nc bnc" id="L232" title="All 2 branches missed.">									assert false : &quot;Property column family for &quot; + this.getClass().getName() + &quot; refers to a missing property &quot; + key;</span>
+							}
+						} else {
+							//No need for auto-loading for it is a changed value
+<span class="fc" id="L236">							Object element = family.getElement(key);</span>
+							Class&lt;?&gt; expected;
+<span class="fc bfc" id="L238" title="All 2 branches covered.">							if (cfField != null) {</span>
+<span class="fc" id="L239">								expected = family.getClazz();</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">							} else if (element instanceof PropertyManagement.Property) {</span>
+<span class="fc" id="L241">								Field propField = ((PropertyManagement.Property)element).getField();</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">								if (propField == null) //Property that was activated but which has disappeared</span>
+<span class="nc" id="L243">									continue;</span>
+<span class="fc" id="L244">								changedFields.put(propField.getName(), propField);</span>
+<span class="fc" id="L245">								expected = propField.getType();</span>
+							} else {
+<span class="nc bnc" id="L247" title="All 2 branches missed.">								assert false;</span>
+<span class="nc" id="L248">								expected = element.getClass();</span>
+							}
+<span class="fc" id="L250">							familyChanges.put(key, ConversionTools.convert(element, expected));</span>
+						}
+					}
+<span class="fc bfc" id="L253" title="All 2 branches covered.">					if (!familyChanges.isEmpty())</span>
+<span class="fc" id="L254">						changed.put(family.getName(), familyChanges);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">					if (!familyDeleted.isEmpty())</span>
+<span class="fc" id="L256">						deleted.put(family.getName(), familyDeleted);</span>
+				}
+<span class="fc" id="L258">				Set&lt;String&gt; incrementedKeys = family.incrementedKeySet();</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">				if (!incrementedKeys.isEmpty()) {</span>
+<span class="fc" id="L260">					Map&lt;String, Number&gt; familyIncr = new TreeMap&lt;String,Number&gt;();</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">					for (String key : incrementedKeys) {</span>
+<span class="fc" id="L262">						Number incr = family.getIncrement(key);</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">						if (incr.longValue() != 0) {</span>
+<span class="fc" id="L264">							familyIncr.put(key, incr);</span>
+<span class="pc bpc" id="L265" title="2 of 4 branches missed.">							assert cfField != null : &quot;Increments for properties should not be processed there&quot;;</span>
+						}
+					}
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">					if (!familyIncr.isEmpty()) {</span>
+<span class="fc" id="L269">						increments.put(family.getName(), familyIncr);</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">						if (cfField != null)</span>
+<span class="fc" id="L271">							changedFields.put(cfField.getName(), cfField);</span>
+					}
+				}
+			}
+			
+			//Storing keys into properties. As keys are final, there is no need to store them again if we know that the object already exists within the base
+<span class="pc bpc" id="L277" title="1 of 4 branches missed.">			if (annotation.storeKeys() &amp;&amp; (!Boolean.TRUE.equals(this.exists))) {</span>
+<span class="fc" id="L278">				localChanges = new DefaultColumnFamilyData(changed);</span>
+<span class="fc" id="L279">				Map&lt;String, byte[]&gt; changedProperties = changed.get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">				if (changedProperties == null) {</span>
+<span class="nc" id="L281">					changedProperties = new TreeMap&lt;String, byte[]&gt;();</span>
+				} else {
+<span class="fc" id="L283">					changedProperties = new TreeMap&lt;String, byte[]&gt;(changedProperties);</span>
+				}
+<span class="fc" id="L285">				localChanges.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changedProperties);</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">				for (Field key : this.getKeys()) {</span>
+					try {
+<span class="fc" id="L288">						changedProperties.put(key.getName(), ConversionTools.convert(pm.readValue(this, key), key.getType()));</span>
+<span class="fc" id="L289">						changedFields.put(key.getName(), key);</span>
+<span class="nc" id="L290">					} catch (RuntimeException e) {</span>
+<span class="nc" id="L291">						throw e;</span>
+<span class="nc" id="L292">					} catch (Exception e) {</span>
+<span class="nc" id="L293">						throw new IllegalStateException(&quot;Cannot save object ; problem reading property : &quot; + e.getMessage(), e);</span>
+					}
+				}
+			} else
+<span class="fc" id="L297">				localChanges = changed;</span>
+			
+<span class="fc bfc" id="L299" title="All 8 branches covered.">			if (!(this.exists == Boolean.TRUE &amp;&amp; changed.isEmpty() &amp;&amp; deleted.isEmpty() &amp;&amp; increments.isEmpty())) {</span>
+				
+<span class="fc bfc" id="L301" title="All 2 branches covered.">				this.getStore().storeChanges(new MetaInformation().forElement(this).withColumnFamilies(changedFields), this.getTable(), this.getIdentifier(), localChanges, deleted, increments);</span>
+
+<span class="fc bfc" id="L303" title="All 2 branches covered.">				if (propsIncrs.isEmpty()) { // Increment does not make sure we have latest value</span>
+<span class="fc" id="L304">					boolean fullPropertiesChange = true;</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">					for (Field f : pm.getProperties(this.getClass())) {</span>
+<span class="fc bfc" id="L306" title="All 4 branches covered.">						if (! changedFields.containsKey(f.getName()) &amp;&amp; !this.getKeys().contains(f)) {</span>
+<span class="fc" id="L307">							fullPropertiesChange = false;</span>
+<span class="fc" id="L308">							break;</span>
+						}
+					}
+<span class="fc bfc" id="L311" title="All 2 branches covered.">					if (fullPropertiesChange) {</span>
+						// All properties were changed and no increment were performed
+						// as such, it's just like an activate (we just stored all)
+<span class="fc" id="L314">						this.getPropertiesColumnFamily().setActivated();</span>
+					}
+				}
+				
+<span class="fc" id="L318">				propsIncrs.clear();</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">				for(ColumnFamily&lt;?&gt; family : families) {</span>
+<span class="fc" id="L320">					family.clearChanges();</span>
+				}
+				
+				//Storing in persisting superclasses
+<span class="fc" id="L324">				Collection&lt;Class&lt;? extends PersistingElement&gt;&gt; persistingSuperClasses = this.getPersistingSuperClasses();</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">				if (!persistingSuperClasses.isEmpty()) {</span>
+<span class="fc" id="L326">					PersistingMixin px = PersistingMixin.getInstance();</span>
+					//The next line to avoid repeating all properties in superclasses
+<span class="fc bfc" id="L328" title="All 2 branches covered.">					if (!annotation.storeAlsoInSuperClasses()) {</span>
+<span class="fc" id="L329">						changed.clear(); deleted.clear(); increments.clear(); changedFields.clear();</span>
+					}
+//					Map&lt;String, byte[]&gt; classColumn = new TreeMap&lt;String, byte[]&gt;();
+//					String clsName = this.getClass().getName();
+//					classColumn.put(CLASS_COLUMN, ConversionTools.convert(clsName, String.class));
+//					changed.put(CLASS_COLUMN_FAMILY, classColumn);
+<span class="fc" id="L335">					String ident = this.getFullIdentifier();</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">					for (Class&lt;? extends PersistingElement&gt; sc : persistingSuperClasses) {</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">						this.getStore().storeChanges(new MetaInformation().forElement(this).withColumnFamilies(changedFields), px.getTable(sc), ident, changed, deleted, increments);</span>
+					}
+				}
+			}
+			
+			//Store depending properties
+<span class="fc bfc" id="L343" title="All 2 branches covered.">			for (Field prop : pm.getProperties(this.getClass())) {</span>
+<span class="fc bfc" id="L344" title="All 4 branches covered.">				if (pm.isPersistingPropertyType(prop.getType()) &amp;&amp; prop.isAnnotationPresent(ImplicitActivation.class)) {</span>
+<span class="fc" id="L345">					Object kVal = pm.candideReadValue(this, prop);</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">					if (kVal != null)</span>
+<span class="fc" id="L347">						((PersistingElement)kVal).store();</span>
+				}
+			}
+			
+<span class="fc" id="L351">			this.exists= Boolean.TRUE;</span>
+<span class="fc" id="L352">		} finally {</span>
+<span class="pc" id="L353">			synchronized(this) {</span>
+<span class="pc bpc" id="L354" title="6 of 8 branches missed.">				isStoring = false;</span>
+			}
+<span class="fc" id="L356">		}</span>
+<span class="fc" id="L357">	}</span>
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	public Collection&lt;Class&lt;? extends PersistingElement&gt;&gt; PersistingElement.getPersistingSuperClasses() {
+<span class="fc bfc" id="L361" title="All 2 branches covered.">		if (this.persistingSuperClasses != null)</span>
+<span class="fc" id="L362">			return this.persistingSuperClasses;</span>
+		
+<span class="fc" id="L364">		this.persistingSuperClasses = new LinkedList&lt;Class&lt;? extends PersistingElement&gt;&gt;();</span>
+<span class="fc" id="L365">		Class&lt;?&gt; sp = this.getClass().getSuperclass();</span>
+		Class&lt;? extends PersistingElement&gt; spPers;
+<span class="fc bfc" id="L367" title="All 2 branches covered.">		while (sp != null) {</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">			if (sp.isAnnotationPresent(Persisting.class)) {</span>
+<span class="fc" id="L369">				spPers = (Class&lt;? extends PersistingElement&gt;) sp;</span>
+<span class="fc" id="L370">				this.persistingSuperClasses.add(spPers);</span>
+			}
+<span class="fc" id="L372">			sp = sp.getSuperclass();</span>
+		}
+<span class="fc" id="L374">		return this.persistingSuperClasses;</span>
+	}
+
+	@Continuator
+	public void PersistingElement.activateColumnFamily(String name) throws DatabaseNotReachedException {
+<span class="fc" id="L379">		this.getColumnFamily(name).activate();</span>
+<span class="fc" id="L380">	}</span>
+
+	public void PersistingElement.activateColumnFamily(String name, Object fromObject, Object toObject) throws DatabaseNotReachedException {
+<span class="nc" id="L383">		this.getColumnFamily(name).activate(fromObject, toObject);</span>
+<span class="nc" id="L384">	}</span>
+	
+	public void PersistingElement.activateColumnFamilyIfNotAlready(String name) throws DatabaseNotReachedException {
+<span class="fc" id="L387">		ColumnFamily&lt;?&gt; cf = this.getColumnFamily(name);</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">		if (!cf.isActivated())</span>
+<span class="nc" id="L389">			cf.activate();</span>
+<span class="fc" id="L390">	}</span>
+	
+	public void PersistingElement.activateColumnFamilyIfNotAlready(String name, long timeout) throws DatabaseNotReachedException {
+<span class="fc" id="L393">		ColumnFamily&lt;?&gt; cf = this.getColumnFamily(name);</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">		if (!cf.isActivated(timeout))</span>
+<span class="fc" id="L395">			cf.activate();</span>
+<span class="fc" id="L396">	}</span>
+	
+	public void PersistingElement.activateColumnFamilyIfNotAlready(String name, Object fromObject, Object toObject) throws DatabaseNotReachedException {
+<span class="nc" id="L399">		ColumnFamily&lt;?&gt; cf = this.getColumnFamily(name);</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">		if (!cf.isActivated())</span>
+<span class="nc" id="L401">			cf.activate(fromObject, toObject);</span>
+<span class="nc" id="L402">	}</span>
+	
+	public void PersistingElement.activateColumnFamilyIfNotAlready(String name, long timeout, Object fromObject, Object toObject) throws DatabaseNotReachedException {
+<span class="nc" id="L405">		ColumnFamily&lt;?&gt; cf = this.getColumnFamily(name);</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">		if (!cf.isActivated(timeout))</span>
+<span class="nc" id="L407">			cf.activate(fromObject, toObject);</span>
+<span class="nc" id="L408">	}</span>
+	
+	public void PersistingElement.activateIfNotAlready(String... families) throws DatabaseNotReachedException {
+<span class="fc" id="L411">		this.activate(Long.MAX_VALUE, families);</span>
+<span class="fc" id="L412">	}</span>
+	
+	public void PersistingElement.activateIfNotAlready(long timeout, String... families) throws DatabaseNotReachedException {
+<span class="fc" id="L415">		this.activate(timeout, families);</span>
+<span class="fc" id="L416">	}</span>
+	
+	@Continuator
+	public void PersistingElement.activate(String... families) throws DatabaseNotReachedException {
+<span class="fc" id="L420">		this.activate(-1, families);</span>
+<span class="fc" id="L421">	}</span>
+	
+	public void PersistingElement.activate(Object... families) throws DatabaseNotReachedException {
+<span class="fc" id="L424">		String[] fams = new String[families.length];</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">		for (int i = 0; i &lt; families.length; ++i) {</span>
+<span class="fc" id="L426">			ColumnFamily&lt;?&gt; cf = this.getColumnFamily(families[i]);</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">			if (cf == null)</span>
+<span class="nc" id="L428">				throw new IllegalArgumentException(&quot;Element &quot; + families[i] + &quot; does not correspond to a column familiy.&quot;);</span>
+<span class="fc" id="L429">			fams[i] = cf.getName();</span>
+		}
+<span class="fc" id="L431">		this.activate(fams);</span>
+<span class="fc" id="L432">	}</span>
+
+	private void PersistingElement.activate(long timeout, String... families) throws DatabaseNotReachedException {
+<span class="fc" id="L435">		this.checkIsValid();</span>
+		
+<span class="fc" id="L437">		Map&lt;String, Field&gt; toBeActivated = getActualFamiliesToBeActivated(timeout, families);</span>
+		
+<span class="fc bfc" id="L439" title="All 2 branches covered.">		if (! toBeActivated.isEmpty()) {</span>
+<span class="pc bpc" id="L440" title="1 of 4 branches missed.">			ColumnFamilyData rawData = this.getStore().get(new MetaInformation().forElement(this).withColumnFamilies(toBeActivated), this.getTable(), this.getIdentifier(), toBeActivated.keySet());</span>
+<span class="fc" id="L441">			activateFromRawData(toBeActivated.keySet(), rawData);</span>
+		}
+<span class="fc" id="L443">	}</span>
+
+	public void PersistingElement.activateFromRawData(Set&lt;String&gt; toBeActivated,
+			ColumnFamilyData rawData) {
+<span class="pc bpc" id="L447" title="2 of 4 branches missed.">		assert ! toBeActivated.isEmpty();</span>
+<span class="fc bfc" id="L448" title="All 2 branches covered.">		if (rawData == null)</span>
+<span class="fc" id="L449">			this.exists = Boolean.FALSE;</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">		else if (!rawData.isEmpty())</span>
+<span class="fc" id="L451">			this.exists = Boolean.TRUE;</span>
+		
+<span class="fc" id="L453">		toBeActivated = new TreeSet&lt;String&gt;(toBeActivated);//Avoiding changing the initial collection</span>
+		
+		ColumnFamily&lt;?&gt; cf;
+<span class="fc bfc" id="L456" title="All 2 branches covered.">		if (rawData != null) {</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">			for (Entry&lt;String, Map&lt;String, byte[]&gt;&gt; families : rawData.entrySet()) {</span>
+<span class="fc" id="L458">				cf = this.getColumnFamily(families.getKey());</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">				if (cf != null) //might happen in case of scheme evolution</span>
+<span class="fc" id="L460">					cf.rebuild(families.getValue());</span>
+<span class="fc" id="L461">				boolean removed = toBeActivated.remove(families.getKey());</span>
+<span class="pc bpc" id="L462" title="3 of 6 branches missed.">				assert cf != null ? removed : true : &quot;Got unexpected column family &quot; + families.getKey() + &quot; from raw data for &quot; + this;</span>
+			}
+		}
+		
+<span class="fc bfc" id="L466" title="All 2 branches covered.">		if (!toBeActivated.isEmpty()) {</span>
+<span class="fc" id="L467">			Map&lt;String, byte[]&gt; emptyTree = new TreeMap&lt;String, byte[]&gt;();</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">			for (String tba : toBeActivated) {</span>
+<span class="fc" id="L469">				cf = this.getColumnFamily(tba);</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">				if (cf != null)</span>
+<span class="fc" id="L471">					cf.rebuild(emptyTree);</span>
+			}
+		}
+<span class="fc" id="L474">	}</span>
+	
+	public static &lt;E extends PersistingElement&gt; E getFromRawData(Class&lt;E&gt; type, Row row, Set&lt;String&gt; toBeActivated) {
+<span class="nc" id="L477">		E element = StorageManagement.getElement(type, row.getKey());</span>
+<span class="nc" id="L478">		element.activateFromRawData(toBeActivated, row.getValues());</span>
+<span class="nc" id="L479">		return element;</span>
+	}
+
+	private Map&lt;String, Field&gt; PersistingElement.getActualFamiliesToBeActivated(long timeout, String... families) {
+<span class="fc" id="L483">		Map&lt;String, Field&gt; toBeActivated = StorageManagement.getAutoActivatedFamilies(this.getClass(), families);</span>
+
+<span class="fc bfc" id="L485" title="All 2 branches covered.">		if (timeout &gt; 0) {</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">			for (String family : new TreeSet&lt;String&gt;(toBeActivated.keySet())) {</span>
+<span class="fc" id="L487">				ColumnFamily&lt;?&gt; cf = this.getColumnFamily(family);</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">				if (cf.isActivated(timeout))</span>
+<span class="fc" id="L489">					toBeActivated.remove(family);</span>
+			}
+		}
+<span class="fc" id="L492">		return toBeActivated;</span>
+	}
+	
+	/**
+	 * The list of column families that should be activated while providing the desired list of column families.
+	 * This function takes care of the property column family and any {@link ImplicitActivation} marked column family.
+	 * @param clazz the class of the element where column families should be found
+	 * @param families the desired set of families
+	 * @return names/fields for families to be activated
+	 */
+	public static Map&lt;String, Field&gt; getAutoActivatedFamilies(Class&lt;? extends PersistingElement&gt; clazz, String... families) {
+<span class="fc" id="L503">		ColumnFamiliyManagement cfm = ColumnFamiliyManagement.getInstance();</span>
+<span class="fc" id="L504">		Map&lt;String, Field&gt; toBeActivated = new TreeMap&lt;String, Field&gt;();</span>
+		
+<span class="fc bfc" id="L506" title="All 2 branches covered.">		if (families == null)</span>
+<span class="fc" id="L507">			return toBeActivated;</span>
+		
+<span class="fc" id="L509">		toBeActivated.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, null);</span>
+		
+<span class="fc" id="L511">		Map&lt;String, Field&gt; knownFamilies = cfm.getColumnFamilies(clazz);</span>
+<span class="fc bfc" id="L512" title="All 2 branches covered.">		for (Entry&lt;String, Field&gt; cff : knownFamilies.entrySet()) {</span>
+<span class="fc bfc" id="L513" title="All 2 branches covered.">			if (cff.getValue().getAnnotation(ImplicitActivation.class) != null)</span>
+<span class="fc" id="L514">				toBeActivated.put(cff.getKey(), cff.getValue());</span>
+		}
+		
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">		if (families != null) {</span>
+<span class="fc bfc" id="L518" title="All 2 branches covered.">			for (String family : families) {</span>
+<span class="fc bfc" id="L519" title="All 2 branches covered.">				if (PropertyManagement.PROPERTY_COLUMNFAMILY_NAME.equals(family))</span>
+<span class="fc" id="L520">					continue;</span>
+<span class="fc" id="L521">				Field f = knownFamilies.get(family); </span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">				if (f == null)</span>
+<span class="nc" id="L523">					throw new IllegalArgumentException(&quot;Unknown column family &quot; + family + &quot; in class &quot; + clazz);</span>
+<span class="fc" id="L524">				toBeActivated.put(family, f);</span>
+			}
+		}
+<span class="fc" id="L527">		return toBeActivated;</span>
+	}
+	
+	public boolean PersistingElement.exists() throws DatabaseNotReachedException {
+<span class="fc bfc" id="L531" title="All 2 branches covered.">		if (this.exists == null) {</span>
+<span class="fc" id="L532">			this.existsInStore();</span>
+<span class="pc bpc" id="L533" title="2 of 4 branches missed.">			assert this.exists != null;</span>
+		}
+		
+<span class="fc" id="L536">		return this.exists;</span>
+	}
+
+	@Continuator
+	public boolean PersistingElement.existsInStore() throws DatabaseNotReachedException {
+<span class="fc bfc" id="L541" title="All 2 branches covered.">		boolean ret = this.getStore().exists(new MetaInformation().forElement(this), this.getTable(), this.getIdentifier());</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">		this.exists = ret ? Boolean.TRUE : Boolean.FALSE;</span>
+<span class="fc" id="L543">		return ret;</span>
+	}
+	
+	public static &lt;T&gt; T getElement(Class&lt;T&gt; clazz, String identifier) {
+<span class="fc" id="L547">		return KeyManagement.getInstance().createElement(clazz, identifier);</span>
+	}
+
+	/**
+	 * Creates an element from byte-array based data. If element can be found in cache, it will.
+	 * Any existing data is replaced by the given {@link Row}, except for families with no data.
+	 * @param clazz the class of the returned element
+	 * @param toBeActivated the list of families to be activated
+	 * @param data the raw data as can be found in a data store
+	 */
+	public static &lt;T extends PersistingElement&gt; T createElementFromRow(final Class&lt;T&gt; clazz,
+			final Map&lt;String, Field&gt; toBeActivated, Row data) {
+<span class="fc" id="L559">		T elt = ConversionTools.convertFromString(clazz, data.getKey());</span>
+<span class="fc" id="L560">		((PersistingElement)elt).exists = Boolean.TRUE;</span>
+		//assert (toBeActivated == null) == ((data.getValues() == null)  || (data.getValues().entrySet().isEmpty())); //may be false (e.g. no properties)
+<span class="fc bfc" id="L562" title="All 2 branches covered.">		if (toBeActivated != null) { //the element should be activated</span>
+<span class="fc" id="L563">			Map&lt;String, Field&gt; tba = toBeActivated;</span>
+<span class="fc" id="L564">			Set&lt;String&gt; missingCf = null;</span>
+<span class="fc" id="L565">			Set&lt;String&gt; dataKeys = data.getValues().keySet();</span>
+<span class="fc bfc" id="L566" title="All 2 branches covered.">			if (! dataKeys.containsAll(toBeActivated.keySet())) {</span>
+<span class="fc" id="L567">				missingCf = new TreeSet&lt;String&gt;(toBeActivated.keySet());</span>
+<span class="fc" id="L568">				missingCf.removeAll(dataKeys);</span>
+<span class="fc" id="L569">				tba = new TreeMap&lt;String, Field&gt;(toBeActivated);</span>
+<span class="fc" id="L570">				tba.keySet().retainAll(dataKeys);</span>
+<span class="fc" id="L571">				Iterator&lt;String&gt; mci = missingCf.iterator();</span>
+<span class="fc bfc" id="L572" title="All 2 branches covered.">				while (mci.hasNext()) {</span>
+<span class="fc bfc" id="L573" title="All 2 branches covered.">					if (elt.getColumnFamily(mci.next()).isActivated())</span>
+<span class="fc" id="L574">						mci.remove();</span>
+				}
+			}
+			
+<span class="fc bfc" id="L578" title="All 2 branches covered.">			if (!tba.isEmpty()) {</span>
+<span class="fc" id="L579">				elt.activateFromRawData(tba.keySet(), new DefaultColumnFamilyData(data.getValues()));</span>
+			}
+			
+<span class="fc bfc" id="L582" title="All 4 branches covered.">			if (missingCf != null &amp;&amp; !missingCf.isEmpty()) {</span>
+<span class="fc" id="L583">				elt.activate(missingCf.toArray(new String[missingCf.size()]));</span>
+			}
+		}
+<span class="pc bpc" id="L586" title="1 of 4 branches missed.">		return elt;</span>
+	}
+	
+	public static class SearchResultIterator&lt;T extends PersistingElement&gt; implements CloseableIterator&lt;T&gt; {
+		private final Class&lt;T&gt; clazz;
+		private final int limit;
+		private final Map&lt;String, Field&gt; toBeActivated;
+		private final CloseableKeyIterator keys;
+<span class="fc" id="L594">		private int returned = 0;</span>
+<span class="fc" id="L595">		private boolean closed = false;</span>
+		
+<span class="fc" id="L597">		public SearchResultIterator(Class&lt;T&gt; clazz, int limit, Map&lt;String, Field&gt; toBeActivated, CloseableKeyIterator keys) {</span>
+<span class="fc" id="L598">			this.clazz = clazz;</span>
+<span class="fc" id="L599">			this.limit = limit;</span>
+<span class="pc bpc" id="L600" title="1 of 2 branches missed.">			this.toBeActivated = toBeActivated;</span>
+<span class="fc" id="L601">			this.keys = keys;</span>
+<span class="fc" id="L602">		}</span>
+
+		@Override
+		@Continuator
+		public boolean hasNext() {
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">			if (closed)</span>
+<span class="nc" id="L608">				return false;</span>
+<span class="fc bfc" id="L609" title="All 4 branches covered.">			boolean ret = returned &lt; limit &amp;&amp; keys.hasNext();</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">			if (! ret) </span>
+<span class="fc" id="L611">				this.close();</span>
+<span class="fc" id="L612">			return ret;</span>
+		}
+
+		@Override
+		@Continuator
+		public T next() {
+<span class="fc bfc" id="L618" title="All 2 branches covered.">			if (!this.hasNext())</span>
+<span class="fc" id="L619">				throw new NoSuchElementException();</span>
+<span class="fc" id="L620">			Row data = keys.next();</span>
+			try {
+<span class="fc" id="L622">				return createElementFromRow(clazz, toBeActivated, data);</span>
+<span class="nc" id="L623">			} finally {</span>
+<span class="pc" id="L624">				returned++;</span>
+<span class="nc" id="L625">			}</span>
+		}
+
+		@Override
+		@Continuator
+		public void remove() {
+<span class="nc" id="L631">			keys.remove();</span>
+<span class="nc" id="L632">		}</span>
+
+		@Override
+		@Continuator
+		public void close() {
+<span class="fc bfc" id="L637" title="All 2 branches covered.">			if (closed)</span>
+<span class="fc" id="L638">				return;</span>
+			
+<span class="fc" id="L640">			keys.close();</span>
+<span class="fc" id="L641">			this.closed = true;</span>
+<span class="fc" id="L642">		}</span>
+		
+		@Override
+		protected void finalize() throws Throwable {
+<span class="fc" id="L646">			this.close();</span>
+<span class="fc" id="L647">			super.finalize();</span>
+<span class="fc" id="L648">		}</span>
+	}
+	
+	public static &lt;T extends PersistingElement&gt; CloseableIterator&lt;T&gt; findElement(Class&lt;T&gt; clazz, Constraint c, int limit, String... families) throws DatabaseNotReachedException {
+<span class="fc" id="L652">		Store store = StoreSelector.getInstance().getStoreFor(clazz);</span>
+<span class="fc bfc" id="L653" title="All 2 branches covered.">		final Map&lt;String, Field&gt; toBeActivated = families == null ? null : getAutoActivatedFamilies(clazz, families);</span>
+<span class="fc bfc" id="L654" title="All 2 branches covered.">		final CloseableKeyIterator keys = store.get(new MetaInformation().forClass(clazz).withColumnFamilies(toBeActivated), PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated == null ? null : toBeActivated.keySet());</span>
+		try {
+<span class="fc" id="L656">			CloseableIterator&lt;T&gt; ret = new SearchResultIterator&lt;T&gt;(clazz, limit, toBeActivated, keys);</span>
+<span class="fc" id="L657">			return ret;</span>
+<span class="nc" id="L658">		} catch (RuntimeException x) {</span>
+<span class="nc bnc" id="L659" title="All 2 branches missed.">			if (keys != null)</span>
+<span class="nc" id="L660">				keys.close();</span>
+<span class="nc" id="L661">			throw x;</span>
+		}
+	}
+	
+	public static &lt;T extends PersistingElement&gt; long countElements(Class&lt;T&gt; clazz, Constraint c) {
+<span class="fc" id="L666">		Store store = StoreSelector.getInstance().getStoreFor(clazz);</span>
+<span class="fc" id="L667">		return store.count(new MetaInformation().forClass(clazz), PersistingMixin.getInstance().getTable(clazz), c);</span>
+	}
+	
+//	/**
+//	 * WARNING: this function empties the cache for all elements of class clazz.
+//	 */
+//	public static &lt;T extends PersistingElement&gt; void truncateElements(Class&lt;T&gt; clazz, Constraint c) {
+//		Store store = StoreSelector.getInstance().getStoreFor(clazz);
+//		KeyManagement.getInstance().cleanupKnownPersistingElements();
+//		store.truncate(PersistingMixin.getInstance().getTable(clazz), c);
+//	}
+
+	public static &lt;T extends PersistingElement&gt; NavigableSet&lt;T&gt; findElementsToSet(final Class&lt;T&gt; clazz, Constraint c, final int limit, String... families) throws DatabaseNotReachedException {
+<span class="fc" id="L680">		CloseableIterator&lt;T&gt; found = findElement(clazz, c, limit, families);</span>
+		try {
+<span class="fc" id="L682">			NavigableSet&lt;T&gt; ret = new TreeSet&lt;T&gt;();</span>
+<span class="fc bfc" id="L683" title="All 2 branches covered.">			while (found.hasNext()) {</span>
+<span class="fc" id="L684">				ret.add(found.next());</span>
+			}
+			//assert ret.size() == Math.min(limit, countElements(clazz, c));
+<span class="fc" id="L687">			return ret;</span>
+<span class="fc" id="L688">		} finally {</span>
+<span class="fc" id="L689">			found.close();</span>
+<span class="fc" id="L690">		}</span>
+	}
+	
+	@Trigger
+	public static ConstraintBuilder findElements() {
+<span class="fc" id="L695">		return new ConstraintBuilder();</span>
+	}
+	
+	/**
+	 * Gets an element according to its keys.
+	 * In case the element is in cache, returns that element.
+	 * Otherwise, returns the element sent in parameter.
+	 * This method should be invoked an a newly created element.
+	 * @see PersistingElement#getCachedVersion()
+	 */
+	public static &lt;T extends PersistingElement&gt; T getElementUsingCache(T element) {
+<span class="fc" id="L706">		KeyManagement km = KeyManagement.getInstance();</span>
+<span class="fc" id="L707">		String id = km.createIdentifier(element, PersistingElement.class);</span>
+		@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L709">		T ret = (T) km.getKnownPersistingElement(id);</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">		if (ret != null)</span>
+<span class="fc" id="L711">			return ret;</span>
+		else {
+<span class="fc" id="L713">			km.register(element); //sets the element in cache</span>
+<span class="fc" id="L714">			return element;</span>
+		}
+	}
+	
+	/**
+	 * Gets an element according to its key values.
+	 * In case the element is a {@link PersistingElement}, the cache is queried.
+	 * @param type the class of the element
+	 * @param keyValues the values for each key in the correct order
+	 * @see PersistingElement#getCachedVersion()
+	 */
+	@SuppressWarnings(&quot;unchecked&quot;)
+	public static &lt;T&gt; T getElementWithKeys(Class&lt;T&gt; clazz, Object... keyValues) {
+<span class="fc" id="L727">		T ret = KeyManagement.getInstance().createElement(clazz, keyValues);</span>
+<span class="pc bpc" id="L728" title="1 of 2 branches missed.">		if (ret instanceof PersistingElement) {</span>
+<span class="fc" id="L729">			return (T) getElementUsingCache((PersistingElement)ret);</span>
+		} else {
+<span class="nc" id="L731">			return ret;</span>
+		}
+	}
+	
+	public PersistingElement PersistingElement.getCachedVersion() {
+<span class="fc" id="L736">		return StorageManagement.getElementUsingCache((PersistingElement)this);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

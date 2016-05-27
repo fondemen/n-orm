@@ -1,0 +1,79 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+HBase driver for n-orm,org.apache.zookeeper.recipes.lock,SharedExclusiveLock,187,302,24,20,41,77,22,17,6,11
+HBase driver for n-orm,org.apache.zookeeper.recipes.lock,SharedExclusiveLock.NotifyOnDelete,5,23,1,1,0,8,1,2,0,2
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,ActionJob,3,101,1,1,2,17,2,1,1,1
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,RowCounter.RowCounterMapper.Counters,9,19,0,0,0,2,2,2,2,2
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,Truncator,3,45,0,0,2,8,1,1,1,1
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,LocalFormat,31,176,5,5,9,36,6,5,1,5
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,ActionJob.ActionMapper,28,68,1,1,12,17,1,3,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,LocalOutputFormat,67,0,2,0,16,0,7,0,6,0
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,LocalInputFormat,4,36,2,2,2,11,2,3,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,ActionLocalInputFormat,12,29,1,1,5,10,1,2,0,2
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,LocalTableRecordWriter,13,0,0,0,6,0,3,0,3,0
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,Truncator.TruncatorMapper,0,47,0,2,0,13,0,5,0,4
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,RowCounter.RowCounterMapper,0,21,1,1,0,6,1,2,0,2
+HBase driver for n-orm,com.googlecode.n_orm.hbase.mapreduce,RowCounter,3,37,0,0,2,5,1,1,1,1
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,TTLProperty.TTLForcedProperty,2,10,0,0,1,3,1,3,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,ReplicationScopeProperty.ReplicationScopeForcedProperty,2,10,0,0,1,3,1,3,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,HBaseProperty,3,125,1,23,1,31,2,14,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,TTLProperty,3,36,1,5,1,8,2,8,1,6
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,ForcableHTableProperty,0,35,1,5,0,5,1,4,0,2
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,CompressorProperty,2,29,0,2,1,8,1,7,1,6
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,ForcableHColumnProperty,0,36,1,5,0,5,1,4,0,2
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,BloomTypeProperty,4,58,1,5,2,16,2,8,1,6
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,HTableProperty,18,39,3,5,2,7,3,5,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,TypeWithPostfix,0,29,0,2,0,7,0,4,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,DefaultHBaseSchema,109,131,0,0,49,38,30,14,30,14
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,PropertyCacheValue.new Comparator() {...},0,9,0,0,0,2,0,2,0,2
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,ShouldForceHBaseProperty.new Object() {...},3,23,0,0,0,1,0,1,0,1
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,InMemoryProperty.InMemoryForcedProperty,2,10,0,0,1,3,1,3,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,ClassWithPostfix,0,27,0,2,0,8,0,4,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,HColumnFamilyProperty,0,57,1,7,0,9,1,7,0,4
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,ShouldForceHBaseProperty,2,25,1,5,0,8,1,7,0,4
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,PropertyCacheValue,5,71,1,7,0,17,1,6,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,InMemoryProperty,2,34,0,4,1,8,1,8,1,6
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,BloomTypeProperty.BloomTypeForcedProperty,2,10,0,0,1,3,1,3,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,BlockCacheProperty,3,33,1,3,1,8,2,7,1,6
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,CompressorProperty.CompressorForcedProperty,2,10,0,0,1,3,1,3,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,PropertyCacheKey,20,111,10,22,10,27,10,9,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,ColumnFamilyWithPostfix,0,27,0,2,0,8,0,4,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,DeferredLogFlushProperty,2,33,0,4,1,8,1,8,1,6
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,MaxVersionsProperty.MaxVersionsForcedProperty,2,10,0,0,1,3,1,3,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,DefaultHBaseSchema.DummyClass,3,0,0,0,1,0,1,0,1,0
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,DeferredLogFlushProperty.DeferredLogFlushForcedProperty,2,10,0,0,1,3,1,3,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,BlockSizeProperty,3,36,1,5,1,8,2,8,1,6
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,PropertyUtils,17,280,7,25,6,48,8,20,1,11
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,MaxVersionsProperty,3,36,1,5,1,8,2,8,1,6
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,BlockSizeProperty.BlockSizeForcedProperty,2,10,0,0,1,3,1,3,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,ReplicationScopeProperty,3,40,1,7,1,8,2,9,1,6
+HBase driver for n-orm,com.googlecode.n_orm.hbase.properties,BlockCacheProperty.BlockCacheForcedProperty,2,10,0,0,1,3,1,3,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.actions,TruncateAction,19,102,5,9,1,26,4,7,0,4
+HBase driver for n-orm,com.googlecode.n_orm.hbase.actions,Action,0,10,0,0,0,4,0,3,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.actions,PutAction,16,0,0,0,6,0,3,0,3,0
+HBase driver for n-orm,com.googlecode.n_orm.hbase.actions,BatchAction,0,17,0,0,0,6,0,3,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.actions,GetAction,0,15,0,0,0,5,0,3,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.actions,ExistsAction,0,16,0,0,0,5,0,3,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.actions,DeleteAction,0,16,0,0,0,6,0,3,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.actions,IncrementAction,0,17,0,0,0,6,0,3,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.actions,ScanAction,0,15,0,0,0,5,0,3,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase.actions,CountAction,19,72,4,6,1,20,3,7,0,5
+HBase driver for n-orm,com.googlecode.n_orm.hbase,HBaseSchema.SettableBoolean,5,43,0,0,0,4,1,3,1,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase,TableLocker.LockKind,9,29,0,0,0,2,2,2,2,2
+HBase driver for n-orm,com.googlecode.n_orm.hbase,HBase.new RecursiveFileAction() {...},57,3,0,0,11,1,2,1,2,1
+HBase driver for n-orm,com.googlecode.n_orm.hbase,CloseableIterator.new Thread() {...},0,13,0,0,0,3,0,2,0,2
+HBase driver for n-orm,com.googlecode.n_orm.hbase,RecursiveFileAction,11,255,4,26,4,55,6,18,2,7
+HBase driver for n-orm,com.googlecode.n_orm.hbase,MangledTableName,36,146,13,23,8,31,13,15,1,9
+HBase driver for n-orm,com.googlecode.n_orm.hbase,HBase.HBaseDependency,17,9,2,0,6,4,2,1,1,1
+HBase driver for n-orm,com.googlecode.n_orm.hbase,TableLocker,396,515,71,95,35,125,66,28,1,10
+HBase driver for n-orm,com.googlecode.n_orm.hbase,Store.ReportConf,0,30,0,4,0,10,0,5,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase,RowWrapper,0,79,0,6,0,17,0,7,0,4
+HBase driver for n-orm,com.googlecode.n_orm.hbase,Store.new Thread() {...},11,7,0,0,5,1,1,1,1,1
+HBase driver for n-orm,com.googlecode.n_orm.hbase,Store.new Thread() {...},32,29,3,1,5,5,2,2,0,2
+HBase driver for n-orm,com.googlecode.n_orm.hbase,Store.new Object() {...},2,17,0,0,0,1,0,1,0,1
+HBase driver for n-orm,com.googlecode.n_orm.hbase,CloseableIterator,46,199,7,11,8,45,8,9,1,7
+HBase driver for n-orm,com.googlecode.n_orm.hbase,Store,1283,3814,160,431,248,791,162,252,27,91
+HBase driver for n-orm,com.googlecode.n_orm.hbase,Store.new RecursiveFileAction() {...},14,29,0,0,3,6,0,3,0,3
+HBase driver for n-orm,com.googlecode.n_orm.hbase,RecursiveFileAction.Report,0,3,0,0,0,1,0,1,0,1
+HBase driver for n-orm,com.googlecode.n_orm.hbase,HBaseSchema.WALWritePolicy,5,58,0,2,0,8,1,5,1,4
+HBase driver for n-orm,com.googlecode.n_orm.hbase,HBase,193,243,11,3,39,14,10,3,4,2
+HBase driver for n-orm,org.apache.hadoop.hbase.mapreduce,ScanHandler,154,20,23,1,29,6,15,2,3,2

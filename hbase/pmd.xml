@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pmd version="4.3" timestamp="2013-01-25T21:04:50.044">
+<file name="/Users/fondemen/Documents/workspace/n-orm/hbase/src/main/java/com/googlecode/n_orm/hbase/Store.java">
+<violation beginline="1200" endline="1200" begincolumn="51" endcolumn="81" rule="EmptyCatchBlock" ruleset="Basic Rules" package="com.googlecode.n_orm.hbase" class="Store" method="getLock" externalInfoUrl="http://pmd.sourceforge.net/rules/basic.html#EmptyCatchBlock" priority="3">
+Avoid empty catch blocks
+</violation>
+<violation beginline="1205" endline="1205" begincolumn="51" endcolumn="81" rule="EmptyCatchBlock" ruleset="Basic Rules" package="com.googlecode.n_orm.hbase" class="Store" method="getLock" externalInfoUrl="http://pmd.sourceforge.net/rules/basic.html#EmptyCatchBlock" priority="3">
+Avoid empty catch blocks
+</violation>
+<violation beginline="1211" endline="1211" begincolumn="51" endcolumn="81" rule="EmptyCatchBlock" ruleset="Basic Rules" package="com.googlecode.n_orm.hbase" class="Store" method="getLock" externalInfoUrl="http://pmd.sourceforge.net/rules/basic.html#EmptyCatchBlock" priority="3">
+Avoid empty catch blocks
+</violation>
+</file>
+</pmd>

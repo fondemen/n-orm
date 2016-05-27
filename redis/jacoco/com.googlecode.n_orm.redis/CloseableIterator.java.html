@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>CloseableIterator.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Redis driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.redis</a> &gt; <span class="el_source">CloseableIterator.java</span></div><h1>CloseableIterator.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.redis;
+
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Set;
+
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Row;
+
+final class CloseableIterator implements CloseableKeyIterator {
+	private String startKey;
+	private final String stopKey, table;
+	private final Set&lt;String&gt; families;
+	private final RedisStore store;
+	private Iterator&lt;Row&gt; currentIterator;
+	private final int limit;
+	private int count;
+	private boolean lastCall, done;
+
+<span class="fc" id="L21">	public CloseableIterator(RedisStore store, String startKey,</span>
+			String stopKey, String table, int limit, Set&lt;String&gt; families) {
+<span class="fc" id="L23">		this.store = store;</span>
+<span class="fc" id="L24">		this.stopKey = stopKey;</span>
+<span class="fc" id="L25">		this.startKey = startKey;</span>
+<span class="fc" id="L26">		this.table = table;</span>
+<span class="fc" id="L27">		this.limit = limit;</span>
+<span class="fc" id="L28">		this.families = families;</span>
+<span class="fc" id="L29">		this.currentIterator = null;</span>
+<span class="fc" id="L30">		this.count = 0;</span>
+<span class="fc" id="L31">		this.done = false;</span>
+<span class="fc" id="L32">		this.lastCall = false;</span>
+<span class="fc" id="L33">	}</span>
+
+	@Override
+	public void close() {
+<span class="fc" id="L37">	}</span>
+
+	@Override
+	public boolean hasNext() {
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">		if(count &gt; limit || done)</span>
+<span class="nc" id="L42">			return false;</span>
+		
+<span class="fc bfc" id="L44" title="All 4 branches covered.">		if(currentIterator != null &amp;&amp; currentIterator.hasNext())</span>
+<span class="fc" id="L45">			return true;</span>
+		
+<span class="fc" id="L47">		this.loadNextElements();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">		if (this.done)</span>
+<span class="fc" id="L49">			return false;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">		this.done = !this.currentIterator.hasNext();</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">		return !this.done;</span>
+	}
+
+	@Override
+	public Row next() {
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">		if(count++ &gt; limit || done) {</span>
+<span class="nc" id="L57">			throw new NoSuchElementException();</span>
+		}
+<span class="pc bpc" id="L59" title="2 of 4 branches missed.">		if(currentIterator != null &amp;&amp; this.currentIterator.hasNext()) {</span>
+			// On a encore des données en attente
+<span class="fc" id="L61">			return currentIterator.next();</span>
+		} else {
+			// On est au bout de l'iterateur, il faut recharger les éléments suivants
+<span class="nc" id="L64">			this.loadNextElements();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">			if(this.currentIterator.hasNext())</span>
+<span class="nc" id="L66">				return this.currentIterator.next();</span>
+			else {
+<span class="nc" id="L68">				done = true;</span>
+<span class="nc" id="L69">				throw new NoSuchElementException();</span>
+			}
+		}
+	}
+
+	private void loadNextElements() {
+		// Pas de chargement si l'itérateur n'est pas vide
+<span class="pc bpc" id="L76" title="1 of 6 branches missed.">		if(this.currentIterator != null &amp;&amp; this.currentIterator.hasNext() || this.lastCall)</span>
+<span class="fc" id="L77">			return;</span>
+		
+		List&lt;Row&gt; result;
+<span class="fc" id="L80">		int scanCaching = store.getScanCaching();</span>
+<span class="fc" id="L81">		result = store.get(table, startKey, stopKey, families, scanCaching);</span>
+<span class="fc" id="L82">		this.currentIterator = result.iterator();</span>
+<span class="fc" id="L83">		int size = result.size();</span>
+		
+<span class="fc bfc" id="L85" title="All 2 branches covered.">		if (size == 0)</span>
+<span class="fc" id="L86">			this.done = true;</span>
+		
+<span class="fc bfc" id="L88" title="All 2 branches covered.">		if (size &lt; scanCaching)</span>
+<span class="fc" id="L89">			this.lastCall = true;</span>
+		
+<span class="fc bfc" id="L91" title="All 2 branches covered.">		if(result.size() &gt;= 1) {</span>
+			// dernière clé
+<span class="fc" id="L93">			this.startKey = result.get(result.size()-1).getKey() + '\0';</span>
+		}
+		
+<span class="fc" id="L96">	}</span>
+
+	@Override
+	public void remove() {
+<span class="nc" id="L100">		throw new IllegalStateException(</span>
+<span class="nc" id="L101">				&quot;Cannot remove key from a result set.&quot;);		</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

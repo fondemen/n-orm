@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>QueryCounter.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.memory</a> &gt; <span class="el_source">QueryCounter.aj</span></div><h1>QueryCounter.aj</h1><pre class="source lang-java linenums"><span class="pc bpc" id="L1" title="3 of 6 branches missed.">package com.googlecode.n_orm.memory;</span>
+
+import java.lang.reflect.Method;
+
+import org.aspectj.lang.reflect.MethodSignature;
+
+import com.googlecode.n_orm.utils.LongAdder;
+
+<span class="pc" id="L9">public aspect QueryCounter {</span>
+	private LongAdder Memory.queries = new LongAdder();
+	
+	public void Memory.resetQueries() {
+<span class="fc" id="L13">		this.queries.reset();</span>
+<span class="fc" id="L14">	}</span>
+	
+	public int Memory.getQueriesAndReset() {
+<span class="fc" id="L17">		int ret = queries.intValue();</span>
+<span class="fc" id="L18">		queries.reset();</span>
+<span class="fc" id="L19">		return ret;</span>
+	}
+	
+	public boolean Memory.hadAQuery() {
+<span class="fc bfc" id="L23" title="All 2 branches covered.">		return this.getQueriesAndReset() == 1;</span>
+	}
+	
+	public boolean Memory.hadNoQuery() {
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">		return this.getQueriesAndReset() == 0;</span>
+	}
+	
+	private transient volatile Method Memory.running = null;
+	
+	protected pointcut runningQuery(Memory self) : execution(* com.googlecode.n_orm.storeapi.SimpleStore.*(..)) &amp;&amp; !execution(void com.googlecode.n_orm.storeapi.SimpleStore.start()) &amp;&amp; target(self);
+	
+	before(Memory self): runningQuery(self) &amp;&amp; if(self.running == null) {
+<span class="fc" id="L35">		self.running = ((MethodSignature)thisJoinPointStaticPart.getSignature()).getMethod();</span>
+<span class="fc" id="L36">		self.queries.increment();</span>
+<span class="fc" id="L37">	}</span>
+	
+	after(Memory self): runningQuery(self) {
+<span class="fc" id="L40">		Method m = ((MethodSignature)thisJoinPointStaticPart.getSignature()).getMethod();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">		if (m.equals(self.running))</span>
+<span class="fc" id="L42">			self.running = null;</span>
+<span class="fc" id="L43">	}</span>
+	
+	after(Memory self) returning: execution(public void reset()) &amp;&amp; this(self) {
+<span class="fc" id="L46">		self.resetQueries();</span>
+<span class="fc" id="L47">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

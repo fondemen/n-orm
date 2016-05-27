@@ -1,0 +1,932 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>MongoStore.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">mongoDB driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.mongo</a> &gt; <span class="el_source">MongoStore.java</span></div><h1>MongoStore.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.mongo;
+
+import java.lang.reflect.Field;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.cf.ColumnFamily;
+import com.googlecode.n_orm.conversion.ConversionTools;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.GenericStore;
+import com.googlecode.n_orm.storeapi.MetaInformation;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Store;
+import com.mongodb.BasicDBObject;
+import com.mongodb.DB;
+import com.mongodb.DBCollection;
+import com.mongodb.DBCursor;
+import com.mongodb.DBObject;
+import com.mongodb.MongoClient;
+import com.mongodb.MongoException;
+
+
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">public class MongoStore implements Store, GenericStore</span>
+{
+<span class="fc" id="L38">	private static String DB_NAME    = &quot;n_orm&quot;;</span>
+<span class="fc" id="L39">	private static short  MONGO_PORT =  27017;</span>
+<span class="fc" id="L40">	private static String MONGO_HOST = &quot;localhost&quot;;</span>
+	
+	private static final Set&lt;Class&lt;?&gt;&gt; SIMPLE_TYPES;
+
+	private static String hostname;
+
+<span class="fc" id="L46">	private static Map&lt;Properties, MongoStore&gt; knownStores = new ConcurrentHashMap&lt;Properties, MongoStore&gt;();</span>
+	
+	static {
+		/* FIXME: getHostAddress returns wrong IP address...
+		try {
+			hostname = InetAddress.getLocalHost().getHostAddress();
+		} catch (Exception e) {
+			Mongo.mongoLog.log(
+				Level.WARNING,
+				&quot;Could not get local addr. \&quot;localhost\&quot; will be used.&quot;
+			);
+			hostname = MONGO_HOST;
+		}
+		*/
+		
+<span class="fc" id="L61">		Set&lt;Class&lt;?&gt;&gt; simpleClasses = new HashSet&lt;Class&lt;?&gt;&gt;();</span>
+<span class="fc" id="L62">		simpleClasses.add(Boolean.class);</span>
+<span class="fc" id="L63">		simpleClasses.add(boolean.class);</span>
+<span class="fc" id="L64">		simpleClasses.add(String.class);</span>
+<span class="fc" id="L65">		simpleClasses.add(long.class);</span>
+<span class="fc" id="L66">		simpleClasses.add(Long.class);</span>
+<span class="fc" id="L67">		simpleClasses.add(int.class);</span>
+<span class="fc" id="L68">		simpleClasses.add(Integer.class);</span>
+<span class="fc" id="L69">		simpleClasses.add(short.class);</span>
+<span class="fc" id="L70">		simpleClasses.add(Short.class);</span>
+<span class="fc" id="L71">		simpleClasses.add(byte.class);</span>
+<span class="fc" id="L72">		simpleClasses.add(Byte.class);</span>
+		// Mongo converts reals to integers depending on their value,
+		// which makes it hard to convert back the proper value (type lost)
+//		simpleClasses.add(double.class);
+//		simpleClasses.add(Double.class);
+//		simpleClasses.add(float.class);
+//		simpleClasses.add(Float.class);
+<span class="fc" id="L79">		simpleClasses.add(Date.class);</span>
+		
+<span class="fc" id="L81">		SIMPLE_TYPES = Collections.unmodifiableSet(simpleClasses);</span>
+<span class="fc" id="L82">	}</span>
+	
+<span class="fc" id="L84">	private static class MSQuery {</span>
+		DBObject query;
+		DBObject rowObj;
+	}
+
+	private DB mongoDB;
+	private MongoClient mongoClient;
+
+<span class="fc" id="L92">	private int    port = MONGO_PORT;</span>
+<span class="fc" id="L93">	private String host = hostname;</span>
+<span class="fc" id="L94">	private String db   = DB_NAME;</span>
+
+<span class="fc" id="L96">	private volatile boolean started = false;</span>
+
+<span class="fc" id="L98">	private Map&lt;String, Boolean&gt; hasTableCache = new HashMap&lt;String, Boolean&gt;();</span>
+
+	public static MongoStore getStore() {
+<span class="fc" id="L101">		Properties p = new Properties();</span>
+<span class="fc" id="L102">		p.put(&quot;address&quot;, MONGO_HOST);</span>
+<span class="fc" id="L103">		p.put(&quot;port&quot;, MONGO_PORT);</span>
+<span class="fc" id="L104">		return getStore(p);</span>
+	}
+
+	public static MongoStore getStore(String addr) {
+<span class="nc" id="L108">		Properties p = new Properties();</span>
+<span class="nc" id="L109">		p.put(&quot;address&quot;, addr);</span>
+<span class="nc" id="L110">		p.put(&quot;port&quot;, MONGO_PORT);</span>
+<span class="nc" id="L111">		return getStore(p);</span>
+	}
+
+	public static MongoStore getStore(String addr, short port) {
+<span class="nc" id="L115">		Properties p = new Properties();</span>
+<span class="nc" id="L116">		p.put(&quot;address&quot;, addr);</span>
+<span class="nc" id="L117">		p.put(&quot;port&quot;, port);</span>
+<span class="nc" id="L118">		return getStore(p);</span>
+	}
+
+	public static MongoStore getStore(Properties p) {
+<span class="fc" id="L122">		synchronized (MongoStore.class) {</span>
+<span class="fc" id="L123">			MongoStore store = knownStores.get(p);</span>
+
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">			if (store == null) {</span>
+<span class="nc" id="L126">				store = new MongoStore((String) p.get(&quot;address&quot;), (Short) p.get(&quot;port&quot;));</span>
+			}
+
+<span class="fc" id="L129">			return store;</span>
+<span class="nc" id="L130">		}</span>
+	}
+
+	public MongoStore() {
+<span class="fc" id="L134">		this(MONGO_HOST, MONGO_PORT);</span>
+<span class="fc" id="L135">	}</span>
+
+	public MongoStore(String host) {
+<span class="nc" id="L138">		this(host, MONGO_PORT);</span>
+<span class="nc" id="L139">	}</span>
+
+<span class="fc" id="L141">	public MongoStore(String host, short port) {</span>
+<span class="fc" id="L142">		Properties p = new Properties();</span>
+<span class="fc" id="L143">		p.put(&quot;address&quot;, host);</span>
+<span class="fc" id="L144">		p.put(&quot;port&quot;, port);</span>
+
+<span class="fc" id="L146">		setHost(host);</span>
+<span class="fc" id="L147">		setPort(port);</span>
+
+<span class="fc" id="L149">		knownStores.put(p, this);</span>
+<span class="fc" id="L150">	}</span>
+
+	/**
+	 * The port for the MongoDB connection.
+	 */
+	public int getPort() {
+<span class="nc" id="L156">		return port;</span>
+	}
+
+	/**
+	 * The host name or ip for the MongoDB connection.
+	 */
+	public String getHost() {
+<span class="nc" id="L163">		return host;</span>
+	}
+
+	/**
+	 * The name of the database used by this driver.
+	 */
+	public String getDb() {
+<span class="nc" id="L170">		return db;</span>
+	}
+
+	/**
+	 * The MongoDB connection.
+	 * Null if not started yet.
+	 */
+	public MongoClient getMongoClient() {
+<span class="nc" id="L178">		return mongoClient;</span>
+	}
+
+	/**
+	 * The database used by this driver.
+	 * Null if not started yet.
+	 */
+	public DB getMongoDB() {
+<span class="nc" id="L186">		return mongoDB;</span>
+	}
+
+	public synchronized void start()
+		throws DatabaseNotReachedException
+	{
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (started) return;</span>
+
+        try {
+<span class="fc" id="L195">            Mongo.mongoLog.log(</span>
+                Level.FINE,
+                &quot;Trying to connect to the mongo database &quot;+host+&quot;:&quot;+port
+            );
+<span class="fc" id="L199">            mongoClient = new MongoClient(host, port);</span>
+
+<span class="nc" id="L201">        } catch(Exception e) {</span>
+<span class="nc" id="L202">            Mongo.mongoLog.log(</span>
+                Level.SEVERE,
+                &quot;Could not find &quot;+host+&quot;:&quot;+port
+            );
+<span class="nc" id="L206">            throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L207">        }</span>
+
+        try {
+<span class="fc" id="L210">            mongoDB = mongoClient.getDB(db);</span>
+            // Mongo won't complain that it couldn't connect to the database
+            // until the first access attempt. Force access to the DB.
+<span class="fc" id="L213">            mongoDB.getCollectionNames();</span>
+
+<span class="nc" id="L215">        } catch(Exception e) {</span>
+<span class="nc" id="L216">            Mongo.mongoLog.log(</span>
+                Level.SEVERE,
+                &quot;Could not find a running database on &quot;+host+&quot;:&quot;+port
+            );
+<span class="nc" id="L220">            throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L221">        }</span>
+
+<span class="fc" id="L223">        started = true;</span>
+<span class="fc" id="L224">	}</span>
+
+	/**
+	 * Mangles a name supposed to represent a table.
+	 */
+    public String sanitizeTableName(String name) {
+<span class="fc" id="L230">        return name.replace('$', '_');</span>
+    }
+
+    /**
+     * Mangles a name supposed to represent a property or a column family.
+     */
+    protected String sanitizeName(String name) {
+<span class="fc" id="L237">        return MongoNameSanitizer.sanitize(name);</span>
+    }
+
+    /**
+     * Finds back from a {@link #sanitizeName(String) sanitized name}
+     * the original name of a property or a column family.
+     */
+	protected String dirtyName(String name) {
+<span class="fc" id="L245">		return MongoNameSanitizer.dirty(name);</span>
+	}
+
+	public boolean hasTable(String tableName)
+		throws DatabaseNotReachedException
+	{
+		Boolean ret;
+
+<span class="fc" id="L253">        String sanitizedTableName = sanitizeTableName(tableName);</span>
+
+<span class="fc" id="L255">		checkIsStarted();</span>
+
+		try {
+<span class="fc" id="L258">			ret = hasTableCache.get(sanitizedTableName);</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">			if (ret == null) {</span>
+<span class="fc" id="L260">				ret = mongoDB.collectionExists(sanitizedTableName);</span>
+<span class="fc" id="L261">				hasTableCache.put(sanitizedTableName, ret);</span>
+				
+			}
+<span class="nc" id="L264">		} catch (Exception e) {</span>
+<span class="nc" id="L265">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L266">		}</span>
+
+<span class="fc" id="L268">		return ret.booleanValue();</span>
+	}
+
+
+	protected DBObject findLimitedRow(String table, String row)
+		throws DatabaseNotReachedException
+	{
+<span class="nc" id="L275">		return findLimitedRow(table, row, new TreeSet&lt;String&gt;(), null);</span>
+	}
+
+
+	protected DBObject findLimitedRow(String table, String row, Set&lt;String&gt; families)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L282">		return findLimitedRow(table, row, families, null);</span>
+	}
+
+
+	protected DBObject findLimitedRow(String table, String row, String family)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L289">		Set&lt;String&gt; families = new TreeSet&lt;String&gt;();</span>
+<span class="fc" id="L290">		families.add(family);</span>
+<span class="fc" id="L291">		return findLimitedRow(table, row, families);</span>
+	}
+
+
+	protected DBObject findLimitedRow(String table, String row, String family, String column)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L298">		Set&lt;String&gt; families = new TreeSet&lt;String&gt;();</span>
+<span class="fc" id="L299">		families.add(family);</span>
+<span class="fc" id="L300">		return findLimitedRow(table, row, families, column);</span>
+	}
+
+	
+	protected DBObject findLimitedRow(
+		String table, String row, Set&lt;String&gt; families, String column
+	) throws DatabaseNotReachedException
+	{
+<span class="fc bfc" id="L308" title="All 2 branches covered.">		if (!hasTable(table)) {</span>
+<span class="fc" id="L309">			return null;</span>
+		}
+
+<span class="pc bpc" id="L312" title="3 of 6 branches missed.">		assert families != null &amp;&amp; !families.isEmpty();</span>
+<span class="pc bpc" id="L313" title="2 of 6 branches missed.">		assert column != null ? families.size() == 1 : true;</span>
+		
+		DBObject limitedRow;
+<span class="fc" id="L316">		DBObject query = new BasicDBObject();</span>
+<span class="fc" id="L317">		DBObject keys = new BasicDBObject();</span>
+
+<span class="fc" id="L319">		query.put(MongoRow.ROW_ENTRY_NAME, row);</span>
+		
+<span class="fc bfc" id="L321" title="All 2 branches covered.">		for (String family : families) {</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">			if (families != null) {</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">				if (column != null) {</span>
+<span class="fc" id="L324">					keys.put(family + &quot;.&quot; + column, 1);</span>
+				} else {
+<span class="fc" id="L326">					keys.put(family, 1);</span>
+				}
+			}
+<span class="fc" id="L329">		}</span>
+		
+<span class="fc" id="L331">		keys.put(MongoRow.ROW_ENTRY_NAME, 1);</span>
+
+		try {
+<span class="fc" id="L334">			limitedRow = mongoDB.getCollection(table).findOne(query, keys);</span>
+<span class="nc" id="L335">		} catch (Exception e) {</span>
+<span class="nc" id="L336">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L337">		}</span>
+
+<span class="fc" id="L339">		return limitedRow;</span>
+	}
+
+
+	protected DBObject getColumns(DBObject families, String familyName)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L346">		DBObject cols = (DBObject) families.get(familyName);</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">		return (cols != null) ? cols : new BasicDBObject();</span>
+	}
+
+	
+	public void delete(MetaInformation meta, String table, String id)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L354">		checkIsStarted();</span>
+
+<span class="fc" id="L356">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="fc" id="L357">		String sanitizedRowName = sanitizeName(id);</span>
+
+		try {
+<span class="fc" id="L360">			mongoDB.getCollection(sanitizedTableName).remove(</span>
+				new BasicDBObject(MongoRow.ROW_ENTRY_NAME, sanitizedRowName)
+			);
+<span class="nc" id="L363">		} catch (Exception e) {</span>
+<span class="nc" id="L364">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L365">		}</span>
+<span class="fc" id="L366">	}</span>
+	
+	private MSQuery createQuery(String sanitizedRowName) {
+<span class="fc" id="L369">		checkIsStarted();</span>
+		
+<span class="fc" id="L371">		DBObject query = new BasicDBObject(MongoRow.ROW_ENTRY_NAME, sanitizedRowName);</span>
+<span class="fc" id="L372">		DBObject rowObj = new BasicDBObject();</span>
+<span class="fc" id="L373">		rowObj.put(&quot;$set&quot;, new BasicDBObject(MongoRow.ROW_ENTRY_EXISTS, true)); // ensure the row exists</span>
+		
+<span class="fc" id="L375">		MSQuery q = new MSQuery();</span>
+<span class="fc" id="L376">		q.query = query;</span>
+<span class="fc" id="L377">		q.rowObj = rowObj;</span>
+		
+<span class="fc" id="L379">		return q;</span>
+	}
+
+	private void checkIsStarted() {
+<span class="fc bfc" id="L383" title="All 2 branches covered.">		if (!started) {</span>
+<span class="fc" id="L384">			Mongo.mongoLog.log(Level.SEVERE, &quot;Store not started&quot;);</span>
+<span class="fc" id="L385">			throw new DatabaseNotReachedException(&quot;Store not started&quot;);</span>
+		}
+<span class="fc" id="L387">	}</span>
+	
+	private void runQuery(MSQuery q, String sanitizedTableName) {
+		try {
+<span class="fc" id="L391">			DBCollection col = mongoDB.getCollection(sanitizedTableName);</span>
+<span class="pc bpc" id="L392" title="1 of 4 branches missed.">			if (hasTableCache.put(sanitizedTableName, true) == null &amp;&amp; !&quot;_id&quot;.equals(MongoRow.ROW_ENTRY_NAME)) {</span>
+<span class="nc" id="L393">				DBObject idx = new BasicDBObject();</span>
+<span class="nc" id="L394">				idx.put(MongoRow.ROW_ENTRY_NAME, 1);</span>
+<span class="nc" id="L395">				DBObject idxOpts = new BasicDBObject();</span>
+<span class="nc" id="L396">				idxOpts.put(&quot;unique&quot;, true);</span>
+<span class="nc" id="L397">				col.ensureIndex(idx, idxOpts);</span>
+			}
+<span class="fc" id="L399">			col.update(q.query, q.rowObj, true, false);</span>
+<span class="nc" id="L400">		} catch (MongoException e) {</span>
+<span class="nc" id="L401">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L402">		}</span>
+<span class="fc" id="L403">	}</span>
+
+	public void insert(
+			MetaInformation meta, String table, String row, ColumnFamilyData data
+	) throws DatabaseNotReachedException {
+<span class="fc" id="L408">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="fc" id="L409">		String sanitizedRowName = sanitizeName(row);</span>
+<span class="fc" id="L410">        MSQuery q = createQuery(sanitizedRowName);</span>
+<span class="fc" id="L411">		enrichQueryWithInsert(meta, q, sanitizedTableName, sanitizedRowName, data);</span>
+<span class="fc" id="L412">		runQuery(q, sanitizedTableName);</span>
+<span class="fc" id="L413">	}</span>
+
+	public void enrichQueryWithInsert(
+			MetaInformation meta, MSQuery q, String sanitizedTableName, String sanitizedRowName, ColumnFamilyData data
+	) throws DatabaseNotReachedException
+	{
+<span class="fc bfc" id="L419" title="All 4 branches covered.">		if (data == null || data.isEmpty()) {</span>
+<span class="fc" id="L420">			return;</span>
+		}
+		
+<span class="fc" id="L423">		DBObject sets = (DBObject) q.rowObj.get(&quot;$set&quot;);</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">		if (sets == null) sets = new BasicDBObject();</span>
+
+<span class="fc bfc" id="L426" title="All 2 branches covered.">		for (Map.Entry&lt;String, Map&lt;String, byte[]&gt;&gt; family : data.entrySet()) {</span>
+<span class="fc" id="L427">			String sanitizedFamilyName = sanitizeName(family.getKey());</span>
+<span class="fc" id="L428">			Map&lt;String, byte[]&gt; columns = family.getValue();</span>
+			
+<span class="fc bfc" id="L430" title="All 2 branches covered.">			Field f = meta == null ? null : meta.getFamilies().get(family.getKey());</span>
+			Class&lt;?&gt; clazz;
+<span class="fc bfc" id="L432" title="All 2 branches covered.">			boolean isCf = f != null;</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">			if (isCf) {</span>
+<span class="fc" id="L434">				ColumnFamily&lt;?&gt; cf = meta.getElement().getColumnFamily(f.getName());</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">				if (cf != null) {</span>
+<span class="fc" id="L436">					clazz = cf.getClazz();</span>
+				} else {
+<span class="nc" id="L438">					clazz = null;</span>
+				}
+<span class="fc" id="L440">			} else {</span>
+<span class="fc" id="L441">				clazz = null;</span>
+			}
+
+<span class="fc bfc" id="L444" title="All 2 branches covered.">			for (Map.Entry&lt;String, byte[]&gt; col : columns.entrySet()) {</span>
+<span class="fc" id="L445">				String sanitizedColumnName = sanitizeName(col.getKey());</span>
+				
+<span class="fc bfc" id="L447" title="All 2 branches covered.">				if (!isCf) {</span>
+					// Class for simple properties should be found property by property
+<span class="fc bfc" id="L449" title="All 2 branches covered.">					f = meta == null ? null : meta.getFamilies().get(col.getKey());</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">					clazz = f == null ? null : f.getType();</span>
+				}
+				
+				Object value;
+<span class="fc bfc" id="L454" title="All 2 branches covered.">				if (clazz == null) {</span>
+<span class="fc" id="L455">					value = col.getValue();</span>
+<span class="fc bfc" id="L456" title="All 4 branches covered.">				} else if ( PersistingElement.class.isAssignableFrom(clazz) || clazz.isEnum() ) {</span>
+<span class="fc" id="L457">					value = ConversionTools.convert(String.class, col.getValue());</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">				} else if (SIMPLE_TYPES.contains(clazz)) {</span>
+<span class="fc" id="L459">					value = ConversionTools.convert(clazz, col.getValue());</span>
+				} else {
+<span class="fc" id="L461">					value = col.getValue();</span>
+				}
+				
+<span class="fc" id="L464">				sets.put(</span>
+					sanitizedFamilyName + &quot;.&quot; + sanitizedColumnName,
+					value
+				);
+<span class="fc" id="L468">			}</span>
+
+<span class="fc" id="L470">		}</span>
+
+<span class="fc" id="L472">		q.rowObj.put(&quot;$set&quot;, sets);</span>
+		
+<span class="fc" id="L474">	}</span>
+
+	public void increment(String table, String row, Map&lt;String, Map&lt;String, Number&gt;&gt; increments) {
+<span class="nc" id="L477">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="nc" id="L478">		String sanitizedRowName = sanitizeName(row);</span>
+<span class="nc" id="L479">        MSQuery q = createQuery(sanitizedRowName);</span>
+<span class="nc" id="L480">        enrichQueryWithIncrement(q, sanitizedTableName, sanitizedRowName, increments);</span>
+<span class="nc" id="L481">		runQuery(q, sanitizedTableName);</span>
+<span class="nc" id="L482">	}</span>
+
+	public void enrichQueryWithIncrement(MSQuery q, String sanitizedTableName, String sanitizedRowName, Map&lt;String, Map&lt;String, Number&gt;&gt; increments) {
+<span class="fc bfc" id="L485" title="All 4 branches covered.">		if (increments == null || increments.isEmpty()) {</span>
+<span class="fc" id="L486">			return;</span>
+		}
+		
+<span class="fc" id="L489">		DBObject incs = (DBObject) q.rowObj.get(&quot;$inc&quot;);</span>
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">		if (incs == null) incs = new BasicDBObject();</span>
+
+<span class="fc bfc" id="L492" title="All 2 branches covered.">		for (Map.Entry&lt;String, Map&lt;String, Number&gt;&gt; family : increments.entrySet()) {</span>
+<span class="fc" id="L493">			String sanitizedFamilyName = sanitizeName(family.getKey());</span>
+<span class="fc" id="L494">			Map&lt;String, Number&gt; columns = family.getValue();</span>
+
+<span class="fc bfc" id="L496" title="All 2 branches covered.">			for (Map.Entry&lt;String, Number&gt; col : columns.entrySet()) {</span>
+<span class="fc" id="L497">				String sanitizedColumnName = sanitizeName(col.getKey());</span>
+<span class="fc" id="L498">				incs.put(</span>
+					sanitizedFamilyName + &quot;.&quot; + sanitizedColumnName,
+					col.getValue()
+				);
+<span class="fc" id="L502">			}</span>
+
+<span class="fc" id="L504">		}</span>
+
+<span class="fc" id="L506">		q.rowObj.put(&quot;$inc&quot;, incs);</span>
+<span class="fc" id="L507">	}</span>
+	
+	public void remove(String table, String row, Map&lt;String, Set&lt;String&gt;&gt; removed) {
+<span class="nc" id="L510">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="nc" id="L511">		String sanitizedRowName = sanitizeName(row);</span>
+<span class="nc" id="L512">        MSQuery q = createQuery(sanitizedRowName);</span>
+<span class="nc" id="L513">        enrichQueryWithRemove(q, sanitizedTableName, sanitizedRowName, removed);</span>
+<span class="nc" id="L514">		runQuery(q, sanitizedTableName);</span>
+<span class="nc" id="L515">	}</span>
+
+	public void enrichQueryWithRemove(MSQuery q, String sanitizedTableName, String sanitizedRowName, Map&lt;String, Set&lt;String&gt;&gt; removed) {
+
+<span class="fc bfc" id="L519" title="All 4 branches covered.">		if (removed == null || removed.isEmpty())</span>
+<span class="fc" id="L520">			return;</span>
+		
+<span class="fc" id="L522">		DBObject unsets = new BasicDBObject();</span>
+
+<span class="fc bfc" id="L524" title="All 2 branches covered.">		for (Map.Entry&lt;String, Set&lt;String&gt;&gt; family : removed.entrySet()) {</span>
+<span class="fc" id="L525">			String sanitizedFamilyName = sanitizeName(family.getKey());</span>
+<span class="fc" id="L526">			Set&lt;String&gt; columns = family.getValue();</span>
+
+<span class="fc bfc" id="L528" title="All 2 branches covered.">			for (String col: columns) {</span>
+<span class="fc" id="L529">				String sanitizedColumnName = sanitizeName(col);</span>
+<span class="fc" id="L530">				unsets.put(</span>
+					sanitizedFamilyName + &quot;.&quot; + sanitizedColumnName,
+					&quot;&quot;
+				);
+<span class="fc" id="L534">			}</span>
+<span class="fc" id="L535">		}</span>
+		
+<span class="fc" id="L537">		q.rowObj.put(&quot;$unset&quot;, unsets);</span>
+<span class="fc" id="L538">	}</span>
+	
+
+	public boolean exists(MetaInformation meta, String table, String row)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L544">		checkIsStarted();</span>
+
+<span class="fc" id="L546">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="fc" id="L547">		String sanitizedRowName = sanitizeName(row);</span>
+
+<span class="fc" id="L549">		DBObject found = null;</span>
+		
+		try {
+<span class="fc" id="L552">			DBObject query = new BasicDBObject();</span>
+<span class="fc" id="L553">			DBObject keys = new BasicDBObject();</span>
+
+<span class="fc" id="L555">			query.put(MongoRow.ROW_ENTRY_NAME, sanitizedRowName);</span>
+			
+<span class="fc" id="L557">			keys.put(MongoRow.ROW_ENTRY_NAME, 1);</span>
+			
+<span class="fc" id="L559">			found = mongoDB.getCollection(sanitizedTableName).findOne(query, keys);</span>
+<span class="nc" id="L560">		} catch (Exception e) {</span>
+<span class="nc" id="L561">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L562">		}</span>
+
+<span class="fc bfc" id="L564" title="All 2 branches covered.">		return found != null;</span>
+	}
+
+
+	public boolean exists(
+		MetaInformation meta, String table, String row, String family
+	) throws DatabaseNotReachedException
+	{
+<span class="fc" id="L572">		checkIsStarted();</span>
+
+<span class="fc" id="L574">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="fc" id="L575">		String sanitizedRowName = sanitizeName(row);</span>
+<span class="fc" id="L576">		String sanitizedFamilyName = sanitizeName(family);</span>
+		
+<span class="fc" id="L578">		DBObject found = null;</span>
+<span class="fc" id="L579">		DBObject query = new BasicDBObject();</span>
+<span class="fc" id="L580">		DBObject keys = new BasicDBObject();</span>
+
+<span class="fc" id="L582">		query.put(MongoRow.ROW_ENTRY_NAME, sanitizedRowName);</span>
+<span class="fc" id="L583">		query.put(sanitizedFamilyName, new BasicDBObject(&quot;$type&quot;, 3));</span>
+<span class="fc" id="L584">		query.put(&quot;$where&quot;, &quot;Object.keys(this['&quot; + sanitizedFamilyName + &quot;']).length &gt; 0&quot;);</span>
+		
+<span class="fc" id="L586">		keys.put(MongoRow.ROW_ENTRY_NAME, 1);</span>
+
+		try {
+<span class="fc" id="L589">			found = mongoDB.getCollection(sanitizedTableName).findOne(query, keys);</span>
+<span class="nc" id="L590">		} catch (Exception e) {</span>
+<span class="nc" id="L591">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L592">		}</span>
+		
+<span class="fc bfc" id="L594" title="All 2 branches covered.">		return found != null;</span>
+	}
+
+
+	public CloseableKeyIterator get(
+		MetaInformation meta, String table,
+		Constraint c, int limit, Set&lt;String&gt; families
+	) throws DatabaseNotReachedException
+	{
+<span class="fc" id="L603">		checkIsStarted();</span>
+
+<span class="fc" id="L605">        String sanitizedTableName = sanitizeTableName(table);</span>
+
+<span class="fc" id="L607">		DBObject query = buildQueryWithRowConstraint(c);</span>
+
+<span class="fc" id="L609">		DBObject keys = new BasicDBObject();</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">		if (families != null) {</span>
+<span class="fc bfc" id="L611" title="All 2 branches covered.">			for (String family : families) {</span>
+<span class="fc" id="L612">				String sanitizedFamilyName = sanitizeName(family);</span>
+<span class="fc" id="L613">				keys.put(sanitizedFamilyName, 1);</span>
+<span class="fc" id="L614">			}</span>
+		}
+<span class="fc" id="L616">		keys.put(MongoRow.ROW_ENTRY_NAME, 1);</span>
+
+<span class="fc" id="L618">		BasicDBObject mastoQuery = new BasicDBObject();</span>
+<span class="fc bfc" id="L619" title="All 2 branches covered.">		mastoQuery.put(&quot;$query&quot;,   query == null ? new BasicDBObject() : query);</span>
+<span class="fc" id="L620">		mastoQuery.put(&quot;$limit&quot;,   Integer.toString(limit));</span>
+<span class="fc" id="L621">		mastoQuery.put(&quot;$orderby&quot;, new BasicDBObject(MongoRow.ROW_ENTRY_NAME, 1));</span>
+
+		DBCursor cur;
+		try {
+<span class="fc" id="L625">			cur = mongoDB.getCollection(sanitizedTableName).find(mastoQuery, keys);</span>
+<span class="nc" id="L626">		} catch (MongoException e) {</span>
+<span class="nc" id="L627">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L628">		}</span>
+
+<span class="fc" id="L630">		return new CloseableIterator(cur);</span>
+	}
+
+	private DBObject buildQueryWithRowConstraint(Constraint c) {
+<span class="fc" id="L634">		DBObject query = null;</span>
+<span class="fc bfc" id="L635" title="All 2 branches covered.">		if (c != null) {</span>
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">			DBObject startCond = c.getStartKey() == null ? null : new BasicDBObject(MongoRow.ROW_ENTRY_NAME,</span>
+					new BasicDBObject(&quot;$gte&quot;, sanitizeName(c.getStartKey())));
+<span class="fc bfc" id="L638" title="All 2 branches covered.">			DBObject endCond = c.getEndKey() == null ? null : new BasicDBObject(MongoRow.ROW_ENTRY_NAME,</span>
+					new BasicDBObject(&quot;$lte&quot;, sanitizeName(c.getEndKey())));
+			
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">			if (startCond != null) {</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">				if (endCond != null) {</span>
+<span class="fc" id="L643">					query = new BasicDBObject(&quot;$and&quot;, new Object[] {startCond, endCond});</span>
+				} else {
+<span class="fc" id="L645">					query = startCond;</span>
+				}
+<span class="nc bnc" id="L647" title="All 2 branches missed.">			} else if (endCond != null) {</span>
+<span class="nc" id="L648">				query = endCond;</span>
+			}
+		}
+<span class="fc" id="L651">		return query;</span>
+	}
+
+
+	public byte[] get(
+			MetaInformation meta, String table, String row,
+			String family, String key
+	) throws DatabaseNotReachedException
+	{
+<span class="fc" id="L660">		checkIsStarted();</span>
+
+<span class="fc" id="L662">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="fc" id="L663">		String sanitizedRowName = sanitizeName(row);</span>
+<span class="fc" id="L664">		String sanitizedFamilyName = sanitizeName(family);</span>
+<span class="fc" id="L665">		String sanitizedKeyName = sanitizeName(key);</span>
+
+<span class="fc" id="L667">		byte[] ret = null;</span>
+		DBObject limitedRow, columns;
+
+		try {
+<span class="fc" id="L671">			limitedRow = findLimitedRow(</span>
+				sanitizedTableName,
+				sanitizedRowName,
+				sanitizedFamilyName,
+				sanitizedKeyName
+			);
+
+<span class="fc" id="L678">			columns = getColumns(</span>
+				limitedRow,
+				sanitizedFamilyName
+			);
+
+<span class="fc bfc" id="L683" title="All 2 branches covered.">			if (columns.containsField(sanitizedKeyName)) {</span>
+<span class="fc" id="L684">				ret = ConversionTools.convert(columns.get(sanitizedKeyName));</span>
+			}
+
+<span class="nc" id="L687">		} catch (Exception e) {</span>
+<span class="nc" id="L688">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L689">		}</span>
+
+<span class="fc" id="L691">		return ret;</span>
+	}
+
+
+	public Map&lt;String, byte[]&gt; get(
+		MetaInformation meta, String table, String id, String family
+	) throws DatabaseNotReachedException
+	{
+<span class="fc" id="L699">		Map&lt;String, byte[]&gt; map = new HashMap&lt;String, byte[]&gt;();</span>
+
+<span class="fc" id="L701">		checkIsStarted();</span>
+
+<span class="fc" id="L703">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="fc" id="L704">		String sanitizedRowName = sanitizeName(id);</span>
+<span class="fc" id="L705">		String sanitizedFamilyName = sanitizeName(family);</span>
+		
+		DBObject limitedRow, columns;
+
+		try {
+<span class="fc" id="L710">			limitedRow = findLimitedRow(sanitizedTableName, sanitizedRowName, sanitizedFamilyName);</span>
+
+<span class="fc" id="L712">			columns = getColumns(</span>
+				limitedRow,
+				sanitizedFamilyName
+			);
+
+<span class="fc bfc" id="L717" title="All 2 branches covered.">			for (String key : columns.keySet()) {</span>
+<span class="fc" id="L718">				map.put(</span>
+					dirtyName(key),
+					ConversionTools.convert(columns.get(key))
+				);
+<span class="fc" id="L722">			}</span>
+
+<span class="nc" id="L724">		} catch (Exception e) {</span>
+<span class="nc" id="L725">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L726">		}</span>
+
+<span class="fc" id="L728">		return map;</span>
+	}
+
+
+	public Map&lt;String, byte[]&gt; get(
+		MetaInformation meta, String table,
+		String id, String family, Constraint c
+	) throws DatabaseNotReachedException
+	{
+<span class="fc" id="L737">		checkIsStarted();</span>
+
+<span class="fc" id="L739">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="fc" id="L740">		String sanitizedRowName = sanitizeName(id);</span>
+<span class="fc" id="L741">		String sanitizedFamilyName = sanitizeName(family);</span>
+
+		DBObject limitedRow, columns;
+<span class="fc" id="L744">		Map&lt;String, byte[]&gt; map = new HashMap&lt;String, byte[]&gt;();</span>
+
+		try {
+<span class="fc" id="L747">			limitedRow = findLimitedRow(sanitizedTableName, sanitizedRowName, sanitizedFamilyName);</span>
+
+<span class="fc" id="L749">			columns = getColumns(</span>
+				limitedRow,
+				sanitizedFamilyName
+			);
+
+<span class="fc bfc" id="L754" title="All 2 branches covered.">			if (c != null) {</span>
+<span class="fc bfc" id="L755" title="All 2 branches covered.">				for (String key : columns.keySet()) {</span>
+<span class="fc" id="L756">					String originalKey = dirtyName(key);</span>
+<span class="fc bfc" id="L757" title="All 4 branches covered.">					boolean ok1 = (c.getStartKey() != null)</span>
+						? originalKey.compareTo(c.getStartKey()) &gt;= 0
+						: true;
+<span class="fc bfc" id="L760" title="All 4 branches covered.">					boolean ok2 = (c.getEndKey() != null)</span>
+						? originalKey.compareTo(c.getEndKey()) &lt;= 0
+						: true;
+<span class="fc bfc" id="L763" title="All 4 branches covered.">					if (ok1 &amp;&amp; ok2) {</span>
+<span class="fc" id="L764">						map.put(</span>
+							originalKey,
+							ConversionTools.convert(columns.get(key))
+						);
+					}
+<span class="fc" id="L769">				}</span>
+			}
+			
+			else {
+<span class="fc bfc" id="L773" title="All 2 branches covered.">				for (String key : columns.keySet()) {</span>
+<span class="fc" id="L774">					map.put(</span>
+						dirtyName(key),
+						ConversionTools.convert(columns.get(key))
+					);
+<span class="fc" id="L778">				}</span>
+			}
+
+<span class="nc" id="L781">		} catch (Exception e) {</span>
+<span class="nc" id="L782">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L783">		}</span>
+
+<span class="fc" id="L785">		return map;</span>
+	}
+
+
+	public ColumnFamilyData get(
+		MetaInformation meta, String table, String id, Set&lt;String&gt; families
+	) throws DatabaseNotReachedException
+	{
+<span class="fc" id="L793">		TreeMap&lt;String, Map&lt;String, byte[]&gt;&gt; mapOfMaps</span>
+			= new TreeMap&lt;String, Map&lt;String, byte[]&gt;&gt;();
+
+<span class="fc" id="L796">		checkIsStarted();</span>
+
+<span class="fc" id="L798">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="fc" id="L799">		String sanitizedRowName = sanitizeName(id);</span>
+<span class="fc" id="L800">		Set&lt;String&gt; sanitizedFamiliesNames = new TreeSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L801" title="All 2 branches covered.">		for (String family : families) {</span>
+<span class="fc" id="L802">			sanitizedFamiliesNames.add(this.sanitizeName(family));</span>
+<span class="fc" id="L803">		}</span>
+
+		DBObject limitedRow, columns;
+
+		try {
+<span class="fc" id="L808">			limitedRow = findLimitedRow(sanitizedTableName, sanitizedRowName, sanitizedFamiliesNames);</span>
+
+<span class="fc bfc" id="L810" title="All 2 branches covered.">			for (String family : families) {</span>
+<span class="fc" id="L811">				Map&lt;String, byte[]&gt; map = new HashMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L812">				String sanitizedFamilyName = sanitizeName(family);</span>
+
+<span class="fc" id="L814">				columns = getColumns(limitedRow, sanitizedFamilyName);</span>
+<span class="fc bfc" id="L815" title="All 2 branches covered.">				for (String key : columns.keySet()) {</span>
+<span class="fc" id="L816">					map.put(</span>
+						dirtyName(key),
+						ConversionTools.convert(columns.get(key))
+					);
+<span class="fc" id="L820">				}</span>
+
+<span class="fc" id="L822">				mapOfMaps.put(family, map);</span>
+<span class="fc" id="L823">			}</span>
+
+<span class="fc" id="L825">		} catch (Exception e) {</span>
+<span class="fc" id="L826">			return null;</span>
+			//throw new DatabaseNotReachedException(e);
+<span class="fc" id="L828">		}</span>
+
+<span class="fc" id="L830">		return new DefaultColumnFamilyData(mapOfMaps);</span>
+	}
+
+
+	public void storeChanges(
+		MetaInformation meta, String table, String id,
+		ColumnFamilyData changed,
+		Map&lt;String, Set&lt;String&gt;&gt; removed,
+		Map&lt;String, Map&lt;String, Number&gt;&gt; increments
+	) throws DatabaseNotReachedException
+	{
+<span class="fc" id="L841">		checkIsStarted();</span>
+
+<span class="fc" id="L843">        String sanitizedTableName = sanitizeTableName(table);</span>
+<span class="fc" id="L844">		String sanitizedRowName = sanitizeName(id);</span>
+<span class="fc" id="L845">        MSQuery q = createQuery(sanitizedRowName);</span>
+
+<span class="fc" id="L847">		enrichQueryWithInsert(meta, q, sanitizedTableName, sanitizedRowName, changed);</span>
+<span class="fc" id="L848">		enrichQueryWithIncrement(q, sanitizedTableName, sanitizedRowName, increments);</span>
+<span class="fc" id="L849">		enrichQueryWithRemove(q, sanitizedTableName, sanitizedRowName, removed);</span>
+
+<span class="fc" id="L851">		runQuery(q, sanitizedTableName);</span>
+
+<span class="fc" id="L853">	}</span>
+
+
+	public long count(MetaInformation meta, String table, Constraint c)
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L859">		checkIsStarted();</span>
+
+<span class="fc" id="L861">        String sanitizedTableName = sanitizeTableName(table);</span>
+
+<span class="fc" id="L863">		long cnt = 0;</span>
+
+<span class="fc" id="L865">		DBObject query = buildQueryWithRowConstraint(c);</span>
+
+		try {
+<span class="fc bfc" id="L868" title="All 2 branches covered.">			cnt = mongoDB.getCollection(sanitizedTableName).count(query == null ? new BasicDBObject() : query);</span>
+<span class="nc" id="L869">		} catch (Exception e) {</span>
+<span class="nc" id="L870">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L871">		}</span>
+
+<span class="fc" id="L873">		return cnt;</span>
+	}
+
+	public void dropTable(String table)
+	{
+<span class="fc" id="L878">		checkIsStarted();</span>
+
+<span class="fc" id="L880">        String sanitizedTableName = sanitizeTableName(table);</span>
+
+		try {
+<span class="fc" id="L883">			mongoDB.getCollection(sanitizedTableName).drop();</span>
+<span class="fc" id="L884">			hasTableCache.put(sanitizedTableName, false);</span>
+<span class="nc" id="L885">		} catch (Exception e) {</span>
+<span class="nc" id="L886">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L887">		}</span>
+<span class="fc" id="L888">	}</span>
+
+	public void setHost(String host)
+	{
+<span class="pc bpc" id="L892" title="1 of 2 branches missed.">		if (started) return;</span>
+<span class="fc" id="L893">		this.host = host;</span>
+<span class="fc" id="L894">	}</span>
+
+	public void setPort(int port)
+	{
+<span class="pc bpc" id="L898" title="1 of 2 branches missed.">		if (started) return;</span>
+<span class="fc" id="L899">		this.port = port;</span>
+<span class="fc" id="L900">	}</span>
+	
+	public void setDb(String dbname) {
+<span class="fc" id="L903">		this.setDB(dbname);</span>
+<span class="fc" id="L904">	}</span>
+
+	public void setDB(String dbname)
+	{
+<span class="fc" id="L908">		this.db = dbname;</span>
+
+<span class="pc bpc" id="L910" title="1 of 2 branches missed.">		if (started) {</span>
+<span class="nc" id="L911">			mongoDB = mongoClient.getDB(db);</span>
+		}
+<span class="fc" id="L913">	}</span>
+
+	public synchronized void close()
+		throws DatabaseNotReachedException
+	{
+<span class="fc" id="L918">		checkIsStarted();</span>
+
+		// TODO: save changes before closing
+
+		// close connections
+<span class="fc" id="L923">		mongoClient.close();</span>
+
+		// reset default values
+<span class="fc" id="L926">		started = false;</span>
+<span class="fc" id="L927">		db      = DB_NAME;</span>
+<span class="fc" id="L928">		port    = MONGO_PORT;</span>
+<span class="fc" id="L929">		host    = hostname;</span>
+<span class="fc" id="L930">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

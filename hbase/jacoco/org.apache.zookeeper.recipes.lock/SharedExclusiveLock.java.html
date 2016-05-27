@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>SharedExclusiveLock.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">org.apache.zookeeper.recipes.lock</a> &gt; <span class="el_source">SharedExclusiveLock.java</span></div><h1>SharedExclusiveLock.java</h1><pre class="source lang-java linenums">/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements. See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership. The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.zookeeper.recipes.lock;
+
+
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.EventType;
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.Stat;
+
+public class SharedExclusiveLock {
+    /**
+     * Shared lock node prefix.
+     */
+<span class="fc" id="L39">    private String SHLOCK = &quot;shlock-&quot;;</span>
+
+    /**
+     * Exclusive lock node prefix.
+     */
+<span class="fc" id="L44">    private String EXLOCK = &quot;exlock-&quot;;</span>
+
+    private ZooKeeper zooKeeper;
+    private String lockPath;
+    private String writeLockPrefix;
+    private String readLockPrefix;
+
+    /**
+     * When an exclusive lock is acquired, we write down ourselves as the owner
+     * so we can not dead-lock ourselves.
+     */
+    private String currentExclusiveLock;
+
+    private String currentSharedLock;
+    
+    private Thread currentThread;
+
+<span class="fc" id="L61">    public SharedExclusiveLock(ZooKeeper zooKeeper, String lockPath) {</span>
+<span class="fc" id="L62">        this.zooKeeper = zooKeeper;</span>
+<span class="fc" id="L63">        this.lockPath = lockPath;</span>
+<span class="fc" id="L64">        this.writeLockPrefix = lockPath + &quot;/&quot; + EXLOCK;</span>
+<span class="fc" id="L65">        this.readLockPrefix = lockPath + &quot;/&quot; + SHLOCK;</span>
+<span class="fc" id="L66">        this.currentExclusiveLock = null;</span>
+<span class="fc" id="L67">        this.currentSharedLock = null;</span>
+<span class="fc" id="L68">    }</span>
+
+    public String getPath() {
+<span class="fc" id="L71">        return lockPath;</span>
+    }
+
+    public boolean isExclusive(String lockNodePath) {
+<span class="nc" id="L75">        return lockNodePath.startsWith(writeLockPrefix);</span>
+    }
+
+    public boolean isShared(String lockNodePath) {
+<span class="nc" id="L79">        return lockNodePath.startsWith(readLockPrefix);</span>
+    }
+
+    public boolean isExpired(String lockNodePath) throws KeeperException,
+            InterruptedException {
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        return zooKeeper.exists(lockNodePath, false) == null;</span>
+    }
+
+    public String getExclusiveLock() throws KeeperException,
+            InterruptedException {
+<span class="nc" id="L89">        return getExclusiveLock(0L);</span>
+    }
+
+    public String getSharedLock() throws KeeperException, InterruptedException {
+<span class="nc" id="L93">        return getSharedLock(0L);</span>
+    }
+    
+    /* ADDED by F.Fondement */
+    public ZooKeeper getZookeeper() {
+<span class="fc" id="L98">    	return this.zooKeeper;</span>
+    }
+
+    
+    /* ADDED by F.Fondement */
+    public void setZookeeper(ZooKeeper zk) {
+<span class="fc" id="L104">    	this.zooKeeper = zk;</span>
+<span class="fc" id="L105">    }</span>
+
+    /**
+     * Block until we obtain an exclusive lock. Taken from
+     * http://hadoop.apache.org/zookeeper/docs/r3.3.0/recipes.html#Shared+Locks
+     *
+     * @param timeout
+     *            the timeout in milliseconds to wait for a lock or to abandon
+     *            the prospect.
+     * @return the lock name or null if this timeout.
+     * @throws InterruptedException
+     * @throws KeeperException
+     */
+    public String getExclusiveLock(Long timeout) throws KeeperException,
+            InterruptedException {
+        // Check that we don't already have a lock...
+<span class="pc bpc" id="L121" title="3 of 4 branches missed.">        if (currentExclusiveLock != null &amp;&amp; !isExpired(currentExclusiveLock)) {</span>
+            // We have the exclusive lock! Remove newly made lock file and just
+            // return.
+<span class="nc" id="L124">            return currentExclusiveLock;</span>
+        }
+
+        // Request a lock. This does not mean we proceed as if we held the lock.
+<span class="fc" id="L128">        final String exclusiveLock = zooKeeper.create(writeLockPrefix, null,</span>
+                ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+
+<span class="fc" id="L131">        final Long exclusiveLockId = getSequenceId(exclusiveLock);</span>
+
+        Long lockId;
+<span class="fc" id="L134">        String lock = null;</span>
+
+<span class="fc" id="L136">        boolean checkForLocks = true;</span>
+
+        try {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        	while (checkForLocks) {</span>
+<span class="fc" id="L140">                        lockId = -1L;</span>
+
+<span class="fc" id="L142">        		List&lt;String&gt; children = zooKeeper.getChildren(lockPath, false);</span>
+
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        		for (String child : children) {</span>
+<span class="fc" id="L145">        			final Long tmp = getSequenceId(child);</span>
+
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        			if (tmp &gt; lockId &amp;&amp; tmp &lt; exclusiveLockId) {</span>
+<span class="fc" id="L148">        				lockId = tmp;</span>
+<span class="fc" id="L149">        				lock = lockPath + &quot;/&quot; + child;</span>
+        			}
+<span class="fc" id="L151">			}</span>
+
+       			// There is any other lock...
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        		if (lockId &gt;= 0) {</span>
+<span class="fc" id="L155">        			final Object mutex = new Object();</span>
+
+<span class="fc" id="L157">        			synchronized (mutex) {</span>
+<span class="fc" id="L158">        				final Stat lockStat = zooKeeper.exists(lock,</span>
+        						new NotifyOnDelete(mutex));
+
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        				if (lockStat != null) {</span>
+<span class="fc" id="L162">        					long startTime = System.currentTimeMillis();</span>
+
+<span class="fc" id="L164">       						mutex.wait(timeout);</span>
+
+<span class="pc bpc" id="L166" title="2 of 4 branches missed.">       						if (timeout &gt; 0</span>
+       								&amp;&amp; System.currentTimeMillis() - startTime &gt; timeout) {
+<span class="nc" id="L168">       							zooKeeper.delete(exclusiveLock, -1);</span>
+<span class="nc" id="L169">       							return null;</span>
+       						}
+
+       						// Notice: We recheck for new locks that may have
+       						// shown up.
+       						// Perhaps this is necessary? The cost is 1 extra
+       								// getChildren
+       						// call, so it is worth the protection.
+<span class="fc" id="L177">       						checkForLocks = true;</span>
+<span class="fc" id="L178">       					} else {</span>
+       						// If we are here, then the file was possibly
+       						// deleted / recreated.
+       						// We need to recheck for write locks again...
+<span class="nc" id="L182">       						checkForLocks = true;</span>
+      					}
+<span class="pc" id="L184">       				}</span>
+<span class="fc" id="L185">       			} else {</span>
+       				// If we found NO other write lock, exit.
+<span class="fc" id="L187">       				checkForLocks = false;</span>
+       			}
+<span class="fc" id="L189">       		}</span>
+<span class="nc" id="L190">        } catch(InterruptedException interruptedException) {</span>
+        	// NOTE: This may be thrown by the mutex.wait or ZK operations. Both results in
+        	//       roll back of our lock attempt.
+<span class="nc" id="L193">        	zooKeeper.delete(exclusiveLock, -1);</span>
+<span class="nc" id="L194">        	throw interruptedException;</span>
+<span class="nc" id="L195">        } catch(KeeperException zookeeperException) {</span>
+<span class="nc" id="L196">        	zooKeeper.delete(exclusiveLock, -1);</span>
+<span class="nc" id="L197">        	throw zookeeperException;</span>
+<span class="fc" id="L198">        }</span>
+
+<span class="fc" id="L200">        currentExclusiveLock = exclusiveLock;</span>
+<span class="fc" id="L201">        currentThread = Thread.currentThread();</span>
+
+<span class="fc" id="L203">        return exclusiveLock;</span>
+    }
+
+    /**
+     * Block until we obtain a shared lock. Taken from
+     * http://hadoop.apache.org/zookeeper/docs/r3.3.0/recipes.html#Shared+Locks
+     *
+     * @param timeout
+     *            the timeout in milliseconds to wait for a lock or to abandon
+     *            the prospect.
+     * @return the lock name or null if this timeout.
+     * @throws InterruptedException
+     * @throws KeeperException
+     */
+    public String getSharedLock(Long timeout) throws KeeperException,
+            InterruptedException {
+        // Check that we don't already have a lock...
+<span class="pc bpc" id="L220" title="3 of 4 branches missed.">        if (currentSharedLock != null &amp;&amp; !isExpired(currentSharedLock)) {</span>
+            // We have the exclusive lock! Remove newly made lock file and just
+            // return.
+<span class="nc" id="L223">            return currentSharedLock;</span>
+        }
+
+        // Request a lock. This does not mean we proceed as if we held the lock.
+<span class="fc" id="L227">        final String sharedLock = zooKeeper.create(readLockPrefix, null,</span>
+                ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+
+<span class="fc" id="L230">        final Long sharedLockId = getSequenceId(sharedLock);</span>
+
+        Long exclusiveLockId;
+<span class="fc" id="L233">        String exclusiveLock = null;</span>
+
+<span class="fc" id="L235">        boolean checkForExclusiveLocks = true;</span>
+
+        try {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">	        while (checkForExclusiveLocks) {</span>
+<span class="fc" id="L239">                    exclusiveLockId = -1L;</span>
+
+<span class="fc" id="L241">	            List&lt;String&gt; children = zooKeeper.getChildren(lockPath, false);</span>
+	
+<span class="fc bfc" id="L243" title="All 2 branches covered.">	            for (String child : children) {</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">	                if (child.startsWith(EXLOCK)) {</span>
+<span class="nc" id="L245">	                    final Long tmp = getSequenceId(child);</span>
+	
+<span class="nc bnc" id="L247" title="All 4 branches missed.">	                    if (tmp &gt; exclusiveLockId &amp;&amp; tmp &lt; sharedLockId) {</span>
+<span class="nc" id="L248">	                    	exclusiveLockId = tmp;</span>
+<span class="nc" id="L249">	                    	exclusiveLock = lockPath + &quot;/&quot; + child;</span>
+	                    }
+	                }
+<span class="fc" id="L252">	            }</span>
+	
+	            // There is a write in progress. Wait for it...
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">	            if (exclusiveLockId &gt;= 0) {</span>
+<span class="nc" id="L256">	                final Object mutex = new Object();</span>
+	
+<span class="nc" id="L258">	                synchronized (mutex) {</span>
+<span class="nc" id="L259">	                    final Stat writeLockStat = zooKeeper.exists(exclusiveLock,</span>
+	                            new NotifyOnDelete(mutex));
+	
+<span class="nc bnc" id="L262" title="All 2 branches missed.">	                    if (writeLockStat != null) {</span>
+<span class="nc" id="L263">	                        long startTime = System.currentTimeMillis();</span>
+	
+<span class="nc" id="L265">	                        mutex.wait(timeout);</span>
+	
+<span class="nc bnc" id="L267" title="All 4 branches missed.">	                        if (timeout &gt; 0</span>
+	                                &amp;&amp; System.currentTimeMillis() - startTime &gt; timeout) {
+<span class="nc" id="L269">	                            zooKeeper.delete(sharedLock, -1);</span>
+<span class="nc" id="L270">	                            return null;</span>
+	                        }
+	
+	                        // Notice: We recheck for new locks that may have shown
+	                        // up.
+	                        // Perhaps this is necessary? The cost is 1 extra
+	                        // getChildren call,
+	                        // so it is worth the protection.
+<span class="nc" id="L278">	                        checkForExclusiveLocks = true;</span>
+<span class="nc" id="L279">	                    } else {</span>
+	                        // If we are here, then the file was possibly deleted /
+	                        // recreated.
+	                        // We need to recheck for write locks again...
+<span class="nc" id="L283">	                    	checkForExclusiveLocks = true;</span>
+	                    }
+<span class="nc" id="L285">	                }</span>
+<span class="nc" id="L286">	            } else {</span>
+	                // If we found NO other write lock, exit.
+<span class="fc" id="L288">	            	checkForExclusiveLocks = false;</span>
+	            }
+<span class="fc" id="L290">	        }</span>
+<span class="nc" id="L291">        } catch(InterruptedException interruptedException) {</span>
+        	// NOTE: This may be thrown by the mutex.wait or ZK operations. Both results in
+        	//       roll back of our lock attempt.
+<span class="nc" id="L294">        	zooKeeper.delete(sharedLock, -1);</span>
+<span class="nc" id="L295">        	throw interruptedException;</span>
+<span class="nc" id="L296">        } catch(KeeperException zookeeperException) {</span>
+<span class="nc" id="L297">        	zooKeeper.delete(sharedLock, -1);</span>
+<span class="nc" id="L298">        	throw zookeeperException;</span>
+<span class="fc" id="L299">        }</span>
+<span class="fc" id="L300">        currentSharedLock = sharedLock;</span>
+<span class="fc" id="L301">        currentThread = Thread.currentThread();</span>
+
+<span class="fc" id="L303">        return sharedLock;</span>
+    }
+
+    public void releaseSharedLock() throws InterruptedException,
+            KeeperException {
+<span class="fc" id="L308">        zooKeeper.delete(currentSharedLock, -1);</span>
+<span class="fc" id="L309">        currentSharedLock = null;</span>
+<span class="fc" id="L310">        currentThread = null;</span>
+<span class="fc" id="L311">    }</span>
+
+    public void releaseExclusiveLock() throws InterruptedException,
+            KeeperException {
+<span class="fc" id="L315">        zooKeeper.delete(currentExclusiveLock, -1);</span>
+<span class="fc" id="L316">        currentExclusiveLock = null;</span>
+<span class="fc" id="L317">        currentThread = null;</span>
+<span class="fc" id="L318">    }</span>
+
+    private Long getSequenceId(final String fileName) {
+<span class="fc" id="L321">        final Matcher m = Pattern.compile(&quot;.*[^\\d](\\d+)&quot;).matcher(fileName);</span>
+
+<span class="fc" id="L323">        m.matches();</span>
+
+<span class="fc" id="L325">        return Long.parseLong(m.group(1));</span>
+    }
+
+    public String getCurrentExclusiveLock() {
+<span class="fc" id="L329">        return currentExclusiveLock;</span>
+    }
+
+    public String getCurrentSharedLock() {
+<span class="fc" id="L333">        return currentSharedLock;</span>
+    }
+    
+    public Thread getCurrentThread() {
+<span class="nc" id="L337">    	return this.currentThread;</span>
+    }
+
+    /**
+     * Callback object used to unblock caller threads waiting to recheck if they
+     * have acuired a lock.
+     */
+    private static class NotifyOnDelete implements Watcher {
+        private Object mutex;
+
+<span class="fc" id="L347">        public NotifyOnDelete(Object mutex) {</span>
+<span class="fc" id="L348">            this.mutex = mutex;</span>
+<span class="fc" id="L349">        }</span>
+
+        @Override
+        public void process(WatchedEvent event) {
+<span class="fc" id="L353">            synchronized (mutex) {</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            	if (EventType.NodeDeleted.equals(event.getType())) {</span>
+<span class="fc" id="L355">                    mutex.notify();</span>
+                }
+<span class="pc" id="L357">            }</span>
+<span class="fc" id="L358">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

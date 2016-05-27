@@ -1,0 +1,32 @@
+-classpath
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/console/target/classes:/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/console/target/test-classes:/home/stefrd/.m2/repository/org/easymock/easymock/3.0/easymock-3.0.jar:/home/stefrd/.m2/repository/commons-beanutils/commons-beanutils-core/1.8.3/commons-beanutils-core-1.8.3.jar:/home/stefrd/.m2/repository/org/objenesis/objenesis/1.2/objenesis-1.2.jar:/home/stefrd/.m2/repository/cglib/cglib-nodep/2.2/cglib-nodep-2.2.jar:/home/stefrd/.m2/repository/commons-logging/commons-logging/1.1.1/commons-logging-1.1.1.jar:/home/stefrd/.m2/repository/jline/jline/0.9.9/jline-0.9.9.jar:/home/stefrd/.m2/repository/com/googlecode/n_orm/storage/0.0.1-SNAPSHOT/storage-0.0.1-SNAPSHOT-tests.jar:/home/stefrd/.m2/repository/commons-beanutils/commons-beanutils/1.8.3/commons-beanutils-1.8.3.jar:/home/stefrd/.m2/repository/org/aspectj/aspectjrt/1.6.12/aspectjrt-1.6.12.jar:/home/stefrd/.m2/repository/com/googlecode/n_orm/storage/0.0.1-SNAPSHOT/storage-0.0.1-SNAPSHOT.jar:/home/stefrd/.m2/repository/junit/junit/4.8.2/junit-4.8.2.jar'
+-encoding
+'UTF-8'
+-protected
+-sourcepath
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/console/src/test/java'
+-author
+-bottom
+'Copyright &#169; 2013. All Rights Reserved.'
+-charset
+'UTF-8'
+-d
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/console/target/site/testapidocs'
+-docencoding
+'UTF-8'
+-doctitle
+'n-orm console 0.0.1-SNAPSHOT Test API'
+-link
+'../apidocs'
+-link
+'http://java.sun.com/javase/6/docs/api'
+-linkoffline
+'http://n-orm.googlecode.com/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/storage/target/site/testapidocs'
+-linkoffline
+'http://n-orm.googlecode.com/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/hbase/target/site/testapidocs'
+-linkoffline
+'http://n-orm.googlecode.com/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm.redis/target/site/testapidocs'
+-use
+-version
+-windowtitle
+'n-orm console 0.0.1-SNAPSHOT Test API'

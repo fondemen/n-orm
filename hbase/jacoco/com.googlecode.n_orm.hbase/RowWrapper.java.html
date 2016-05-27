@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>RowWrapper.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase</a> &gt; <span class="el_source">RowWrapper.java</span></div><h1>RowWrapper.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase;
+
+import java.io.Serializable;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+import java.util.Map.Entry;
+
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.util.Bytes;
+
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.Row;
+
+public class RowWrapper implements Row, Serializable {
+	private static final long serialVersionUID = -3943538431236454382L;
+	private final String key;
+	private final ColumnFamilyData values;
+
+	public RowWrapper(Result r) {
+<span class="fc" id="L21">		this(r, true);</span>
+<span class="fc" id="L22">	}</span>
+		
+	
+<span class="fc" id="L25">	public RowWrapper(Result r, boolean sendValues) {</span>
+<span class="fc" id="L26">		this.key = Bytes.toString(r.getRow());</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">		if (sendValues) {</span>
+<span class="fc" id="L28">			this.values = new DefaultColumnFamilyData();</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">			for (Entry&lt;byte[], NavigableMap&lt;byte[], byte[]&gt;&gt; famData : r.getNoVersionMap().entrySet()) {</span>
+<span class="fc" id="L30">				Map&lt;String, byte[]&gt; fam = new TreeMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L31">				this.values.put(Bytes.toString(famData.getKey()), fam);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">				for (Entry&lt;byte[], byte[]&gt; colData : famData.getValue().entrySet()) {</span>
+<span class="fc" id="L33">					fam.put(Bytes.toString(colData.getKey()), colData.getValue());</span>
+<span class="fc" id="L34">				}</span>
+<span class="fc" id="L35">			}</span>
+		} else
+<span class="fc" id="L37">			this.values = null;</span>
+<span class="fc" id="L38">	}</span>
+
+	@Override
+	public String getKey() {
+<span class="fc" id="L42">		return this.key;</span>
+	}
+
+	@Override
+	public ColumnFamilyData getValues() {
+<span class="fc" id="L47">		return this.values;</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

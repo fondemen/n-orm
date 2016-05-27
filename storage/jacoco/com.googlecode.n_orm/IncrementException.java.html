@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>IncrementException.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">IncrementException.java</span></div><h1>IncrementException.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm;
+
+import java.lang.reflect.Field;
+
+/**
+ * Thrown in case a property annotated with {@link Incrementing} is given a lower value than before.
+ */
+public class IncrementException extends RuntimeException {
+
+	private static final long serialVersionUID = 1180399897249752085L;
+	
+	private final Field property;
+	private final boolean increment;
+	private final long delta;
+
+	public IncrementException(Field property, boolean increment, long l) {
+<span class="fc bfc" id="L17" title="All 4 branches covered.">		super(&quot;Property &quot; + property + &quot; can only &quot; + (increment ? &quot;in&quot; : &quot;de&quot;) + &quot;crease with time ; trying to &quot; + (!increment ? &quot;in&quot; : &quot;de&quot;) + &quot;crement it of &quot; + Math.abs(l));</span>
+<span class="fc" id="L18">		this.property = property;</span>
+<span class="fc" id="L19">		this.increment = increment;</span>
+<span class="fc" id="L20">		this.delta = l;</span>
+<span class="fc" id="L21">	}</span>
+
+	public Field getProperty() {
+<span class="nc" id="L24">		return property;</span>
+	}
+
+	public boolean isIncrement() {
+<span class="nc" id="L28">		return increment;</span>
+	}
+
+	public long getDelta() {
+<span class="nc" id="L32">		return delta;</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

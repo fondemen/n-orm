@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>LocalOutputFormat.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.mapreduce</a> &gt; <span class="el_source">LocalOutputFormat.java</span></div><h1>LocalOutputFormat.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.mapreduce;
+
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+
+import org.apache.hadoop.conf.Configurable;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableOutputCommitter;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.OutputCommitter;
+import org.apache.hadoop.mapreduce.OutputFormat;
+import org.apache.hadoop.mapreduce.RecordWriter;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
+
+<span class="nc" id="L17">public class LocalOutputFormat&lt;T&gt; extends</span>
+		OutputFormat&lt;ImmutableBytesWritable, T&gt; implements Configurable {
+	public static final String OUTPUTWRITER_CLASS = &quot;outputwriter-class&quot;;
+<span class="nc" id="L20">	private LocalFormat localFormat = new LocalFormat();</span>
+	private LocalTableRecordWriter&lt;T&gt; outputWriter;
+
+	@Override
+	public RecordWriter&lt;ImmutableBytesWritable, T&gt; getRecordWriter(
+			TaskAttemptContext context) throws IOException,
+			InterruptedException {
+<span class="nc" id="L27">		return this.outputWriter;</span>
+	}
+
+	@Override
+	public void checkOutputSpecs(JobContext arg0) throws IOException,
+			InterruptedException {
+<span class="nc" id="L33">	}</span>
+
+	@Override
+	public OutputCommitter getOutputCommitter(TaskAttemptContext arg0)
+			throws IOException, InterruptedException {
+<span class="nc" id="L38">		return new TableOutputCommitter();</span>
+	}
+
+	@Override
+	public void setConf(Configuration conf) {
+<span class="nc bnc" id="L43" title="All 2 branches missed.">		if (outputWriter != null)</span>
+<span class="nc" id="L44">			return;</span>
+
+<span class="nc" id="L46">		localFormat.setConf(conf);</span>
+		
+		try {
+			@SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L50">			Class&lt;? extends LocalTableRecordWriter&lt;T&gt;&gt; outputWriterClass = (Class&lt;? extends LocalTableRecordWriter&lt;T&gt;&gt;) LocalOutputFormat.class.getClassLoader().loadClass(conf.get(OUTPUTWRITER_CLASS));</span>
+<span class="nc" id="L51">			Constructor&lt;? extends LocalTableRecordWriter&lt;T&gt;&gt; outputWriterConstr = outputWriterClass.getConstructor(HTable.class);</span>
+<span class="nc" id="L52">			outputWriter = outputWriterConstr.newInstance(localFormat.getTable());</span>
+<span class="nc" id="L53">		} catch (Exception e) {</span>
+<span class="nc" id="L54">			throw new RuntimeException(e.getMessage(), e);</span>
+<span class="nc" id="L55">		}</span>
+<span class="nc" id="L56">	}</span>
+
+	@Override
+	public Configuration getConf() {
+<span class="nc" id="L60">		return localFormat.getConf();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

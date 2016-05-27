@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PropertyUtils.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.properties</a> &gt; <span class="el_source">PropertyUtils.java</span></div><h1>PropertyUtils.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.properties;
+
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+
+import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.hbase.HBaseSchema;
+import com.googlecode.n_orm.hbase.Store;
+
+<span class="nc" id="L20">public class PropertyUtils {</span>
+	/**
+	 * Set of HBase-schema properties available on tables.
+	 */
+	public static final HTableProperty&lt;?&gt;[] tableProperties;
+
+	/**
+	 * Set of HBase-schema properties available on column families.
+	 */
+	public static final HColumnFamilyProperty&lt;?&gt;[] columnProperties;
+
+	static {
+<span class="fc" id="L32">		tableProperties = new HTableProperty&lt;?&gt;[] {new DeferredLogFlushProperty()};</span>
+		
+<span class="fc" id="L34">		columnProperties = new HColumnFamilyProperty[] { new InMemoryProperty(),</span>
+				new CompressorProperty(), new TTLProperty(),
+				new MaxVersionsProperty(), new BloomTypeProperty(),
+				new BlockCacheProperty(), new BlockSizeProperty(),
+				new ReplicationScopeProperty() };
+	}
+	
+	/**
+	 * Checks whether given table descriptor is as expected (no testing column families).
+	 */
+	public static boolean asExpected(Store store, HTableDescriptor tableDescriptor, Class&lt;? extends PersistingElement&gt; clazz, String tablePostfix) {
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">		if (tableDescriptor == null) {</span>
+<span class="nc" id="L46">			return false;</span>
+		} else {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">			for (HTableProperty&lt;?&gt; hprop : PropertyUtils.tableProperties) {</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">				if(hprop.shouldAlter(tableDescriptor, store, clazz, tablePostfix)) {</span>
+<span class="fc" id="L50">					return false;</span>
+				}
+			}
+<span class="fc" id="L53">			return true;</span>
+		}
+	}
+	
+	/**
+	 * Checks whether given table descriptor is as expected (no testing column families).
+	 * @return list of properties badly set
+	 */
+	public static HTableProperty&lt;?&gt;[] checkIsAsExpected(Store store, HTableDescriptor tableDescriptor, Class&lt;? extends PersistingElement&gt; clazz, String tablePostfix) {
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">		if (tableDescriptor == null) {</span>
+<span class="nc" id="L63">			return null;</span>
+		} else {
+<span class="fc" id="L65">			Collection&lt;HTableProperty&lt;?&gt;&gt; ret = new LinkedList&lt;HTableProperty&lt;?&gt;&gt;(Arrays.asList(PropertyUtils.tableProperties));</span>
+<span class="fc" id="L66">			Iterator&lt;HTableProperty&lt;?&gt;&gt; it = ret.iterator();</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">			while(it.hasNext()) {</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">				if (!it.next().shouldAlter(tableDescriptor, store, clazz, tablePostfix))</span>
+<span class="fc" id="L69">					it.remove();</span>
+			}
+<span class="fc" id="L71">			return ret.toArray(new HTableProperty[ret.size()]);</span>
+		}
+	}
+	
+	/**
+	 * Changes given table descriptor so that it becomes as expected.
+	 */
+	public static void setValues(Store store, HTableDescriptor tableDescriptor, Class&lt;? extends PersistingElement&gt; clazz, String tablePostfix) {
+<span class="fc bfc" id="L79" title="All 2 branches covered.">		for (HTableProperty&lt;?&gt; hprop : PropertyUtils.tableProperties) {</span>
+<span class="fc" id="L80">			hprop.setValue(tableDescriptor, store, clazz, tablePostfix);</span>
+		}
+<span class="fc" id="L82">	}</span>
+
+	/**
+	 * Checks whether given column family descriptor is as expected.
+	 */
+	public static boolean asExpected(Store store, HColumnDescriptor columnDescriptor, Class&lt;? extends PersistingElement&gt; clazz, Field cfField, String tablePostfix) {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">		if (columnDescriptor == null) {</span>
+<span class="fc" id="L89">			return false;</span>
+		} else {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">			for (HColumnFamilyProperty&lt;?&gt; hprop : PropertyUtils.columnProperties) {</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">				if(hprop.shouldAlter(columnDescriptor, store, clazz, cfField, tablePostfix)) {</span>
+<span class="fc" id="L93">					return false;</span>
+				}
+			}
+<span class="fc" id="L96">			return true;</span>
+		}
+	}
+	
+	/**
+	 * Checks whether given table descriptor is as expected (no testing column families).
+	 * @return list of properties badly set
+	 */
+	public static HColumnFamilyProperty&lt;?&gt;[] checkIsAsExpected(Store store, HColumnDescriptor columnDescriptor, Class&lt;? extends PersistingElement&gt; clazz, Field cfField, String tablePostfix) {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">		if (columnDescriptor == null) {</span>
+<span class="nc" id="L106">			return null;</span>
+		} else {
+<span class="fc" id="L108">			Collection&lt;HColumnFamilyProperty&lt;?&gt;&gt; ret = new LinkedList&lt;HColumnFamilyProperty&lt;?&gt;&gt;(Arrays.asList(PropertyUtils.columnProperties));</span>
+<span class="fc" id="L109">			Iterator&lt;HColumnFamilyProperty&lt;?&gt;&gt; it = ret.iterator();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">			while(it.hasNext()) {</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">				if (!it.next().shouldAlter(columnDescriptor, store, clazz, cfField, tablePostfix))</span>
+<span class="fc" id="L112">					it.remove();</span>
+			}
+<span class="fc" id="L114">			return ret.toArray(new HColumnFamilyProperty[ret.size()]);</span>
+		}
+	}
+	
+	/**
+	 * Changes given column family descriptor so that it becomes as expected.
+	 */
+	public static void setValues(Store store, HColumnDescriptor columnDescriptor, Class&lt;? extends PersistingElement&gt; clazz, Field cfField, String tablePostfix) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">		for (HColumnFamilyProperty&lt;?&gt; hprop : PropertyUtils.columnProperties) {</span>
+<span class="fc" id="L123">			hprop.setValue(columnDescriptor, store, clazz, cfField, tablePostfix);</span>
+		}
+<span class="fc" id="L125">	}</span>
+
+<span class="fc" id="L127">	static final Map&lt;PropertyCacheKey, PropertyCacheValue&gt; values = new ConcurrentHashMap&lt;PropertyCacheKey, PropertyCacheValue&gt;();</span>
+
+	public static void clearCachedValues() {
+<span class="fc" id="L130">		values.clear();</span>
+<span class="fc" id="L131">	}</span>
+
+<span class="fc" id="L133">	static Map&lt;TypeWithPostfix, HBaseSchema&gt; specificities = new TreeMap&lt;TypeWithPostfix, HBaseSchema&gt;();</span>
+
+	/**
+	 * Resets caches ; for test purpose.
+	 */
+	public static void clearAllSchemaSpecificities() {
+<span class="fc" id="L139">		specificities.clear();</span>
+<span class="fc" id="L140">		values.clear();</span>
+<span class="fc" id="L141">	}</span>
+
+	/**
+	 * Provides a mean to override a schema specification for a specific table
+	 * in case of a class to be persisted in a {@link Persisting#federated()
+	 * federated table}. Please note that if a column family is defined using
+	 * {@link HBaseSchema}, this definition is not overridden by overriding
+	 * class using this method.
+	 * 
+	 * @param clazz
+	 *            the class of the persisting elements
+	 * @param tablePostfix
+	 *            the postfix for the table for which which schema specificities
+	 *            should be registered ; null means no postfix
+	 * @param schema
+	 *            the schema specificities ; can be a {@link DefaultHBaseSchema}
+	 */
+	public static void registerSchemaSpecificity(
+			Class&lt;? extends PersistingElement&gt; clazz, String tablePostfix,
+			HBaseSchema schema) {
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">		if (clazz == null)</span>
+<span class="nc" id="L162">			throw new NullPointerException();</span>
+<span class="fc" id="L163">		specificities.put(new ClassWithPostfix(clazz, tablePostfix), schema);</span>
+<span class="fc" id="L164">		values.clear();</span>
+<span class="fc" id="L165">	}</span>
+
+	/**
+	 * Provides a mean to override a schema specification for a specific column
+	 * family in case of a class to be persisted in a
+	 * {@link Persisting#federated() federated table}.
+	 * 
+	 * @param field
+	 *            the column family
+	 * @param tablePostfix
+	 *            the postfix for the table for which which schema specificities
+	 *            should be registered ; null means no postfix
+	 * @param schema
+	 *            the schema specificities ; can be a {@link DefaultHBaseSchema}
+	 */
+	public static void registerSchemaSpecificity(Field field,
+			String tablePostfix, HBaseSchema schema) {
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">		if (field == null)</span>
+<span class="nc" id="L183">			throw new NullPointerException();</span>
+<span class="fc" id="L184">		specificities.put(new ColumnFamilyWithPostfix(field, tablePostfix),</span>
+				schema);
+<span class="fc" id="L186">		values.clear();</span>
+<span class="fc" id="L187">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

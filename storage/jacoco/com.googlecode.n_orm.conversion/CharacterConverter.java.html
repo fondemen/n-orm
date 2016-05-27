@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>CharacterConverter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">CharacterConverter.java</span></div><h1>CharacterConverter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+class CharacterConverter extends PrimitiveConverter&lt;Character&gt; {
+	public static final int BYTE_SIZE = Character.SIZE/Byte.SIZE;
+	private final StringBuffer sbuf;
+
+	public CharacterConverter() {
+<span class="fc" id="L8">		super(Character.class, char.class, BYTE_SIZE, BYTE_SIZE, 1, 1, Character.MIN_VALUE);</span>
+<span class="fc" id="L9">		 sbuf = new StringBuffer(1);</span>
+<span class="fc" id="L10">		 sbuf.append(' ');</span>
+<span class="fc" id="L11">	}</span>
+
+	@Override
+	public Character fromString(String rep, Class&lt;?&gt; expected) {
+<span class="fc" id="L15">		return rep.charAt(0);</span>
+	}
+
+	@Override
+	public String toString(Character obj) {
+<span class="fc" id="L20">		sbuf.setCharAt(0, obj.charValue());</span>
+<span class="fc" id="L21">		return sbuf.toString();</span>
+	}
+
+	@Override
+	public Character fromBytes(byte[] rep, Class&lt;?&gt; expected) {
+<span class="fc" id="L26">	    char n = 0;</span>
+<span class="fc" id="L27">	    n ^= rep[0] &amp; 0xFF;</span>
+<span class="fc" id="L28">	    n &lt;&lt;= 8;</span>
+<span class="fc" id="L29">	    n ^= rep[1] &amp; 0xFF;</span>
+<span class="fc" id="L30">	    return n;</span>
+	}
+
+	@Override
+	public byte[] toBytes(Character obj) {
+<span class="fc" id="L35">	    byte[] b = new byte[BYTE_SIZE];</span>
+<span class="fc" id="L36">	    char val = obj.charValue();</span>
+<span class="fc" id="L37">	    b[1] = (byte) (val);</span>
+<span class="fc" id="L38">	    val &gt;&gt;= 8;</span>
+<span class="fc" id="L39">	    b[0] = (byte) (val);</span>
+<span class="fc" id="L40">	    return b;</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>MetaInformation.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.storeapi</a> &gt; <span class="el_source">MetaInformation.java</span></div><h1>MetaInformation.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.storeapi;
+
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.Transient;
+import com.googlecode.n_orm.utils.UnmodifiableOverridingMap;
+
+/**
+ * Simple unchecked class to be sent to data stores for additional and optional
+ * information regarding queries.
+ */
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">public class MetaInformation {</span>
+	
+	// Adding a field here should alter the cloning constructor, equals and
+	// hascode methods.
+	private Class&lt;? extends PersistingElement&gt; clazz;
+	@Transient private Map&lt;String, Field&gt; families;
+	private Field property;
+	private PersistingElement element;
+	private String tablePostfix;
+	
+<span class="fc" id="L26">	private final Object mutex = new Object();</span>
+
+<span class="fc" id="L28">	public MetaInformation() {</span>
+<span class="fc" id="L29">	}</span>
+
+<span class="fc" id="L31">	public MetaInformation(MetaInformation clone) {</span>
+<span class="fc" id="L32">		this.clazz = clone.clazz;</span>
+<span class="fc" id="L33">		this.families = clone.families;</span>
+<span class="fc" id="L34">		this.property = clone.property;</span>
+<span class="fc" id="L35">		this.element = clone.element;</span>
+<span class="fc" id="L36">		this.tablePostfix = clone.tablePostfix;</span>
+<span class="fc" id="L37">	}</span>
+	
+	/**
+	 * Thread-safe merge of another meta information object.
+	 * Meta information to integrate should have similar element, class, and property.
+	 */
+	public void integrate(MetaInformation rhs) {
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">		if (rhs.clazz != null) {</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">			if (this.clazz == null)</span>
+<span class="nc" id="L46">				this.clazz = rhs.clazz;</span>
+			else
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">				assert this.clazz.equals(rhs.clazz);</span>
+		}
+		
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">		if (rhs.element != null) {</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">			if (this.element == null)</span>
+<span class="nc" id="L53">				this.element = rhs.element;</span>
+			else
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">				assert this.element.equals(rhs.element);</span>
+		}
+		
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">		if (rhs.property != null) {</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">			if (this.property == null)</span>
+<span class="nc" id="L60">				this.property = rhs.property;</span>
+			else
+<span class="nc bnc" id="L62" title="All 4 branches missed.">				assert this.property.equals(rhs.property);</span>
+		}
+		
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">		if (rhs.tablePostfix != null) {</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">			if (this.tablePostfix == null)</span>
+<span class="nc" id="L67">				this.tablePostfix = rhs.tablePostfix;</span>
+			else
+<span class="nc bnc" id="L69" title="All 4 branches missed.">				assert this.tablePostfix.equals(rhs.tablePostfix);</span>
+		}
+		
+<span class="fc bfc" id="L72" title="All 2 branches covered.">		if (rhs.families != null) {</span>
+<span class="pc bpc" id="L73" title="1 of 4 branches missed.">			if (this.families == null || !(this.families instanceof UnmodifiableOverridingMap)) {</span>
+<span class="pc" id="L74">				synchronized(mutex) {</span>
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">					if (this.families == null || !(this.families instanceof UnmodifiableOverridingMap)) {</span>
+<span class="fc" id="L76">						Map&lt;String, Field&gt; oldFam = this.families;</span>
+<span class="fc" id="L77">						this.families = new UnmodifiableOverridingMap&lt;String, Field&gt;();</span>
+<span class="fc" id="L78">						((UnmodifiableOverridingMap&lt;String, Field&gt;)this.families).override(oldFam);</span>
+					}
+				}
+			}
+<span class="fc" id="L82">			((UnmodifiableOverridingMap&lt;String, Field&gt;)this.families).override(rhs.families);</span>
+		}
+<span class="fc" id="L84">	}</span>
+
+	public MetaInformation forClass(Class&lt;? extends PersistingElement&gt; clazz) {
+<span class="fc" id="L87">		this.clazz = clazz;</span>
+<span class="fc" id="L88">		return this;</span>
+	}
+
+	public MetaInformation forElement(PersistingElement element) {
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">		if (this.clazz == null)</span>
+<span class="fc" id="L93">			this.clazz = element.getClass();</span>
+<span class="fc" id="L94">		this.element = element;</span>
+<span class="fc" id="L95">		return this;</span>
+	}
+
+	public MetaInformation forProperty(Field property) {
+<span class="fc" id="L99">		this.property = property;</span>
+<span class="fc" id="L100">		return this;</span>
+	}
+
+	public MetaInformation withColumnFamilies(Map&lt;String, Field&gt; families) {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">		this.families = families == null ? null : new HashMap&lt;String, Field&gt;(families);</span>
+<span class="fc" id="L105">		return this;</span>
+	}
+
+	public MetaInformation withPostfixedTable(String originalTable,
+			String postfix) {
+<span class="fc" id="L110">		this.tablePostfix = postfix;</span>
+<span class="fc" id="L111">		return this;</span>
+	}
+
+	public Class&lt;? extends PersistingElement&gt; getClazz() {
+		// A federated table should be with a postfix (at least &quot;&quot;)
+<span class="nc bnc" id="L116" title="All 10 branches missed.">		assert (clazz != null &amp;&amp; clazz.getAnnotation(Persisting.class).federated().isFederated()) == (tablePostfix != null);</span>
+<span class="nc" id="L117">		return clazz;</span>
+	}
+
+	public Class&lt;? extends PersistingElement&gt; getClazzNoCheck() {
+<span class="fc" id="L121">		return clazz;</span>
+	}
+
+	public Map&lt;String, Field&gt; getFamilies() {
+<span class="nc" id="L125">		return families;</span>
+	}
+
+	public Field getProperty() {
+<span class="nc" id="L129">		return property;</span>
+	}
+
+	public PersistingElement getElement() {
+<span class="fc" id="L133">		return element;</span>
+	}
+
+	public String getTablePostfix() {
+<span class="nc" id="L137">		return tablePostfix;</span>
+	}
+
+	@Override
+	public int hashCode() {
+<span class="nc" id="L142">		final int prime = 31;</span>
+<span class="nc" id="L143">		int result = 1;</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">		result = prime * result + ((clazz == null) ? 0 : clazz.hashCode());</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">		result = prime * result + ((element == null) ? 0 : element.hashCode());</span>
+<span class="nc" id="L146">		result = prime * result</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">				+ ((families == null) ? 0 : families.hashCode());</span>
+<span class="nc" id="L148">		result = prime * result</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">				+ ((property == null) ? 0 : property.hashCode());</span>
+<span class="nc" id="L150">		result = prime * result</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">				+ ((tablePostfix == null) ? 0 : tablePostfix.hashCode());</span>
+<span class="nc" id="L152">		return result;</span>
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">		if (this == obj)</span>
+<span class="fc" id="L158">			return true;</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">		if (obj == null)</span>
+<span class="nc" id="L160">			return false;</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">		if (getClass() != obj.getClass())</span>
+<span class="nc" id="L162">			return false;</span>
+<span class="fc" id="L163">		MetaInformation other = (MetaInformation) obj;</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">		if (clazz == null) {</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">			if (other.clazz != null)</span>
+<span class="nc" id="L166">				return false;</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">		} else if (!clazz.equals(other.clazz))</span>
+<span class="nc" id="L168">			return false;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">		if (element == null) {</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">			if (other.element != null)</span>
+<span class="nc" id="L171">				return false;</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">		} else if (!element.equals(other.element))</span>
+<span class="nc" id="L173">			return false;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">		if (families == null) {</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">			if (other.families != null)</span>
+<span class="nc" id="L176">				return false;</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">		} else if (!families.equals(other.families))</span>
+<span class="fc" id="L178">			return false;</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">		if (property == null) {</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">			if (other.property != null)</span>
+<span class="nc" id="L181">				return false;</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">		} else if (!property.equals(other.property))</span>
+<span class="nc" id="L183">			return false;</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">		if (tablePostfix == null) {</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">			if (other.tablePostfix != null)</span>
+<span class="nc" id="L186">				return false;</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">		} else if (!tablePostfix.equals(other.tablePostfix))</span>
+<span class="fc" id="L188">			return false;</span>
+<span class="fc" id="L189">		return true;</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

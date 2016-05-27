@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>CloseableIterator.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">mongoDB driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.mongo</a> &gt; <span class="el_source">CloseableIterator.java</span></div><h1>CloseableIterator.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.mongo;
+
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Row;
+import com.mongodb.DBCursor;
+
+final class CloseableIterator implements CloseableKeyIterator
+{
+	private DBCursor cursor;
+
+<span class="fc" id="L11">	public CloseableIterator(DBCursor cur) {</span>
+<span class="fc" id="L12">		cursor = cur;</span>
+<span class="fc" id="L13">	}</span>
+
+	@Override
+	public boolean hasNext() {
+<span class="fc" id="L17">		return cursor.hasNext();</span>
+	}
+
+	@Override
+	public Row next() {
+<span class="fc" id="L22">		MongoRow row = null;</span>
+
+<span class="fc bfc" id="L24" title="All 2 branches covered.">		if (cursor.hasNext()) {</span>
+<span class="fc" id="L25">			row = new MongoRow(cursor.next());</span>
+		}
+
+<span class="fc" id="L28">		return row;</span>
+	}
+
+	public Row curr() {
+<span class="nc" id="L32">		return new MongoRow(cursor.curr());</span>
+	}
+
+	@Override
+	public void remove() {
+<span class="fc" id="L37">		throw new IllegalStateException(&quot;Cannot remove key from a result set.&quot;);</span>
+	}
+
+	@Override
+	public void close() {
+<span class="fc" id="L42">		cursor = null;</span>
+<span class="fc" id="L43">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

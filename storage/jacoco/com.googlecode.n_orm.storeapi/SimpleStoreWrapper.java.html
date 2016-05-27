@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>SimpleStoreWrapper.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.storeapi</a> &gt; <span class="el_source">SimpleStoreWrapper.java</span></div><h1>SimpleStoreWrapper.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.storeapi;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+
+<span class="fc" id="L10">public class SimpleStoreWrapper implements Store {</span>
+<span class="fc" id="L11">	private static Map&lt;SimpleStore, Store&gt; INSTANCES = new HashMap&lt;SimpleStore, Store&gt;();</span>
+
+	public static SimpleStoreWrapper getWrapper(SimpleStore s) {
+<span class="pc" id="L14">		synchronized (INSTANCES) {</span>
+<span class="fc" id="L15">			SimpleStoreWrapper ret = (SimpleStoreWrapper) INSTANCES</span>
+<span class="fc" id="L16">					.get(s);</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">			if (ret == null) {</span>
+<span class="fc" id="L18">				ret = new SimpleStoreWrapper(s);</span>
+			}
+<span class="fc" id="L20">			return ret;</span>
+		}
+	}
+
+	private final SimpleStore store;
+
+<span class="nc" id="L26">	protected SimpleStoreWrapper() {</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">		if (!(this instanceof SimpleStore))</span>
+<span class="nc" id="L28">			throw new IllegalStateException(this.getClass().getName()</span>
+<span class="nc" id="L29">					+ &quot; must implement &quot; + SimpleStore.class.getName());</span>
+
+<span class="nc" id="L31">		synchronized (INSTANCES) {</span>
+<span class="nc" id="L32">			INSTANCES.put((SimpleStore) this, this);</span>
+<span class="nc" id="L33">			this.store = (SimpleStore) this;</span>
+		}
+<span class="nc" id="L35">	}</span>
+
+<span class="fc" id="L37">	private SimpleStoreWrapper(SimpleStore store) {</span>
+<span class="pc" id="L38">		synchronized (INSTANCES) {</span>
+<span class="fc" id="L39">			INSTANCES.put(store, this);</span>
+<span class="fc" id="L40">			this.store = store;</span>
+		}
+<span class="fc" id="L42">	}</span>
+
+	public SimpleStore getStore() {
+<span class="nc" id="L45">		return this.store;</span>
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.googlecode.n_orm.storeapi.TypeAwareStore#start()
+	 */
+	@Override
+	public void start() throws DatabaseNotReachedException {
+<span class="fc" id="L55">		store.start();</span>
+<span class="fc" id="L56">	}</span>
+	
+	@Override
+	public boolean hasTable(String tableName) throws DatabaseNotReachedException {
+<span class="fc" id="L60">		return this.store.hasTable(tableName);</span>
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * com.googlecode.n_orm.storeapi.TypeAwareStore#delete(com.googlecode.n_orm
+	 * .PersistingElement, java.lang.String, java.lang.String)
+	 */
+	@Override
+	public void delete(MetaInformation meta, String table, String id)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L73">		this.store.delete(table, id);</span>
+<span class="fc" id="L74">	}</span>
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * com.googlecode.n_orm.storeapi.TypeAwareStore#exists(com.googlecode.n_orm
+	 * .PersistingElement, java.lang.String, java.lang.String)
+	 */
+	@Override
+	public boolean exists(MetaInformation meta, String table, String row)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L86">		return this.store.exists(table, row);</span>
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * com.googlecode.n_orm.storeapi.TypeAwareStore#exists(com.googlecode.n_orm
+	 * .PersistingElement, java.lang.reflect.Field, java.lang.String,
+	 * java.lang.String, java.lang.String)
+	 */
+	@Override
+	public boolean exists(MetaInformation meta, 
+			String table, String row, String family)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L101">		return this.store.exists(table, row, family);</span>
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.googlecode.n_orm.storeapi.TypeAwareStore#get(java.lang.Class,
+	 * java.util.Set, java.lang.String,
+	 * com.googlecode.n_orm.storeapi.Constraint, int, java.util.Set)
+	 */
+	@Override
+	public CloseableKeyIterator get(MetaInformation meta,
+			String table, Constraint c, int limit,
+			Set&lt;String&gt; families) throws DatabaseNotReachedException {
+<span class="fc" id="L115">		return this.store.get(table, c, limit, families);</span>
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * com.googlecode.n_orm.storeapi.TypeAwareStore#get(com.googlecode.n_orm
+	 * .PersistingElement, java.lang.reflect.Field, java.lang.String,
+	 * java.lang.String, java.lang.String, java.lang.String)
+	 */
+	@Override
+	public byte[] get(MetaInformation meta, String table,
+			String row, String family, String key)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L130">		return this.store.get(table, row, family, key);</span>
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * com.googlecode.n_orm.storeapi.TypeAwareStore#get(com.googlecode.n_orm
+	 * .PersistingElement, java.lang.reflect.Field, java.lang.String,
+	 * java.lang.String, java.lang.String)
+	 */
+	@Override
+	public Map&lt;String, byte[]&gt; get(MetaInformation meta, 
+			String table, String id, String family)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L145">		return store.get(table, id, family);</span>
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * com.googlecode.n_orm.storeapi.TypeAwareStore#get(com.googlecode.n_orm
+	 * .PersistingElement, java.lang.reflect.Field, java.lang.String,
+	 * java.lang.String, java.lang.String,
+	 * com.googlecode.n_orm.storeapi.Constraint)
+	 */
+	@Override
+	public Map&lt;String, byte[]&gt; get(MetaInformation meta, 
+			String table, String id, String family, Constraint c)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L161">		return store.get(table, id, family, c);</span>
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * com.googlecode.n_orm.storeapi.TypeAwareStore#get(com.googlecode.n_orm
+	 * .PersistingElement, java.lang.String, java.lang.String, java.util.Set)
+	 */
+	@Override
+	public ColumnFamilyData get(MetaInformation meta, 
+			String table, String id,
+			Set&lt;String&gt; families) throws DatabaseNotReachedException {
+<span class="fc" id="L175">		return store.get(table, id, families);</span>
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * com.googlecode.n_orm.storeapi.TypeAwareStore#storeChanges(com.googlecode
+	 * .n_orm.PersistingElement, java.lang.String, java.lang.String,
+	 * java.util.Map, java.util.Map, java.util.Map)
+	 */
+	@Override
+	public void storeChanges(MetaInformation meta,
+			String table, String id, ColumnFamilyData changed,
+			Map&lt;String, Set&lt;String&gt;&gt; removed,
+			Map&lt;String, Map&lt;String, Number&gt;&gt; increments)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L192">		store.storeChanges(table, id, changed, removed, increments);</span>
+<span class="fc" id="L193">	}</span>
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.googlecode.n_orm.storeapi.TypeAwareStore#count(java.lang.Class,
+	 * java.lang.String, com.googlecode.n_orm.storeapi.Constraint)
+	 */
+	@Override
+	public long count(MetaInformation meta, String table,
+			Constraint c) throws DatabaseNotReachedException {
+<span class="fc" id="L204">		return store.count(table, c);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

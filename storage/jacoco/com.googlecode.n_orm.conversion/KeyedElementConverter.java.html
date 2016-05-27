@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>KeyedElementConverter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.conversion</a> &gt; <span class="el_source">KeyedElementConverter.java</span></div><h1>KeyedElementConverter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.conversion;
+
+import com.googlecode.n_orm.KeyManagement;
+
+class KeyedElementConverter extends Converter&lt;Object&gt; {
+<span class="fc" id="L6">	private final KeyManagement keyManager = KeyManagement.getInstance();</span>
+	
+	public KeyedElementConverter() {
+<span class="fc" id="L9">		super(Object.class);</span>
+<span class="fc" id="L10">	}</span>
+
+	@Override
+	public Object getDefaultValue(Class&lt;?&gt; type) {
+<span class="fc" id="L14">		return null;</span>
+	}
+
+	@Override
+	public Object fromString(String rep, Class&lt;?&gt; expected) {
+<span class="fc" id="L19">		return keyManager.createElement(expected, rep);</span>
+	}
+
+	@Override
+	public String toString(Object obj, Class&lt;?&gt; expected) {
+<span class="fc" id="L24">		return keyManager.createIdentifier(obj, expected);</span>
+	}
+
+	@Override
+	public Object fromBytes(byte[] rep, Class&lt;? extends Object&gt; expected) {
+<span class="fc" id="L29">		return keyManager.createElement(expected, ConversionTools.stringConverter.fromBytes(rep, String.class));</span>
+	}
+
+	@Override
+	public byte[] toBytes(Object obj, Class&lt;?&gt; expected) {
+<span class="fc" id="L34">		return ConversionTools.stringConverter.toBytes(this.toString(obj, expected));</span>
+	}
+
+	@Override
+	public boolean canConvert(Class&lt;?&gt; type) {
+<span class="fc" id="L39">		return KeyManagement.getInstance().canCreateFromKeys(type);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

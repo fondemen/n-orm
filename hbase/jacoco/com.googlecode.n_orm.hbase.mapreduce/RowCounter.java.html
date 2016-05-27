@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>RowCounter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.mapreduce</a> &gt; <span class="el_source">RowCounter.java</span></div><h1>RowCounter.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.mapreduce;
+
+import java.io.IOException;
+
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapreduce.TableMapper;
+import org.apache.hadoop.mapreduce.Job;
+
+import com.googlecode.n_orm.hbase.Store;
+
+<span class="nc" id="L15">public class RowCounter {</span>
+
+	static final String NAME = &quot;rowcounter&quot;;
+
+<span class="pc" id="L19">	public static class RowCounterMapper extends</span>
+			TableMapper&lt;ImmutableBytesWritable, Result&gt; {
+
+<span class="pc" id="L22">		public static enum Counters {</span>
+<span class="fc" id="L23">			ROWS</span>
+		}
+
+		@Override
+		public void map(ImmutableBytesWritable row, Result values,
+				Context context) throws IOException {
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">			for (@SuppressWarnings(&quot;unused&quot;) KeyValue value : values.list()) {</span>
+<span class="fc" id="L30">				context.getCounter(Counters.ROWS).increment(1);</span>
+<span class="fc" id="L31">				break;</span>
+			}
+<span class="fc" id="L33">		}</span>
+	}
+
+	public static Job createSubmittableJob(Store s, String tableName,
+			Scan scan) throws IOException {
+<span class="fc" id="L38">		Job job = new Job(LocalFormat.prepareConf(s, null), NAME + &quot;_&quot; + tableName + &quot;_&quot; + scan.hashCode());</span>
+<span class="fc" id="L39">		TableMapReduceUtil.initTableMapperJob(tableName, scan,</span>
+				RowCounterMapper.class, ImmutableBytesWritable.class,
+				Result.class, job, false);
+<span class="fc" id="L42">		LocalFormat.prepareJob(job, scan, s);</span>
+<span class="fc" id="L43">		job.setNumReduceTasks(0);</span>
+<span class="fc" id="L44">		return job;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

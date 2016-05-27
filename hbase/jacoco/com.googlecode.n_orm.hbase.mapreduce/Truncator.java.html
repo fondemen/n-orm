@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Truncator.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.mapreduce</a> &gt; <span class="el_source">Truncator.java</span></div><h1>Truncator.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.mapreduce;
+
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapreduce.TableMapper;
+import org.apache.hadoop.mapreduce.Job;
+
+import com.googlecode.n_orm.hbase.Store;
+
+<span class="nc" id="L18">public class Truncator {</span>
+
+	static final String NAME = &quot;truncator&quot;;
+<span class="pc" id="L21">	public static class TruncatorMapper extends</span>
+			TableMapper&lt;ImmutableBytesWritable, Void&gt; {
+		private HTable table;
+		
+		@Override
+		protected void setup(Context context) throws IOException,
+				InterruptedException {
+<span class="fc" id="L28">			super.setup(context);</span>
+<span class="fc" id="L29">			LocalFormat lf = new LocalFormat();</span>
+<span class="fc" id="L30">			lf.setConf(context.getConfiguration());</span>
+<span class="fc" id="L31">			this.table = lf.getTable();</span>
+<span class="fc" id="L32">		}</span>
+
+		@Override
+		protected void cleanup(Context context) throws IOException,
+				InterruptedException {
+<span class="fc" id="L37">			this.table.flushCommits();</span>
+<span class="fc" id="L38">			super.cleanup(context);</span>
+<span class="fc" id="L39">		}</span>
+
+		@Override
+		public void map(ImmutableBytesWritable row, Result values,
+				Context context) throws IOException {
+			for (@SuppressWarnings(&quot;unused&quot;)
+<span class="fc bfc" id="L45" title="All 2 branches covered.">			KeyValue value : values.list()) {</span>
+<span class="fc" id="L46">				this.table.delete(new Delete(row.get()));</span>
+<span class="fc" id="L47">			}</span>
+<span class="fc" id="L48">		}</span>
+	}
+
+	public static Job createSubmittableJob(Store s,
+			String tableName, Scan scan) throws IOException {
+<span class="fc" id="L53">		Configuration conf = LocalFormat.prepareConf(s, null);</span>
+<span class="fc" id="L54">		Job job = new Job(conf, NAME + &quot;_&quot; + tableName + &quot;_&quot; + scan.hashCode());</span>
+<span class="fc" id="L55">		TableMapReduceUtil.initTableMapperJob(tableName, scan,</span>
+				TruncatorMapper.class, ImmutableBytesWritable.class,
+				Delete.class, job, false);
+<span class="fc" id="L58">	    job.setOutputKeyClass(ImmutableBytesWritable.class);</span>
+<span class="fc" id="L59">	    job.setOutputValueClass(Delete.class);</span>
+<span class="fc" id="L60">	    LocalFormat.prepareJob(job, scan, s);</span>
+<span class="fc" id="L61">		job.setNumReduceTasks(0);</span>
+<span class="fc" id="L62">		return job;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

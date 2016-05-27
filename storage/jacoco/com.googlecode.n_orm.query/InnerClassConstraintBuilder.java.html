@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>InnerClassConstraintBuilder.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.query</a> &gt; <span class="el_source">InnerClassConstraintBuilder.java</span></div><h1>InnerClassConstraintBuilder.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.query;
+
+import java.lang.reflect.Field;
+
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+
+<span class="pc bpc" id="L8" title="1 of 2 branches missed.">public class InnerClassConstraintBuilder&lt;T extends PersistingElement&gt; extends ClassConstraintBuilder&lt;T&gt; {</span>
+	private final ClassConstraintBuilder&lt;T&gt; constraintBuilder;
+	private final Field key;
+
+	public InnerClassConstraintBuilder(Field key, ClassConstraintBuilder&lt;T&gt; constraintBuilder) {
+<span class="fc" id="L13">		super(key.getType());</span>
+<span class="fc" id="L14">		this.constraintBuilder = constraintBuilder;</span>
+<span class="fc" id="L15">		this.key = key;</span>
+<span class="fc" id="L16">	}</span>
+
+	@Override
+	public KeyConstraintBuilder&lt;T&gt; createKeyBuilder(
+			Field f) {
+<span class="fc" id="L21">		return new InnerKeyConstraintBuilder&lt;T&gt;(this, f);</span>
+	}
+
+	@Continuator
+	public SearchableClassConstraintBuilder&lt;T&gt; and() {
+<span class="fc" id="L26">		this.constraintBuilder.setSubConstraint(key, this.getConstraint());</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">		if (this.constraintBuilder instanceof SearchableClassConstraintBuilder)</span>
+<span class="fc" id="L28">			return (SearchableClassConstraintBuilder&lt;T&gt;)this.constraintBuilder;</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">		else if (this.constraintBuilder instanceof InnerClassConstraintBuilder)</span>
+<span class="nc" id="L30">			return ((InnerClassConstraintBuilder&lt;T&gt;)this.constraintBuilder).and();</span>
+		else
+<span class="nc bnc" id="L32" title="All 2 branches missed.">			assert false;</span>
+<span class="nc" id="L33">		return null;</span>
+	}
+
+	@Continuator
+	public InnerKeyConstraintBuilder&lt;T&gt; withKey(String key) {
+<span class="fc" id="L38">		return (InnerKeyConstraintBuilder&lt;T&gt;) super.withKeyInt(key);</span>
+	}
+
+	@Continuator
+	public InnerKeyConstraintBuilder&lt;T&gt; andWithKey(String key) {
+<span class="fc" id="L43">		return this.withKey(key);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

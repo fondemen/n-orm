@@ -1,0 +1,2252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Store.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase</a> &gt; <span class="el_source">Store.java</span></div><h1>Store.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.InvalidFamilyOperationException;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.NotServingRegionException;
+import org.apache.hadoop.hbase.TableExistsException;
+import org.apache.hadoop.hbase.TableNotDisabledException;
+import org.apache.hadoop.hbase.TableNotEnabledException;
+import org.apache.hadoop.hbase.TableNotFoundException;
+import org.apache.hadoop.hbase.UnknownScannerException;
+import org.apache.hadoop.hbase.ZooKeeperConnectionException;
+import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.HConnectionManager;
+import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.client.HTablePool;
+import org.apache.hadoop.hbase.client.Increment;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.RetriesExhaustedWithDetailsException;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.ScannerTimeoutException;
+import org.apache.hadoop.hbase.filter.BinaryComparator;
+import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
+import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.FilterList;
+import org.apache.hadoop.hbase.filter.FirstKeyOnlyFilter;
+import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
+import org.apache.hadoop.hbase.filter.QualifierFilter;
+import org.apache.hadoop.hbase.io.hfile.Compression;
+import org.apache.hadoop.hbase.io.hfile.Compression.Algorithm;
+import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
+import org.apache.hadoop.hbase.regionserver.StoreFile;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.zookeeper.RecoverableZooKeeper;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.zookeeper.ZooKeeper;
+import org.codehaus.plexus.util.DirectoryScanner;
+
+import com.googlecode.n_orm.Callback;
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.EmptyCloseableIterator;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.Process;
+import com.googlecode.n_orm.PropertyManagement;
+import com.googlecode.n_orm.cache.perthread.Cache;
+import com.googlecode.n_orm.hbase.RecursiveFileAction.Report;
+import com.googlecode.n_orm.hbase.actions.Action;
+import com.googlecode.n_orm.hbase.actions.BatchAction;
+import com.googlecode.n_orm.hbase.actions.CountAction;
+import com.googlecode.n_orm.hbase.actions.DeleteAction;
+import com.googlecode.n_orm.hbase.actions.ExistsAction;
+import com.googlecode.n_orm.hbase.actions.GetAction;
+import com.googlecode.n_orm.hbase.actions.IncrementAction;
+import com.googlecode.n_orm.hbase.actions.ScanAction;
+import com.googlecode.n_orm.hbase.actions.TruncateAction;
+import com.googlecode.n_orm.hbase.mapreduce.ActionJob;
+import com.googlecode.n_orm.hbase.properties.HColumnFamilyProperty;
+import com.googlecode.n_orm.hbase.properties.HTableProperty;
+import com.googlecode.n_orm.hbase.properties.PropertyUtils;
+import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
+import com.googlecode.n_orm.storeapi.ActionnableStore;
+import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.DefaultColumnFamilyData;
+import com.googlecode.n_orm.storeapi.GenericStore;
+import com.googlecode.n_orm.storeapi.MetaInformation;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+
+/**
+ * The HBase store found according to its configuration folder.
+ * An example store.properties file is:&lt;br&gt;&lt;code&gt;
+ * class=com.googlecode.n_orm.hbase.Store&lt;br&gt;
+ * static-accessor=getStore&lt;br&gt;
+ * 1=/usr/lib/hbase/conf/
+ * &lt;/code&gt;&lt;br&gt;
+ * Given files adn directories are explored recursively ignoring files given with a ! prefix. You can also define  (positive or negative with a ! prefix) filters using wilcards such as * (any character set), ? (any character), and ** (any sub-directory) can be used both in included and excluded patterns (see {@link DirectoryScanner}), but at least one directory to look in must be defined without wildcard.
+ * Two attempts are performed during search: first explicitly looking for ./*-site.xml and ./conf/*-site.xml, and then all possible ** /*-site.xml. hbase-site.xml MUST be found for the operation to succeed.
+ * Compared to {@link HBase}, no jar found in those is added to classpath.
+ * For test purpose, you can also directly reach an HBase instance thanks to one of its zookeeper host and client port:&lt;br&gt;&lt;code&gt;
+ * class=com.googlecode.n_orm.hbase.Store&lt;br&gt;
+ * static-accessor=getStore&lt;br&gt;
+ * 1=localhost&lt;br&gt;
+ * 2=2181&lt;br&gt;
+ * compression=gz &amp;#35;can be 'none', 'gz', 'lzo', or 'snappy' (default is 'none') ; in the latter two cases, take great care that those compressors are available for all nodes of your hbase cluster
+ * &lt;br&gt;&lt;/code&gt;
+ * One important property to configure is {@link #setScanCaching(Integer)}.&lt;br&gt;
+ * Most properties can be overloaded at class or column-family level by using the annotation {@link HBaseSchema}. 
+ * This store supports remote processes (see {@link com.googlecode.n_orm.operations.Process#processElementsRemotely(Class, Constraint, Process, Callback, int, String[], int, long)} and {@link SearchableClassConstraintBuilder#remoteForEach(Process, Callback, int, long)}) as it implements {@link ActionnableStore} by using HBase/Hadoop Map-only jobs. However, be careful when configuring your hadoop: all jars containing your process and n-orm (with dependencies) should be available.
+ * By default, all known jars are sent (which might become a problem is same jars are sent over and over).
+ * You can change this using e.g. {@link #setMapRedSendJars(boolean)}.
+ */
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableStore, GenericStore {</span>
+	private static final String CONF_MAXRETRIES_KEY = &quot;hbase.client.retries.number&quot;;
+
+	private static final String CONF_PORT_KEY = &quot;hbase.zookeeper.property.clientPort&quot;;
+
+	private static final String CONF_HOST_KEY = HConstants.ZOOKEEPER_QUORUM;
+
+	private static class ReportConf extends Report {
+		private final Configuration conf;
+<span class="fc" id="L137">		public boolean foundPropertyFile = false;</span>
+<span class="fc" id="L138">		public boolean foundHBasePropertyFile = false;</span>
+
+		public ReportConf(Configuration conf) {
+<span class="fc" id="L141">			super();</span>
+<span class="fc" id="L142">			this.conf = conf;</span>
+<span class="fc" id="L143">		}</span>
+
+		Configuration getConf() {
+<span class="fc" id="L146">			return conf;</span>
+		}
+
+		@Override
+		public void fileHandled(File f) {
+<span class="fc" id="L151">			this.foundPropertyFile = true;</span>
+<span class="fc bfc" id="L152" title="All 4 branches covered.">			if (!this.foundHBasePropertyFile &amp;&amp; f.getName().equals(&quot;hbase-site.xml&quot;))</span>
+<span class="fc" id="L153">				this.foundHBasePropertyFile = true;</span>
+<span class="fc" id="L154">		}</span>
+		
+	}
+
+<span class="fc" id="L158">	private static RecursiveFileAction addConfAction = new RecursiveFileAction() {</span>
+		
+		@Override
+		public void fileFound(File f, Report r) {
+			try {
+<span class="fc" id="L163">				((ReportConf)r).getConf().addResource(new FileInputStream(f));</span>
+<span class="fc" id="L164">				System.out.println(&quot;Getting HBase store: found configuration file &quot; + f.getAbsolutePath());</span>
+<span class="nc" id="L165">			} catch (FileNotFoundException e) {</span>
+<span class="nc" id="L166">				System.err.println(&quot;Could not load configuration file &quot; + f.getName());</span>
+<span class="nc" id="L167">				e.printStackTrace();</span>
+<span class="fc" id="L168">			}</span>
+<span class="fc" id="L169">		}</span>
+
+		@Override
+		public boolean acceptFile(File file) {
+<span class="fc" id="L173">			return file.getName().endsWith(&quot;-site.xml&quot;);</span>
+		}
+	};
+
+<span class="fc" id="L177">	public static final Logger logger = HBase.logger;</span>
+<span class="fc" id="L178">	public static final Logger errorLogger = HBase.errorLogger;</span>
+	public static final String localHostName;
+<span class="fc" id="L180">	private static List&lt;String&gt; unavailableCompressors = new ArrayList&lt;String&gt;();</span>
+	
+<span class="fc" id="L182">	protected static Map&lt;Properties, Store&gt; knownStores = new HashMap&lt;Properties, Store&gt;();</span>
+	
+	static {
+		String lhn;
+		try {
+<span class="fc" id="L187">			lhn = java.net.InetAddress.getLocalHost().getHostName();</span>
+<span class="nc" id="L188">		} catch (Exception x) {</span>
+<span class="nc" id="L189">			lhn = &quot;localhost&quot;;</span>
+<span class="nc" id="L190">			errorLogger.log(Level.WARNING, &quot;Cannot get local host name&quot;, x);</span>
+<span class="fc" id="L191">		}</span>
+<span class="fc" id="L192">		localHostName = lhn;</span>
+<span class="fc" id="L193">	}</span>
+
+	/**
+	 * For test purpose ; avoid using this.
+	 */
+	public static Store getStore(String host, int port) {
+<span class="nc" id="L199">		return getStore(host, port, null);</span>
+	}
+
+	/**
+	 * For test purpose ; avoid using this.
+	 */
+	public static Store getStore(String host, int port, Integer maxRetries) {
+<span class="fc" id="L206">		synchronized (Store.class) {</span>
+<span class="fc" id="L207">			Properties p = new Properties();</span>
+<span class="fc" id="L208">			p.setProperty(&quot;host&quot;, host);</span>
+<span class="fc" id="L209">			p.setProperty(&quot;port&quot;, Integer.toString(port));</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">			if (maxRetries != null)</span>
+<span class="fc" id="L211">				p.setProperty(&quot;maxRetries&quot;, maxRetries.toString());</span>
+<span class="fc" id="L212">			Store ret = knownStores.get(p);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">			if (ret == null) {</span>
+<span class="fc" id="L214">				logger.info(&quot;Creating store for &quot; + host + ':' + port);</span>
+<span class="fc" id="L215">				ret = new Store(p);</span>
+<span class="fc" id="L216">				ret.setHost(host);</span>
+<span class="fc" id="L217">				ret.setPort(port);</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">				if (maxRetries != null)</span>
+<span class="fc" id="L219">					ret.setMaxRetries(maxRetries);</span>
+<span class="fc" id="L220">				knownStores.put(p, ret);</span>
+<span class="fc" id="L221">				logger.info(&quot;Created store &quot; + ret.hashCode() + &quot; for &quot; + host + ':' + port);</span>
+			}
+<span class="fc" id="L223">			return ret;</span>
+<span class="nc" id="L224">		}</span>
+	}
+	
+	/**
+	 * Get an HBase store according to a set of comma-separated configuration folders.
+	 * Those folders are supposed to have configuration files following the pattern *-site.xml. 
+	 */
+	public static Store getStore(String commaSeparatedConfigurationFolders) throws IOException {
+<span class="fc" id="L232">		synchronized(Store.class) {</span>
+<span class="fc" id="L233">			Properties p = new Properties();</span>
+<span class="fc" id="L234">			p.setProperty(&quot;commaSeparatedConfigurationFolders&quot;, commaSeparatedConfigurationFolders);</span>
+<span class="fc" id="L235">			Store ret = knownStores.get(p);</span>
+			
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">			if (ret == null) {</span>
+<span class="fc" id="L238">				logger.info(&quot;Creating store for &quot; + commaSeparatedConfigurationFolders);</span>
+<span class="fc" id="L239">				Configuration conf = new Configuration();</span>
+<span class="fc" id="L240">				ReportConf r = new ReportConf(conf);</span>
+				
+				//First attempt using usual configuration
+<span class="fc" id="L243">				String cscf = commaSeparatedConfigurationFolders + &quot;,conf/*-site.xml,*-site.xml,!**/*example*/**,!**/*src*/**&quot;;</span>
+<span class="fc" id="L244">				addConfAction.clear();</span>
+<span class="fc" id="L245">				addConfAction.addFiles(cscf);</span>
+				try {
+<span class="fc" id="L247">					addConfAction.explore(r);</span>
+<span class="nc" id="L248">				} catch (IllegalArgumentException x) {</span>
+<span class="nc" id="L249">					throw new DatabaseNotReachedException(&quot;Invalid configuration folders specification &quot; + commaSeparatedConfigurationFolders + &quot;: &quot; + x.getMessage());</span>
+<span class="fc" id="L250">				}</span>
+<span class="fc bfc" id="L251" title="All 4 branches covered.">				if (!r.foundPropertyFile || !r.foundHBasePropertyFile) {</span>
+					//Second attempt exploring all possibilities
+<span class="fc" id="L253">					cscf = commaSeparatedConfigurationFolders;</span>
+<span class="fc" id="L254">					addConfAction.clear();</span>
+<span class="fc" id="L255">					addConfAction.addFiles(cscf);</span>
+<span class="fc" id="L256">					addConfAction.explore(r);</span>
+				}
+			
+<span class="fc bfc" id="L259" title="All 2 branches covered.">				if (!r.foundPropertyFile)</span>
+<span class="fc" id="L260">					throw new IOException(&quot;No configuration file found in the following folders &quot; + commaSeparatedConfigurationFolders + &quot; ; expecting some *-site.xml files&quot;);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">				if (!r.foundHBasePropertyFile)</span>
+<span class="fc" id="L262">					throw new IOException(&quot;Could not find hbase-site.xml from folders &quot; + commaSeparatedConfigurationFolders);</span>
+				
+<span class="fc" id="L264">				ret = new Store(p);</span>
+<span class="fc" id="L265">				ret.setConf(HBaseConfiguration.create(conf));</span>
+				
+<span class="fc" id="L267">				knownStores.put(p, ret);</span>
+<span class="fc" id="L268">				logger.info(&quot;Created store &quot; + ret.hashCode() + &quot; for &quot; + commaSeparatedConfigurationFolders);</span>
+			}
+			
+<span class="fc" id="L271">			return ret;</span>
+<span class="fc" id="L272">		}</span>
+	}
+	
+	public static Store getKnownStore(Properties properties) {
+<span class="fc" id="L276">		return knownStores.get(properties);</span>
+	}
+	
+	public static Store getStore(Configuration conf, Properties props) throws IOException {
+<span class="nc bnc" id="L280" title="All 2 branches missed.">		if (knownStores.containsKey(props))</span>
+<span class="nc" id="L281">			throw new IllegalStateException(&quot;Store already exists with &quot; + props);</span>
+<span class="nc" id="L282">		Store s = new Store(props);</span>
+<span class="nc" id="L283">		s.setConf(conf);</span>
+<span class="nc" id="L284">		return s;</span>
+	}
+	
+	private final Properties launchProps;
+	
+	//For inter-processes synchronization:
+	//avoids different processes to alter schema concurrently
+<span class="fc" id="L291">	private ConcurrentMap&lt;MangledTableName , TableLocker /*lock*/&gt; locks = new ConcurrentHashMap&lt;MangledTableName, TableLocker&gt;();</span>
+	
+<span class="fc" id="L293">	private String host = localHostName;</span>
+<span class="fc" id="L294">	private int port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;</span>
+<span class="fc" id="L295">	private Integer maxRetries = null;</span>
+<span class="fc" id="L296">	private boolean wasStarted = false;</span>
+<span class="fc" id="L297">	private volatile boolean restarting = false;</span>
+<span class="fc" id="L298">	private final Object restartMutex = new Object();</span>
+	private Configuration config;
+	private HBaseAdmin admin;
+<span class="fc" id="L301">	private long cacheTTLMs = 10*60*1000; //10 min</span>
+<span class="fc" id="L302">	public ConcurrentMap&lt;MangledTableName, HTableDescriptor&gt; tablesD = new ConcurrentHashMap&lt;MangledTableName, HTableDescriptor&gt;();</span>
+<span class="fc" id="L303">	public ConcurrentHashMap&lt;MangledTableName, Object&gt; notExistingTables = new ConcurrentHashMap&lt;MangledTableName, Object&gt;();</span>
+	public HTablePool tablesC;
+	
+<span class="fc" id="L306">	private Integer clientTimeout = null;</span>
+	
+<span class="fc" id="L308">	private Integer scanCaching = null;</span>
+	
+<span class="fc" id="L310">	private Boolean deferredLogFlush = null;</span>
+<span class="fc" id="L311">	private boolean forceDeferredLogFlush = false;</span>
+	
+	private Algorithm compression;
+<span class="fc" id="L314">	private boolean forceCompression = false;</span>
+	
+<span class="fc" id="L316">	private Boolean inMemory = null;</span>
+<span class="fc" id="L317">	private boolean forceInMemory = false;</span>
+	
+<span class="fc" id="L319">	private Integer timeToLiveSeconds = null;</span>
+<span class="fc" id="L320">	private boolean forceTimeToLive = false;</span>
+	
+<span class="fc" id="L322">	private Integer maxVersions = null;</span>
+<span class="fc" id="L323">	private boolean forceMaxVersions = false;</span>
+	
+<span class="fc" id="L325">	private StoreFile.BloomType bloomFilterType = null;</span>
+<span class="fc" id="L326">	private boolean forceBloomFilterType = false;</span>
+
+<span class="fc" id="L328">	private Boolean blockCacheEnabled = null;</span>
+<span class="fc" id="L329">	private boolean forceBlockCacheEnabled = false;</span>
+<span class="fc" id="L330">	private Integer blockSize = null;</span>
+<span class="fc" id="L331">	private boolean forceBlockSize = false;</span>
+	
+<span class="fc" id="L333">	private Integer replicationScope = null;</span>
+<span class="fc" id="L334">	private boolean forceReplicationScope = false;</span>
+	
+<span class="fc" id="L336">	private boolean countMapRed = false;</span>
+<span class="fc" id="L337">	private boolean truncateMapRed = false;</span>
+	
+<span class="fc" id="L339">	private int mapRedScanCaching = 500;</span>
+<span class="fc" id="L340">	private boolean mapRedSendHBaseJars = true;</span>
+<span class="fc" id="L341">	private boolean mapRedSendNOrmJars = true;</span>
+<span class="fc" id="L342">	private boolean mapRedSendJobJars = true;</span>
+
+<span class="fc" id="L344">	protected Store(Properties properties) {</span>
+<span class="fc" id="L345">		this.launchProps = properties;</span>
+		try {
+<span class="fc" id="L347">			host = java.net.InetAddress.getLocalHost().getHostName();</span>
+<span class="nc" id="L348">		} catch (Exception x) {</span>
+<span class="nc" id="L349">			errorLogger.log(Level.WARNING, &quot;Cannot get local host name&quot;, x);</span>
+<span class="fc" id="L350">		}</span>
+		
+<span class="fc" id="L352">		Thread cacheReloader = new Thread(&quot;n-orm hbase cache reloader&quot;) {</span>
+
+			@Override
+			public void run() {
+				while(true) {
+					try {
+<span class="nc" id="L358">						Thread.sleep(getCacheTTLMs());</span>
+<span class="nc" id="L359">					} catch (InterruptedException e) {</span>
+<span class="nc" id="L360">						return;</span>
+<span class="nc" id="L361">					}</span>
+<span class="nc" id="L362">					loadCache();</span>
+				}
+			}
+			
+		};
+<span class="fc" id="L367">		cacheReloader.setDaemon(true);</span>
+<span class="fc" id="L368">		cacheReloader.start();</span>
+<span class="fc" id="L369">	}</span>
+
+	public synchronized void start() throws DatabaseNotReachedException {
+<span class="fc bfc" id="L372" title="All 2 branches covered.">		if (this.wasStarted)</span>
+<span class="fc" id="L373">			return;</span>
+		
+<span class="fc" id="L375">		logger.info(&quot;Starting store &quot; + this.hashCode());</span>
+
+<span class="fc bfc" id="L377" title="All 2 branches covered.">		if (this.config == null) {</span>
+<span class="fc" id="L378">			Configuration properties = HBaseConfiguration.create();</span>
+<span class="fc" id="L379">			properties.clear();</span>
+
+<span class="fc" id="L381">			properties.set(CONF_HOST_KEY, this.getHost());</span>
+<span class="fc" id="L382">			properties.setInt(CONF_PORT_KEY, this.getPort());</span>
+
+<span class="fc" id="L384">			this.config = properties;</span>
+		}
+
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">		if (this.maxRetries != null)</span>
+<span class="fc" id="L388">			this.config.set(CONF_MAXRETRIES_KEY, this.maxRetries.toString());</span>
+		
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">		if (this.clientTimeout != null)</span>
+<span class="nc" id="L391">			this.config.set(HConstants.HBASE_RPC_TIMEOUT_KEY, this.clientTimeout.toString());</span>
+
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">		if (this.admin == null)</span>
+			try {
+<span class="fc" id="L395">				logger.fine(&quot;Connecting HBase admin for store &quot; + this.hashCode());</span>
+<span class="fc" id="L396">				this.setAdmin(new HBaseAdmin(this.config));</span>
+<span class="fc" id="L397">				logger.fine(&quot;Connected HBase admin for store &quot; + this.hashCode());</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">				if (!this.admin.isMasterRunning()) {</span>
+<span class="nc" id="L399">					errorLogger.severe(&quot;No HBase master running for store &quot; + this.hashCode());</span>
+<span class="nc" id="L400">					throw new DatabaseNotReachedException(new MasterNotRunningException());</span>
+				}
+<span class="nc" id="L402">			} catch (Exception e) {</span>
+<span class="nc" id="L403">				errorLogger.severe(&quot;Could not connect HBase for store &quot; + this.hashCode() + &quot; (&quot; +e.getMessage() +')');</span>
+<span class="nc" id="L404">				throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L405">			}</span>
+		
+<span class="fc" id="L407">		this.tablesC = new HTablePool(this.getConf(), Integer.MAX_VALUE);</span>
+		
+		//Wait for Zookeeper availability
+<span class="fc" id="L410">		int maxRetries = 100;</span>
+<span class="fc" id="L411">		RecoverableZooKeeper zk = null;</span>
+		do {
+			try {
+<span class="fc" id="L414">				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper();</span>
+<span class="nc" id="L415">			} catch (Exception x) {</span>
+				try {
+<span class="nc" id="L417">					Thread.sleep(50);</span>
+<span class="nc" id="L418">				} catch (InterruptedException e) {</span>
+<span class="nc" id="L419">				}</span>
+<span class="fc" id="L420">			}</span>
+<span class="pc bpc" id="L421" title="3 of 4 branches missed.">		} while (zk == null &amp;&amp; maxRetries-- &gt; 0);</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">		if (zk == null) {</span>
+<span class="nc" id="L423">			logger.log(Level.SEVERE, &quot;Cannot reach Zookeeper&quot;);</span>
+		}
+		
+		try {
+<span class="fc" id="L427">			String[] host = this.admin.getConnection().getZooKeeperWatcher().getQuorum().split(&quot;,&quot;)[0].split(&quot;:&quot;);</span>
+<span class="fc" id="L428">			this.host = host[0].trim();</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">			if (host.length &gt; 1)</span>
+<span class="fc" id="L430">				this.port = Integer.parseInt(host[1].trim());</span>
+			else
+<span class="nc" id="L432">				this.port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;</span>
+<span class="nc" id="L433">		} catch (Exception e) {</span>
+<span class="nc" id="L434">			errorLogger.log(Level.WARNING, &quot;Cannot read zookeeper info... Might be a bug.&quot;, e);</span>
+<span class="fc" id="L435">		}</span>
+
+<span class="fc" id="L437">		this.wasStarted = true;</span>
+		// Loading schema in cache AFTER marked as started
+<span class="fc" id="L439">		this.loadCache();</span>
+		
+<span class="fc" id="L441">		logger.info(&quot;Started store &quot; + this.hashCode());</span>
+<span class="fc" id="L442">	}</span>
+
+	/**
+	 * The zookeeper host to be used.
+	 * You can only trust this method is this store was explicitly set the host before or started.
+	 */
+	public String getHost() {
+<span class="fc" id="L449">		return host;</span>
+	}
+
+	/**
+	 * The zookeeper quorum host to be used.
+	 * You shouldn't use this method as it should be set by {@link #getStore(String)}, {@link #getStore(String, int)}, or {@link #getStore(String, int, Integer)}.
+	 */
+	@Override
+	public void setHost(String url) {
+<span class="fc" id="L458">		this.host = url;</span>
+<span class="fc" id="L459">	}</span>
+
+	/**
+	 * The zookeeper quorum port to be used.
+	 * You can only trust this method is this store was explicitly set the port before or started.
+	 */
+	public int getPort() {
+<span class="fc" id="L466">		return port;</span>
+	}
+
+	/**
+	 * The zookeeper quorum port to be used.
+	 * You shouldn't use this method as it should be set by {@link #getStore(String)}, {@link #getStore(String, int)}, or {@link #getStore(String, int, Integer)}.
+	 */
+	public void setPort(int port) {
+<span class="fc" id="L474">		this.port = port;</span>
+<span class="fc" id="L475">	}</span>
+
+	/**
+	 * Schema for table are cached ; indicates time (in ms) when cache is reloaded (default is 10min)
+	 */
+	public long getCacheTTLMs() {
+<span class="fc" id="L481">		return cacheTTLMs;</span>
+	}
+
+
+	/**
+	 * Schema for table are cached ; indicates time (in ms) when cache is reloaded (default is 10min).
+	 * New value will be considered after next reload.
+	 */
+	public void setCacheTTLMs(long cacheTTLMs) {
+<span class="nc bnc" id="L490" title="All 2 branches missed.">		if (cacheTTLMs &lt;= 0)</span>
+<span class="nc" id="L491">			throw new IllegalArgumentException(&quot;Cannot reload cache each &quot; + cacheTTLMs + &quot;ms&quot;);</span>
+<span class="nc" id="L492">		this.cacheTTLMs = cacheTTLMs;</span>
+<span class="nc" id="L493">	}</span>
+
+	/**
+	 * The number of times this store can retry connecting the cluster.
+	 * Default value is HBase default value (10).
+	 * @throws IllegalArgumentException in case the sent value is less that 1
+	 */
+	public void setMaxRetries(int maxRetries) {
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">		if (maxRetries &lt;= 0)</span>
+<span class="nc" id="L502">			throw new IllegalArgumentException(&quot;Cannot retry less than once&quot;);</span>
+<span class="fc" id="L503">		PropertyUtils.clearCachedValues();</span>
+<span class="fc" id="L504">		this.maxRetries = Integer.valueOf(maxRetries);</span>
+<span class="fc" id="L505">	}</span>
+
+	/**
+	 * Maximum duration in milliseconds a request can last.
+	 */
+	public Integer getClientTimeout() {
+<span class="nc" id="L511">		return clientTimeout;</span>
+	}
+
+	/**
+	 * Maximum duration in milliseconds a request can last.
+	 * &lt;code&gt;null&lt;/code&gt; means default value (see {@link HConstants#DEFAULT_HBASE_RPC_TIMEOUT}).
+	 */
+	public void setClientTimeout(Integer clientTimeout) {
+<span class="nc" id="L519">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L520">		this.clientTimeout = clientTimeout;</span>
+<span class="nc" id="L521">	}</span>
+
+	/**
+	 * The number of elements that this store scans at once during a search.
+	 * @return the expected value, or null if not set (equivalent to the HBase default value - 1 - see &lt;a href=&quot;http://hbase.apache.org/book/perf.reading.html#perf.hbase.client.caching&quot;&gt;the HBase documentation&lt;/a&gt;)
+	 */
+	public Integer getScanCaching() {
+<span class="fc" id="L528">		return scanCaching;</span>
+	}
+
+	/**
+	 * The number of elements that this store scans at once during a search.
+	 * Default value is HBase default value (1).
+	 * Use this carefully ; read &lt;a href=&quot;http://hbase.apache.org/book/perf.reading.html#perf.hbase.client.caching&quot;&gt;the HBase documentation&lt;/a&gt;.
+	 */
+	public void setScanCaching(Integer scanCaching) {
+<span class="fc" id="L537">		PropertyUtils.clearCachedValues();</span>
+<span class="fc" id="L538">		this.scanCaching = scanCaching;</span>
+<span class="fc" id="L539">	}</span>
+
+	/**
+	 * Whether {@link HTableDescriptor#setDeferredLogFlush(boolean)} should be set for tables.
+	 * Improves write throughput by making writes log asynchronous on the server while improving risk of data loss in case of server crash.
+	 * Default value is HBase default value (false).
+	 * Use this carefully ; read &lt;a href=&quot;http://hbase.apache.org/book/perf.writing.html#def.log.flush&quot;&gt;the HBase documentation&lt;/a&gt;.
+	 */
+	public Boolean getDeferredLogFlush() {
+<span class="fc" id="L548">		return deferredLogFlush;</span>
+	}
+
+	/**
+	 * Whether {@link HTableDescriptor#setDeferredLogFlush(boolean)} should be set for tables.
+	 * Improves write throughput by making writes log asynchronous on the server while improving risk of data loss in case of server crash.
+	 * Default value is HBase default value (false).
+	 * Use this carefully ; read &lt;a href=&quot;http://hbase.apache.org/book/perf.writing.html#def.log.flush&quot;&gt;the HBase documentation&lt;/a&gt;.
+	 */
+	public void setDeferredLogFlush(Boolean deferredLogFlush) {
+<span class="nc" id="L558">		this.deferredLogFlush = deferredLogFlush;</span>
+<span class="nc" id="L559">	}</span>
+
+	/**
+	 * Whether existing tables have to be altered if they don't have the proper deferredLogFlush property.
+	 * @see #getDeferredLogFlush()
+	 */
+	public boolean isForceDeferredLogFlush() {
+<span class="fc" id="L566">		return forceDeferredLogFlush;</span>
+	}
+
+	/**
+	 * Whether existing tables have to be altered if they don't use the correct deferredLogFlush property.
+	 * Default value is false.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceDeferredLogFlush()} to true and different values for {@link Store#getDeferredLogFlush()} : tables might be altered in an endless loop !
+	 * Note that altering a table takes some time as it must be disabled and enabled again, so use this with care.
+	 * @see #getDeferredLogFlush()
+	 */
+	public void setForceDeferredLogFlush(boolean forceDeferredLogFlush) {
+<span class="nc" id="L577">		this.forceDeferredLogFlush = forceDeferredLogFlush;</span>
+<span class="nc" id="L578">	}</span>
+
+	/**
+	 * The number of elements that this store scans at once during a Map/Reduce task (see &lt;a href=&quot;http://hbase.apache.org/book/perf.reading.html#perf.hbase.client.caching&quot;&gt;the HBase documentation&lt;/a&gt;).
+	 * @see com.googlecode.n_orm.operations.Process#processElementsRemotely(Class, Constraint, Process, Callback, int, String[], int, long)
+	 * @see SearchableClassConstraintBuilder#remoteForEach(Process, Callback, int, long)
+	 */
+	public int getMapRedScanCaching() {
+<span class="fc" id="L586">		return mapRedScanCaching;</span>
+	}
+
+	public void setMapRedScanCaching(int mapRedScanCaching) {
+<span class="nc" id="L590">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L591">		this.mapRedScanCaching = mapRedScanCaching;</span>
+<span class="nc" id="L592">	}</span>
+
+	/**
+	 * The used compression for this store.
+	 * Compression is used when creating a column family in the HBase cluster.
+	 * In case you set {@link #setForceCompression(boolean)} to true, existing column families are also checked and altered if necessary.
+	 * @return the used compression, or null if not set (equivalent to the HBase default value - none)
+	 */
+	public String getCompression() {
+<span class="pc bpc" id="L601" title="1 of 2 branches missed.">		if (getCompressionAlgorithm() == null)</span>
+<span class="fc" id="L602">			return null;</span>
+<span class="nc" id="L603">		return getCompressionAlgorithm().getName();</span>
+	}
+
+	/**
+	 * The used compression for this store.
+	 * Default value is the HBase default (none).
+	 * Compression is used when creating a column family in the HBase cluster.
+	 * In case you set {@link #setForceCompression(boolean)} to true, existing column families are also checked and altered if necessary.
+	 * You can test for LOCALLY available compressors using tested_ prefix (e.g. tested_lzo-or-gz).
+	 */
+	public void setCompression(String compression) {
+<span class="fc bfc" id="L614" title="All 2 branches covered.">		if (compression == null) {</span>
+<span class="fc" id="L615">			PropertyUtils.clearCachedValues();</span>
+<span class="fc" id="L616">			this.compression = null;</span>
+		} else {
+<span class="fc" id="L618">			compression = compression.toLowerCase();</span>
+<span class="fc bfc" id="L619" title="All 2 branches covered.">			for (String cmp : compression.split(&quot;-or-&quot;)) {</span>
+<span class="fc" id="L620">				cmp = cmp.trim();</span>
+<span class="fc" id="L621">				boolean tested = cmp.startsWith(&quot;tested_&quot;);</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">				if (tested) {</span>
+<span class="fc" id="L623">					cmp = cmp.substring(&quot;tested_&quot;.length()).trim();</span>
+				}
+<span class="fc" id="L625">				Algorithm newCompression = getCompressionByName(cmp);</span>
+<span class="fc bfc" id="L626" title="All 2 branches covered.">				if (newCompression != null) {</span>
+<span class="fc bfc" id="L627" title="All 2 branches covered.">					if (tested) {</span>
+						try {
+<span class="fc" id="L629">							org.apache.hadoop.hbase.util.CompressionTest.testCompression(newCompression);</span>
+<span class="fc" id="L630">						} catch (Throwable t) {</span>
+<span class="fc" id="L631">							logger.log(Level.WARNING, &quot;Cannot use compressor: &quot; + newCompression, t);</span>
+<span class="fc" id="L632">							continue;</span>
+<span class="fc" id="L633">						}</span>
+					}
+<span class="fc" id="L635">					PropertyUtils.clearCachedValues();</span>
+<span class="fc" id="L636">					this.compression = newCompression;</span>
+<span class="fc" id="L637">					return;</span>
+				} else {
+<span class="fc" id="L639">					logger.log(Level.WARNING, &quot;Unknown compressor: &quot; + cmp);</span>
+				}
+			}
+<span class="fc" id="L642">			throw new DatabaseNotReachedException(&quot;Failed to load compression &quot; + compression);</span>
+		}
+<span class="fc" id="L644">	}</span>
+	
+	public Algorithm getCompressionAlgorithm() {
+<span class="fc" id="L647">		return compression;</span>
+	}
+
+	public static Algorithm getCompressionByName(String requestedCompression) {
+<span class="fc bfc" id="L651" title="All 2 branches covered.">		if (requestedCompression.length() &gt; 0) {</span>
+<span class="fc bfc" id="L652" title="All 2 branches covered.">			if (unavailableCompressors.contains(requestedCompression))</span>
+<span class="fc" id="L653">				return null;</span>
+			try {
+<span class="fc" id="L655">				return Compression.getCompressionAlgorithmByName(requestedCompression);</span>
+<span class="fc" id="L656">			} catch (Exception x) {</span>
+<span class="fc" id="L657">				unavailableCompressors.add(requestedCompression);</span>
+<span class="fc" id="L658">				logger.log(Level.WARNING, &quot;Cannot not use compression &quot; + requestedCompression, x);</span>
+<span class="fc" id="L659">				return null;</span>
+			}
+		} else
+<span class="fc" id="L662">			return null;</span>
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct compressor.
+	 * @see #getCompression()
+	 */
+	public boolean isForceCompression() {
+<span class="fc" id="L670">		return forceCompression;</span>
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct compressor.
+	 * Default value is false.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceCompression()} to true and different values for {@link Store#getCompression()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getCompression()
+	 */
+	public void setForceCompression(boolean forceCompression) {
+<span class="fc" id="L681">		PropertyUtils.clearCachedValues();</span>
+<span class="fc" id="L682">		this.forceCompression = forceCompression;</span>
+<span class="fc" id="L683">	}</span>
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setInMemory(boolean)} set. 
+	 */
+	public Boolean isInMemory() {
+<span class="fc" id="L689">		return inMemory;</span>
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setInMemory(boolean)} set.
+	 * Default value is false.
+	 * null is considered as unset (i.e. the default value)
+	 */
+	public void setInMemory(Boolean inMemory) {
+<span class="nc" id="L698">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L699">		this.inMemory = inMemory;</span>
+<span class="nc" id="L700">	}</span>
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setInMemory(boolean)} setting.
+	 * @see #isInMemory()
+	 */
+	public boolean isForceInMemory() {
+<span class="fc" id="L707">		return forceInMemory;</span>
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setInMemory(boolean)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceInMemory()} to true and different values for {@link Store#getCompression()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #isInMemory()
+	 */
+	public void setForceInMemory(boolean forceInMemory) {
+<span class="nc" id="L717">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L718">		this.forceInMemory = forceInMemory;</span>
+<span class="nc" id="L719">	}</span>
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setTimeToLive(int)} set. 
+	 */
+	public Integer getTimeToLiveSeconds() {
+<span class="fc" id="L725">		return timeToLiveSeconds;</span>
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setTimeToLive(int)} set.
+	 * Default value is {@link HColumnDescriptor#DEFAULT_TTL}
+	 * null or value &amp;lt= 0 is considered as unset (i.e. the default value).
+	 */
+	public void setTimeToLiveSeconds(Integer timeToLiveSeconds) {
+<span class="nc" id="L734">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L735">		this.timeToLiveSeconds = timeToLiveSeconds;</span>
+<span class="nc" id="L736">	}</span>
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setTimeToLive(int)} setting.
+	 * @see #getTimeToLiveSeconds()
+	 */
+	public boolean isForceTimeToLive() {
+<span class="fc" id="L743">		return forceTimeToLive;</span>
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setTimeToLive(int)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceTimeToLive()} to true and different values for {@link Store#getTimeToLiveSeconds()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getTimeToLiveSeconds()
+	 */
+	public void setForceTimeToLive(boolean forceTimeToLive) {
+<span class="nc" id="L753">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L754">		this.forceTimeToLive = forceTimeToLive;</span>
+<span class="nc" id="L755">	}</span>
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setMaxVersions(int)} set. 
+	 */
+	public Integer getMaxVersions() {
+<span class="fc" id="L761">		return maxVersions;</span>
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setMaxVersions(int)} set.
+	 * Default value is {@link HColumnDescriptor#DEFAULT_VERSIONS}
+	 * null or value &amp;lt= 0 is considered as unset (i.e. the default value).
+	 */
+	public void setMaxVersions(Integer maxVersions) {
+<span class="nc" id="L770">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L771">		this.maxVersions = maxVersions;</span>
+<span class="nc" id="L772">	}</span>
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setMaxVersions(int)} setting.
+	 * @see #getMaxVersions()
+	 */
+	public boolean isForceMaxVersions() {
+<span class="fc" id="L779">		return forceMaxVersions;</span>
+	}
+	
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setMaxVersions(int)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceMaxVersions()} to true and different values for {@link Store#getMaxVersions()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getMaxVersions()
+	 */
+	public void setForceMaxVersions(boolean forceMaxVersions) {
+<span class="nc" id="L789">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L790">		this.forceMaxVersions = forceMaxVersions;</span>
+<span class="nc" id="L791">	}</span>
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBloomFilterType(org.apache.hadoop.hbase.regionserver.StoreFile.BloomType)} set. 
+	 */
+	public StoreFile.BloomType getBloomFilterType() {
+<span class="fc" id="L797">		return bloomFilterType;</span>
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBloomFilterType(org.apache.hadoop.hbase.regionserver.StoreFile.BloomType)} set.
+	 * Default value is equivalent to {@link HColumnDescriptor#DEFAULT_BLOOMFILTER}
+	 * null is considered as unset (i.e. the default value).
+	 */
+	public void setBloomFilterType(StoreFile.BloomType bloomFilterType) {
+<span class="nc" id="L806">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L807">		this.bloomFilterType = bloomFilterType;</span>
+<span class="nc" id="L808">	}</span>
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBloomFilterType(org.apache.hadoop.hbase.regionserver.StoreFile.BloomType)} setting.
+	 * @see #getBloomFilterType()
+	 */
+	public boolean isForceBloomFilterType() {
+<span class="fc" id="L815">		return forceBloomFilterType;</span>
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBloomFilterType(org.apache.hadoop.hbase.regionserver.StoreFile.BloomType)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceBloomFilterType()} to true and different values for {@link Store#getBloomFilterType()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getBloomFilterType()
+	 */
+	public void setForceBloomFilterType(boolean forceBloomFilterType) {
+<span class="nc" id="L825">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L826">		this.forceBloomFilterType = forceBloomFilterType;</span>
+<span class="nc" id="L827">	}</span>
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBlockCacheEnabled(boolean)} set. 
+	 */
+	public Boolean getBlockCacheEnabled() {
+<span class="fc" id="L833">		return blockCacheEnabled;</span>
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBlockCacheEnabled(boolean)} set.
+	 * Default value is equivalent to {@link HColumnDescriptor#DEFAULT_BLOCKCACHE}
+	 * null is considered as unset (i.e. the default value).
+	 */
+	public void setBlockCacheEnabled(Boolean blockCacheEnabled) {
+<span class="nc" id="L842">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L843">		this.blockCacheEnabled = blockCacheEnabled;</span>
+<span class="nc" id="L844">	}</span>
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBlockCacheEnabled(boolean)} setting.
+	 * @see #getBlockCacheEnabled()
+	 */
+	public boolean isForceBlockCacheEnabled() {
+<span class="fc" id="L851">		return forceBlockCacheEnabled;</span>
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBlockCacheEnabled(boolean)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceBlockCacheEnabled()} to true and different values for {@link Store#getBlockCacheEnabled()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getBlockCacheEnabled()
+	 */
+	public void setForceBlockCacheEnabled(boolean forceBlockCacheEnabled) {
+<span class="nc" id="L861">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L862">		this.forceBlockCacheEnabled = forceBlockCacheEnabled;</span>
+<span class="nc" id="L863">	}</span>
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBlocksize(int)} set. 
+	 */
+	public Integer getBlockSize() {
+<span class="fc" id="L869">		return blockSize;</span>
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setBlocksize(int)} set.
+	 * Default value is equivalent to {@link HColumnDescriptor#DEFAULT_BLOCKSIZE}
+	 * null is considered as unset (i.e. the default value).
+	 */
+	public void setBlockSize(Integer blockSize) {
+<span class="nc" id="L878">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L879">		this.blockSize = blockSize;</span>
+<span class="nc" id="L880">	}</span>
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBlocksize(int)} setting.
+	 * @see #getBlockCacheEnabled()
+	 */
+	public boolean isForceBlockSize() {
+<span class="fc" id="L887">		return forceBlockSize;</span>
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setBlocksize(int)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceBlockSize()} to true and different values for {@link Store#getBlockSize()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getBlockSize()
+	 */
+	public void setForceBlockSize(boolean forceBlockSize) {
+<span class="nc" id="L897">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L898">		this.forceBlockSize = forceBlockSize;</span>
+<span class="nc" id="L899">	}</span>
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setScope(int)} set. 
+	 */
+	public Integer getReplicationScope() {
+<span class="fc" id="L905">		return replicationScope;</span>
+	}
+
+	/**
+	 * Whether created tables should have {@link HColumnDescriptor#setScope(int)} set.
+	 * Default value is equivalent to {@link HColumnDescriptor#DEFAULT_REPLICATION_SCOPE}
+	 * null or &amp;lt= 0 or &amp;gt=2 is considered as unset (i.e. the default value).
+	 */
+	public void setReplicationScope(Integer replicationScope) {
+<span class="nc" id="L914">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L915">		this.replicationScope = replicationScope;</span>
+<span class="nc" id="L916">	}</span>
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setScope(int)} setting.
+	 * @see #getReplicationScope()
+	 */
+	public boolean isForceReplicationScope() {
+<span class="fc" id="L923">		return forceReplicationScope;</span>
+	}
+
+	/**
+	 * Whether existing columns have to be altered if they don't use the correct {@link HColumnDescriptor#setScope(int)} setting.
+	 * Be careful with this parameter as if two process have a store on the same cluster each with {@link #isForceReplicationScope()} to true and different values for {@link Store#getReplicationScope()} : column families might be altered in an endless loop !
+	 * Note that altering a column family takes some time as tables must be disabled and enabled again, so use this with care.
+	 * @see #getReplicationScope()
+	 */
+	public void setForceReplicationScope(boolean forceReplicationScope) {
+<span class="nc" id="L933">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L934">		this.forceReplicationScope = forceReplicationScope;</span>
+<span class="nc" id="L935">	}</span>
+
+	/**
+	 * Whether counts (e.g. {@link #count(MetaInformation, String, Constraint)}) should use a map/reduce job.
+	 */
+	public boolean isCountMapRed() {
+<span class="fc" id="L941">		return countMapRed;</span>
+	}
+
+	/**
+	 * Whether counts (e.g. {@link Store#count(MetaInformation, String, Constraint)}) should use a map/reduce job.
+	 * Default value is false.
+	 * Map/reduce jobs are usually hard to run, so if this method is faster in case of large data on large cluster, it should be avoided on small clusters.
+	 */
+	public void setCountMapRed(boolean countMapRed) {
+<span class="fc" id="L950">		PropertyUtils.clearCachedValues();</span>
+<span class="fc" id="L951">		this.countMapRed = countMapRed;</span>
+<span class="fc" id="L952">	}</span>
+
+	/**
+	 * Whether truncates (e.g. {@link #truncate(MetaInformation, String, Constraint)}) should use a map/reduce job.
+	 */
+	public boolean isTruncateMapRed() {
+<span class="fc" id="L958">		return truncateMapRed;</span>
+	}
+
+	/**
+	 * Whether truncates (e.g. {@link #truncate(MetaInformation, String, Constraint)}) should use a map/reduce job.
+	 * Default value is false.
+	 * Map/reduce jobs are usually hard to run, so if this method is faster in case of large data on large cluster, it should be avoided on small clusters.
+	 */
+	public void setTruncateMapRed(boolean truncateMapRed) {
+<span class="fc" id="L967">		PropertyUtils.clearCachedValues();</span>
+<span class="fc" id="L968">		this.truncateMapRed = truncateMapRed;</span>
+<span class="fc" id="L969">	}</span>
+
+	/**
+	 * Whether jar files containing sent jobs should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 */
+	public boolean isMapRedSendJobJars() {
+<span class="fc" id="L975">		return mapRedSendJobJars;</span>
+	}
+
+	/**
+	 * Whether jar files containing sent jobs should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 * Default value is true.
+	 * Setting this parameter to false will improve map/reduce tasks setup, but you might face {@link ClassNotFoundException} on task tracker nodes if their CLASSPATH is not configured properly.
+	 * To be used with care !
+	 */
+	public void setMapRedSendJobJars(boolean mapRedSendJars) {
+<span class="nc" id="L985">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L986">		this.mapRedSendJobJars = mapRedSendJars;</span>
+<span class="nc" id="L987">	}</span>
+
+	/**
+	 * Whether jar files containing n-orm and the n-orm HBase driver should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 */
+	public boolean isMapRedSendNOrmJars() {
+<span class="fc" id="L993">		return mapRedSendNOrmJars;</span>
+	}
+
+	/**
+	 * Whether jar files containing n-orm and the n-orm HBase driver should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 * Default value is true.
+	 * Setting this parameter to false will improve map/reduce tasks setup, but you might face {@link ClassNotFoundException} on task tracker nodes if their CLASSPATH is not configured properly.
+	 * To be used with care !
+	 */
+	public void setMapRedSendNOrmJars(boolean mapRedSendJars) {
+<span class="nc" id="L1003">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L1004">		this.mapRedSendNOrmJars = mapRedSendJars;</span>
+<span class="nc" id="L1005">	}</span>
+
+	/**
+	 * Whether jar files containing the HBase client should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 */
+	public boolean isMapRedSendHBaseJars() {
+<span class="fc" id="L1011">		return mapRedSendHBaseJars;</span>
+	}
+
+	/**
+	 * Whether jar files containing the HBase client should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 * Default value is true.
+	 * Setting this parameter to false will improve map/reduce tasks setup, but you might face {@link ClassNotFoundException} on task tracker nodes if their CLASSPATH is not configured properly.
+	 * To be used with care !
+	 */
+	public void setMapRedSendHBaseJars(boolean mapRedSendJars) {
+<span class="nc" id="L1021">		PropertyUtils.clearCachedValues();</span>
+<span class="nc" id="L1022">		this.mapRedSendHBaseJars = mapRedSendJars;</span>
+<span class="nc" id="L1023">	}</span>
+
+	/**
+	 * Whether jar files containing HBase, n-orm, the n-orm HBase driver and sent job should be sent to the Hadoop Map/Reduce cluster while performing a Map/Reduce job.
+	 * Default value is true.
+	 * Setting this parameter to false will improve map/reduce tasks setup, but you might face {@link ClassNotFoundException} on task tracker nodes if their CLASSPATH is not configured properly.
+	 * To be used with care !
+	 */
+	public void setMapRedSendJars(boolean mapRedSendJars) {
+<span class="nc" id="L1032">		this.setMapRedSendJobJars(mapRedSendJars);</span>
+<span class="nc" id="L1033">		this.setMapRedSendNOrmJars(mapRedSendJars);</span>
+<span class="nc" id="L1034">		this.setMapRedSendHBaseJars(mapRedSendJars);</span>
+<span class="nc" id="L1035">	}</span>
+
+	/**
+	 * The configuration used by this store.
+	 * You can only trust this method is this store was explicitly set the host before or started.
+	 * This method provides a mean to have greater control over HBase and Hadoop.
+	 */
+	public Configuration getConf() {
+<span class="fc" id="L1043">		return this.config;</span>
+	}
+
+	public Properties getLaunchProps() {
+<span class="fc" id="L1047">		return launchProps;</span>
+	}
+
+
+	/**
+	 * The configuration to be used by this store for its {@link #start()} or {@link #restart()}.
+	 * Only valid when store is not started yet.
+	 * Overloads any other configuration setting already set by {@link #getStore(String)}, {@link #getStore(String, int)}, {@link #getStore(String, int, Integer)}, or {@link #getAdmin()}.
+	 * Ignored in case of a subsequent {@link #setAdmin(HBaseAdmin)}.
+	 * Changed when invoked {@link #start()} or {@link #restart()}.
+	 * @throws IllegalStateException if this store was started already
+	 */
+	public void setConf(Configuration configuration) {
+<span class="pc bpc" id="L1060" title="1 of 2 branches missed.">		if (this.wasStarted)</span>
+<span class="nc" id="L1061">			synchronized(this) {</span>
+<span class="nc bnc" id="L1062" title="All 2 branches missed.">				if (this.wasStarted)</span>
+<span class="nc" id="L1063">					throw new IllegalStateException(&quot;Cannot set new admin object on already started store &quot; + this);</span>
+<span class="nc" id="L1064">			}</span>
+		
+<span class="fc" id="L1066">		this.config = configuration;</span>
+<span class="fc" id="L1067">		String prop = this.config.get(CONF_HOST_KEY);</span>
+<span class="pc bpc" id="L1068" title="1 of 2 branches missed.">		if (prop != null)</span>
+<span class="fc" id="L1069">			this.host = prop;</span>
+		else
+			try {
+<span class="nc" id="L1072">				this.host = java.net.InetAddress.getLocalHost().getHostName();</span>
+<span class="nc" id="L1073">			} catch (UnknownHostException e) {</span>
+<span class="nc" id="L1074">				logger.log(Level.WARNING, &quot;Cannot determine local host&quot;, e);</span>
+<span class="nc" id="L1075">			}</span>
+<span class="fc" id="L1076">		prop = this.config.get(CONF_PORT_KEY);</span>
+<span class="pc bpc" id="L1077" title="1 of 2 branches missed.">		if (prop != null)</span>
+<span class="fc" id="L1078">			this.port = Integer.parseInt(prop);</span>
+		else
+<span class="nc" id="L1080">			this.port = HConstants.DEFAULT_ZOOKEPER_CLIENT_PORT;</span>
+<span class="fc" id="L1081">		prop = this.config.get(CONF_MAXRETRIES_KEY);</span>
+<span class="pc bpc" id="L1082" title="1 of 2 branches missed.">		if (prop != null)</span>
+<span class="fc" id="L1083">			this.maxRetries = Integer.parseInt(prop);</span>
+		else
+<span class="nc" id="L1085">			this.maxRetries = null;</span>
+<span class="fc" id="L1086">	}</span>
+	
+	public HBaseAdmin getAdmin() {
+<span class="fc" id="L1089">		return this.admin;</span>
+	}
+
+	/**
+	 * Sets the HBase admin object.
+	 * Only valid before the store is started.
+	 * @throws IllegalStateException in case this store is already started
+	 */
+	public void setAdmin(HBaseAdmin admin) {
+<span class="pc bpc" id="L1098" title="1 of 2 branches missed.">		if (this.wasStarted)</span>
+<span class="nc" id="L1099">			synchronized(this) {</span>
+<span class="nc bnc" id="L1100" title="All 2 branches missed.">				if (this.wasStarted)</span>
+<span class="nc" id="L1101">					throw new IllegalStateException(&quot;Cannot set new admin object on already started store &quot; + this);</span>
+<span class="nc" id="L1102">			}</span>
+<span class="fc" id="L1103">		this.admin = admin;</span>
+<span class="fc" id="L1104">		this.setConf(admin.getConfiguration());</span>
+<span class="fc" id="L1105">	}</span>
+
+	private void loadCache() {
+<span class="pc bpc" id="L1108" title="1 of 2 branches missed.">		if (! this.wasStarted)</span>
+<span class="nc" id="L1109">			return;</span>
+<span class="fc" id="L1110">		this.notExistingTables.clear();</span>
+		try {
+			
+<span class="fc" id="L1113">			HTableDescriptor[] tbls = this.admin.listTables();</span>
+<span class="pc bpc" id="L1114" title="2 of 4 branches missed.">			List&lt;HTableDescriptor&gt; tables = tbls == null || tbls.length == 0 ? new LinkedList&lt;HTableDescriptor&gt;() : Arrays.asList(tbls);</span>
+<span class="fc bfc" id="L1115" title="All 2 branches covered.">			for(HTableDescriptor td : tables) {</span>
+<span class="fc" id="L1116">				this.tablesD.put(new MangledTableName(td.getNameAsString()), td);</span>
+<span class="fc" id="L1117">			}</span>
+<span class="fc" id="L1118">			Iterator&lt;Entry&lt;MangledTableName, HTableDescriptor&gt;&gt; it = this.tablesD.entrySet().iterator();</span>
+<span class="fc bfc" id="L1119" title="All 2 branches covered.">			while (it.hasNext()) {</span>
+<span class="fc" id="L1120">				Entry&lt;MangledTableName, HTableDescriptor&gt; cur = it.next();</span>
+<span class="pc bpc" id="L1121" title="1 of 2 branches missed.">				if (! tables.contains(cur.getValue()))</span>
+<span class="nc" id="L1122">					it.remove();</span>
+<span class="fc" id="L1123">			}</span>
+<span class="nc" id="L1124">		} catch (IOException e) {</span>
+<span class="nc" id="L1125">			errorLogger.log(Level.SEVERE, &quot;Cannot load existing tables in cache: &quot; + e.getMessage(), e);</span>
+<span class="nc" id="L1126">			throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L1127">		}</span>
+<span class="fc" id="L1128">	}</span>
+	
+	// For test purpose
+	void clearCache() {
+<span class="fc" id="L1132">		this.tablesD.clear();</span>
+<span class="fc" id="L1133">	}</span>
+	
+	private void cache(MangledTableName tableName, HTableDescriptor descr) {
+<span class="fc" id="L1136">		HTableDescriptor knownDescr = this.tablesD.get(tableName);</span>
+<span class="fc bfc" id="L1137" title="All 4 branches covered.">		if (knownDescr == null || !knownDescr.equals(descr)) {</span>
+<span class="fc" id="L1138">			this.uncache(tableName);</span>
+<span class="fc" id="L1139">			this.tablesD.put(tableName, descr);</span>
+<span class="fc" id="L1140">			this.notExistingTables.remove(tableName);</span>
+		}
+<span class="fc" id="L1142">	}</span>
+
+	private void uncache(MangledTableName tableName) {
+<span class="fc" id="L1145">		this.tablesD.remove(tableName);</span>
+<span class="fc" id="L1146">		this.notExistingTables.remove(tableName);</span>
+<span class="fc" id="L1147">	}</span>
+
+	/**
+	 * Resets the connection to HBase.
+	 * Also vacuum any cached value about the store (but not Cached elements from {@link Cache}).
+	 * This method is thread-safe ; if a restart is already ongoing, the methods block until restart is done.
+	 */
+	public void restart() {
+<span class="fc" id="L1155">		synchronized(this.restartMutex) {</span>
+<span class="pc bpc" id="L1156" title="1 of 2 branches missed.">			if (this.restarting)</span>
+				try {
+<span class="nc" id="L1158">					this.restartMutex.wait(10000);</span>
+<span class="nc bnc" id="L1159" title="All 4 branches missed.">					assert !this.restarting;</span>
+<span class="nc" id="L1160">					return;</span>
+<span class="nc" id="L1161">				} catch (InterruptedException e) {</span>
+<span class="nc" id="L1162">					errorLogger.log(Level.WARNING, &quot;Problem while waiting for store restart: &quot; + e.getMessage(), e);</span>
+				}
+<span class="fc" id="L1164">			this.restarting = true;</span>
+<span class="pc" id="L1165">		}</span>
+		try {
+				try {
+<span class="fc" id="L1168">					this.admin.close();</span>
+<span class="nc" id="L1169">				} catch (Exception x) {</span>
+<span class="nc" id="L1170">					logger.log(Level.WARNING, &quot;Exception while restarting store &quot; + this + &quot;: error while stopping admin&quot;, x);</span>
+<span class="fc" id="L1171">				}</span>
+<span class="fc" id="L1172">			this.tablesD.clear();</span>
+			try {
+<span class="fc" id="L1174">				HConnectionManager.deleteConnection(this.config);</span>
+<span class="nc" id="L1175">			} catch (Exception x) {</span>
+<span class="nc" id="L1176">				logger.log(Level.WARNING, &quot;Problem while closing connection during store restart: &quot; + x.getMessage(), x);</span>
+<span class="fc" id="L1177">			}</span>
+<span class="fc" id="L1178">			this.config = HBaseConfiguration.create(this.config);</span>
+<span class="fc" id="L1179">			this.admin = null;</span>
+<span class="fc" id="L1180">			this.wasStarted = false;</span>
+<span class="fc" id="L1181">			this.tablesD.clear();</span>
+<span class="fc" id="L1182">			this.start();</span>
+		} finally {
+<span class="pc" id="L1184">			synchronized (this.restartMutex) {</span>
+<span class="pc" id="L1185">				this.restartMutex.notifyAll();</span>
+<span class="pc" id="L1186">				this.restarting = false;</span>
+<span class="pc" id="L1187">			}</span>
+<span class="fc" id="L1188">		}</span>
+<span class="fc" id="L1189">	}</span>
+	
+	private boolean hasProblem(Throwable t, Class&lt;? extends Throwable&gt; problem) {
+<span class="fc" id="L1192">		Set&lt;Throwable&gt; explored = new HashSet&lt;Throwable&gt;(); </span>
+<span class="pc bpc" id="L1193" title="1 of 4 branches missed.">		while (t != null &amp;&amp; explored.add(t)) {</span>
+<span class="fc bfc" id="L1194" title="All 2 branches covered.">			if (problem.isInstance(t)) {</span>
+<span class="fc" id="L1195">				return true;</span>
+			}
+<span class="pc bpc" id="L1197" title="1 of 4 branches missed.">			if (t.getMessage()  != null &amp;&amp; t.getMessage().contains(problem.getName())) {</span>
+<span class="fc" id="L1198">				return true;</span>
+			}
+<span class="fc bfc" id="L1200" title="All 2 branches covered.">			if (t instanceof RetriesExhaustedWithDetailsException) {</span>
+<span class="fc bfc" id="L1201" title="All 2 branches covered.">				for (Throwable e : ((RetriesExhaustedWithDetailsException)t).getCauses()) {</span>
+<span class="pc bpc" id="L1202" title="1 of 4 branches missed.">					if (explored.add(e) &amp;&amp; hasProblem(e, problem))</span>
+<span class="fc" id="L1203">						return true;</span>
+<span class="fc" id="L1204">				}</span>
+			}
+<span class="fc" id="L1206">			t = t.getCause();</span>
+		}
+<span class="fc" id="L1208">		return false;</span>
+	}
+	
+	protected void handleProblem(Throwable e, Class&lt;? extends PersistingElement&gt; clazz, MangledTableName table, String tablePostfix, Map&lt;String, Field&gt; expectedFamilies) throws DatabaseNotReachedException {		
+<span class="pc bpc" id="L1212" title="2 of 6 branches missed.">		while (((e instanceof UndeclaredThrowableException) || (e instanceof RuntimeException)) &amp;&amp; e.getCause() != null) {</span>
+<span class="fc" id="L1213">			e = e.getCause();</span>
+		}
+		
+<span class="pc bpc" id="L1216" title="1 of 2 branches missed.">		if (e instanceof DatabaseNotReachedException)</span>
+<span class="nc" id="L1217">			throw (DatabaseNotReachedException)e;</span>
+		
+<span class="fc" id="L1219">		String msg = e.getMessage();</span>
+<span class="pc bpc" id="L1220" title="1 of 2 branches missed.">		if (msg == null) msg = &quot;&quot;;</span>
+		
+		//System.err.println(&quot;====================== handling &quot; + e + &quot; with message &quot; + msg);
+		
+<span class="fc bfc" id="L1224" title="All 2 branches covered.">		if (this.hasProblem(e, TableNotFoundException.class)) {</span>
+<span class="fc" id="L1225">			errorLogger.log(Level.INFO, &quot;Trying to recover from exception for store &quot; + this.hashCode() + &quot; it seems that a table was dropped ; recreating&quot;, e);</span>
+<span class="fc" id="L1226">			this.uncache(table);</span>
+			try {
+<span class="fc" id="L1228">				this.getTableDescriptor(clazz, table, tablePostfix, expectedFamilies);</span>
+<span class="nc" id="L1229">			} catch (Exception x) {</span>
+<span class="nc" id="L1230">				throw new DatabaseNotReachedException(x);</span>
+<span class="fc" id="L1231">			}</span>
+<span class="pc bpc" id="L1232" title="2 of 8 branches missed.">		} else if (this.hasProblem(e, NotServingRegionException.class)</span>
+				|| this.hasProblem(e, TableNotEnabledException.class)
+				|| (e.getMessage() != null &amp;&amp; e.getMessage().contains(&quot;disabled&quot;))) {
+			try {
+<span class="fc" id="L1236">				TableLocker lock = this.getLock(table);</span>
+<span class="fc" id="L1237">				lock.sharedLockTable();</span>
+				try {
+<span class="pc bpc" id="L1239" title="2 of 4 branches missed.">					if (this.hasTableInt(table) &amp;&amp; this.admin.isTableDisabled(table.getNameAsBytes())) { //First detect the error</span>
+<span class="fc" id="L1240">						errorLogger.log(Level.INFO, &quot;It seems that table &quot; + table + &quot; was disabled ; enabling&quot;, e);</span>
+<span class="fc" id="L1241">						this.enableTable(clazz, table, tablePostfix);</span>
+					} else // Error was auto-repaired (another thread ?)
+						return;
+				} finally {
+<span class="pc" id="L1245">					lock.sharedUnlockTable();</span>
+<span class="fc" id="L1246">				}</span>
+<span class="nc" id="L1247">			} catch (IOException f) {</span>
+<span class="nc" id="L1248">				throw new DatabaseNotReachedException(f);</span>
+<span class="fc" id="L1249">			}</span>
+<span class="pc bpc" id="L1250" title="1 of 2 branches missed.">		} else if (this.hasProblem(e, NoSuchColumnFamilyException.class)) {</span>
+<span class="fc" id="L1251">			errorLogger.log(Level.INFO, &quot;Trying to recover from exception for store &quot; + this.hashCode() + &quot; it seems that table &quot; + table + &quot; was dropped a column family ; recreating&quot;, e);</span>
+<span class="fc" id="L1252">			this.uncache(table);</span>
+			try {
+<span class="fc" id="L1254">				this.getTableDescriptor(clazz, table, tablePostfix, expectedFamilies);</span>
+<span class="nc" id="L1255">			} catch (Exception x) {</span>
+<span class="nc" id="L1256">				throw new DatabaseNotReachedException(x);</span>
+<span class="fc" id="L1257">			}</span>
+<span class="nc bnc" id="L1258" title="All 4 branches missed.">		} else if (this.hasProblem(e, ConnectException.class) || msg.contains(&quot;closed&quot;)) {</span>
+<span class="nc" id="L1259">			errorLogger.log(Level.INFO, &quot;Trying to recover from exception for store &quot; + this.hashCode() + &quot; it seems that connection was lost ; restarting store&quot;, e);</span>
+<span class="nc" id="L1260">			restart();</span>
+<span class="nc bnc" id="L1261" title="All 10 branches missed.">		} else if (this.hasProblem(e, SocketTimeoutException.class) || this.hasProblem(e, ScannerTimeoutException.class) || msg.contains(&quot;timeout&quot;) || this.hasProblem(e, UnknownScannerException.class) || this.hasProblem(e, TimeoutException.class)) {</span>
+<span class="nc" id="L1262">			errorLogger.log(Level.INFO, &quot;Timeout while requesting &quot; + table + &quot; (max duration is set to &quot; + this.config.get(HConstants.HBASE_RPC_TIMEOUT_KEY, Integer.toString(HConstants.DEFAULT_HBASE_RPC_TIMEOUT)) + &quot;ms)&quot;, e);</span>
+<span class="nc bnc" id="L1263" title="All 2 branches missed.">		} else if (this.hasProblem(e, IOException.class)) {</span>
+<span class="nc" id="L1264">			errorLogger.log(Level.INFO, &quot;Trying to recover from IO exception for store &quot; + this.hashCode() + &quot; ; restarting store&quot;, e);</span>
+<span class="nc" id="L1265">			restart();</span>
+		} else {
+<span class="nc" id="L1267">			throw new DatabaseNotReachedException(e);</span>
+		}
+<span class="fc" id="L1269">	}</span>
+	
+	protected &lt;R&gt; R tryPerform(Action&lt;R&gt; action, Class&lt;? extends PersistingElement&gt; clazz,  MangledTableName tableName, String tablePostfix, Map&lt;String, Field&gt; expectedFamilies) throws DatabaseNotReachedException {
+<span class="fc" id="L1272">		HTableInterface table = this.getTable(clazz, tableName, tablePostfix, expectedFamilies);</span>
+		try {
+<span class="fc" id="L1274">			return this.tryPerform(action, table, clazz, tablePostfix, expectedFamilies);</span>
+		} finally {
+<span class="nc" id="L1276">			try {</span>
+<span class="pc" id="L1277">				this.returnTable(action.getTable());</span>
+<span class="nc" id="L1278">			} catch (IOException x) {</span>
+<span class="pc" id="L1279">				throw new DatabaseNotReachedException(x);</span>
+<span class="pc" id="L1280">			}</span>
+		}
+		
+	}
+	
+	/**
+	 * Performs an action. Table should be replaced by action.getTable() as it can change in case of problem handling (like a connection lost).
+	 */
+	protected &lt;R&gt; R tryPerform(final Action&lt;R&gt; action, HTableInterface table, Class&lt;? extends PersistingElement&gt; clazz, String tablePostfix, Map&lt;String, Field&gt; expectedFamilies) throws DatabaseNotReachedException {	
+<span class="pc bpc" id="L1289" title="2 of 6 branches missed.">		assert tablePostfix == null || Bytes.toString(table.getTableName()).endsWith(tablePostfix);</span>
+<span class="fc" id="L1290">		action.setTable(table);</span>
+		try {
+<span class="fc" id="L1292">			return action.perform();</span>
+<span class="fc" id="L1293">		} catch (Throwable e) {</span>
+<span class="fc" id="L1294">			errorLogger.log(Level.INFO, &quot;Got an error while performing a &quot; + action.getClass().getName() + &quot; on table &quot; + Bytes.toString(action.getTable().getTableName()) + &quot; for store &quot; + this.hashCode(), e);</span>
+			
+<span class="fc" id="L1296">			HTablePool tp = this.tablesC;</span>
+<span class="fc" id="L1297">			MangledTableName tableName = new MangledTableName(table);</span>
+<span class="fc" id="L1298">			this.handleProblem(e, clazz, tableName, tablePostfix, expectedFamilies);</span>
+<span class="pc bpc" id="L1299" title="1 of 2 branches missed.">			if (tp != this.tablesC) { //Store was restarted ; we should get a new table client</span>
+<span class="nc" id="L1300">				table = this.getTable(clazz, tableName, tablePostfix, expectedFamilies);</span>
+<span class="nc" id="L1301">				action.setTable(table);</span>
+			}
+			try {
+<span class="fc" id="L1304">				errorLogger.log(Level.INFO, &quot;Retrying to perform again erroneous &quot; + action.getClass().getName() + &quot; on table &quot; + Bytes.toString(action.getTable().getTableName()) + &quot; for store &quot; + this.hashCode(), e);</span>
+<span class="fc" id="L1305">				return action.perform();</span>
+<span class="nc" id="L1306">			} catch (Exception f) {</span>
+<span class="nc" id="L1307">				errorLogger.log(Level.SEVERE, &quot;Cannot recover from error while performing a&quot; + action.getClass().getName() + &quot; on table &quot; + Bytes.toString(action.getTable().getTableName()) + &quot; for store &quot; + this.hashCode(), e);</span>
+<span class="nc" id="L1308">				throw new DatabaseNotReachedException(f);</span>
+			}
+		}
+	}
+	
+	ZooKeeper getZooKeeper() throws DatabaseNotReachedException {
+		ZooKeeper zk;
+		try {
+			try {
+<span class="fc" id="L1317">				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();</span>
+<span class="nc" id="L1318">			} catch (ZooKeeperConnectionException x) { //Lost zookeeper ?</span>
+<span class="nc" id="L1319">				this.restart();</span>
+<span class="nc" id="L1320">				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();</span>
+<span class="nc" id="L1321">			} catch (NullPointerException x) { //Lost zookeeper ?</span>
+<span class="nc" id="L1322">				this.restart();</span>
+<span class="nc" id="L1323">				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();</span>
+<span class="pc" id="L1324">			}</span>
+<span class="pc bpc" id="L1325" title="1 of 2 branches missed.">			if (!zk.getState().isAlive()) {</span>
+<span class="nc" id="L1326">				errorLogger.log(Level.WARNING, &quot;Zookeeper connection lost ; restarting...&quot;);</span>
+<span class="nc" id="L1327">				this.restart();</span>
+<span class="nc" id="L1328">				zk = this.admin.getConnection().getZooKeeperWatcher().getRecoverableZooKeeper().getZooKeeper();</span>
+			}
+<span class="fc" id="L1330">			return zk;</span>
+<span class="nc" id="L1331">		} catch (Exception e1) {</span>
+<span class="nc" id="L1332">			throw new DatabaseNotReachedException(e1);</span>
+		}
+		
+	}
+	
+	protected TableLocker getLock(MangledTableName table) throws DatabaseNotReachedException {
+		
+<span class="fc" id="L1339">		TableLocker ret = new TableLocker(this, table);</span>
+		
+<span class="fc" id="L1341">		TableLocker actualRet = this.locks.putIfAbsent(table, ret);</span>
+<span class="fc bfc" id="L1342" title="All 2 branches covered.">		if(actualRet != null) {</span>
+<span class="fc" id="L1343">			ret = actualRet;</span>
+		}
+
+<span class="fc" id="L1346">		return ret;</span>
+	}
+
+	@Override
+	public boolean hasTable(String name) throws DatabaseNotReachedException {
+<span class="nc" id="L1351">		return this.hasTable(new MangledTableName(name));</span>
+	}
+
+	public boolean hasTable(MangledTableName name) throws DatabaseNotReachedException {
+<span class="fc bfc" id="L1355" title="All 2 branches covered.">		if (this.tablesD.containsKey(name))</span>
+<span class="fc" id="L1356">			return true;</span>
+		
+<span class="fc bfc" id="L1358" title="All 2 branches covered.">		if (this.notExistingTables.containsKey(name))</span>
+<span class="fc" id="L1359">			return false;</span>
+
+<span class="fc" id="L1361">		return hasTableNoCache(name);</span>
+	}
+
+	private boolean hasTableNoCache(MangledTableName name) {
+		try {
+<span class="fc" id="L1366">			TableLocker lock = this.getLock(name);</span>
+<span class="fc" id="L1367">			lock.sharedLockTable();</span>
+			try {
+<span class="fc" id="L1369">				return this.hasTableInt(name);</span>
+			} finally {
+<span class="pc" id="L1371">				lock.sharedUnlockTable();</span>
+			}
+<span class="nc" id="L1373">		} catch (Exception e) {</span>
+<span class="nc" id="L1374">			throw new DatabaseNotReachedException(e);</span>
+		}
+	}
+	
+	private boolean hasTableInt(MangledTableName name) throws IOException {
+		boolean ret;
+		try {
+<span class="fc" id="L1381">			ret = this.admin.tableExists(name.getNameAsBytes());</span>
+<span class="nc" id="L1382">		} catch (IOException x) {</span>
+<span class="nc" id="L1383">			String msg = x.getMessage();</span>
+<span class="nc bnc" id="L1384" title="All 4 branches missed.">			if (msg != null &amp;&amp; msg.contains(&quot;closed&quot;)) {</span>
+<span class="nc" id="L1385">				this.restart();</span>
+<span class="nc" id="L1386">				ret = this.admin.tableExists(name.getNameAsBytes());</span>
+			} else {
+<span class="nc" id="L1388">				throw x;</span>
+			}
+<span class="fc" id="L1390">		}</span>
+<span class="fc bfc" id="L1391" title="All 2 branches covered.">		if (ret) {</span>
+<span class="fc" id="L1392">			this.notExistingTables.remove(name);</span>
+		} else {
+<span class="fc" id="L1394">			this.uncache(name);</span>
+<span class="fc" id="L1395">			this.notExistingTables.put(name, name);</span>
+		}
+<span class="fc" id="L1397">		return ret;</span>
+	}
+	
+	private void disableTable(
+			Class&lt;? extends PersistingElement&gt; clazz,
+			MangledTableName tableName, String tablePostfix)
+					throws IOException {
+<span class="fc" id="L1404">		TableLocker lock = this.getLock(tableName);</span>
+<span class="fc" id="L1405">		lock.exclusiveLockTable();</span>
+		try {
+<span class="fc" id="L1407">			this.admin.disableTable(tableName.getNameAsBytes());</span>
+<span class="nc" id="L1408">		} catch (TableNotEnabledException x) {</span>
+<span class="nc" id="L1409">			logger.info(&quot;Table &quot; + tableName + &quot; already disabled&quot;);</span>
+<span class="nc" id="L1410">		} catch (TableNotFoundException x) {</span>
+<span class="nc" id="L1411">			this.handleProblem(x, clazz, tableName, tablePostfix, null);</span>
+<span class="nc" id="L1412">			this.admin.disableTable(tableName.getNameAsBytes());</span>
+		} finally {
+<span class="pc" id="L1414">			lock.exclusiveUnlockTable();</span>
+<span class="pc" id="L1415">		}</span>
+<span class="pc bpc" id="L1416" title="1 of 2 branches missed.">		if (! this.admin.isTableDisabled(tableName.getNameAsBytes()))</span>
+<span class="nc" id="L1417">			throw new IOException(&quot;Not able to disable table &quot; + tableName);</span>
+<span class="fc" id="L1418">		logger.info(&quot;Table &quot; + tableName + &quot; disabled&quot;);</span>
+<span class="fc" id="L1419">	}</span>
+	
+	private void enableTable(
+			Class&lt;? extends PersistingElement&gt; clazz,
+			MangledTableName tableName, String tablePostfix)
+					throws IOException {
+<span class="fc" id="L1425">		TableLocker lock = this.getLock(tableName);</span>
+<span class="fc" id="L1426">		lock.exclusiveLockTable();</span>
+		try {
+<span class="fc" id="L1428">			this.admin.enableTable(tableName.getNameAsBytes());</span>
+<span class="pc bpc" id="L1429" title="1 of 2 branches missed.">			if (!this.admin.isTableEnabled(tableName.getNameAsBytes()))</span>
+<span class="nc" id="L1430">				throw new IOException();</span>
+<span class="nc" id="L1431">		} catch (TableNotDisabledException x) {</span>
+<span class="nc" id="L1432">			logger.info(&quot;Table &quot; + tableName + &quot; already enabled&quot;);</span>
+<span class="nc" id="L1433">		} catch (Exception x) {</span>
+<span class="nc" id="L1434">			this.handleProblem(x, clazz, tableName, tablePostfix, null);</span>
+<span class="nc" id="L1435">			this.admin.enableTable(tableName.getNameAsBytes());</span>
+<span class="nc bnc" id="L1436" title="All 2 branches missed.">			if (!this.admin.isTableEnabled(tableName.getNameAsBytes()))</span>
+<span class="nc" id="L1437">				throw new IOException(&quot;SEVERE: cannot enable table &quot; + tableName);</span>
+		} finally {
+<span class="pc" id="L1439">			lock.exclusiveUnlockTable();</span>
+<span class="pc" id="L1440">		}</span>
+<span class="fc" id="L1441">		logger.info(&quot;Table &quot; + tableName + &quot; enabled&quot;);</span>
+<span class="fc" id="L1442">	}</span>
+	
+	protected HTableDescriptor getTableDescriptor(Class&lt;? extends PersistingElement&gt; clazz, MangledTableName name, String tablePostfix, Map&lt;String, Field&gt; expectedFamilies) throws Exception {
+		HTableDescriptor td;
+<span class="fc" id="L1446">		boolean created = false;</span>
+<span class="fc" id="L1447">		boolean freshDescriptor = false;</span>
+<span class="fc" id="L1448">		td = this.tablesD.get(name);</span>
+<span class="fc bfc" id="L1449" title="All 2 branches covered.">		if (td == null) {</span>
+
+<span class="fc" id="L1451">			TableLocker lock = this.getLock(name);</span>
+<span class="fc" id="L1452">			lock.sharedLockTable();</span>
+			try {
+<span class="fc" id="L1454">				logger.fine(&quot;Unknown table &quot; + name + &quot; for store &quot; + this.hashCode());</span>
+<span class="fc bfc" id="L1455" title="All 2 branches covered.">				if (!this.hasTable(name)) {</span>
+<span class="fc" id="L1456">					lock.exclusiveLockTable();</span>
+					try {
+<span class="fc bfc" id="L1458" title="All 2 branches covered.">						if (!this.hasTableInt(name)) {</span>
+<span class="fc bfc" id="L1459" title="All 2 branches covered.">							logger.info(&quot;Table &quot; + name + &quot; not found ; creating&quot; + (expectedFamilies == null ? &quot;&quot; : &quot; with column families &quot; + expectedFamilies.keySet().toString()));</span>
+<span class="fc" id="L1460">							td = new HTableDescriptor(name.getNameAsBytes());</span>
+<span class="fc" id="L1461">							PropertyUtils.setValues(this, td, clazz, tablePostfix);</span>
+<span class="fc bfc" id="L1462" title="All 2 branches covered.">							if (expectedFamilies != null) {</span>
+<span class="fc bfc" id="L1463" title="All 2 branches covered.">								for (Entry&lt;String, Field&gt; fam : expectedFamilies.entrySet()) {</span>
+<span class="fc" id="L1464">									byte [] famB = Bytes.toBytes(fam.getKey());</span>
+<span class="pc bpc" id="L1465" title="1 of 2 branches missed.">									if (!td.hasFamily(famB)) {</span>
+<span class="fc" id="L1466">										HColumnDescriptor famD = new HColumnDescriptor(famB);</span>
+<span class="fc" id="L1467">										PropertyUtils.setValues(this, famD, clazz, fam.getValue(), tablePostfix);</span>
+<span class="fc" id="L1468">										td.addFamily(famD);</span>
+									}
+<span class="fc" id="L1470">								}</span>
+							}
+<span class="fc" id="L1472">							this.admin.createTable(td);</span>
+<span class="fc" id="L1473">							logger.info(&quot;Table &quot; + name + &quot; created&quot;);</span>
+<span class="fc" id="L1474">							created = true;</span>
+<span class="fc" id="L1475">							freshDescriptor = true;</span>
+						}
+<span class="nc" id="L1477">					} catch (TableExistsException x) {</span>
+						//Already done by another process...
+<span class="nc" id="L1479">						td = this.admin.getTableDescriptor(name.getNameAsBytes());</span>
+<span class="nc" id="L1480">						freshDescriptor = true;</span>
+<span class="nc" id="L1481">						logger.fine(&quot;Got descriptor for table &quot; + name);</span>
+					} finally {
+<span class="pc" id="L1483">						lock.exclusiveUnlockTable();</span>
+<span class="pc bpc" id="L1484" title="10 of 12 branches missed.">						assert this.getLock(name).isShareLocked();</span>
+					}
+				}
+<span class="fc bfc" id="L1487" title="All 2 branches covered.">				if (td == null) {</span>
+<span class="fc" id="L1488">					td = this.admin.getTableDescriptor(name.getNameAsBytes());</span>
+<span class="fc" id="L1489">					freshDescriptor = true;</span>
+<span class="fc" id="L1490">					logger.fine(&quot;Got descriptor for table &quot; + name);</span>
+				}
+<span class="fc" id="L1492">				this.cache(name, td);</span>
+			} finally {
+<span class="pc" id="L1494">				lock.sharedUnlockTable();</span>
+<span class="fc" id="L1495">			}</span>
+		}
+		
+		// Checking whether table is well formed in case it were just retrieved
+<span class="fc bfc" id="L1499" title="All 4 branches covered.">		if (freshDescriptor &amp;&amp; !PropertyUtils.asExpected(this, td, clazz, tablePostfix)) {</span>
+<span class="fc" id="L1500">			logger.info(&quot;Table &quot; + td.getNameAsString() + &quot; has wrong properties : altering&quot;);</span>
+<span class="fc" id="L1501">			PropertyUtils.setValues(this, td, clazz, tablePostfix);</span>
+<span class="fc" id="L1502">			TableLocker lock = this.getLock(name);</span>
+<span class="fc" id="L1503">			lock.exclusiveLockTable();</span>
+			try {
+<span class="fc" id="L1505">				this.disableTable(clazz, name, tablePostfix);</span>
+				try {
+<span class="fc" id="L1507">					this.admin.modifyTable(td.getName(), td);</span>
+<span class="nc" id="L1508">				} catch (TableNotFoundException x) {</span>
+<span class="nc" id="L1509">					this.handleProblem(x, clazz, name, tablePostfix, null);</span>
+<span class="nc" id="L1510">					this.admin.modifyTable(td.getName(), td);</span>
+<span class="fc" id="L1511">				}</span>
+				do {
+<span class="fc" id="L1513">					Thread.sleep(10);</span>
+<span class="fc" id="L1514">					td = this.admin.getTableDescriptor(td.getName());</span>
+<span class="pc bpc" id="L1515" title="1 of 2 branches missed.">				} while (!PropertyUtils.asExpected(this, td, clazz, tablePostfix));</span>
+<span class="fc" id="L1516">				this.enableTable(clazz, name, tablePostfix);</span>
+<span class="fc" id="L1517">				HTableProperty&lt;?&gt;[] problems = PropertyUtils.checkIsAsExpected(this, td, clazz, tablePostfix);</span>
+<span class="pc bpc" id="L1518" title="1 of 2 branches missed.">				if (problems.length &gt; 0)</span>
+<span class="nc" id="L1519">					throw new IOException(&quot;Table &quot; + td.getName() + &quot; still has wrong properties &quot; + Arrays.toString(problems));</span>
+			} finally {
+<span class="pc" id="L1521">				lock.exclusiveUnlockTable();</span>
+<span class="fc" id="L1522">			}</span>
+		}
+		
+<span class="fc bfc" id="L1525" title="All 2 branches covered.">		if (freshDescriptor) {</span>
+<span class="fc" id="L1526">			this.cache(name, td);</span>
+		}
+		
+<span class="pc bpc" id="L1529" title="1 of 6 branches missed.">		if (!created &amp;&amp; expectedFamilies != null &amp;&amp; expectedFamilies.size()&gt;0) {</span>
+<span class="fc" id="L1530">			this.enforceColumnFamiliesExists(td, freshDescriptor, clazz, expectedFamilies, name, tablePostfix);</span>
+		}
+		
+<span class="fc" id="L1533">		return td;</span>
+	}
+
+	protected HTableInterface getTable(Class&lt;? extends PersistingElement&gt; clazz, MangledTableName name, String tablePostfix, Map&lt;String, Field&gt; expectedFamilies)
+			throws DatabaseNotReachedException {
+<span class="pc bpc" id="L1538" title="2 of 6 branches missed.">		assert tablePostfix == null || name.getName().endsWith(tablePostfix);</span>
+		
+		try {
+			//Checking that this table actually exists with the expected column families
+<span class="fc" id="L1542">			this.getTableDescriptor(clazz, name, tablePostfix, expectedFamilies);</span>
+<span class="fc" id="L1543">			return this.tablesC.getTable(name.getNameAsBytes());</span>
+<span class="nc" id="L1544">		} catch (Throwable x) {</span>
+<span class="nc" id="L1545">			this.handleProblem(x, clazz, name, tablePostfix, expectedFamilies);</span>
+			try {
+<span class="nc" id="L1547">				this.getTableDescriptor(clazz, name, tablePostfix, expectedFamilies);</span>
+<span class="nc" id="L1548">			} catch (Exception y) {</span>
+<span class="nc" id="L1549">				throw new DatabaseNotReachedException(x);</span>
+<span class="nc" id="L1550">			}</span>
+<span class="nc" id="L1551">			return (HTableInterface)this.tablesC.getTable(name.getNameAsBytes());</span>
+		}
+	}
+	
+	protected void returnTable(HTableInterface table) throws IOException {
+<span class="fc" id="L1556">		table.close();</span>
+		//this.tablesC.putTable(table);
+<span class="fc" id="L1558">	}</span>
+
+	protected boolean hasColumnFamily(MangledTableName table, String family)
+			throws DatabaseNotReachedException {
+<span class="fc bfc" id="L1562" title="All 2 branches covered.">		if (!this.hasTable(table))</span>
+<span class="fc" id="L1563">			return false;</span>
+
+<span class="fc" id="L1565">		HTableDescriptor td = this.tablesD.get(table);</span>
+<span class="pc bpc" id="L1566" title="2 of 4 branches missed.">		if (td != null &amp;&amp; td.hasFamily(Bytes.toBytes(family)))</span>
+<span class="fc" id="L1567">			return true;</span>
+		
+<span class="nc" id="L1569">		TableLocker lock = this.getLock(table);</span>
+<span class="nc" id="L1570">		lock.sharedLockTable();</span>
+		try {
+<span class="nc" id="L1572">			td = this.admin.getTableDescriptor(table.getNameAsBytes());</span>
+<span class="nc" id="L1573">			this.cache(table, td);</span>
+<span class="nc" id="L1574">		} catch (Exception e) {</span>
+<span class="nc" id="L1575">			throw new DatabaseNotReachedException(e);</span>
+		} finally {
+<span class="nc" id="L1577">			lock.sharedUnlockTable();</span>
+<span class="nc" id="L1578">		}</span>
+<span class="nc" id="L1579">		return td.hasFamily(Bytes.toBytes(family));</span>
+	}
+	
+	private void enforceColumnFamiliesExists(HTableDescriptor tableD, boolean freshDescriptor, Class&lt;? extends PersistingElement&gt; clazz, 
+			Map&lt;String, Field&gt; columnFamilies, MangledTableName tableName, String tablePostfix) throws DatabaseNotReachedException {
+<span class="pc bpc" id="L1584" title="2 of 4 branches missed.">		assert tableD != null;</span>
+<span class="fc" id="L1585">		List&lt;HColumnDescriptor&gt; toBeAdded = new ArrayList&lt;HColumnDescriptor&gt;(columnFamilies.size());</span>
+<span class="fc" id="L1586">		List&lt;HColumnDescriptor&gt; toBeAltered = new ArrayList&lt;HColumnDescriptor&gt;(columnFamilies.size());</span>
+<span class="fc" id="L1587">		TableLocker lock = null;</span>
+<span class="fc" id="L1588">		boolean recreated = freshDescriptor; //Whether table descriptor was just retrieved from HBase admin</span>
+<span class="fc bfc" id="L1589" title="All 2 branches covered.">		for (Entry&lt;String, Field&gt; cf : columnFamilies.entrySet()) {</span>
+<span class="fc" id="L1590">			byte[] cfname = Bytes.toBytes(cf.getKey());</span>
+<span class="fc bfc" id="L1591" title="All 2 branches covered.">			HColumnDescriptor family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;</span>
+<span class="fc" id="L1592">			boolean asExpected = PropertyUtils.asExpected(this, family, clazz, cf.getValue(), tablePostfix);</span>
+<span class="fc bfc" id="L1593" title="All 4 branches covered.">			if (!recreated &amp;&amp; !asExpected) {</span>
+<span class="fc" id="L1594">				logger.fine(&quot;Table &quot; + tableName + &quot; is not known to have family &quot; + cf.getKey() + &quot; properly configured: checking from HBase&quot;);</span>
+<span class="fc" id="L1595">				lock = this.getLock(tableName);</span>
+<span class="fc" id="L1596">				lock.sharedLockTable();</span>
+				try {
+<span class="fc" id="L1598">					tableD = this.admin.getTableDescriptor(tableD.getName());</span>
+<span class="fc" id="L1599">				} catch (Exception e) {</span>
+<span class="fc" id="L1600">					errorLogger.log(Level.INFO, &quot; Problem while getting descriptor for &quot; + tableName + &quot;; retrying&quot;, e);</span>
+<span class="fc" id="L1601">					this.handleProblem(e, clazz, tableName, tablePostfix, null);</span>
+					try {
+<span class="fc" id="L1603">						this.getTableDescriptor(clazz, tableName, tablePostfix, columnFamilies);</span>
+<span class="nc" id="L1604">					} catch (Exception x) {</span>
+<span class="nc" id="L1605">						throw new DatabaseNotReachedException(x);</span>
+<span class="fc" id="L1606">					}</span>
+					return;
+				} finally {
+<span class="pc" id="L1609">					lock.sharedUnlockTable();</span>
+<span class="fc" id="L1610">				}</span>
+<span class="fc bfc" id="L1611" title="All 2 branches covered.">				family = tableD.hasFamily(cfname) ? tableD.getFamily(cfname) : null;</span>
+<span class="fc" id="L1612">				asExpected = PropertyUtils.asExpected(this, family, clazz, cf.getValue(), tablePostfix);</span>
+<span class="fc" id="L1613">				this.cache(tableName, tableD);</span>
+<span class="fc" id="L1614">				recreated = true;</span>
+			}
+<span class="fc bfc" id="L1616" title="All 2 branches covered.">			if (family == null) {</span>
+<span class="fc" id="L1617">				HColumnDescriptor newFamily = new HColumnDescriptor(cfname);</span>
+<span class="fc" id="L1618">				PropertyUtils.setValues(this, newFamily, clazz, cf.getValue(), tablePostfix);</span>
+<span class="fc" id="L1619">				toBeAdded.add(newFamily);</span>
+<span class="fc bfc" id="L1620" title="All 2 branches covered.">			} else if (!asExpected) {</span>
+<span class="fc" id="L1621">				PropertyUtils.setValues(this, family, clazz, cf.getValue(), tablePostfix);</span>
+<span class="fc" id="L1622">				toBeAltered.add(family);</span>
+			}
+<span class="fc" id="L1624">		}</span>
+<span class="fc bfc" id="L1625" title="All 4 branches covered.">		if (!toBeAdded.isEmpty() || !toBeAltered.isEmpty()) {</span>
+			try {
+<span class="fc bfc" id="L1627" title="All 2 branches covered.">				if (!toBeAdded.isEmpty())</span>
+<span class="fc" id="L1628">					logger.info(&quot;Table &quot; + tableName + &quot; is missing families &quot; + toBeAdded.toString() + &quot;: altering&quot;);</span>
+<span class="fc bfc" id="L1629" title="All 2 branches covered.">				if (!toBeAltered.isEmpty())</span>
+<span class="fc" id="L1630">					logger.info(&quot;Table &quot; + tableName + &quot; has wrong properties for families &quot; + toBeAltered.toString() + &quot;: altering&quot;);</span>
+<span class="fc bfc" id="L1631" title="All 2 branches covered.">				if (lock == null)</span>
+<span class="fc" id="L1632">					lock = getLock(tableName);</span>
+<span class="fc" id="L1633">				lock.exclusiveLockTable();</span>
+				try {
+<span class="fc" id="L1635">					this.disableTable(clazz, tableName, tablePostfix);</span>
+<span class="fc bfc" id="L1636" title="All 2 branches covered.">					for (HColumnDescriptor hColumnDescriptor : toBeAdded) {</span>
+						try {
+<span class="fc" id="L1638">							this.admin.addColumn(tableD.getName(),hColumnDescriptor);</span>
+<span class="nc" id="L1639">						} catch (TableNotFoundException x) {</span>
+<span class="nc" id="L1640">							this.handleProblem(x, clazz, tableName, tablePostfix, null);</span>
+<span class="nc" id="L1641">							this.admin.addColumn(tableD.getName(),hColumnDescriptor);</span>
+<span class="fc" id="L1642">						} catch (InvalidFamilyOperationException x) {</span>
+<span class="fc" id="L1643">							String msg = x.getMessage();</span>
+<span class="pc bpc" id="L1644" title="2 of 4 branches missed.">							if (msg != null &amp;&amp; msg.contains(&quot;already exists&quot;)) {</span>
+<span class="fc" id="L1645">								toBeAltered.add(hColumnDescriptor);</span>
+							} else
+<span class="nc" id="L1647">								throw x;</span>
+<span class="pc" id="L1648">						}</span>
+<span class="fc" id="L1649">					}</span>
+<span class="fc bfc" id="L1650" title="All 2 branches covered.">					for (HColumnDescriptor hColumnDescriptor : toBeAltered) {</span>
+						try {
+<span class="fc" id="L1652">							this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);</span>
+<span class="nc" id="L1653">						} catch (TableNotFoundException x) {</span>
+<span class="nc" id="L1654">							this.handleProblem(x, clazz, tableName, tablePostfix, null);</span>
+<span class="nc" id="L1655">							this.admin.modifyColumn(tableD.getName(), hColumnDescriptor);</span>
+<span class="fc" id="L1656">						}</span>
+<span class="fc" id="L1657">					}</span>
+<span class="fc" id="L1658">					boolean done = true;</span>
+					do {
+<span class="fc" id="L1660">						Thread.sleep(10);</span>
+<span class="fc" id="L1661">						tableD = this.admin.getTableDescriptor(tableD.getName());</span>
+<span class="pc bpc" id="L1662" title="1 of 4 branches missed.">						for (int i = 0; done &amp;&amp; i &lt; toBeAdded.size(); i++) {</span>
+<span class="pc bpc" id="L1663" title="2 of 4 branches missed.">							done = done &amp;&amp; tableD.hasFamily(toBeAdded.get(i).getName());</span>
+						}
+<span class="pc bpc" id="L1665" title="1 of 4 branches missed.">						for (int i = 0; done &amp;&amp; i &lt; toBeAltered.size(); ++i) {</span>
+<span class="fc" id="L1666">							HColumnDescriptor expectedFamily = toBeAltered.get(i);</span>
+<span class="fc" id="L1667">							HColumnDescriptor actualFamily = tableD.getFamily(expectedFamily.getName());</span>
+<span class="pc bpc" id="L1668" title="2 of 4 branches missed.">							done = done &amp;&amp; actualFamily != null;</span>
+<span class="pc bpc" id="L1669" title="1 of 2 branches missed.">							if (done) {</span>
+<span class="fc bfc" id="L1670" title="All 2 branches covered.">								for (HColumnFamilyProperty&lt;?&gt; hprop : PropertyUtils.columnProperties) {</span>
+<span class="pc bpc" id="L1671" title="2 of 4 branches missed.">									done = done &amp;&amp; hprop.hasValue(actualFamily, this, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix);</span>
+								}
+							}
+						}
+<span class="pc bpc" id="L1675" title="1 of 2 branches missed.">					} while (!done);</span>
+<span class="fc" id="L1676">					this.enableTable(clazz, tableName, tablePostfix);</span>
+					
+					//Checking post-condition
+<span class="pc bpc" id="L1679" title="1 of 4 branches missed.">					for (int i = 0; done &amp;&amp; i &lt; toBeAdded.size(); i++) {</span>
+<span class="pc bpc" id="L1680" title="1 of 2 branches missed.">						if (!tableD.hasFamily(toBeAdded.get(i).getName()))</span>
+<span class="nc" id="L1681">							throw new IOException(&quot;Table &quot; + tableName + &quot; is still lacking familiy &quot; + toBeAdded.get(i).getNameAsString());</span>
+					}
+<span class="pc bpc" id="L1683" title="1 of 4 branches missed.">					for (int i = 0; done &amp;&amp; i &lt; toBeAltered.size(); ++i) {</span>
+<span class="fc" id="L1684">						HColumnDescriptor expectedFamily = toBeAltered.get(i);</span>
+<span class="fc" id="L1685">						HColumnDescriptor actualFamily = tableD.getFamily(expectedFamily.getName());</span>
+<span class="pc bpc" id="L1686" title="1 of 2 branches missed.">						if (actualFamily == null)</span>
+<span class="nc" id="L1687">							throw new IOException(&quot;Table &quot; + tableName + &quot; is now lacking familiy &quot; + expectedFamily.getNameAsString());</span>
+<span class="fc" id="L1688">						HColumnFamilyProperty&lt;?&gt;[] problems = PropertyUtils.checkIsAsExpected(this, actualFamily, clazz, columnFamilies.get(expectedFamily.getNameAsString()), tablePostfix);</span>
+<span class="pc bpc" id="L1689" title="1 of 2 branches missed.">						if (problems.length &gt; 0)</span>
+<span class="nc" id="L1690">							throw new IOException(&quot;Table &quot; + tableD.getName() + &quot; still has wrong properties for column family &quot; + expectedFamily.getNameAsString() + &quot;: &quot; + Arrays.toString(problems));</span>
+					}
+<span class="fc" id="L1692">					this.cache(tableName, tableD);</span>
+<span class="fc" id="L1693">					logger.info(&quot;Table &quot; + tableD.getNameAsString() + &quot; altered&quot;);</span>
+				} finally {
+<span class="pc" id="L1695">					lock.exclusiveUnlockTable();</span>
+<span class="fc" id="L1696">				}</span>
+<span class="nc" id="L1697">			} catch (Exception e) {</span>
+<span class="nc" id="L1698">				errorLogger.log(Level.SEVERE, &quot;Could not create on table &quot; + tableD.getNameAsString() + &quot; families &quot; + toBeAdded.toString(), e);</span>
+<span class="nc" id="L1699">				throw new DatabaseNotReachedException(e);</span>
+<span class="fc" id="L1700">			}</span>
+
+		}
+<span class="fc" id="L1703">	}</span>
+	
+	protected Map&lt;String, Field&gt; toMap(String family, Field field) {
+<span class="pc bpc" id="L1706" title="1 of 2 branches missed.">		if (family == null)</span>
+<span class="nc" id="L1707">			return null;</span>
+		
+<span class="fc" id="L1709">		Map&lt;String, Field&gt; ret = new TreeMap&lt;String, Field&gt;();</span>
+<span class="pc bpc" id="L1710" title="1 of 4 branches missed.">		ret.put(family, field == null ? null : (family.equals(field.getName()) ? field : null));</span>
+<span class="fc" id="L1711">		return ret;</span>
+	}
+	
+	protected Map&lt;String, Field&gt; toMap(Set&lt;String&gt; families, MetaInformation meta) {
+<span class="fc bfc" id="L1715" title="All 2 branches covered.">		return this.toMap(families, meta == null ? null : meta.getFamilies());</span>
+	}
+	
+	protected Map&lt;String, Field&gt; toMap(Set&lt;String&gt; families, Map&lt;String, Field&gt; fields) {
+<span class="fc bfc" id="L1719" title="All 2 branches covered.">		if (families == null)</span>
+<span class="fc" id="L1720">			return null;</span>
+		
+<span class="fc bfc" id="L1722" title="All 4 branches covered.">		if (fields != null &amp;&amp; families.equals(fields.keySet()))</span>
+<span class="fc" id="L1723">			return fields;</span>
+		
+<span class="fc" id="L1725">		Map&lt;String, Field&gt; ret = new TreeMap&lt;String, Field&gt;();</span>
+		
+<span class="fc bfc" id="L1727" title="All 2 branches covered.">		for (String family : families) {</span>
+<span class="fc" id="L1728">			ret.put(family, null);</span>
+<span class="fc" id="L1729">		}</span>
+		
+<span class="fc bfc" id="L1731" title="All 2 branches covered.">		if (fields != null) {</span>
+<span class="fc bfc" id="L1732" title="All 2 branches covered.">			for (Entry&lt;String, Field&gt; field : fields.entrySet()) {</span>
+<span class="fc bfc" id="L1733" title="All 2 branches covered.">				if (ret.containsKey(field.getKey())) {</span>
+<span class="fc" id="L1734">					ret.put(field.getKey(), field.getValue());</span>
+				}
+<span class="fc" id="L1736">			}</span>
+		}
+		
+<span class="fc" id="L1739">		return ret;</span>
+	}
+	
+	////////////////////////////////////////////////////////////////////
+	// Actual implementation methods
+	////////////////////////////////////////////////////////////////////
+
+	private Filter addFilter(Filter f1, Filter f2) {
+<span class="pc bpc" id="L1747" title="1 of 2 branches missed.">		if (f2 == null) {</span>
+<span class="nc" id="L1748">			return f1;</span>
+<span class="fc bfc" id="L1749" title="All 2 branches covered.">		} else if (f1 == null) {</span>
+<span class="fc" id="L1750">			return f2;</span>
+<span class="pc bpc" id="L1751" title="1 of 2 branches missed.">		} else if (f1 instanceof FilterList) {</span>
+<span class="nc" id="L1752">			((FilterList) f1).addFilter(f2);</span>
+<span class="nc" id="L1753">			return f1;</span>
+		} else {
+<span class="fc" id="L1755">			FilterList list = new FilterList();</span>
+<span class="fc" id="L1756">			list.addFilter(f1);</span>
+<span class="fc" id="L1757">			list.addFilter(f2);</span>
+<span class="fc" id="L1758">			return list;</span>
+		}
+	}
+
+	protected Filter createFamilyConstraint(Constraint c) {
+<span class="fc" id="L1763">		Filter f = null;</span>
+<span class="fc bfc" id="L1764" title="All 2 branches covered.">		if (c.getStartKey() != null)</span>
+<span class="fc" id="L1765">			f = new QualifierFilter(CompareOp.GREATER_OR_EQUAL,</span>
+					new BinaryComparator(Bytes.toBytes(c.getStartKey())));
+<span class="fc bfc" id="L1767" title="All 2 branches covered.">		if (c.getEndKey() != null)</span>
+<span class="fc" id="L1768">			f = this.addFilter(f, new QualifierFilter(CompareOp.LESS_OR_EQUAL,</span>
+					new BinaryComparator(Bytes.toBytes(c.getEndKey()))));
+<span class="fc" id="L1770">		return f;</span>
+	}
+
+	protected Scan getScan(Constraint c, Class&lt;? extends PersistingElement&gt; clazz, Map&lt;String, Field&gt; families) throws DatabaseNotReachedException {
+<span class="fc" id="L1774">		Scan s = new Scan();</span>
+		
+		//Getting scan caching:
+<span class="fc" id="L1777">		Integer caching = null;</span>
+		//Grabbing the lowest values for all column families
+<span class="fc bfc" id="L1779" title="All 2 branches covered.">		if (families != null)</span>
+<span class="fc bfc" id="L1780" title="All 2 branches covered.">			for (Field fam : families.values()) {</span>
+<span class="fc bfc" id="L1781" title="All 2 branches covered.">				if (fam != null) {</span>
+<span class="fc" id="L1782">					HBaseSchema ann = fam.getAnnotation(HBaseSchema.class);</span>
+<span class="fc bfc" id="L1783" title="All 2 branches covered.">					if (ann != null) {</span>
+<span class="fc" id="L1784">						int famCaching = ann.scanCaching();</span>
+<span class="pc bpc" id="L1785" title="2 of 6 branches missed.">						if (famCaching &gt; 0 &amp;&amp; (caching == null || famCaching &lt; caching))</span>
+<span class="fc" id="L1786">							caching = famCaching;</span>
+					}
+				}
+<span class="fc" id="L1789">			}</span>
+		//If not found, looking for the class value
+<span class="fc bfc" id="L1791" title="All 4 branches covered.">		if (caching == null &amp;&amp; clazz != null) {</span>
+<span class="fc" id="L1792">			HBaseSchema ann = clazz.getAnnotation(HBaseSchema.class);</span>
+<span class="pc bpc" id="L1793" title="1 of 4 branches missed.">			if (ann != null &amp;&amp; ann.scanCaching() &gt; 0)</span>
+<span class="fc" id="L1794">				caching = ann.scanCaching();</span>
+		}
+		//If not found, looking for this store value
+<span class="fc bfc" id="L1797" title="All 2 branches covered.">		if (caching == null)</span>
+<span class="fc" id="L1798">			caching = this.getScanCaching();</span>
+		//If there exists one, setting it
+<span class="fc bfc" id="L1800" title="All 2 branches covered.">		if (caching != null)</span>
+<span class="fc" id="L1801">			s.setCaching(caching);</span>
+		
+<span class="pc bpc" id="L1803" title="1 of 4 branches missed.">		if (c != null &amp;&amp; c.getStartKey() != null)</span>
+<span class="fc" id="L1804">			s.setStartRow(Bytes.toBytes(c.getStartKey()));</span>
+<span class="fc bfc" id="L1805" title="All 4 branches covered.">		if (c != null &amp;&amp; c.getEndKey() != null) {</span>
+<span class="fc" id="L1806">			byte[] endb = Bytes.toBytes(c.getEndKey());</span>
+<span class="fc" id="L1807">			endb = Bytes.add(endb, new byte[] { 0 });</span>
+<span class="fc" id="L1808">			s.setStopRow(endb);</span>
+		}
+		
+<span class="fc bfc" id="L1811" title="All 2 branches covered.">		if (families != null) {</span>
+<span class="fc bfc" id="L1812" title="All 2 branches covered.">			for (String fam : families.keySet()) {</span>
+<span class="fc" id="L1813">				s.addFamily(Bytes.toBytes(fam));</span>
+<span class="fc" id="L1814">			}</span>
+		} else {
+			//No family to load ; avoid getting all information in the row (that may be big)
+<span class="fc" id="L1817">			s.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));</span>
+		}
+		
+<span class="fc" id="L1820">		return s;</span>
+	}
+
+	@Override
+	public ColumnFamilyData get(MetaInformation meta, String tableName, String id,
+			Set&lt;String&gt; families) throws DatabaseNotReachedException {
+<span class="fc" id="L1826">		MangledTableName table = new MangledTableName(tableName);</span>
+<span class="fc bfc" id="L1827" title="All 2 branches covered.">		if (!this.hasTable(table))</span>
+<span class="fc" id="L1828">			return null;</span>
+		
+<span class="fc" id="L1830">		Map&lt;String, Field&gt; cf = toMap(families, meta);</span>
+		
+<span class="fc" id="L1832">		Get g = new Get(Bytes.toBytes(id));</span>
+<span class="fc bfc" id="L1833" title="All 2 branches covered.">		for (String family : families) {</span>
+<span class="fc" id="L1834">			g.addFamily(Bytes.toBytes(family));</span>
+<span class="fc" id="L1835">		}</span>
+
+<span class="pc bpc" id="L1837" title="2 of 4 branches missed.">		Result r = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), cf);</span>
+<span class="fc bfc" id="L1838" title="All 2 branches covered.">		if (r.isEmpty())</span>
+<span class="fc" id="L1839">			return null;</span>
+		
+<span class="fc" id="L1841">		ColumnFamilyData ret = new DefaultColumnFamilyData();</span>
+<span class="fc bfc" id="L1842" title="All 2 branches covered.">		for (KeyValue kv : r.list()) {</span>
+<span class="fc" id="L1843">			String familyName = Bytes.toString(kv.getFamily());</span>
+<span class="fc" id="L1844">			Map&lt;String, byte[]&gt; fam = ret.get(familyName);</span>
+<span class="fc bfc" id="L1845" title="All 2 branches covered.">			if (fam == null) {</span>
+<span class="fc" id="L1846">				fam = new TreeMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L1847">				ret.put(familyName, fam);</span>
+			}
+<span class="fc" id="L1849">			fam.put(Bytes.toString(kv.getQualifier()),</span>
+					kv.getValue());
+<span class="fc" id="L1851">		}</span>
+<span class="fc" id="L1852">		return ret;</span>
+	}
+	
+	/**
+	 * Waits until an element can be updated (stored/deleted) again.
+	 * Objects should be marked using {@link #tagUpdate(MetaInformation, long)}
+	 * each time they are updated.
+	 * @return timestamp to be used within next {@link #tagUpdate(MetaInformation, long)}
+	 */
+	private void waitForNewUpdate(MetaInformation meta, MangledTableName table, String row) {
+<span class="fc bfc" id="L1862" title="All 2 branches covered.">		if (meta == null)</span>
+<span class="fc" id="L1863">			return;</span>
+<span class="fc" id="L1864">		PersistingElement pe = meta.getElement();</span>
+<span class="pc bpc" id="L1865" title="2 of 4 branches missed.">		assert pe != null;</span>
+<span class="fc" id="L1866">		ThreadLocal&lt;Long&gt; npu = (ThreadLocal&lt;Long&gt;)pe.getAdditionalProperty(&quot;HBaseNextPossibleUpdateInTable&quot;+table.getName());</span>
+<span class="fc bfc" id="L1867" title="All 4 branches covered.">		if (npu == null || npu.get() == null)</span>
+<span class="fc" id="L1868">			return;</span>
+		long now;
+<span class="fc bfc" id="L1870" title="All 2 branches covered.">		while ((now = System.currentTimeMillis()) &lt; npu.get()) {</span>
+			try {
+<span class="fc" id="L1872">				Thread.sleep(npu.get()-now);</span>
+<span class="nc" id="L1873">			} catch (InterruptedException e) {</span>
+<span class="pc" id="L1874">			}</span>
+		}
+<span class="fc" id="L1876">	}</span>
+	
+	/**
+	 * Marks necessary additional information
+	 * to use {@link #waitForNewUpdate(MetaInformation)}.
+	 */
+	private void tagUpdate(MetaInformation meta, MangledTableName table, String row) {
+<span class="fc bfc" id="L1883" title="All 2 branches covered.">		if (meta == null)</span>
+<span class="fc" id="L1884">			return;</span>
+<span class="fc" id="L1885">		PersistingElement pe = meta.getElement();</span>
+<span class="pc bpc" id="L1886" title="2 of 4 branches missed.">		assert pe != null;</span>
+		// HBase uses timestamps ; next possible update for this element is next timestamp...
+		// We rely here on meta as it is important to preserve sequentiality for a given
+		// persisting element, but not for different one (even if targeting the same row)
+		// as they are certainly not in the same threads
+		// Corrects com.googlecode.n_orm.ImportExportTest
+<span class="fc" id="L1892">		String key = &quot;HBaseNextPossibleUpdateInTable&quot;+table.getName();</span>
+<span class="fc" id="L1893">		ThreadLocal&lt;Long&gt; npu = (ThreadLocal&lt;Long&gt;)pe.getAdditionalProperty(key);</span>
+<span class="fc bfc" id="L1894" title="All 2 branches covered.">		if (npu == null) {</span>
+<span class="fc" id="L1895">			npu = (ThreadLocal&lt;Long&gt;)pe.addAdditionalProperty(key, new ThreadLocal&lt;Long&gt;(), true);</span>
+		}
+<span class="fc bfc" id="L1897" title="All 2 branches covered.">		if (npu == null) // Ugh, looks like we are inside a test and pe was mocked</span>
+<span class="fc" id="L1898">			return;</span>
+<span class="pc bpc" id="L1899" title="2 of 4 branches missed.">		assert pe.getAdditionalProperty(key) == npu;</span>
+<span class="fc" id="L1900">		npu.set(System.currentTimeMillis()+1);</span>
+<span class="fc" id="L1901">	}</span>
+
+	@Override
+	public void storeChanges(MetaInformation meta, String tableName, String id,
+			ColumnFamilyData changed,
+			Map&lt;String, Set&lt;String&gt;&gt; removed,
+			Map&lt;String, Map&lt;String, Number&gt;&gt; increments)
+			throws DatabaseNotReachedException {
+		//Grabbing all involved families
+<span class="fc" id="L1910">		Set&lt;String&gt; families = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L1911" title="All 2 branches covered.">		if (changed !=null) families.addAll(changed.keySet());</span>
+<span class="fc bfc" id="L1912" title="All 2 branches covered.">		if (removed != null) families.addAll(removed.keySet());</span>
+<span class="fc bfc" id="L1913" title="All 2 branches covered.">		if (increments != null) families.addAll(increments.keySet());</span>
+		
+		//In HBase, an element only exists when there is a value for its column family
+		//Storing (see later) an empty value with an empty qualifier within the properties family
+		//Thus the properties family is always involved
+<span class="fc" id="L1918">		families.add(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);</span>
+<span class="fc" id="L1919">		Map&lt;String, Field&gt; fams = this.toMap(families, meta);</span>
+
+<span class="fc" id="L1921">		MangledTableName table = new MangledTableName(tableName);</span>
+<span class="fc bfc" id="L1922" title="All 4 branches covered.">		HTableInterface t = this.getTable(meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), fams);</span>
+
+		try {
+<span class="fc" id="L1925">			byte[] row = Bytes.toBytes(id);</span>
+			
+<span class="fc" id="L1927">			List&lt;org.apache.hadoop.hbase.client.Row&gt; actions = new ArrayList&lt;org.apache.hadoop.hbase.client.Row&gt;(2); //At most one put and one delete</span>
+			
+<span class="fc" id="L1929">			this.waitForNewUpdate(meta, table, id);</span>
+	
+			//Transforming changes into a big Put (if necessary)
+			//and registering it as an action to be performed
+<span class="fc" id="L1933">			Put rowPut = null;</span>
+<span class="fc bfc" id="L1934" title="All 4 branches covered.">			if (changed != null &amp;&amp; !changed.isEmpty()) {</span>
+<span class="fc" id="L1935">				rowPut = new Put(row);</span>
+<span class="fc bfc" id="L1936" title="All 2 branches covered.">				for (Entry&lt;String, Map&lt;String, byte[]&gt;&gt; family : changed.entrySet()) {</span>
+<span class="fc" id="L1937">					byte[] cf = Bytes.toBytes(family.getKey());</span>
+<span class="fc bfc" id="L1938" title="All 2 branches covered.">					for (Entry&lt;String, byte[]&gt; col : family.getValue().entrySet()) {</span>
+<span class="fc" id="L1939">						rowPut.add(cf, Bytes.toBytes(col.getKey()), col.getValue());</span>
+<span class="fc" id="L1940">					}</span>
+<span class="fc" id="L1941">				}</span>
+<span class="pc bpc" id="L1942" title="1 of 2 branches missed.">				if (rowPut.getFamilyMap().isEmpty())</span>
+<span class="nc" id="L1943">					rowPut = null;</span>
+				else
+<span class="fc" id="L1945">					actions.add(rowPut);</span>
+			}
+
+			//Transforming deletes into a big Delete (if necessary)
+			//and registering it as an action to be performed
+<span class="fc" id="L1950">			Delete rowDel = null;</span>
+<span class="fc bfc" id="L1951" title="All 4 branches covered.">			if (removed != null &amp;&amp; !removed.isEmpty()) {</span>
+<span class="fc" id="L1952">				rowDel = new Delete(row);</span>
+<span class="fc bfc" id="L1953" title="All 2 branches covered.">				for (Entry&lt;String, Set&lt;String&gt;&gt; family : removed.entrySet()) {</span>
+<span class="fc" id="L1954">					byte[] cf = Bytes.toBytes(family.getKey());</span>
+<span class="fc bfc" id="L1955" title="All 2 branches covered.">					for (String key : family.getValue()) {</span>
+<span class="fc" id="L1956">						rowDel.deleteColumns(cf, Bytes.toBytes(key));</span>
+<span class="fc" id="L1957">					}</span>
+	
+<span class="fc" id="L1959">				}</span>
+<span class="pc bpc" id="L1960" title="1 of 2 branches missed.">				if (rowDel.getFamilyMap().isEmpty())</span>
+<span class="nc" id="L1961">					rowDel = null;</span>
+				else
+<span class="fc" id="L1963">					actions.add(rowDel);</span>
+			}
+
+			//Transforming changes into a big Put (if necessary)
+			//but can't register it as an action to be performed (according to HBase API)
+<span class="fc" id="L1968">			Increment rowInc = null;</span>
+<span class="fc bfc" id="L1969" title="All 4 branches covered.">			if (increments != null &amp;&amp; !increments.isEmpty()) {</span>
+<span class="fc" id="L1970">				rowInc = new Increment(row);</span>
+<span class="fc bfc" id="L1971" title="All 2 branches covered.">				for (Entry&lt;String, Map&lt;String, Number&gt;&gt; incrs : increments.entrySet()) {</span>
+<span class="fc" id="L1972">					byte[] cf = Bytes.toBytes(incrs.getKey());</span>
+<span class="fc bfc" id="L1973" title="All 2 branches covered.">					for (Entry&lt;String, Number&gt; inc : incrs.getValue().entrySet()) {</span>
+<span class="fc" id="L1974">						rowInc.addColumn(cf, Bytes.toBytes(inc.getKey()), inc.getValue().longValue());</span>
+<span class="fc" id="L1975">					}</span>
+<span class="fc" id="L1976">				}</span>
+<span class="pc bpc" id="L1977" title="1 of 2 branches missed.">				if (rowInc.getFamilyMap().isEmpty())</span>
+<span class="nc" id="L1978">					rowInc = null;</span>
+				//Can't add that to actions :(
+			}
+	
+			//An empty object is to be stored...
+			//Adding a dummy value into properties family
+<span class="fc bfc" id="L1984" title="All 4 branches covered.">			if (rowPut == null &amp;&amp; rowInc == null) { //NOT rowDel == null; deleting an element that becomes empty actually deletes the element !</span>
+<span class="fc" id="L1985">				rowPut = new Put(row);</span>
+<span class="fc" id="L1986">				rowPut.add(Bytes.toBytes(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME), null, new byte[]{});</span>
+<span class="fc" id="L1987">				actions.add(rowPut);</span>
+			}
+			
+			// Checking for WAL policy
+<span class="fc bfc" id="L1991" title="All 2 branches covered.">			if (rowPut != null) { // Only Puts can override WAL policy in 0.90</span>
+<span class="fc" id="L1992">				HBaseSchema.WALWritePolicy useWal = null;</span>
+<span class="pc bpc" id="L1993" title="1 of 4 branches missed.">				HBaseSchema clazzAnnotation = meta == null || meta.getClazz() == null ? null : meta.getClazz().getAnnotation(HBaseSchema.class);</span>
+<span class="fc bfc" id="L1994" title="All 2 branches covered.">				HBaseSchema.WALWritePolicy clazzWAL = clazzAnnotation == null ? HBaseSchema.WALWritePolicy.UNSET : clazzAnnotation.writeToWAL();</span>
+<span class="fc bfc" id="L1995" title="All 2 branches covered.">				for(byte[] famB : rowPut.getFamilyMap().keySet()) {</span>
+<span class="fc" id="L1996">					String famS = Bytes.toString(famB);</span>
+					HBaseSchema.WALWritePolicy wtw;
+<span class="fc bfc" id="L1998" title="All 2 branches covered.">					if (PropertyManagement.PROPERTY_COLUMNFAMILY_NAME.equals(famS)) {</span>
+						// Properties use schema for classes
+<span class="fc" id="L2000">						wtw = clazzWAL;</span>
+					} else {
+						HBaseSchema schema;
+<span class="fc" id="L2003">						Field fam = fams.get(famS);</span>
+<span class="fc bfc" id="L2004" title="All 2 branches covered.">						if (fam != null) {</span>
+<span class="fc" id="L2005">							schema = fam.getAnnotation(HBaseSchema.class);</span>
+						} else {
+<span class="fc" id="L2007">							schema = null;</span>
+						}
+						// No explicit schema mean schema for class
+<span class="fc bfc" id="L2010" title="All 2 branches covered.">						if (schema == null) {</span>
+<span class="fc" id="L2011">							wtw = clazzWAL;</span>
+						} else {
+<span class="fc" id="L2013">							wtw = schema.writeToWAL();</span>
+<span class="fc bfc" id="L2014" title="All 2 branches covered.">							if (HBaseSchema.WALWritePolicy.UNSET.equals(wtw)) {</span>
+<span class="fc" id="L2015">								wtw = clazzWAL;</span>
+							}
+						}
+					}
+					// Grabbing strongest policy for the store
+<span class="fc bfc" id="L2020" title="All 4 branches covered.">					if (useWal == null || wtw.strongerThan(useWal)) {</span>
+<span class="fc" id="L2021">						useWal = wtw;</span>
+					}
+<span class="fc" id="L2023">				}</span>
+				
+<span class="pc bpc" id="L2025" title="1 of 2 branches missed.">				if (useWal == null) {</span>
+<span class="nc" id="L2026">					useWal = HBaseSchema.WALWritePolicy.UNSET;</span>
+				}
+				
+<span class="pc bfc" id="L2029" title="All 3 branches covered.">				switch(useWal) {</span>
+				case UNSET:
+<span class="fc" id="L2031">					break;</span>
+				case SKIP:
+<span class="fc" id="L2033">					rowPut.setWriteToWAL(false);</span>
+<span class="fc" id="L2034">					break;</span>
+				default:
+<span class="fc" id="L2036">					rowPut.setWriteToWAL(true);</span>
+					break;
+				}
+			}
+			
+			Action&lt;?&gt; act;
+			//Running puts and deletes
+<span class="fc bfc" id="L2043" title="All 2 branches covered.">			if (! actions.isEmpty()) {</span>
+<span class="fc" id="L2044">				act = new BatchAction(actions);</span>
+<span class="fc bfc" id="L2045" title="All 4 branches covered.">				this.tryPerform(act, t, meta == null ? null : meta.getClazz(), meta == null ? null : meta.getTablePostfix(), fams);</span>
+<span class="fc" id="L2046">				t = act.getTable();</span>
+			}
+			//Running increments
+<span class="fc bfc" id="L2049" title="All 2 branches covered.">			if (rowInc != null) {</span>
+<span class="fc" id="L2050">				act = new IncrementAction(rowInc);</span>
+<span class="pc bpc" id="L2051" title="2 of 4 branches missed.">				this.tryPerform(act, t, meta == null ? null : meta.getClazz(), meta == null ? null : meta.getTablePostfix(), fams);</span>
+<span class="fc" id="L2052">				t = act.getTable();</span>
+			}
+			
+<span class="fc" id="L2055">			this.tagUpdate(meta, table, id);</span>
+		} finally {
+<span class="pc bpc" id="L2057" title="2 of 4 branches missed.">			if (t != null)</span>
+				try {
+<span class="pc" id="L2059">					this.returnTable(t);</span>
+<span class="nc" id="L2060">				} catch (IOException e) {</span>
+<span class="nc" id="L2061">					throw new DatabaseNotReachedException(e);</span>
+<span class="pc" id="L2062">				}</span>
+		}
+<span class="fc" id="L2064">	}</span>
+
+	@Override
+	public void delete(MetaInformation meta, String tableName, String id)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L2069">		MangledTableName table = new MangledTableName(tableName);</span>
+<span class="fc bfc" id="L2070" title="All 2 branches covered.">		if (!this.hasTable(table))</span>
+<span class="fc" id="L2071">			return;</span>
+<span class="fc" id="L2072">		this.waitForNewUpdate(meta, table, id);</span>
+<span class="fc" id="L2073">		Delete d = new Delete(Bytes.toBytes(id));</span>
+<span class="fc bfc" id="L2074" title="All 4 branches covered.">		this.tryPerform(new DeleteAction(d), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);</span>
+<span class="fc" id="L2075">		this.tagUpdate(meta, table, id);</span>
+<span class="fc" id="L2076">	}</span>
+
+	@Override
+	public boolean exists(MetaInformation meta, String tableName, String row, String family)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L2081">		MangledTableName table = new MangledTableName(tableName);</span>
+<span class="fc bfc" id="L2082" title="All 2 branches covered.">		if (!this.hasColumnFamily(table, family))</span>
+<span class="fc" id="L2083">			return false;</span>
+
+<span class="fc" id="L2085">		Get g = new Get(Bytes.toBytes(row)).addFamily(Bytes.toBytes(family));</span>
+<span class="fc" id="L2086">		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));</span>
+<span class="fc bfc" id="L2087" title="All 4 branches covered.">		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);</span>
+	}
+
+	@Override
+	public boolean exists(MetaInformation meta, String tableName, String row)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L2093">		MangledTableName table = new MangledTableName(tableName);</span>
+<span class="fc bfc" id="L2094" title="All 2 branches covered.">		if (!this.hasTable(table))</span>
+<span class="fc" id="L2095">			return false;</span>
+
+<span class="fc" id="L2097">		Get g = new Get(Bytes.toBytes(row));</span>
+<span class="fc" id="L2098">		g.setFilter(this.addFilter(new FirstKeyOnlyFilter(), new KeyOnlyFilter()));</span>
+<span class="fc bfc" id="L2099" title="All 4 branches covered.">		return this.tryPerform(new ExistsAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);</span>
+	}
+
+	@Override
+	public byte[] get(MetaInformation meta, String tableName, String row, String family, String key)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L2105">		MangledTableName table = new MangledTableName(tableName);</span>
+<span class="pc bpc" id="L2106" title="1 of 2 branches missed.">		if (! this.hasColumnFamily(table, family))</span>
+<span class="nc" id="L2107">			return null;</span>
+
+<span class="fc" id="L2109">		Get g = new Get(Bytes.toBytes(row)).addColumn(Bytes.toBytes(family),</span>
+				Bytes.toBytes(key));
+
+<span class="pc bpc" id="L2112" title="3 of 6 branches missed.">		Result result = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), this.toMap(family, meta == null ? null : meta.getProperty()));</span>
+		
+<span class="fc bfc" id="L2114" title="All 2 branches covered.">		if (result.isEmpty())</span>
+<span class="fc" id="L2115">			return null;</span>
+<span class="fc" id="L2116">		return result.value();</span>
+	}
+
+	@Override
+	public Map&lt;String, byte[]&gt; get(MetaInformation meta,
+			String table, String id, String family)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L2123">		return this.get(meta, table, id, family, (Constraint) null);</span>
+	}
+
+	@Override
+	public Map&lt;String, byte[]&gt; get(MetaInformation meta,
+			String tableName, String id, String family,
+			Constraint c) throws DatabaseNotReachedException {
+<span class="fc" id="L2130">		MangledTableName table = new MangledTableName(tableName);</span>
+<span class="pc bpc" id="L2131" title="1 of 2 branches missed.">		if (!this.hasTable(table))</span>
+<span class="nc" id="L2132">			return null;</span>
+
+<span class="fc" id="L2134">		Get g = new Get(Bytes.toBytes(id)).addFamily(Bytes.toBytes(family));</span>
+
+<span class="fc bfc" id="L2136" title="All 2 branches covered.">		if (c != null) {</span>
+<span class="fc" id="L2137">			g.setFilter(createFamilyConstraint(c));</span>
+		}
+
+<span class="fc bfc" id="L2140" title="All 6 branches covered.">		Result r = this.tryPerform(new GetAction(g), meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), toMap(family, meta == null ? null : meta.getProperty()));</span>
+<span class="pc bpc" id="L2141" title="1 of 2 branches missed.">		if (r.isEmpty())</span>
+<span class="nc" id="L2142">			return null;</span>
+		
+<span class="fc" id="L2144">		Map&lt;String, byte[]&gt; ret = new HashMap&lt;String, byte[]&gt;();</span>
+<span class="pc bpc" id="L2145" title="1 of 2 branches missed.">		if (!r.isEmpty()) {</span>
+<span class="fc bfc" id="L2146" title="All 2 branches covered.">			for (KeyValue kv : r.raw()) {</span>
+<span class="fc" id="L2147">				ret.put(Bytes.toString(kv.getQualifier()), kv.getValue());</span>
+			}
+		}
+<span class="fc" id="L2150">		return ret;</span>
+	}
+
+	@Override
+	public long count(MetaInformation meta, String tableName, Constraint c) throws DatabaseNotReachedException {
+<span class="fc" id="L2155">		MangledTableName table = new MangledTableName(tableName);</span>
+<span class="fc bfc" id="L2156" title="All 2 branches covered.">		if (! this.hasTable(table))</span>
+<span class="fc" id="L2157">			return 0;</span>
+		
+<span class="fc bfc" id="L2159" title="All 2 branches covered.">		Class&lt;? extends PersistingElement&gt; type = meta == null ? null : meta.getClazz();</span>
+<span class="fc bfc" id="L2160" title="All 2 branches covered.">		return this.tryPerform(new CountAction(this, this.getScan(c, type, null)), type, table, meta == null ? null : meta.getTablePostfix(), null);</span>
+	}
+
+	@Override
+	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(MetaInformation meta, String tableName, Constraint c,
+			 int limit, Set&lt;String&gt; families) throws DatabaseNotReachedException {
+<span class="fc" id="L2166">		return this.get(meta, new MangledTableName(tableName), c, limit, families);</span>
+	}
+
+
+	public com.googlecode.n_orm.storeapi.CloseableKeyIterator get(MetaInformation meta, MangledTableName table, Constraint c,
+			 int limit, Set&lt;String&gt; families) throws DatabaseNotReachedException {
+<span class="fc bfc" id="L2172" title="All 2 branches covered.">		if (!this.hasTable(table))</span>
+<span class="fc" id="L2173">			return new EmptyCloseableIterator();</span>
+		
+<span class="fc" id="L2175">		Map&lt;String, Field&gt; cf = toMap(families, meta);</span>
+		
+<span class="pc bpc" id="L2177" title="1 of 2 branches missed.">		Class&lt;? extends PersistingElement&gt; clazz = meta == null ? null : meta.getClazz();</span>
+<span class="fc" id="L2178">		Scan s = this.getScan(c, clazz, cf);</span>
+<span class="fc" id="L2179">		int cacheSize = s.getCaching();</span>
+<span class="pc bpc" id="L2180" title="1 of 2 branches missed.">		if (cacheSize &gt; limit)</span>
+<span class="nc" id="L2181">			s.setCaching(limit);</span>
+		
+<span class="pc bpc" id="L2183" title="1 of 2 branches missed.">		String tablePostfix = meta == null ? null : meta.getTablePostfix();</span>
+<span class="fc" id="L2184">		ResultScanner r = this.tryPerform(new ScanAction(s), clazz, table, tablePostfix, cf);</span>
+<span class="fc bfc" id="L2185" title="All 2 branches covered.">		return new CloseableIterator(this, clazz, table, tablePostfix, c, limit, cf, r, cf != null);</span>
+	}
+
+	public void truncate(MetaInformation meta, String tableName, Constraint c) throws DatabaseNotReachedException {
+<span class="fc" id="L2189">		MangledTableName table = new MangledTableName(tableName);</span>
+<span class="pc bpc" id="L2190" title="1 of 2 branches missed.">		if (!this.hasTable(table))</span>
+<span class="nc" id="L2191">			return;</span>
+		
+<span class="fc" id="L2193">		logger.info(&quot;Truncating table &quot; + table);</span>
+		
+<span class="pc bpc" id="L2195" title="1 of 2 branches missed.">		TruncateAction action = new TruncateAction(this, this.getScan(c, meta == null ? null : meta.getClazz(), null));</span>
+<span class="pc bpc" id="L2196" title="2 of 4 branches missed.">		this.tryPerform(action, meta == null ? null : meta.getClazz(), table, meta == null ? null : meta.getTablePostfix(), null);</span>
+		
+<span class="fc" id="L2198">		logger.info(&quot;Truncated table &quot; + table);</span>
+<span class="fc" id="L2199">	}</span>
+
+	@Override
+	public &lt;AE extends PersistingElement, E extends AE&gt; void process(MetaInformation meta,
+			final String tableName, Constraint c, Set&lt;String&gt; families, Class&lt;E&gt; elementClass,
+			Process&lt;AE&gt; action, final Callback callback)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L2206">		final MangledTableName table = new MangledTableName(tableName);</span>
+<span class="pc bpc" id="L2207" title="1 of 2 branches missed.">		if (! this.hasTable(table)) {</span>
+<span class="nc bnc" id="L2208" title="All 2 branches missed.">			if (callback != null)</span>
+<span class="nc" id="L2209">				callback.processCompleted();</span>
+<span class="nc" id="L2210">			return;</span>
+		}
+<span class="fc" id="L2212">		Map&lt;String, Field&gt; cf = toMap(families, meta);</span>
+<span class="fc" id="L2213">		final Class&lt;?&gt; actionClass = action.getClass();</span>
+		try {
+			//Checking that cf are all there so that process will work
+<span class="pc bpc" id="L2216" title="1 of 2 branches missed.">			this.getTableDescriptor(elementClass, table, meta == null ? null : meta.getTablePostfix(), cf);</span>
+<span class="fc" id="L2217">			final Job job = ActionJob.createSubmittableJob(this, table, this.getScan(c, elementClass, cf), action, elementClass, families.toArray(new String[families.size()]));</span>
+<span class="fc" id="L2218">			logger.log(Level.FINE, &quot;Runing server-side process &quot; + actionClass.getName() + &quot; on table &quot; + table + &quot; with id &quot; + job.hashCode());</span>
+<span class="pc bpc" id="L2219" title="1 of 2 branches missed.">			if (callback != null) {</span>
+<span class="fc" id="L2220">				new Thread() {</span>
+
+					@Override
+					public void run() {
+						try {
+<span class="pc bpc" id="L2225" title="1 of 2 branches missed.">							if (job.waitForCompletion(false)) {</span>
+<span class="fc" id="L2226">								callback.processCompleted();</span>
+							} else {
+<span class="nc" id="L2228">								throw new RuntimeException(&quot;Unknown reason&quot;);</span>
+							}
+<span class="nc" id="L2230">						} catch (Throwable x) {</span>
+<span class="nc" id="L2231">							errorLogger.log(Level.WARNING, &quot;Could not perform server-side process &quot; + actionClass.getName() + &quot; on table &quot; + table, x);</span>
+<span class="nc bnc" id="L2232" title="All 2 branches missed.">							if (callback != null) {</span>
+<span class="nc" id="L2233">								callback.processCompletedInError(x);</span>
+							}
+<span class="fc" id="L2235">						}</span>
+<span class="fc" id="L2236">					}</span>
+					
+				}.start();
+			} else
+<span class="nc" id="L2240">				job.submit();</span>
+
+<span class="fc" id="L2242">			logger.log(Level.FINE, &quot;Server-side process &quot; + actionClass.getName() + &quot; on table &quot; + table + &quot; with id &quot; + job.hashCode() + &quot; done !&quot;);</span>
+<span class="nc" id="L2243">		} catch (Throwable x) {</span>
+<span class="nc" id="L2244">			errorLogger.log(Level.WARNING, &quot;Could not perform server-side process &quot; + actionClass.getName() + &quot; on table &quot; + table, x);</span>
+<span class="nc bnc" id="L2245" title="All 2 branches missed.">			if (callback != null) {</span>
+<span class="nc" id="L2246">				callback.processCompletedInError(x);</span>
+			}
+<span class="fc" id="L2248">		}</span>
+<span class="fc" id="L2249">	}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

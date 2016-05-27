@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Process.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.operations</a> &gt; <span class="el_source">Process.java</span></div><h1>Process.java</h1><pre class="source lang-java linenums"><span class="pc" id="L1">package com.googlecode.n_orm.operations;</span>
+
+import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
+import com.googlecode.n_orm.Callback;
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingMixin;
+import com.googlecode.n_orm.ProcessCanceller;
+import com.googlecode.n_orm.ProcessException;
+import com.googlecode.n_orm.TimeoutCanceller;
+import com.googlecode.n_orm.ProcessException.Problem;
+import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.storeapi.ActionnableStore;
+import com.googlecode.n_orm.storeapi.CloseableKeyIterator;
+import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.MetaInformation;
+import com.googlecode.n_orm.storeapi.Row;
+import com.googlecode.n_orm.storeapi.Store;
+
+public class Process {
+<span class="fc" id="L35">	public static class ProcessReport&lt;T extends PersistingElement&gt; {</span>
+		private int elementsTreated;
+		private T lastProcessedElement;
+		private Row lastProcessedElementData;
+		private Class&lt;T&gt; clazz;
+		private Map&lt;String, Field&gt; toBeActivated;
+		private long durationInMillis;
+		private List&lt;Future&lt;?&gt;&gt; performing;
+		
+		/**
+		 * The number of elements that were processed.
+		 */
+		public int getElementsTreated() {
+<span class="fc" id="L48">			return elementsTreated;</span>
+		}
+		
+		/**
+		 * The last element that was processed. Can be null if no element was processed.
+		 */
+		public T getLastProcessedElement() {
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">			if (this.lastProcessedElement == null &amp;&amp; this.lastProcessedElementData != null) {</span>
+<span class="fc" id="L56">				lastProcessedElement = StorageManagement.createElementFromRow(clazz, toBeActivated, lastProcessedElementData);</span>
+			}
+<span class="fc" id="L58">			return lastProcessedElement;</span>
+		}
+		
+		/**
+		 * Total time took for processing elements.
+		 */
+		public long getDurationInMillis() {
+<span class="fc" id="L65">			return durationInMillis;</span>
+		}
+		
+		/**
+		 * The list of future for processed that are still performing.
+		 * Should be empty if you did not give executor by yourself.
+		 * Should be less or equal than the number of admitted threads.
+		 */
+		public List&lt;Future&lt;?&gt;&gt; getPerforming() {
+<span class="fc" id="L74">			Iterator&lt;Future&lt;?&gt;&gt; prfIt = performing.iterator();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">			while (prfIt.hasNext()) {</span>
+<span class="fc" id="L76">				Future&lt;?&gt; prf = prfIt.next();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">				if (prf.isDone())</span>
+<span class="fc" id="L78">					prfIt.remove();</span>
+			}
+<span class="fc" id="L80">			return performing;</span>
+		}
+		
+		/**
+		 * Waits for all processes to be done.
+		 * Termination is checked at least each 100ms, and at most each 10ms.
+		 * Should not wait if you did not provide an executor by yourself.
+		 * @param timeout number of milliseconds the wait can happen.
+		 * @return true if termination happened, false if timeout occured
+		 */
+		public boolean awaitTermination(long timeout) {
+<span class="fc" id="L91">			long end  = System.currentTimeMillis()+timeout;</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">			if (end &lt; 0) end = Long.MAX_VALUE;</span>
+			List&lt;Future&lt;?&gt;&gt; prf;
+<span class="pc bfc" id="L94" title="All 2 branches covered.">			while (!(prf = getPerforming()).isEmpty()) {</span>
+				try {
+<span class="fc" id="L96">					Thread.sleep(Math.min(100, Math.max(10, 2 * prf.size())));</span>
+<span class="nc" id="L97">				} catch (InterruptedException e) {</span>
+<span class="nc" id="L98">					e.printStackTrace();</span>
+				}
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">				if (end &lt; System.currentTimeMillis())</span>
+<span class="nc" id="L101">					return false;</span>
+			}
+<span class="fc" id="L103">			return true;</span>
+		}
+	}
+	
+	private static class ProcessRunnable&lt;AE extends PersistingElement, E extends AE&gt; implements Runnable, Serializable {
+		private static final long serialVersionUID = 3707496852314499064L;
+		
+		private final Map&lt;String, Field&gt; toBeActivated;
+		private final Row data;
+		private final Class&lt;E&gt; clazz;
+		private final com.googlecode.n_orm.Process&lt;AE&gt; processAction;
+		private final List&lt;Problem&gt; problems;
+	
+<span class="fc" id="L116">		private ProcessRunnable(Map&lt;String, Field&gt; toBeActivated, Row data,</span>
+				Class&lt;E&gt; clazz, com.googlecode.n_orm.Process&lt;AE&gt; processAction,
+				List&lt;Problem&gt; problems) {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">			this.toBeActivated = toBeActivated;</span>
+<span class="fc" id="L120">			this.data = data;</span>
+<span class="fc" id="L121">			this.clazz = clazz;</span>
+<span class="fc" id="L122">			this.processAction = processAction;</span>
+<span class="fc" id="L123">			this.problems = problems;</span>
+<span class="fc" id="L124">		}</span>
+	
+		@Override
+		public void run() {
+<span class="fc" id="L128">			E elt = null;</span>
+			try {
+<span class="fc" id="L130">				elt = StorageManagement.createElementFromRow(clazz, toBeActivated, data);</span>
+<span class="fc" id="L131">				processAction.process(elt);</span>
+<span class="fc" id="L132">			} catch (Throwable t) {</span>
+<span class="fc" id="L133">				problems.add(new ProcessException.Problem(elt, data, t));</span>
+			}
+<span class="fc" id="L135">		}</span>
+	}
+
+<span class="nc" id="L138">	private Process() {}</span>
+
+	public static &lt;AE extends PersistingElement, E extends AE&gt; ProcessReport&lt;E&gt; processElements(final Class&lt;E&gt; clazz, Constraint c, final com.googlecode.n_orm.Process&lt;AE&gt; processAction, int limit, String[] families, int threadNumber, ProcessCanceller cancel, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+<span class="fc" id="L141">		ProcessReport&lt;E&gt; ret = new ProcessReport&lt;E&gt;();</span>
+<span class="fc" id="L142">		long start = System.currentTimeMillis();</span>
+		//long end = (threadNumber == 1 || start &gt; Long.MAX_VALUE - timeout) ? Long.MAX_VALUE : start+timeout;
+		//final CloseableIterator&lt;E&gt; it = findElement(clazz, c, limit, families);
+<span class="fc" id="L145">		Store store = StoreSelector.getInstance().getStoreFor(clazz);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">		final Map&lt;String, Field&gt; toBeActivated = families == null ? null : StorageManagement.getAutoActivatedFamilies(clazz, families);</span>
+<span class="fc" id="L147">		ret.toBeActivated = toBeActivated;</span>
+<span class="fc" id="L148">		ret.clazz = clazz;</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">		final CloseableKeyIterator keys = store.get(new MetaInformation().forClass(clazz).withColumnFamilies(toBeActivated), PersistingMixin.getInstance().getTable(clazz), c, limit, toBeActivated == null ? null : toBeActivated.keySet());</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">		boolean ownsExecutor = executor == null;</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">		if (ownsExecutor) {</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">			executor = threadNumber == 1 ? null : Executors.newCachedThreadPool();</span>
+		}
+<span class="fc" id="L154">		final List&lt;ProcessException.Problem&gt; problems = Collections.synchronizedList(new LinkedList&lt;ProcessException.Problem&gt;());</span>
+<span class="fc" id="L155">		List&lt;Throwable&gt; exceptions = new LinkedList&lt;Throwable&gt;();</span>
+		try {
+<span class="fc" id="L157">			ret.performing = new ArrayList&lt;Future&lt;?&gt;&gt;(threadNumber);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">			while (keys.hasNext()) {</span>
+<span class="fc" id="L159">				final Row data = keys.next();</span>
+<span class="pc bpc" id="L160" title="2 of 4 branches missed.">				if (cancel != null &amp;&amp; cancel.isCancelled())</span>
+<span class="nc" id="L161">					throw new InterruptedException(cancel.getErrorMessage(processAction));</span>
+				//Cleaning performing from done until there is room for another execution
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">				while (ret.getPerforming().size() &gt;= threadNumber) {</span>
+<span class="nc" id="L164">					Thread.sleep(25); //Hopefully, some execution will be done</span>
+<span class="nc bnc" id="L165" title="All 4 branches missed.">					if (cancel != null &amp;&amp; cancel.isCancelled())</span>
+<span class="nc" id="L166">						throw new InterruptedException(cancel.getErrorMessage(processAction));</span>
+				}
+<span class="fc" id="L168">				Runnable r = new ProcessRunnable&lt;AE,E&gt;(toBeActivated, data, clazz,</span>
+<span class="fc" id="L169">						processAction, problems);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">				if (threadNumber == 1)</span>
+<span class="fc" id="L171">					r.run();</span>
+				else
+<span class="fc" id="L173">					ret.performing.add(executor.submit(r));</span>
+<span class="fc" id="L174">				ret.lastProcessedElementData = data;</span>
+<span class="fc" id="L175">				ret.elementsTreated++;</span>
+			}
+<span class="nc" id="L177">		} catch (Throwable t) {</span>
+<span class="nc" id="L178">			exceptions.add(t);</span>
+<span class="nc" id="L179">		} finally {</span>
+<span class="pc" id="L180">			keys.close();</span>
+<span class="pc bpc" id="L181" title="8 of 12 branches missed.">			if (executor != null &amp;&amp; ownsExecutor) {</span>
+<span class="pc" id="L182">				executor.shutdown();</span>
+<span class="pc bpc" id="L183" title="5 of 6 branches missed.">				long to = cancel instanceof TimeoutCanceller ? ((TimeoutCanceller)cancel).getDuration() : 60000;</span>
+<span class="pc bpc" id="L184" title="4 of 6 branches missed.">				if (!executor.awaitTermination(to, TimeUnit.MILLISECONDS)) {</span>
+<span class="pc" id="L185">					exceptions.add(new InterruptedException(&quot;Timeout while expecting termination for process &quot; + processAction.getClass().getName() + ' ' + processAction + &quot; started at &quot; + new Date(start)));</span>
+				}
+			}
+<span class="pc bpc" id="L188" title="8 of 12 branches missed.">			if (!problems.isEmpty() || !exceptions.isEmpty()) {</span>
+<span class="pc" id="L189">				throw new ProcessException(processAction, ret, problems, exceptions);</span>
+			}
+<span class="pc" id="L191">			ret.durationInMillis = System.currentTimeMillis()-start;</span>
+<span class="nc" id="L192">		}</span>
+<span class="fc" id="L193">		return ret;</span>
+	}
+
+	public static &lt;AE extends PersistingElement, E extends AE&gt; void processElementsRemotely(final Class&lt;E&gt; clazz, final Constraint c, final com.googlecode.n_orm.Process&lt;AE&gt; process, final Callback callback, final int limit, final String[] families, final int threadNumber, final long timeout) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
+		
+<span class="fc" id="L198">		Store store = StoreSelector.getInstance().getActualStoreFor(clazz);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">		if (store instanceof ActionnableStore) {</span>
+<span class="fc" id="L200">			Map&lt;String, Field&gt; autoActivatedFamilies = StorageManagement.getAutoActivatedFamilies(clazz, families);</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">			((ActionnableStore)store).process(new MetaInformation().forClass(clazz).withColumnFamilies(autoActivatedFamilies), PersistingMixin.getInstance().getTable(clazz), c, autoActivatedFamilies == null ? null : autoActivatedFamilies.keySet(), clazz, process, callback);</span>
+		} else {
+<span class="fc" id="L203">			new Thread() {</span>
+				public void run() {
+					try {
+<span class="fc" id="L206">						processElements(clazz, c, process, limit, families, threadNumber, new TimeoutCanceller(timeout), null);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">						if (callback != null)</span>
+<span class="fc" id="L208">							callback.processCompleted();</span>
+<span class="nc" id="L209">					} catch (Throwable e) {</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">						if (callback != null)</span>
+<span class="nc" id="L211">							callback.processCompletedInError(e);</span>
+					}
+<span class="fc" id="L213">				}</span>
+<span class="fc" id="L214">			}.start();</span>
+		}
+<span class="fc" id="L216">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pmd version="4.3" timestamp="2013-01-25T21:04:32.990">
+<file name="/Users/fondemen/Documents/workspace/n-orm/storage/src/main/java/com/googlecode/n_orm/cache/write/WriteRetentionStore.java">
+<violation beginline="1286" endline="1288" begincolumn="27" endcolumn="25" rule="EmptyCatchBlock" ruleset="Basic Rules" package="com.googlecode.n_orm.cache.write" class="WriteRetentionStore" method="runLater" externalInfoUrl="http://pmd.sourceforge.net/rules/basic.html#EmptyCatchBlock" priority="3">
+Avoid empty catch blocks
+</violation>
+</file>
+<file name="/Users/fondemen/Documents/workspace/n-orm/storage/src/main/java/com/googlecode/n_orm/utils/Striped64.java">
+<violation beginline="331" endline="332" begincolumn="26" endcolumn="64" rule="AvoidThreadGroup" ruleset="Basic Rules" package="com.googlecode.n_orm.utils" class="Striped64" method="getUnsafe" externalInfoUrl="http://pmd.sourceforge.net/rules/basic.html#AvoidThreadGroup" priority="3">
+Avoid using java.lang.ThreadGroup; it is not thread safe
+</violation>
+</file>
+</pmd>

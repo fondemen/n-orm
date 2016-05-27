@@ -1,0 +1,17 @@
+com.googlecode.n_orm
+com.googlecode.n_orm.cache.perthread
+com.googlecode.n_orm.cache.write
+com.googlecode.n_orm.cf
+com.googlecode.n_orm.conversion
+com.googlecode.n_orm.doublereferencestoragefile
+com.googlecode.n_orm.dummystoragefile
+com.googlecode.n_orm.keyedstoragefile
+com.googlecode.n_orm.mocked
+com.googlecode.n_orm.nostoragefile
+com.googlecode.n_orm.performance
+com.googlecode.n_orm.query
+com.googlecode.n_orm.referencestoragefile
+com.googlecode.n_orm.simplestoragefile
+com.googlecode.n_orm.singletonstoragefile
+com.googlecode.n_orm.utils
+com.googlecode.n_orm.writeretentionstoragefile

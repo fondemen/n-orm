@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>SearchableClassConstraintBuilder.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.query</a> &gt; <span class="el_source">SearchableClassConstraintBuilder.java</span></div><h1>SearchableClassConstraintBuilder.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.query;
+
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import com.googlecode.n_orm.Callback;
+import com.googlecode.n_orm.CloseableIterator;
+import com.googlecode.n_orm.ColumnFamiliyManagement;
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.FederatedTableManagement;
+import com.googlecode.n_orm.ImplicitActivation;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.PersistingElementOverFederatedTable;
+import com.googlecode.n_orm.Process;
+import com.googlecode.n_orm.ProcessCanceller;
+import com.googlecode.n_orm.ProcessException;
+import com.googlecode.n_orm.StorageManagement;
+import com.googlecode.n_orm.StoreSelector;
+import com.googlecode.n_orm.TimeoutCanceller;
+import com.googlecode.n_orm.WaitingCallBack;
+import com.googlecode.n_orm.operations.ImportExport;
+import com.googlecode.n_orm.operations.Process.ProcessReport;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+import com.googlecode.n_orm.storeapi.ActionnableStore;
+import com.googlecode.n_orm.storeapi.Constraint;
+import com.googlecode.n_orm.storeapi.Store;
+
+public class SearchableClassConstraintBuilder&lt;T extends PersistingElement&gt;
+		extends ClassConstraintBuilder&lt;T&gt; {
+
+<span class="fc" id="L40">	private Integer limit = null;</span>
+<span class="fc" id="L41">	private String [] toBeActivated = null; //null: no activation, non null: autoactivation</span>
+<span class="fc" id="L42">	private String tablePostfix = null;</span>
+
+
+	public SearchableClassConstraintBuilder(Class&lt;T&gt; clazz) {
+<span class="fc" id="L46">		super(clazz);</span>
+<span class="fc" id="L47">	}</span>
+
+	Integer getLimit() {
+<span class="nc" id="L50">		return limit;</span>
+	}
+
+	void setLimit(int limit) {
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">		if (this.limit != null) {</span>
+<span class="nc" id="L55">			throw new IllegalArgumentException(&quot;A limit is already set to &quot; + this.limit);</span>
+		}
+<span class="fc" id="L57">		this.limit = limit;</span>
+<span class="fc" id="L58">	}</span>
+
+	/**
+	 * Returns whether a limit was set for this query.
+	 */
+	public boolean hasNoLimit() {
+<span class="pc bpc" id="L64" title="1 of 4 branches missed.">		return this.limit == null || this.limit &lt; 1;</span>
+	}
+
+	private void checkHasLimits() {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">		if (hasNoLimit())</span>
+<span class="fc" id="L69">			throw new IllegalStateException(&quot;No limit set ; please use withAtMost expression.&quot;);</span>
+<span class="fc" id="L70">	}</span>
+
+	public String getTablePostfix() {
+<span class="fc" id="L73">		return this.tablePostfix;</span>
+	}
+	
+	@Override
+	@SuppressWarnings(&quot;unchecked&quot;)
+	public Class&lt;T&gt; getClazz() {
+<span class="fc" id="L79">		return (Class&lt;T&gt;) super.getClazz();</span>
+	}
+
+	@Override
+	public KeyConstraintBuilder&lt;T&gt; createKeyBuilder(
+			Field f) {
+<span class="fc" id="L85">		return new SearchableKeyConstraintBuilder&lt;T&gt;(this, f);</span>
+	}
+	
+	@Continuator
+	public LimitConstraintBuilder&lt;T&gt; withAtMost(int limit) {
+<span class="fc" id="L90">		return new LimitConstraintBuilder&lt;T&gt;(this, limit);</span>
+	}
+	
+	/**
+	 * Sets the table to look for. This is only possible in case searched
+	 * element is over a {@link PersistingElementOverFederatedTable federated
+	 * table}. Element is thus searched from only one sigle table, whose name is
+	 * the original table, postfixed by the given parameter.
+	 * 
+	 * @param tablePostfix
+	 *            the table to look for has to have the given postfix (can be &quot;&quot;
+	 *            for original table)
+	 * @throws IllegalArgumentException
+	 *             in case this class is not over a
+	 *             {@link PersistingElementOverFederatedTable federated table}
+	 * @throws IllegalArgumentException
+	 *             in case this table cannot be part of the federation for
+	 *             {@link ConstraintBuilder#ofClass(Class) searched class} (i.e.
+	 *             it does not starts with original table name)
+	 * @throws IllegalArgumentException
+	 *             in case a different table was already set in the query
+	 */
+	@Continuator
+	public SearchableClassConstraintBuilder&lt;T&gt; inTableWithPostfix(String tablePostfix) {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">		if (!PersistingElementOverFederatedTable.class.isAssignableFrom(this</span>
+<span class="fc" id="L115">				.getClazz()))</span>
+<span class="fc" id="L116">			throw new IllegalArgumentException(&quot;Class &quot;</span>
+<span class="fc" id="L117">					+ this.getClazz().getName()</span>
+<span class="fc" id="L118">					+ &quot; is not federated ; cannot assign table in query&quot;);</span>
+
+<span class="fc bfc" id="L120" title="All 4 branches covered.">		if (this.tablePostfix != null &amp;&amp; !this.tablePostfix.equals(tablePostfix))</span>
+<span class="fc" id="L121">			throw new IllegalArgumentException(</span>
+<span class="fc" id="L122">					&quot;This query is already limited to table postfix &quot; + this.tablePostfix</span>
+<span class="fc" id="L123">							+ &quot; ; cannot set it to &quot; + tablePostfix);</span>
+
+<span class="fc" id="L125">		this.tablePostfix = tablePostfix;</span>
+<span class="fc" id="L126">		return this;</span>
+	}
+
+	@Override
+	public Constraint getConstraint() {
+<span class="fc" id="L131">		Constraint ret = super.getConstraint();</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">		if (this.getTablePostfix() != null)</span>
+<span class="fc" id="L133">			ret = new FederatedTableManagement.ConstraintWithPostfix(ret, getTablePostfix());</span>
+<span class="fc" id="L134">		return ret;</span>
+	}
+
+	/**
+	 * Requests for some more family activations while executing the query, in addition to simple properties and families marked as {@link ImplicitActivation}.
+	 * @param families the names of the families to be activated (i.e. name of the {@link Map} or {@link Set} property).
+	 */
+	@Continuator
+	public SearchableClassConstraintBuilder&lt;T&gt; andActivate(String... families) {
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">		if (this.toBeActivated == null)</span>
+<span class="fc" id="L144">			this.toBeActivated = families;</span>
+		else {
+<span class="nc" id="L146">			String [] tba = new String [families.length];</span>
+<span class="nc" id="L147">			System.arraycopy(this.toBeActivated, 0, tba, 0, this.toBeActivated.length);</span>
+<span class="nc" id="L148">			System.arraycopy(families, 0, tba, this.toBeActivated.length, families.length);</span>
+<span class="nc" id="L149">			this.toBeActivated = tba;</span>
+		}
+<span class="fc" id="L151">		return this;</span>
+	}
+
+	/**
+	 * Activate all known families for this class (see {@link ConstraintBuilder#ofClass(Class)}).
+	 * Please note that only column families for this class (or inherited)
+	 * are activated, and not families for subclasses, even if found elements are instance of a subclass for this class.
+	 * This remark does not hold for properties, which are all
+	 * activated, regardless of the fact they are declared in this class or in a subclass.
+	 */
+	@Continuator
+	public SearchableClassConstraintBuilder&lt;T&gt; andActivateAllFamilies() {
+<span class="fc" id="L163">		Set&lt;String&gt; knownCfs = ColumnFamiliyManagement.getInstance().getColumnFamilies(getClazz()).keySet();</span>
+<span class="fc" id="L164">		this.toBeActivated = knownCfs.toArray(new String[knownCfs.size()]);</span>
+<span class="fc" id="L165">		return this;</span>
+	}
+	
+	/**
+	 * Finds the element with the given id.
+	 * Any limit set by {@link #withAtMost(int)} will be ignored.
+	 * Specified column families are activated if not already (i.e. this element is already known by this thread) (see {@link PersistingElement#activateIfNotAlready(String...)}) ; you should rather perform an {@link PersistingElement#activate(String...)} without specifying any column family with {@link #andActivate(String...)} to force activation.
+	 * @param id non printable character string
+	 * @return element with given id and class ; null if not found
+	 * @throws DatabaseNotReachedException
+	 */
+	@Continuator
+	public T withId(String id) throws DatabaseNotReachedException {
+<span class="fc" id="L178">		T ret = StorageManagement.getElement(getClazz(), id);</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">		if (toBeActivated != null)</span>
+<span class="fc" id="L180">			ret.activateIfNotAlready(toBeActivated);</span>
+<span class="fc" id="L181">		return ret;</span>
+	}
+	
+	/**
+	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Elements activated (see {@link #andActivate(String...)}), and their keys are all loaded into memory.
+	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit.
+	 * @throws DatabaseNotReachedException
+	 */
+	@Continuator
+	public NavigableSet&lt;T&gt; go() throws DatabaseNotReachedException {
+<span class="fc" id="L192">		checkHasLimits();</span>
+<span class="fc" id="L193">		return StorageManagement.findElementsToSet(this.getClazz(), this.getConstraint(), this.limit, this.toBeActivated);</span>
+	}
+	
+	/**
+	 * Runs the query to find at most N matching elements. The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Elements activated (see {@link #andActivate(String...)}). Instead of this function, you should consider using {@link #forEach(Process)}.
+	 * @return A (possibly empty) set of elements matching the query limited to the maximum limit, that has to be closed once performed.
+	 * @throws DatabaseNotReachedException
+	 */
+	@Continuator
+	public CloseableIterator&lt;T&gt; iterate() throws DatabaseNotReachedException {
+<span class="fc" id="L204">		checkHasLimits();</span>
+<span class="fc" id="L205">		return StorageManagement.findElement(this.getClazz(), this.getConstraint(), this.limit, this.toBeActivated);</span>
+	}
+
+	
+	/**
+	 * Runs the query to find an element matching the query. Any limit set by {@link #withAtMost(int)} will be ignored (as it is considered to be 1).
+	 * The element is activated according to declared column families (see {@link #andActivate(String...)}).
+	 * @return A (possibly null) element matching the query.
+	 * @throws DatabaseNotReachedException
+	 */
+	@Continuator
+	public T any()  throws DatabaseNotReachedException {
+<span class="fc" id="L217">		CloseableIterator&lt;T&gt; found = StorageManagement.findElement(this.getClazz(), this.getConstraint(), 1, this.toBeActivated);</span>
+		try {
+<span class="fc bfc" id="L219" title="All 2 branches covered.">			if (found.hasNext())</span>
+<span class="fc" id="L220">				return found.next();</span>
+			else
+<span class="fc" id="L222">				return null;</span>
+<span class="nc" id="L223">		} finally {</span>
+<span class="pc" id="L224">			found.close();</span>
+<span class="nc" id="L225">		}</span>
+	}
+	
+	/**
+	 * Runs the query to find the number of matching elements.
+	 * Any limit set by {@link #withAtMost(int)} will be ignored.
+	 */
+	@Continuator
+	public long count() throws DatabaseNotReachedException {
+<span class="fc" id="L234">		return StorageManagement.countElements(this.getClazz(), this.getConstraint());</span>
+	}
+	
+	@Continuator
+	public SearchableKeyConstraintBuilder&lt;T&gt; withKey(String key) {
+<span class="fc" id="L239">		return (SearchableKeyConstraintBuilder&lt;T&gt;) this.withKeyInt(key);</span>
+	}
+
+	@Continuator
+	public SearchableKeyConstraintBuilder&lt;T&gt; andWithKey(String key) {
+<span class="fc" id="L244">		return this.withKey(key);</span>
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query.
+	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * @param action the action to be performed over each element of the query.
+	 * @throws DatabaseNotReachedException
+	 * @throws InterruptedException in case threads are interrupted or timeout is reached
+	 * @throws ProcessException in case some process sent an exception while running
+	 */
+	public ProcessReport&lt;T&gt; forEach(Process&lt;T&gt; action) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+<span class="fc" id="L256">		return this.forEach(action, 1, 0);</span>
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query using parallel threads.
+	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Invoking this method is blocking until execution is completed.&lt;br&gt;
+	 * In case you only use one thread, process will be performed in this thread.&lt;br&gt;
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(String...)} elements stored in the process to see changes.
+	 * @param action the action to be performed over each element of the query.
+	 * @param threadNumber the maximum number of concurrent threads
+	 * @param timeoutMs the max allowed time to execute this task ; useless in case threadNumber is 1
+	 * @throws DatabaseNotReachedException
+	 * @throws InterruptedException in case threads are interrupted or timeout is reached
+	 * @throws ProcessException in case some process sent an exception while running
+	 */
+	public ProcessReport&lt;T&gt; forEach(Process&lt;T&gt; action, int threadNumber, long timeoutMs) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+<span class="fc" id="L273">		return this.forEach(action, threadNumber, timeoutMs, null);</span>
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query using parallel threads.
+	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Invoking this method is blocking until execution is completed.&lt;br&gt;
+	 * In case you only use one thread, process will be performed in this thread.&lt;br&gt;
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(String...)} elements stored in the process to see changes.
+	 * @param action the action to be performed over each element of the query.
+	 * @param threadNumber the maximum number of concurrent threads
+	 * @param canceller a canceller object regularly observed while performing request ; in case this object responds &lt;code&gt;false&lt;/code&gt; after invoked {@link ProcessCanceller#isCancelled()}, this methods returns a {@link ProcessException} with message found by {@link ProcessCanceller#getErrorMessage(Process)}
+	 * @throws DatabaseNotReachedException
+	 * @throws InterruptedException in case threads are interrupted or canceler responds &lt;code&gt;false&lt;/code&gt; to {@link ProcessCanceller#isCancelled()}
+	 * @throws ProcessException in case some process sent an exception while running
+	 */
+	public ProcessReport&lt;T&gt; forEach(Process&lt;T&gt; action, int threadNumber, ProcessCanceller canceller) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+<span class="nc" id="L290">		return this.forEach(action, threadNumber, canceller, null);</span>
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query using parallel threads ; method might return before process is ended.
+	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Invoking this method can be blocking as long as threadNumber is less that the number of elements to be treated.&lt;br&gt;
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(String...)} elements stored in the process to see changes.
+	 * @param action the action to be performed over each element of the query.
+	 * @param threadNumber the maximum number of concurrent threads
+	 * @param timeoutMs the max allowed time to execute this task ; useless in case threadNumber is 1
+	 * @param executor the executor to run process ; you need to call {@link ExecutorService#awaitTermination(long, java.util.concurrent.TimeUnit)} to be sure that all elements are processed ; if null, this method is equivalent to {@link #forEach(Process, int, long)}
+	 * @throws DatabaseNotReachedException
+	 * @throws InterruptedException in case threads are interrupted or timeout is reached
+	 * @throws ProcessException in case some process sent an exception while running
+	 */
+	public ProcessReport&lt;T&gt; forEach(Process&lt;T&gt; action, int threadNumber, long timeoutMs, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+<span class="fc" id="L307">		this.checkHasLimits();</span>
+<span class="fc" id="L308">		return com.googlecode.n_orm.operations.Process.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, new TimeoutCanceller(timeoutMs), executor);</span>
+	}
+	
+	/**
+	 * Performs an action for each element corresponding to the query using parallel threads ; method might return before process is ended.
+	 * The maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Invoking this method can be blocking as long as threadNumber is less that the number of elements to be treated.&lt;br&gt;
+	 * Be aware that process will not use cache for the current thread, and as such you might need to {@link PersistingElement#activate(String...)} elements stored in the process to see changes.
+	 * @param action the action to be performed over each element of the query.
+	 * @param threadNumber the maximum number of concurrent threads
+	 * @param canceller a canceller object regularly observed while performing request ; in case this object responds &lt;code&gt;false&lt;/code&gt; after invoked {@link ProcessCanceller#isCancelled()}, this methods returns a {@link ProcessException} with message found by {@link ProcessCanceller#getErrorMessage(Process)}
+	 * @param executor the executor to run process ; you need to call {@link ExecutorService#awaitTermination(long, java.util.concurrent.TimeUnit)} to be sure that all elements are processed ; if null, this method is equivalent to {@link #forEach(Process, int, long)}
+	 * @throws DatabaseNotReachedException
+	 * @throws InterruptedException in case threads are interrupted or canceler responds &lt;code&gt;false&lt;/code&gt; to {@link ProcessCanceller#isCancelled()}
+	 * @throws ProcessException in case some process sent an exception while running
+	 */
+	public ProcessReport&lt;T&gt; forEach(Process&lt;T&gt; action, int threadNumber, ProcessCanceller canceller, ExecutorService executor) throws DatabaseNotReachedException, InterruptedException, ProcessException {
+<span class="nc" id="L325">		this.checkHasLimits();</span>
+<span class="nc" id="L326">		return com.googlecode.n_orm.operations.Process.processElements(this.getClazz(), this.getConstraint(), action, this.limit, this.toBeActivated, threadNumber, canceller, executor);</span>
+	}
+	
+	/**
+	 * Performs &lt;i&gt;asynchronously&lt;/i&gt; an action for each element corresponding to the query.
+	 * In case store for class is &lt;i&gt;not&lt;/i&gt; implementing {@link ActionnableStore}, this action is equivalent to an asynchronous call to {@link #forEach(Process)}, and the maximum limit N must be set before using {@link #withAtMost(int)}.
+	 * Otherwise, the action is performed directly using the data store server process, and the limit is useless.
+	 * In order to wait for process completion, you can use {@link WaitingCallBack}.
+	 * @param action class of the action to be performed over each element of the query ; must have a default constructor
+	 * @param callBack a callback to be invoked as soon as the process completes ; can be null
+	 * @param timeout in case store does not support {@link ActionnableStore}
+	 * @throws DatabaseNotReachedException
+	 * @throws IllegalAccessException 
+	 * @throws InstantiationException 
+	 */
+	public void remoteForEach(Process&lt;T&gt; action, Callback callBack, int threadNumber, long timeout) throws DatabaseNotReachedException, InstantiationException, IllegalAccessException {
+<span class="fc" id="L342">		Store s = StoreSelector.getInstance().getStoreFor(this.getClazz());</span>
+<span class="pc bpc" id="L343" title="1 of 4 branches missed.">		if ((!(s instanceof ActionnableStore)) &amp;&amp; hasNoLimit())</span>
+<span class="nc" id="L344">			throw new IllegalStateException(&quot;No limit set while store &quot; + s + &quot; for &quot; + this.getClazz().getName() + &quot; is not implementing &quot; + ActionnableStore.class.getName() + &quot; ; please use withAtMost expression.&quot;);</span>
+		int limit;
+<span class="fc bfc" id="L346" title="All 2 branches covered.">		if (this.limit == null)</span>
+<span class="fc" id="L347">			limit = -1;</span>
+		else
+<span class="fc" id="L349">			limit = this.limit;</span>
+<span class="fc" id="L350">		com.googlecode.n_orm.operations.Process.processElementsRemotely(this.getClazz(), this.getConstraint(), action, callBack, limit, this.toBeActivated, threadNumber, timeout);</span>
+<span class="fc" id="L351">	}</span>
+	
+	/**
+	 * Runs the query to find at most N matching elements and serialize a representation into the output stream. The maximum limit N can be set before using {@link #withAtMost(int)}, but is not mandatory.
+	 * Dependencies are not serialized. Consider carefully setting families to be activated before ; it is advised to use {@link #andActivateAllFamilies()}.
+	 * Implementation tries to optimize as much as possible memory impact.
+	 * @param out an output stream that must support {@link InputStream#markSupported()} ; note that only one {@link ObjectOutputStream} must be created for a given {@link OutputStream}
+	 * @throws IOException 
+	 */
+	public long exportTo(ObjectOutputStream out) throws IOException, DatabaseNotReachedException {
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">		if (this.hasNoLimit()) {</span>
+<span class="nc" id="L362">			long exported = 0;</span>
+<span class="nc" id="L363">			Constraint c = this.getConstraint();</span>
+			do {
+<span class="nc" id="L365">				com.googlecode.n_orm.operations.ImportExport.ExportReport ex = ImportExport.exportPersistingElements(StorageManagement.findElement(this.getClazz(), c, Integer.MAX_VALUE, this.toBeActivated), out);</span>
+<span class="nc" id="L366">				exported+=ex.getExportedElements();</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">				if (ex.getExportedElements() &lt; Integer.MAX_VALUE)</span>
+<span class="nc" id="L368">					return exported;</span>
+				else
+<span class="nc" id="L370">					c = new Constraint(ex.getElement().getIdentifier()+Character.MIN_VALUE, c.getEndKey());</span>
+<span class="nc" id="L371">			} while (true);</span>
+		} else {
+<span class="fc" id="L373">			return ImportExport.exportPersistingElements(this.iterate(), out).getExportedElements();</span>
+		}
+	}
+
+	/**
+	 * Runs the query to find at most N matching elements and serialize a representation into the output stream. The maximum limit N can be set before using {@link #withAtMost(int)}, but is not mandatory.
+	 * Dependencies are not serialized. Consider carefully setting families to be activated before ; it is advised to use {@link #andActivateAllFamilies()}.
+	 * Implementation tries to optimize as much as possible memory impact.
+	 * @param file the file where elements are to be stored ; overwritten if exists
+	 * @throws IOException 
+	 */
+	@Continuator
+	public long exportTo(String file) throws IOException, DatabaseNotReachedException {
+<span class="nc" id="L386">		File f = new File(file);</span>
+<span class="nc" id="L387">		FileOutputStream fo = new FileOutputStream(f);</span>
+<span class="nc" id="L388">		BufferedOutputStream bo = new BufferedOutputStream(fo);</span>
+<span class="nc" id="L389">		return this.exportTo(new ObjectOutputStream(bo));</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

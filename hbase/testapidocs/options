@@ -1,0 +1,32 @@
+-classpath
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/hbase/target/classes:/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/hbase/target/test-classes:/home/stefrd/.m2/repository/log4j/log4j/1.2.16/log4j-1.2.16.jar:/home/stefrd/.m2/repository/javax/ws/rs/jsr311-api/1.1.1/jsr311-api-1.1.1.jar:/home/stefrd/.m2/repository/org/apache/zookeeper/zookeeper/3.3.2/zookeeper-3.3.2.jar:/home/stefrd/.m2/repository/com/sun/jersey/jersey-json/1.4/jersey-json-1.4.jar:/home/stefrd/.m2/repository/commons-net/commons-net/1.4.1/commons-net-1.4.1.jar:/home/stefrd/.m2/repository/org/aspectj/aspectjrt/1.6.12/aspectjrt-1.6.12.jar:/home/stefrd/.m2/repository/com/googlecode/n_orm/storage/0.0.1-SNAPSHOT/storage-0.0.1-SNAPSHOT.jar:/home/stefrd/.m2/repository/junit/junit/4.8.2/junit-4.8.2.jar:/home/stefrd/.m2/repository/org/apache/ftpserver/ftpserver-deprecated/1.0.0-M2/ftpserver-deprecated-1.0.0-M2.jar:/home/stefrd/.m2/repository/org/apache/thrift/thrift/0.2.0/thrift-0.2.0.jar:/home/stefrd/.m2/repository/commons-httpclient/commons-httpclient/3.1/commons-httpclient-3.1.jar:/home/stefrd/.m2/repository/org/codehaus/jackson/jackson-core-asl/1.4.2/jackson-core-asl-1.4.2.jar:/home/stefrd/.m2/repository/commons-logging/commons-logging/1.1.1/commons-logging-1.1.1.jar:/home/stefrd/.m2/repository/org/codehaus/plexus/plexus-utils/2.1/plexus-utils-2.1.jar:/home/stefrd/.m2/repository/com/googlecode/n_orm/storage/0.0.1-SNAPSHOT/storage-0.0.1-SNAPSHOT-tests.jar:/home/stefrd/.m2/repository/xmlenc/xmlenc/0.52/xmlenc-0.52.jar:/home/stefrd/.m2/repository/org/mortbay/jetty/jsp-2.1/6.1.14/jsp-2.1-6.1.14.jar:/home/stefrd/.m2/repository/org/apache/ftpserver/ftpserver-core/1.0.0/ftpserver-core-1.0.0.jar:/home/stefrd/.m2/repository/commons-el/commons-el/1.0/commons-el-1.0.jar:/home/stefrd/.m2/repository/org/jruby/jruby-complete/1.6.0/jruby-complete-1.6.0.jar:/home/stefrd/.m2/repository/org/mortbay/jetty/jetty-util/6.1.26/jetty-util-6.1.26.jar:/home/stefrd/.m2/repository/org/apache/mina/mina-core/2.0.0-M5/mina-core-2.0.0-M5.jar:/home/stefrd/.m2/repository/org/slf4j/slf4j-api/1.5.8/slf4j-api-1.5.8.jar:/home/stefrd/.m2/repository/org/apache/hadoop/hadoop-test/0.20-append-r1056497/hadoop-test-0.20-append-r1056497.jar:/home/stefrd/.m2/repository/org/codehaus/jackson/jackson-xc/1.5.5/jackson-xc-1.5.5.jar:/home/stefrd/.m2/repository/commons-beanutils/commons-beanutils-core/1.8.3/commons-beanutils-core-1.8.3.jar:/home/stefrd/.m2/repository/cglib/cglib-nodep/2.2/cglib-nodep-2.2.jar:/home/stefrd/.m2/repository/org/objenesis/objenesis/1.0/objenesis-1.0.jar:/home/stefrd/.m2/repository/commons-lang/commons-lang/2.5/commons-lang-2.5.jar:/home/stefrd/.m2/repository/javax/xml/bind/jaxb-api/2.1/jaxb-api-2.1.jar:/home/stefrd/.m2/repository/org/apache/hbase/hbase/0.90.4/hbase-0.90.4-tests.jar:/home/stefrd/.m2/repository/com/sun/jersey/jersey-core/1.4/jersey-core-1.4.jar:/home/stefrd/.m2/repository/com/sun/xml/bind/jaxb-impl/2.1.12/jaxb-impl-2.1.12.jar:/home/stefrd/.m2/repository/org/easymock/easymock/3.0/easymock-3.0.jar:/home/stefrd/.m2/repository/org/codehaus/jackson/jackson-mapper-asl/1.4.2/jackson-mapper-asl-1.4.2.jar:/home/stefrd/.m2/repository/tomcat/jasper-runtime/5.5.23/jasper-runtime-5.5.23.jar:/home/stefrd/.m2/repository/com/google/guava/guava/r06/guava-r06.jar:/home/stefrd/.m2/repository/org/apache/hadoop/hadoop-core/0.20-append-r1056497/hadoop-core-0.20-append-r1056497.jar:/home/stefrd/.m2/repository/org/apache/ftpserver/ftplet-api/1.0.0/ftplet-api-1.0.0.jar:/home/stefrd/.m2/repository/org/hamcrest/hamcrest-core/1.1/hamcrest-core-1.1.jar:/home/stefrd/.m2/repository/org/mortbay/jetty/servlet-api-2.5/6.1.14/servlet-api-2.5-6.1.14.jar:/home/stefrd/.m2/repository/javax/activation/activation/1.1/activation-1.1.jar:/home/stefrd/.m2/repository/org/apache/hadoop/avro/1.3.3/avro-1.3.3.jar:/home/stefrd/.m2/repository/org/apache/hbase/hbase/0.90.4/hbase-0.90.4.jar:/home/stefrd/.m2/repository/org/mortbay/jetty/jsp-api-2.1/6.1.14/jsp-api-2.1-6.1.14.jar:/home/stefrd/.m2/repository/org/codehaus/jackson/jackson-jaxrs/1.5.5/jackson-jaxrs-1.5.5.jar:/home/stefrd/.m2/repository/stax/stax-api/1.0.1/stax-api-1.0.1.jar:/home/stefrd/.m2/repository/commons-cli/commons-cli/1.2/commons-cli-1.2.jar:/home/stefrd/.m2/repository/org/codehaus/jettison/jettison/1.1/jettison-1.1.jar:/home/stefrd/.m2/repository/com/google/protobuf/protobuf-java/2.3.0/protobuf-java-2.3.0.jar:/home/stefrd/.m2/repository/com/sun/jersey/jersey-server/1.4/jersey-server-1.4.jar:/home/stefrd/.m2/repository/tomcat/jasper-compiler/5.5.23/jasper-compiler-5.5.23.jar:/home/stefrd/.m2/repository/org/mortbay/jetty/jetty/6.1.26/jetty-6.1.26.jar:/home/stefrd/.m2/repository/org/eclipse/jdt/core/3.1.1/core-3.1.1.jar:/home/stefrd/.m2/repository/asm/asm/3.1/asm-3.1.jar:/home/stefrd/.m2/repository/commons-codec/commons-codec/1.4/commons-codec-1.4.jar'
+-encoding
+'UTF-8'
+-protected
+-sourcepath
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/hbase/src/test/java'
+-author
+-bottom
+'Copyright &#169; 2013. All Rights Reserved.'
+-charset
+'UTF-8'
+-d
+'/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/hbase/target/site/testapidocs'
+-docencoding
+'UTF-8'
+-doctitle
+'HBase driver for n-orm hbase-0.90.4-n-orm-0.0.1-SNAPSHOT Test API'
+-link
+'../apidocs'
+-link
+'http://java.sun.com/javase/6/docs/api'
+-linkoffline
+'http://n-orm.googlecode.com/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/storage/target/site/testapidocs'
+-linkoffline
+'http://n-orm.googlecode.com/console/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm/console/target/site/testapidocs'
+-linkoffline
+'http://n-orm.googlecode.com/apidocs' '/media/win7/Users/Stefrd/Documents/W/workspaces/n-orm.redis/target/site/testapidocs'
+-use
+-version
+-windowtitle
+'HBase driver for n-orm hbase-0.90.4-n-orm-0.0.1-SNAPSHOT Test API'

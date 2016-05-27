@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>SetColumnFamily.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.cf</a> &gt; <span class="el_source">SetColumnFamily.java</span></div><h1>SetColumnFamily.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.cf;
+
+import java.io.Serializable;
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
+import java.util.TreeSet;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.IncrementException;
+import com.googlecode.n_orm.KeyManagement;
+import com.googlecode.n_orm.PersistingElement;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+import com.googlecode.n_orm.conversion.ConversionTools;
+
+/**
+ * Column family for sets.
+ * Elements are stored using their identifier as key (see {@link PersistingElement#getIdentifier()} and {@link PersistingElement#getFullIdentifier()}), and an empty byte array as value.
+ * Elements stored in this set should not be mutable, as they are referred to using their key, that is if it changes afterwards, it's its key value that is actually used to be stored.
+ * This Set does not support null values.
+ * Elements are not actually stored in a real Set, its only their key that is stored by this set. However, retrieving an element from this set is still efficient thanks to the cache (see {@link KeyManagement#createElement(Class, String)}.
+ */
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">public class SetColumnFamily&lt;T&gt; extends ColumnFamily&lt;byte[]&gt; implements Set&lt;T&gt; {</span>
+	/**
+	 * The actual value used in the data store;
+	 */
+<span class="fc" id="L30">	private static final byte [] value = new byte[0];</span>
+	
+	private class SetColumnFamilyIterator implements Iterator&lt;T&gt; {
+		
+		private final Iterator&lt;String&gt; elements;
+		private String current;
+		
+<span class="fc" id="L37">		public SetColumnFamilyIterator(Iterator&lt;String&gt; elements) {</span>
+<span class="fc" id="L38">			this.elements = elements;</span>
+<span class="fc" id="L39">		}</span>
+
+		@Override
+		public boolean hasNext() {
+<span class="fc" id="L43">			return elements.hasNext();</span>
+		}
+
+		@Override
+		public T next() {
+<span class="fc" id="L48">			this.current = elements.next();</span>
+<span class="fc" id="L49">			return KeyManagement.getInstance().createElement(getSetElementClazz(), this.current);</span>
+		}
+
+		@Override
+		public void remove() {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">			if (current == null)</span>
+<span class="fc" id="L55">				throw new IllegalStateException(&quot;Should beiterating over an element ; either removing before calling next, or removing twice.&quot;);</span>
+<span class="fc" id="L56">			SetColumnFamily.this.removeKey(current);</span>
+<span class="fc" id="L57">			current = null;</span>
+<span class="fc" id="L58">		}</span>
+		
+	}
+	
+	/**
+	 * SetColumnFamily inherits ColumnFamily&lt;byte[]&gt; so {@link #getClazz()} returns byte[].class ; this method returns the actual type of expected elements.
+	 */
+	private final Class&lt;T&gt; setElementClazz;
+	
+<span class="fc" id="L67">	public SetColumnFamily() {</span>
+<span class="fc" id="L68">		setElementClazz = null;</span>
+<span class="fc" id="L69">	}</span>
+
+	public SetColumnFamily(Class&lt;T&gt; clazz, Field property,
+			PersistingElement owner) throws SecurityException, NoSuchFieldException {
+<span class="fc" id="L73">		this(clazz, property, property.getName(), owner);</span>
+<span class="fc" id="L74">	}</span>
+
+	public SetColumnFamily(Class&lt;T&gt; clazz, Field property, String name,
+			PersistingElement owner) {
+<span class="fc" id="L78">		super(byte[].class, property, name, owner);</span>
+<span class="fc" id="L79">		this.setElementClazz = clazz;</span>
+<span class="fc" id="L80">	}</span>
+	
+	public Class&lt;T&gt; getSetElementClazz() {
+<span class="fc" id="L83">		return setElementClazz;</span>
+	}
+
+	@Override
+	public Serializable getSerializableVersion() {
+<span class="fc" id="L88">		return new HashSet&lt;T&gt;(this);</span>
+	}
+
+	protected String getIndex(T object) {
+<span class="fc" id="L92">		return ConversionTools.convertToString(object, this.getSetElementClazz());</span>
+	}
+
+	@Override
+	protected byte[] preparePut(String key, byte[] rep) {
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">		assert rep.length == 0;</span>
+<span class="fc" id="L98">		return rep;</span>
+	}
+
+	/**
+	 * Adds an element to the column family.
+	 * For this element to appear in the datastore, the owner object must be called the {@link PersistingElement#store()} method
+	 */
+	@Override
+	@Continuator
+	public boolean add(T o) {
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">		if (o == null)</span>
+<span class="nc" id="L109">			throw new NullPointerException(&quot;Set collection family &quot; + this.getName() + &quot; for persisting &quot; + this.getOwner() + &quot; does not support null values.&quot;);</span>
+		String index;
+		try {
+<span class="fc" id="L112">			index = this.getIndex(o);</span>
+<span class="nc" id="L113">		} catch (IllegalArgumentException x) {</span>
+<span class="nc" id="L114">			throw x;</span>
+<span class="nc" id="L115">		} catch (Exception x) {</span>
+<span class="nc" id="L116">			throw new IllegalArgumentException(&quot;Cannot extract representation for &quot; + o + &quot;: &quot; + x.getMessage(), x);</span>
+		}
+		try {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">			if (this.containsKey(index))</span>
+<span class="fc" id="L120">				return false;</span>
+<span class="fc" id="L121">			putElement(index, value);</span>
+<span class="fc" id="L122">			return true;</span>
+<span class="nc" id="L123">		} catch (IncrementException e) {</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">			assert false;</span>
+<span class="nc" id="L125">			throw new IllegalStateException(e);</span>
+<span class="nc" id="L126">		} finally {</span>
+<span class="pc" id="L127">			this.contains(o);</span>
+<span class="nc" id="L128">		}</span>
+	}
+
+	/**
+	 * Check whether this element exists in the activated elements.
+	 */
+	@SuppressWarnings(&quot;unchecked&quot;)
+	@Override
+	@Continuator
+	public boolean contains(final Object o) {
+		String id;
+		try {
+<span class="fc" id="L140">			id = this.getIndex((T)o);</span>
+<span class="nc" id="L141">		} catch (ClassCastException x) {</span>
+<span class="nc" id="L142">			return false;</span>
+<span class="fc" id="L143">		} catch (IllegalArgumentException x) {</span>
+<span class="fc" id="L144">			return false;</span>
+		}
+		
+<span class="fc" id="L147">		return containsKey(id);</span>
+	}
+	
+	/**
+	 * Checks whether this element exists in the family.
+	 * If this element is unknown in the cache, it triggers a request to the data store.
+	 * In the case it exists, the element is added as an activated element to the collection.
+	 */
+	@SuppressWarnings(&quot;unchecked&quot;)
+	@Continuator
+	public boolean containsInStore(final Object o) throws DatabaseNotReachedException {
+		String id;
+		try {
+<span class="fc" id="L160">			id = this.getIndex((T)o);</span>
+<span class="nc" id="L161">		} catch (ClassCastException x) {</span>
+<span class="nc" id="L162">			return false;</span>
+		}
+		
+<span class="fc bfc" id="L165" title="All 2 branches covered.">		return this.getFromStore(id) != null;</span>
+	}
+
+	/**
+	 * Removes an element to the column family.
+	 * For this element not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
+	 */
+	@SuppressWarnings(&quot;unchecked&quot;)
+	@Override
+	@Continuator
+	public boolean remove(Object o) {
+<span class="fc" id="L176">		String index = this.getIndex((T) o);</span>
+		try {
+<span class="fc bfc" id="L178" title="All 2 branches covered.">			if (!this.containsKey(index))</span>
+<span class="fc" id="L179">				return false;</span>
+<span class="fc" id="L180">			this.removeKey(index);</span>
+<span class="fc" id="L181">			return true;</span>
+<span class="nc" id="L182">		} catch (RuntimeException x) {</span>
+<span class="nc" id="L183">			return false;</span>
+<span class="nc" id="L184">		} finally {</span>
+<span class="pc bpc" id="L185" title="12 of 16 branches missed.">			assert ! this.contains(o);</span>
+<span class="nc" id="L186">		}</span>
+	}
+
+	/**
+	 * Returns true if this collection contains all of the elements in the collection of activated values only.
+	 */
+	@Override
+	public boolean containsAll(Collection&lt;?&gt; c) {
+<span class="fc bfc" id="L194" title="All 2 branches covered.">		for (Object object : c) {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">			if (!this.contains(object))</span>
+<span class="fc" id="L196">				return false;</span>
+		}
+<span class="fc" id="L198">		return true;</span>
+	}
+
+
+	/**
+	 * Adds elements to the column family.
+	 * For those elements to appear in the datastore, the owner object must be called the {@link PersistingElement#store()} method
+	 */
+	@Override
+	public boolean addAll(Collection&lt;? extends T&gt; c) {
+<span class="fc" id="L208">		boolean ret = false;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">		for (T t : c) {</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">			if (this.add(t))</span>
+<span class="fc" id="L211">				ret = true;</span>
+		}
+<span class="fc" id="L213">		return ret;</span>
+	}
+
+
+	/**
+	 * Removes elements to the column family.
+	 * For those elements to appear in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
+	 */
+	@Override
+	public boolean removeAll(Collection&lt;?&gt; c) {
+<span class="fc" id="L223">		boolean ret = false;</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">		for (Object t : c) {</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">			if (this.remove(t))</span>
+<span class="fc" id="L226">				ret = true;</span>
+		}
+<span class="fc" id="L228">		return ret;</span>
+	}
+
+	/**
+	 * Retains only the elements in this collection that are contained in the specified collection of activated elements.
+	 * In other words, removes from this collection all of its elements that are not contained in the specified collection.
+	 * For those elements not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
+	 */
+	@Override
+	public boolean retainAll(Collection&lt;?&gt; c) {
+<span class="fc" id="L238">		boolean ret = false;</span>
+<span class="fc" id="L239">		Iterator&lt;T&gt; it = this.iterator();</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">		while (it.hasNext()) {</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">			if (! c.contains(it.next())) {</span>
+<span class="fc" id="L242">				it.remove();</span>
+<span class="fc" id="L243">				ret = true;</span>
+			}
+		}
+<span class="fc" id="L246">		return ret;</span>
+	}
+
+
+	/**
+	 * Removes all activated elements from the column family.
+	 * For those activated elements not to appear anymore in the datastore, the owner object must be called the {@link PersistingElement#store()} method.
+	 */
+	@Override
+	@Continuator
+	public void clear() {
+<span class="fc" id="L257">		this.removeAll(this);</span>
+<span class="fc" id="L258">	}</span>
+
+	/**
+	 * Supplies an iterator over activated values only.
+	 */
+	@Override
+	public Iterator&lt;T&gt; iterator() {
+<span class="fc" id="L265">		return new SetColumnFamilyIterator(new TreeSet&lt;String&gt;(this.collection.keySet()).iterator());</span>
+	}
+
+	/**
+	 * Supplies an array that contains activated values only.
+	 */
+	@Override
+	@Continuator
+	public Object[] toArray() {
+<span class="fc" id="L274">		return this.toArray(new Object[this.size()]);</span>
+	}
+
+	/**
+	 * Supplies an array that contains activated values only.
+	 */
+	@SuppressWarnings(&quot;unchecked&quot;)
+	@Override
+	public &lt;U&gt; U[] toArray(U[] a) {
+<span class="fc bfc" id="L283" title="All 2 branches covered.">		if (a.length &lt; this.size())</span>
+<span class="fc" id="L284">			a = (U[]) Array.newInstance(a.getClass().getComponentType(), this.size());</span>
+<span class="fc" id="L285">		Iterator&lt;T&gt; it = this.iterator();</span>
+<span class="fc" id="L286">		int i = 0;</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">		while (it.hasNext()) {</span>
+<span class="fc" id="L288">			a[i] = (U) it.next();</span>
+<span class="fc" id="L289">			i++;</span>
+		}
+<span class="fc bfc" id="L291" title="All 2 branches covered.">		while (i &lt; a.length) {</span>
+<span class="fc" id="L292">			a[i] = null;</span>
+<span class="fc" id="L293">			i++;</span>
+		}
+<span class="fc" id="L295">		return a;</span>
+	}
+
+	@SuppressWarnings({ &quot;unchecked&quot;, &quot;rawtypes&quot; })
+	@Override
+	public boolean equals(Object obj) {
+<span class="pc bpc" id="L301" title="2 of 8 branches missed.">		return obj != null &amp;&amp; obj instanceof Set &amp;&amp; this.containsAll((Set)obj) &amp;&amp; ((Set)obj).containsAll(this);</span>
+	}
+
+	@Override
+	@Continuator
+	public int hashCode() {
+<span class="fc" id="L307">		int ret = 0;</span>
+<span class="fc" id="L308">		Iterator&lt;T&gt; it = this.iterator();</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">		while (it.hasNext()) {</span>
+<span class="fc" id="L310">			ret += it.next().hashCode();</span>
+		}
+<span class="fc" id="L312">		return ret;</span>
+	}
+
+	@SuppressWarnings(&quot;unchecked&quot;)
+	@Override
+	@Continuator
+	public void activate(Object from, Object to)
+			throws DatabaseNotReachedException {
+<span class="pc bpc" id="L320" title="1 of 4 branches missed.">		if (from != null &amp;&amp; ! this.getSetElementClazz().isInstance(from))</span>
+<span class="nc" id="L321">			throw new IllegalArgumentException(from.toString() + &quot; is not compatible with &quot; + this.getSetElementClazz());</span>
+<span class="pc bpc" id="L322" title="1 of 4 branches missed.">		if (to != null &amp;&amp; ! this.getSetElementClazz().isInstance(to))</span>
+<span class="nc" id="L323">			throw new IllegalArgumentException(to.toString() + &quot; is not compatible with &quot; + this.getSetElementClazz());</span>
+<span class="fc" id="L324">		super.activate(this.getIndex((T) from), this.getIndex((T) to));</span>
+<span class="fc" id="L325">	}</span>
+
+
+	@Override
+	protected void updateFromPOJO(Object pojo) {
+<span class="fc" id="L330">		Set&lt;String&gt; keys = new TreeSet&lt;String&gt;(this.getKeys());</span>
+		
+		@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L333">		Set&lt;T&gt; pojoS = (Set&lt;T&gt;)pojo;</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">		for (T element : pojoS) {</span>
+<span class="fc" id="L335">			String key = this.getIndex(element);</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">			if (!keys.remove(key)) {</span>
+<span class="fc" id="L337">				this.add(element);</span>
+			}
+<span class="fc bfc" id="L339" title="All 2 branches covered.">			if (this.slow) { //For test purpose</span>
+				try {
+<span class="fc" id="L341">					Thread.sleep(50);</span>
+<span class="nc" id="L342">				} catch (InterruptedException e) {</span>
+				}
+			}
+		}
+		
+<span class="fc bfc" id="L347" title="All 2 branches covered.">		for (String key : keys) {</span>
+<span class="fc" id="L348">			this.removeKey(key);</span>
+		}
+<span class="fc" id="L350">	}</span>
+
+	@Override
+	protected void storeToPOJO(Object pojo) {
+		@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L355">		Set&lt;T&gt; pojoS = (Set&lt;T&gt;)pojo;</span>
+		
+<span class="fc" id="L357">		pojoS.clear();</span>
+<span class="fc" id="L358">		pojoS.addAll(this);</span>
+<span class="fc" id="L359">	}</span>
+
+	@Override
+	protected void addToPOJO(Object pojo, String key, byte[] element) {
+		@SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L364">		Set&lt;T&gt; pojoS = (Set&lt;T&gt;)pojo;</span>
+<span class="fc" id="L365">		T actualElement = KeyManagement.getInstance().createElement(this.getSetElementClazz(), key);</span>
+<span class="fc" id="L366">		pojoS.add(actualElement);</span>
+<span class="fc" id="L367">	}</span>
+	
+<span class="fc" id="L369">	private boolean slow = false;</span>
+	
+	/**
+	 * For test purpose...
+	 */
+	void goSlow() {
+<span class="fc" id="L375">		this.slow = true;</span>
+<span class="fc" id="L376">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

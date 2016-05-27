@@ -1,0 +1,6 @@
+com.googlecode.n_orm.hbase
+com.googlecode.n_orm.hbase.actions
+com.googlecode.n_orm.hbase.mapreduce
+com.googlecode.n_orm.hbase.properties
+org.apache.hadoop.hbase.mapreduce
+org.apache.zookeeper.recipes.lock

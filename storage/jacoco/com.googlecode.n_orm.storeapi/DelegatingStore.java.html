@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>DelegatingStore.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.storeapi</a> &gt; <span class="el_source">DelegatingStore.java</span></div><h1>DelegatingStore.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.storeapi;
+
+import java.util.Map;
+import java.util.Set;
+
+import com.googlecode.n_orm.DatabaseNotReachedException;
+import com.googlecode.n_orm.storeapi.Row.ColumnFamilyData;
+
+/**
+ *	A store that delegates all of its requests to another one.
+ */
+public class DelegatingStore implements Store {
+
+	private final Store actualStore;
+
+<span class="fc" id="L16">	public DelegatingStore(Store actualStore) {</span>
+<span class="fc" id="L17">		this.actualStore = actualStore;</span>
+<span class="fc" id="L18">	}</span>
+	
+	/**
+	 * Returns the {@link Store} to which requests will be delegated to.
+	 */
+	public Store getActualStore() {
+<span class="fc" id="L24">		return this.actualStore;</span>
+	}
+	
+	/**
+	 * Finds the {@link Store} to which requests will be delegated to in the delegation chains of the given class.
+	 */
+	public &lt;T extends Store&gt; T getActualStore(Class&lt;T&gt;clazz) {
+<span class="fc" id="L31">		Store ret = this;</span>
+		while (true) {
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">			if (ret == null)</span>
+<span class="nc" id="L34">				return null;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">			else if (clazz.isInstance(ret))</span>
+<span class="fc" id="L36">				return clazz.cast(ret);</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">			else if (ret instanceof DelegatingStore)</span>
+<span class="nc" id="L38">				ret = ((DelegatingStore)ret).getActualStore(clazz);</span>
+			else
+<span class="nc" id="L40">				return null;</span>
+		}
+	}
+	
+	
+	/**
+	 * Returns the leaf {@link Store} of the delegation chain.
+	 */
+	public Store getDeepActualStore() {
+<span class="nc" id="L49">		Store ret = this.getActualStore();</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">		while (ret instanceof DelegatingStore)</span>
+<span class="nc" id="L51">			ret = ((DelegatingStore)ret).getActualStore();</span>
+<span class="nc" id="L52">		return ret;</span>
+	}
+	
+	public void start() throws DatabaseNotReachedException {
+<span class="fc" id="L56">		actualStore.start();</span>
+<span class="fc" id="L57">	}</span>
+
+	public boolean hasTable(String tableName)
+			throws DatabaseNotReachedException {
+<span class="nc" id="L61">		return actualStore.hasTable(tableName);</span>
+	}
+
+	public void delete(MetaInformation meta, String table, String id)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L66">		actualStore.delete(meta, table, id);</span>
+<span class="fc" id="L67">	}</span>
+
+	public boolean exists(MetaInformation meta, String table, String row)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L71">		return actualStore.exists(meta, table, row);</span>
+	}
+
+	public boolean exists(MetaInformation meta, String table, String row,
+			String family) throws DatabaseNotReachedException {
+<span class="fc" id="L76">		return actualStore.exists(meta, table, row, family);</span>
+	}
+
+	public CloseableKeyIterator get(MetaInformation meta, String table,
+			Constraint c, int limit, Set&lt;String&gt; families)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L82">		return actualStore.get(meta, table, c, limit, families);</span>
+	}
+
+	public byte[] get(MetaInformation meta, String table, String row,
+			String family, String key) throws DatabaseNotReachedException {
+<span class="nc" id="L87">		return actualStore.get(meta, table, row, family, key);</span>
+	}
+
+	public Map&lt;String, byte[]&gt; get(MetaInformation meta, String table,
+			String id, String family) throws DatabaseNotReachedException {
+<span class="nc" id="L92">		return actualStore.get(meta, table, id, family);</span>
+	}
+
+	public Map&lt;String, byte[]&gt; get(MetaInformation meta, String table,
+			String id, String family, Constraint c)
+			throws DatabaseNotReachedException {
+<span class="nc" id="L98">		return actualStore.get(meta, table, id, family, c);</span>
+	}
+
+	public ColumnFamilyData get(MetaInformation meta, String table, String id,
+			Set&lt;String&gt; families) throws DatabaseNotReachedException {
+<span class="fc" id="L103">		return actualStore.get(meta, table, id, families);</span>
+	}
+
+	public void storeChanges(MetaInformation meta, String table, String id,
+			ColumnFamilyData changed, Map&lt;String, Set&lt;String&gt;&gt; removed,
+			Map&lt;String, Map&lt;String, Number&gt;&gt; increments)
+			throws DatabaseNotReachedException {
+<span class="fc" id="L110">		actualStore.storeChanges(meta, table, id, changed, removed, increments);</span>
+<span class="fc" id="L111">	}</span>
+
+	public long count(MetaInformation meta, String table, Constraint c)
+			throws DatabaseNotReachedException {
+<span class="nc" id="L115">		return actualStore.count(meta, table, c);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

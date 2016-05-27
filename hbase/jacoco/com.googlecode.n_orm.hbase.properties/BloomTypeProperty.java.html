@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>BloomTypeProperty.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.properties</a> &gt; <span class="el_source">BloomTypeProperty.java</span></div><h1>BloomTypeProperty.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.properties;
+
+import java.util.logging.Level;
+
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.regionserver.StoreFile;
+
+import com.googlecode.n_orm.hbase.HBaseSchema;
+import com.googlecode.n_orm.hbase.Store;
+
+class BloomTypeProperty extends ForcableHColumnProperty&lt;StoreFile.BloomType&gt; {
+<span class="fc" id="L12">	static class BloomTypeForcedProperty extends ShouldForceHBaseProperty {</span>
+		@Override
+		HBaseSchema.SettableBoolean readRawValue(HBaseSchema ann) {
+<span class="fc" id="L15">			return ann.forceBloomFilterType();</span>
+		}
+
+		@Override
+		Boolean getDefaultValue(Store store) {
+<span class="fc" id="L20">			return store.isForceBloomFilterType();</span>
+		}
+
+		@Override
+		String getName() {
+<span class="nc" id="L25">			return &quot;force bloom filter type&quot;;</span>
+		}
+
+	}
+
+	public BloomTypeProperty() {
+<span class="fc" id="L31">		super(new BloomTypeForcedProperty());</span>
+<span class="fc" id="L32">	}</span>
+
+	@Override
+	boolean hasValue(StoreFile.BloomType value, HColumnDescriptor cf) {
+<span class="fc" id="L36">		return cf.getBloomFilterType().equals(value);</span>
+	}
+
+	@Override
+	public void setValue(StoreFile.BloomType value, HColumnDescriptor cf) {
+<span class="fc" id="L41">		cf.setBloomFilterType(value);</span>
+<span class="fc" id="L42">	}</span>
+
+	@Override
+	StoreFile.BloomType readValue(HBaseSchema ann) {
+<span class="fc" id="L46">		String name = ann.bloomFilterType();</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">		if (name == null)</span>
+<span class="nc" id="L48">			return null;</span>
+<span class="fc" id="L49">		name = name.trim();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">		if (name.length() == 0)</span>
+<span class="fc" id="L51">			return null;</span>
+		try {
+<span class="fc" id="L53">			return StoreFile.BloomType.valueOf(ann.bloomFilterType().trim());</span>
+<span class="fc" id="L54">		} catch (Exception x) {</span>
+<span class="fc" id="L55">			Store.errorLogger.log(Level.WARNING, &quot;Unknown bloom type: &quot; + name,</span>
+					x);
+<span class="fc" id="L57">			return null;</span>
+		}
+	}
+
+	@Override
+	StoreFile.BloomType getDefaultValue(Store store) {
+<span class="fc" id="L63">		return store.getBloomFilterType();</span>
+	}
+
+	@Override
+	boolean isSet(StoreFile.BloomType value) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">		return value != null;</span>
+	}
+
+	@Override
+	String getName() {
+<span class="nc" id="L73">		return &quot;max versions&quot;;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

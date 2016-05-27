@@ -1,0 +1,6 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+Redis driver for n-orm,default,JedisAspectProxy,86,20,5,3,19,3,5,5,2,4
+Redis driver for n-orm,com.googlecode.n_orm.redis,RedisStore.DataTypes,0,60,0,0,0,3,0,4,0,4
+Redis driver for n-orm,com.googlecode.n_orm.redis,RedisStore,462,1431,37,107,65,197,39,74,7,34
+Redis driver for n-orm,com.googlecode.n_orm.redis,RowWrapper,0,21,0,2,0,8,0,4,0,3
+Redis driver for n-orm,com.googlecode.n_orm.redis,CloseableIterator,29,167,9,27,9,37,9,15,1,5

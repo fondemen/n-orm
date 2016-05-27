@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>LIFO.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.cache.perthread</a> &gt; <span class="el_source">LIFO.java</span></div><h1>LIFO.java</h1><pre class="source lang-java linenums"><span class="fc" id="L1">package com.googlecode.n_orm.cache.perthread;</span>
+
+import java.util.ConcurrentModificationException;
+import java.util.Iterator;
+
+<span class="pc bpc" id="L6" title="1 of 2 branches missed.">public class LIFO&lt;T&gt; implements Iterable&lt;T&gt; {</span>
+	private static class Node&lt;T&gt; {
+		private T element;
+		private Node&lt;T&gt; head;
+		private Node&lt;T&gt; tail;
+		
+		public Node(T top, Node&lt;T&gt; tail, Node&lt;T&gt; owner) {
+<span class="fc" id="L13">			super();</span>
+<span class="fc" id="L14">			this.element = top;</span>
+<span class="fc" id="L15">			this.tail = tail;</span>
+<span class="fc" id="L16">			this.head = owner;</span>
+<span class="fc" id="L17">		}</span>
+	}
+	
+	public static interface Criterium {
+		boolean check(Node&lt;?&gt; node, Object... args);
+	}
+	
+<span class="fc" id="L24">	private static final Criterium TAIL_CRITERIUM = new Criterium() {</span>
+
+		@Override
+		public boolean check(Node&lt;?&gt; node, Object... args) {
+<span class="fc bfc" id="L28" title="All 2 branches covered.">			return node.tail == null;</span>
+		}
+		
+	};
+	
+<span class="fc" id="L33">	private static final Criterium CONTAINS_CRITERIUM = new Criterium() {</span>
+
+		@Override
+		public boolean check(Node&lt;?&gt; node, Object... args) {
+<span class="fc" id="L37">			return node.element.equals(args[0]);</span>
+		}
+		
+	};
+	
+	/**
+	 * Iterator over the {@link LIFO} starting from the tail.
+	 * This iterator should be used by only one thread so as to avoid synchronization.
+	 * Might iterate over removed elements or stop too soon or too late... but there won't have any {@link ConcurrentModificationException} !
+	 */
+	private class LIFOIterator implements Iterator&lt;T&gt; {
+		private Node&lt;T&gt; next;
+		private Node&lt;T&gt; previous;
+<span class="fc" id="L50">		boolean removed = false;</span>
+		private final Thread authorized;
+		
+<span class="fc" id="L53">		public LIFOIterator() {</span>
+<span class="fc" id="L54">			this.authorized = Thread.currentThread();</span>
+<span class="fc" id="L55">			this.next = getFirstElement();</span>
+<span class="fc" id="L56">		}</span>
+		
+		protected void checkAccess() {
+<span class="fc" id="L59">			Thread cur = Thread.currentThread();</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">			if (cur != this.authorized)</span>
+<span class="nc" id="L61">				throw new IllegalStateException(cur.toString() + &quot; with id &quot; + cur.getId() + &quot; is not allowed to acccess iterator for thread &quot; + this.authorized + &quot; with id &quot; + this.authorized.getId());</span>
+<span class="fc" id="L62">		}</span>
+
+		@Override
+		public boolean hasNext() {
+<span class="fc" id="L66">			this.checkAccess();</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">			return next != null;</span>
+		}
+
+		@Override
+		public T next() {
+<span class="fc" id="L72">			this.checkAccess();</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">			if (this.next == null)</span>
+<span class="nc" id="L74">				throw new IllegalStateException(&quot;Iterator is empty&quot;);</span>
+<span class="fc" id="L75">			T ret = this.next.element;</span>
+<span class="fc" id="L76">			this.previous = this.next;</span>
+<span class="fc" id="L77">			this.next = this.next.head;</span>
+<span class="fc" id="L78">			this.removed = false;</span>
+<span class="fc" id="L79">			return ret;</span>
+		}
+
+		@Override
+		public void remove() {
+<span class="fc" id="L84">			this.checkAccess();</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">			if (removed)</span>
+<span class="nc" id="L86">				return;</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">			if (previous == null)</span>
+<span class="nc" id="L88">				throw new IllegalStateException(&quot;Cannot remove before calling next()&quot;);</span>
+<span class="pc" id="L89">			synchronized(LIFO.this) { //Can't do pop at same time...</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">				if (actualList == this.previous) {</span>
+<span class="fc" id="L91">					pop();</span>
+<span class="fc" id="L92">					this.previous = null;</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">				} else if (this.previous.head == null) { //We've been too far (some pops or remove happened since last next)</span>
+<span class="fc" id="L94">					this.previous = null; //and not next = null since if there were a remove from another thread, iterator should continue</span>
+				} else {
+<span class="nc" id="L96">					Node&lt;T&gt; head = this.previous.head;</span>
+<span class="nc" id="L97">					Node&lt;T&gt; tail = this.previous.tail;</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">					if (tail != null) tail.head = head;</span>
+<span class="nc" id="L99">					head.tail = tail;</span>
+				}
+<span class="fc" id="L101">				this.removed = true;</span>
+			}
+<span class="fc" id="L103">		}</span>
+		
+	}
+	
+	private Node&lt;T&gt; actualList;
+	
+	public synchronized T pop() {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">		if (actualList == null)</span>
+<span class="fc" id="L111">			return null;</span>
+<span class="fc" id="L112">		T ret = actualList.element;</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">		if (actualList.tail == null) {</span>
+<span class="fc" id="L114">			actualList = null;</span>
+		} else {
+<span class="fc" id="L116">			this.actualList.tail.head = null;</span>
+<span class="fc" id="L117">			this.actualList = this.actualList.tail;</span>
+		}
+<span class="fc" id="L119">		return ret;</span>
+	}
+	
+	public synchronized void push(T element) {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">		if (element == null)</span>
+<span class="nc" id="L124">			return;</span>
+<span class="fc" id="L125">		Node&lt;T&gt; nextActualList = new Node&lt;T&gt;(element, this.actualList, null);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">		if (this.actualList != null)</span>
+<span class="fc" id="L127">			this.actualList.head = nextActualList;</span>
+<span class="fc" id="L128">		this.actualList = nextActualList;</span>
+<span class="fc" id="L129">	}</span>
+
+	public synchronized void pushAll(LIFO&lt;T&gt; available) {
+<span class="fc" id="L132">		Node&lt;T&gt; fa = available.getFirstElement();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">		if (fa == null)</span>
+<span class="fc" id="L134">			return;</span>
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">		assert fa.tail == null;</span>
+<span class="fc" id="L136">		fa.tail = this.actualList;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">		if (this.actualList != null)</span>
+<span class="fc" id="L138">			this.actualList.head = fa;</span>
+<span class="fc" id="L139">		this.actualList = fa;</span>
+<span class="fc" id="L140">	}</span>
+
+	/**
+	 * An iterator starting from the tail of the LIFO.
+	 * Supports {@link Iterator#remove()}.
+	 * The iterator should be used by only one thread.
+	 * Won't throw {@link ConcurrentModificationException} even if LIFO is modified (for instance by calling {@link #push(Object)}, {@link Iterator#remove()}}.
+	 * However, it can iterate over popped or removed elements...
+	 */
+	@Override
+	public Iterator&lt;T&gt; iterator() {
+<span class="fc" id="L151">		return new LIFOIterator();</span>
+	}
+
+	public void clear() {
+<span class="fc" id="L155">		this.actualList = null;</span>
+<span class="fc" id="L156">	}</span>
+
+	public Node&lt;T&gt; findWithCriterium(Criterium c, Object... args) {
+<span class="fc" id="L159">		Node&lt;T&gt; ret = this.actualList;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">		while (ret != null) {</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">			if (c.check(ret, args))</span>
+<span class="fc" id="L162">				return ret;</span>
+<span class="fc" id="L163">			ret = ret.tail;</span>
+		}
+<span class="fc" id="L165">		return null;</span>
+	}
+	
+	public Node&lt;T&gt; getFirstElement() {
+<span class="fc" id="L169">		Node&lt;T&gt; ret = this.findWithCriterium(TAIL_CRITERIUM);</span>
+<span class="pc bpc" id="L170" title="2 of 6 branches missed.">		assert ret == null || ret.tail == null;</span>
+<span class="fc" id="L171">		return ret;</span>
+	}
+
+	public boolean contains(T element) {
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">		return this.findWithCriterium(CONTAINS_CRITERIUM, element) != null;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>

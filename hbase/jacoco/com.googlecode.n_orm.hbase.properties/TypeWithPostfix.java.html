@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TypeWithPostfix.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">HBase driver for n-orm</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.hbase.properties</a> &gt; <span class="el_source">TypeWithPostfix.java</span></div><h1>TypeWithPostfix.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm.hbase.properties;
+
+abstract class TypeWithPostfix implements
+		Comparable&lt;TypeWithPostfix&gt; {
+	private final String postfix;
+
+<span class="fc" id="L7">	public TypeWithPostfix(String postfix) {</span>
+<span class="fc" id="L8">		this.postfix = postfix;</span>
+<span class="fc" id="L9">	}</span>
+
+	public String getPostfix() {
+<span class="fc" id="L12">		return postfix;</span>
+	}
+
+	@Override
+	public int compareTo(TypeWithPostfix o) {
+<span class="fc bfc" id="L17" title="All 2 branches covered.">		if (!this.getClass().equals(o.getClass()))</span>
+<span class="fc" id="L18">			return this.getClass().getSimpleName()</span>
+					.compareTo(o.getClass().getName());
+<span class="fc" id="L20">		return this.getPostfix().compareTo(o.getPostfix());</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>
