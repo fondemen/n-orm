@@ -55,7 +55,11 @@ public class Shell {
 			lineSeparator = System.getProperty("line.separator");
 
 			if ((lineSeparator == null) || (lineSeparator.trim().length() == 0)) {
-				lineSeparator = System.lineSeparator();
+				try {
+					Method lineSepMeth = System.class.getMethod(lineSeparator);
+					lineSeparator = (String)lineSepMeth.invoke(null);
+				} catch (Exception x) {
+				}
 			}
 		}
 
