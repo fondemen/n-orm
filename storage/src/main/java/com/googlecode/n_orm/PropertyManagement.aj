@@ -145,8 +145,7 @@ public aspect PropertyManagement {
 				try {
 					return ConversionTools.convert(obj.getClass(),
 							(byte[]) this.getValue()).equals(obj);
-				} catch (Exception x) {
-				}
+				} catch (Exception x) {}
 			}
 			return getValue().equals(obj);
 		}

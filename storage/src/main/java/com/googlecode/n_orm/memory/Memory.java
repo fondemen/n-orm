@@ -155,7 +155,6 @@ public class Memory implements SimpleStore {
 		/**
 		 * Removes an element from the map.
 		 * @param key the non-null key of the element
-		 * @param value must not be null; use {@link #remove(String)} to remove an element
 		 * @return the previous value for the map
 		 */
 		public  T remove(String key) {
@@ -167,8 +166,7 @@ public class Memory implements SimpleStore {
 
 		/**
 		 * Removes elements from the map according to their keys.
-		 * @param key the non-null key of the element
-		 * @param value must not be null; use {@link #remove(String)} to remove an element
+		 * @param keys the list of keys to remove
 		 */
 		public void removeAll(Set<String> keys) {
 			if (keys == null)

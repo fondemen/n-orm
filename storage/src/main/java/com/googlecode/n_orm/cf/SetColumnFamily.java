@@ -339,8 +339,7 @@ public class SetColumnFamily<T> extends ColumnFamily<byte[]> implements Set<T> {
 			if (this.slow) { //For test purpose
 				try {
 					Thread.sleep(50);
-				} catch (InterruptedException e) {
-				}
+				} catch (InterruptedException e) {}
 			}
 		}
 		

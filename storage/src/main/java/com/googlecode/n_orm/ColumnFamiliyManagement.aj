@@ -92,8 +92,7 @@ public aspect ColumnFamiliyManagement {
 			try {
 				if (cf == collection || pm.readValue(this, cf.getProperty()) == collection)
 					return cf;
-			} catch (Exception e) {
-			}
+			} catch (Exception e) {}
 		}
 		throw new UnknownColumnFamily(this.getClass(), collection.toString());
 	}

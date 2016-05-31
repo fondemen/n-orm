@@ -23,8 +23,7 @@ public aspect ConcurentAccessOnColumnFamily {
 				cme = x;
 				try {
 					Thread.sleep(100);
-				} catch (InterruptedException e) {
-				}
+				} catch (InterruptedException e) {}
 			}
 			maxRetries--;
 		} while (cme != null && maxRetries>=0);

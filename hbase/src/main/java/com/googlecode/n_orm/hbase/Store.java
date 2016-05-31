@@ -728,7 +728,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	/**
 	 * Whether created tables should have {@link HColumnDescriptor#setTimeToLive(int)} set.
 	 * Default value is {@link HColumnDescriptor#DEFAULT_TTL}
-	 * null or value &lt= 0 is considered as unset (i.e. the default value).
+	 * A null, zero or negative value is considered as unset (i.e. the default value).
 	 */
 	public void setTimeToLiveSeconds(Integer timeToLiveSeconds) {
 		PropertyUtils.clearCachedValues();
@@ -764,7 +764,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	/**
 	 * Whether created tables should have {@link HColumnDescriptor#setMaxVersions(int)} set.
 	 * Default value is {@link HColumnDescriptor#DEFAULT_VERSIONS}
-	 * null or value &lt= 0 is considered as unset (i.e. the default value).
+	 * A null, zero or negative value is considered as unset (i.e. the default value).
 	 */
 	public void setMaxVersions(Integer maxVersions) {
 		PropertyUtils.clearCachedValues();
@@ -908,7 +908,7 @@ public class Store implements com.googlecode.n_orm.storeapi.Store, ActionnableSt
 	/**
 	 * Whether created tables should have {@link HColumnDescriptor#setScope(int)} set.
 	 * Default value is equivalent to {@link HColumnDescriptor#DEFAULT_REPLICATION_SCOPE}
-	 * null or &lt= 0 or &gt=2 is considered as unset (i.e. the default value).
+	 * A {@literal <}= 0 or {@literal <}= 2 value is considered as unset (i.e. the default value).
 	 */
 	public void setReplicationScope(Integer replicationScope) {
 		PropertyUtils.clearCachedValues();

@@ -34,7 +34,7 @@ import com.googlecode.n_orm.storeapi.SimpleStore;
  * families</i> that can be assigned to null (only). Those column families will
  * be transformed to instances of {@link com.googlecode.n_orm.cf.ColumnFamily} ({@link com.googlecode.n_orm.cf.SetColumnFamily}
  * for {@link java.util.Set}s or {@link com.googlecode.n_orm.cf.MapColumnFamily} for {@link java.util.Map}s).
- * </p>
+ * 
  * <p>
  * Keys are essential to search persisting elements. Indeed, one can efficiently
  * search for persisting elements between two elements (see

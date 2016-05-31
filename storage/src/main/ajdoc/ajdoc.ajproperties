@@ -1,0 +1,2 @@
+src.includes = src/main/java
+src.excludes = src/test

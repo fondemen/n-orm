@@ -56,5 +56,47 @@ Different data stores are possible, especially column-oriented data stores such 
 		</site>
 	</distributionManagement>
 	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>1.5.0</version>
+				<executions>
+					<execution>
+						<id>enchance-javadoc</id>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<phase>post-site</phase>
+					</execution>
+				</executions>
+				<configuration>
+					<executable>enhancejavadoc.sh</executable>
+				</configuration>
+			</plugin>
+		</plugins>
 	</build>
+	<reporting>
+		<plugins>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>aspectj-maven-plugin</artifactId>
+				<version>${aspectj.plugin.version}</version>
+				<configuration>
+					<verbose>false</verbose>
+					<publicScope>true</publicScope>
+					<complianceLevel>${java.version}</complianceLevel>
+					<ajdtBuildDefFile>src/main/ajdoc/ajdoc.ajproperties</ajdtBuildDefFile>
+
+				</configuration>
+				<reportSets>
+					<reportSet>
+						<reports>
+							<report>aspectj-report</report>
+						</reports>
+					</reportSet>
+				</reportSets>
+			</plugin>
+		</plugins>
+	</reporting>
 </project>

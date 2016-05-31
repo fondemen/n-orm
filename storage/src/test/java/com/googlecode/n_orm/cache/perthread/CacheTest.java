@@ -36,8 +36,10 @@ public class CacheTest {
 
 	@Test(timeout=11000)
 	public void cacheCleanup() throws InterruptedException {
-		int max = Cache.getMaxElementsInCache();
+		final int max = Cache.getMaxElementsInCache();
 		Cache.setMaxElementsInCache(2);
+		final int ttl = Cache.getTimeToLiveSeconds();
+		Cache.setTimeToLiveSeconds((Integer.MAX_VALUE/1000)-1);
 		try {
 			final AssertionError[] error = new AssertionError [1];
 			final BookStore bs = new BookStore("testbookstore");
@@ -50,28 +52,35 @@ public class CacheTest {
 						Thread t = Thread.currentThread();
 						assertFalse(Cache.knowsCache(t));
 						assertNull(Cache.findCache(t));
-						StorageManagement.getElement(BookStore.class, bs.getIdentifier());
+						BookStore bsc = StorageManagement.getElement(BookStore.class, bs.getIdentifier());
+						assertEquals(bs, bsc);
 						Cache c = Cache.findCache(t);
 						assertNotNull(c);
 						assertTrue(Cache.knowsCache(t));
 						assertEquals(1, c.size());
-						assertNotNull(Cache.getCache().getKnownPersistingElement(bs.getFullIdentifier()));
+						assertSame(bsc, Cache.getCache().getKnownPersistingElement(bs.getFullIdentifier()));
+						
+						Thread.sleep(1); // Making sure bs is not registered at same millisecond as bs2
 						
 						BookStore bs2 = new BookStore("bs2");
 						bs2.activate();
 						assertEquals(2, c.size());
-						assertNotNull(Cache.getCache().getKnownPersistingElement(bs.getFullIdentifier()));
-						assertNotNull(Cache.getCache().getKnownPersistingElement(bs2.getFullIdentifier()));
+						assertSame(bsc, Cache.getCache().getKnownPersistingElement(bs.getFullIdentifier()));
+						assertSame(bs2, Cache.getCache().getKnownPersistingElement(bs2.getFullIdentifier()));
+						
+						Thread.sleep(1);
 						
 						BookStore bs3 = new BookStore("bs3");
 						bs3.activate();
 						assertEquals(2, c.size());
 						assertNull(Cache.getCache().getKnownPersistingElement(bs.getFullIdentifier()));
-						assertNotNull(Cache.getCache().getKnownPersistingElement(bs2.getFullIdentifier()));
-						assertNotNull(Cache.getCache().getKnownPersistingElement(bs2.getFullIdentifier()));
+						assertSame(bs2, Cache.getCache().getKnownPersistingElement(bs2.getFullIdentifier()));
+						assertSame(bs3, Cache.getCache().getKnownPersistingElement(bs3.getFullIdentifier()));
 						
 					} catch (AssertionError r) {
 						error[0] = r;
+					} catch (Exception e) {
+						e.printStackTrace();
 					}
 				}
 			};
@@ -89,8 +98,22 @@ public class CacheTest {
 			assertFalse(Cache.knowsCache(t));
 		} finally {
 			Cache.setMaxElementsInCache(max);
+			Cache.setTimeToLiveSeconds(ttl);
 		}
 		
+	}
+	
+	public void maxTTL() throws InterruptedException {
+		final int ttl = Cache.getTimeToLiveSeconds();
+		Cache.setTimeToLiveSeconds(Integer.MAX_VALUE);
+		try {
+			BookStore bs = new BookStore("testbookstore");
+			bs.activate();
+			Thread.sleep(10);
+			assertSame(bs, Cache.getCache().getKnownPersistingElement(bs.getFullIdentifier()));
+		} finally {
+			Cache.setTimeToLiveSeconds(ttl);
+		}
 	}
 	
 	public static class WaitingThread extends Thread {

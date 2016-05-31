@@ -20,7 +20,7 @@ import com.googlecode.n_orm.DatabaseNotReachedException;
  * A zookeeper-based read write lock for protecting table schemas operations.
  * Read lock can be promoted to write lock ;
  * in this latter case write unlock brings back read lock.
- * Uses the "/n-orm/schemalock/<table name>" directory
+ * Uses the "/n-orm/schemalock/[table name]" directory
  * at the zookeeper level.<br>
  * For a given thread, locks can be acquired a reentrant way.
  * However, they must be released in the reversed order the've been acquired.

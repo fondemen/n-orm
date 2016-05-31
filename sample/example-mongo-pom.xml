@@ -3,14 +3,14 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.googlecode.n_orm</groupId>
 	<artifactId>sample</artifactId>
-	<version>${n-orm.version}</version>
+	<version>mongo-${n-orm.version}</version>
 	<name>Sample n-orm project</name>
 	<description>Simple starter project.</description>
 	<properties>
 		<java.version>1.6</java.version>
 		<n-orm.version>0.0.1-SNAPSHOT</n-orm.version>
-		<aspectj.version>1.7.3</aspectj.version>
-		<plugin.aspectj.version>1.4</plugin.aspectj.version>
+		<aspectj.version>1.8.9</aspectj.version>
+		<plugin.aspectj.version>1.8</plugin.aspectj.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 	<build>
@@ -19,16 +19,13 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>2.3.2</version>
+				<version>3.5.1</version>
 				<configuration>
 					<source>${java.version}</source>
 					<target>${java.version}</target>
-					<excludes>
-						<!-- excluding business model as it must be compiled using AspectJ -->
-						<exclude>**/*.java</exclude>
-					</excludes>
+					<skipMain>true</skipMain> <!-- should compile with AspectJ instead -->
 					<testExcludes>
-						<!-- Excluding HBaseTestLauncher as we'll use the Mongo store -->
+						<!-- Excluding HBaseTestLauncher as we'll not use the HBase store -->
 						<excludes>**/HBase*.java</excludes>
 					</testExcludes>
 				</configuration>
@@ -42,6 +39,7 @@
 					<source>${java.version}</source>
 					<target>${java.version}</target>
 					<complianceLevel>${java.version}</complianceLevel>
+					<Xlint>adviceDidNotMatch=ignore</Xlint>
 					<aspectLibraries>
 						<aspectLibrary>
 							<groupId>com.googlecode.n_orm</groupId>
@@ -99,7 +97,7 @@
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
-			<version>4.8.2</version>
+			<version>4.12</version>
 			<type>jar</type>
 			<scope>test</scope>
 		</dependency>

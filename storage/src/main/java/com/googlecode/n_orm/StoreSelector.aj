@@ -217,8 +217,7 @@ public aspect StoreSelector {
 		    			packageStores.put(ret.pack, ret);
 		    			return ret;
 	    			}
-	    		} catch (IOException x) {
-	    		}
+	    		} catch (IOException x) {}
 		}
 		
 		//Not found ; let's try in the package above...
