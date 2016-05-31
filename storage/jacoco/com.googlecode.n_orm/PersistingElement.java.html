@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PersistingElement.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">PersistingElement.java</span></div><h1>PersistingElement.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm;
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PersistingElement.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.source.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">PersistingElement.java</span></div><h1>PersistingElement.java</h1><pre class="source lang-java linenums">package com.googlecode.n_orm;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -16,17 +16,20 @@ import com.googlecode.n_orm.storeapi.Store;
  * To make a class persisting, do not implement this interface, but rather declare the annotation {@link Persisting}.
  * @see Persisting
  */
-<span class="fc" id="L19">public interface PersistingElement extends Comparable&lt;PersistingElement&gt;, Serializable {</span>
+public interface PersistingElement extends Comparable&lt;PersistingElement&gt;, Serializable {
+	
+	public static final long serialVersionUID = 3339697263519532988L;
+	
 	/**
 	 * The list of possible types for simple properties (including keys).
 	 * Other possible types are array of a possible type, persisting elements and classes with only keys.
 	 */
-<span class="fc" id="L24">	public static final Class&lt;?&gt;[] PossiblePropertyTypes = new Class[] { Date.class,</span>
-<span class="fc" id="L25">			String.class, Boolean.class, int.class, byte.class, short.class,</span>
-<span class="fc" id="L26">			long.class, float.class, double.class, boolean.class,</span>
-<span class="fc" id="L27">			char.class, Integer.class, Byte.class, Short.class, Long.class,</span>
-<span class="fc" id="L28">			Float.class, Double.class, Boolean.class,</span>
-<span class="fc" id="L29">			Character.class };</span>
+<span class="fc" id="L27">	public static final Class&lt;?&gt;[] PossiblePropertyTypes = new Class[] { Date.class,</span>
+<span class="fc" id="L28">			String.class, Boolean.class, int.class, byte.class, short.class,</span>
+<span class="fc" id="L29">			long.class, float.class, double.class, boolean.class,</span>
+<span class="fc" id="L30">			char.class, Integer.class, Byte.class, Short.class, Long.class,</span>
+<span class="fc" id="L31">			Float.class, Double.class, Boolean.class,</span>
+<span class="fc" id="L32">			Character.class };</span>
 
 	/**
 	 * The store used for this persisting element.
@@ -123,20 +126,20 @@ import com.googlecode.n_orm.storeapi.Store;
 	 * &lt;b&gt;WARNING:&lt;/b&gt; any column family change would raise a {@link java.util.ConcurrentModificationException} during this period in case application is multi-threaded and this element is explicitly shared by threads.
 	 * In the latter case, the store is retried at most 0.5s per problematic column family.
 	 * Simplest solution is to search this element in each thread using {@link StorageManagement#getElement(Class, String)}.&lt;br&gt;
-	 * A cleaner mean to solve this issue store calls should be performed within a synchronized section on this or on changed column family:&lt;br&gt;
-	 * &lt;code&gt;
-	 * synchronized(element.myFamily) { &lt;i&gt;//or merely synchronized(element)&lt;/i&gt;&lt;br&gt;
-	 * &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;element.myFamily.add(something);&lt;br&gt;
+	 * A cleaner mean to solve this issue store calls should be performed within a synchronized section on this or on changed column family:
+	 * &lt;blockquote&gt;&lt;pre&gt;
+	 * synchronized(element.myFamily) { //or merely synchronized(element)
+	 * 	element.myFamily.add(something);
 	 * }
-	 * &lt;/code&gt;&lt;br&gt;
-	 * Another way to avoid such problem is to use an instance of {@link ColumnFamily} as a column family (but then this cannot be serialized):&lt;br&gt;
-	 * &lt;code&gt;
-	 * &amp;#64;Persisting class Foo {&lt;br&gt;
-	 * &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;...&lt;br&gt;
-	 * &amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;public java.util.Map&lt;BarK,BarV&gt; element = new MapColumnFamily();&lt;br&gt;
+	 * &lt;/pre&gt;&lt;/blockquote&gt;
+	 * Another way to avoid such problem is to use an instance of {@link ColumnFamily} as a column family (but then this cannot be serialized):
+	 * &lt;blockquote&gt;&lt;pre&gt;
+	 * {@literal @}Persisting class Foo {
+	 * 	...
+	 * 	public java.util.Map{@literal &lt;}BarK,BarV{@literal &gt;} element = new MapColumnFamily();
 	 * }
-	 * &lt;/code&gt;
-	 * &lt;/p&gt;
+	 * &lt;/pre&gt;&lt;/blockquote&gt;
+	 * 
 	 * @throws DatabaseNotReachedException in case the store cannot store this persisting object (e.g. cannot connect to database)
 	 * @see #getIdentifier()
 	 * @see com.googlecode.n_orm.storeapi.SimpleStore
@@ -342,4 +345,4 @@ import com.googlecode.n_orm.storeapi.Store;
 	 */
 	public void removePersistingElementListener(PersistingElementListener listener);
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ColumnFamiliyManagement.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">ColumnFamiliyManagement.aj</span></div><h1>ColumnFamiliyManagement.aj</h1><pre class="source lang-java linenums"><span class="pc bpc" id="L1" title="3 of 4 branches missed.">package com.googlecode.n_orm;</span>
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ColumnFamiliyManagement.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.source.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">ColumnFamiliyManagement.aj</span></div><h1>ColumnFamiliyManagement.aj</h1><pre class="source lang-java linenums"><span class="pc bpc" id="L1" title="3 of 4 branches missed.">package com.googlecode.n_orm;</span>
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -25,7 +25,7 @@ import com.googlecode.n_orm.consoleannotations.Continuator;
 
 
 <span class="pc" id="L27">public aspect ColumnFamiliyManagement {</span>
-	private static ColumnFamiliyManagement INSTANCE;
+<span class="fc" id="L28">	private static ColumnFamiliyManagement INSTANCE;</span>
 	
 	public static ColumnFamiliyManagement getInstance() {
 <span class="fc bfc" id="L31" title="All 2 branches covered.">		if (INSTANCE == null)</span>
@@ -92,133 +92,132 @@ import com.googlecode.n_orm.consoleannotations.Continuator;
 			try {
 <span class="fc bfc" id="L93" title="All 4 branches covered.">				if (cf == collection || pm.readValue(this, cf.getProperty()) == collection)</span>
 <span class="fc" id="L94">					return cf;</span>
-<span class="fc" id="L95">			} catch (Exception e) {</span>
-			}
+<span class="fc" id="L95">			} catch (Exception e) {}</span>
 		}
-<span class="nc" id="L98">		throw new UnknownColumnFamily(this.getClass(), collection.toString());</span>
+<span class="nc" id="L97">		throw new UnknownColumnFamily(this.getClass(), collection.toString());</span>
 	}
 	
 	//For test purpose
 	void PersistingElement.clearColumnFamilies() {
-<span class="nc" id="L103">		this.getColumnFamiliesInt().clear();</span>
-<span class="nc" id="L104">	}</span>
+<span class="nc" id="L102">		this.getColumnFamiliesInt().clear();</span>
+<span class="nc" id="L103">	}</span>
 	
 	public boolean PersistingElement.hasChanged() {
-<span class="fc" id="L107">		this.updateFromPOJO();</span>
-<span class="fc bfc" id="L108" title="All 2 branches covered.">		for (ColumnFamily&lt;?&gt; cf : this.getColumnFamiliesInt().values()) {</span>
-<span class="fc bfc" id="L109" title="All 2 branches covered.">			if (cf.hasChanged())</span>
-<span class="fc" id="L110">				return true;</span>
+<span class="fc" id="L106">		this.updateFromPOJO();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">		for (ColumnFamily&lt;?&gt; cf : this.getColumnFamiliesInt().values()) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">			if (cf.hasChanged())</span>
+<span class="fc" id="L109">				return true;</span>
 		}
-<span class="fc" id="L112">		return false;</span>
+<span class="fc" id="L111">		return false;</span>
 	}
 	
 	/**
 	 * Checks whether a {@link Field} of this persisting element represents a column family.
 	 */
 	public boolean isCollectionFamily(Field f) {
-<span class="fc bfc" id="L119" title="All 6 branches covered.">		return ((f.getModifiers() &amp; (Modifier.STATIC | Modifier.TRANSIENT)) == 0) &amp;&amp; !f.isAnnotationPresent(Transient.class) &amp;&amp; this.isCollectionType(f.getType());</span>
+<span class="fc bfc" id="L118" title="All 6 branches covered.">		return ((f.getModifiers() &amp; (Modifier.STATIC | Modifier.TRANSIENT)) == 0) &amp;&amp; !f.isAnnotationPresent(Transient.class) &amp;&amp; this.isCollectionType(f.getType());</span>
 	}
 
 	/**
 	 * Checks whether a column family attribute can have this type
 	 */
 	public boolean isCollectionType(Class&lt;?&gt; type) {
-<span class="fc bfc" id="L126" title="All 8 branches covered.">		return Set.class.equals(type) || Map.class.equals(type) || SetColumnFamily.class.isAssignableFrom(type) || MapColumnFamily.class.isAssignableFrom(type);</span>
+<span class="fc bfc" id="L125" title="All 8 branches covered.">		return Set.class.equals(type) || Map.class.equals(type) || SetColumnFamily.class.isAssignableFrom(type) || MapColumnFamily.class.isAssignableFrom(type);</span>
 	}
 
-<span class="fc" id="L129">	private Map&lt;Class&lt;?&gt;, Map&lt;String, Field&gt;&gt; typeColumnFamilies = new HashMap&lt;Class&lt;?&gt;, Map&lt;String, Field&gt;&gt;();</span>
+<span class="fc" id="L128">	private Map&lt;Class&lt;?&gt;, Map&lt;String, Field&gt;&gt; typeColumnFamilies = new HashMap&lt;Class&lt;?&gt;, Map&lt;String, Field&gt;&gt;();</span>
 	
 	/**
 	 * Finds in a class the fields that are column families
 	 */
 	public Map&lt;String, Field&gt; getColumnFamilies(Class&lt;? extends PersistingElement&gt; clazz) {
-<span class="pc" id="L135">		synchronized (typeColumnFamilies) {</span>
-<span class="fc" id="L136">			Map&lt;String, Field&gt; ret = this.typeColumnFamilies.get(clazz);</span>
-<span class="fc bfc" id="L137" title="All 2 branches covered.">			if (ret == null) {</span>
-<span class="fc" id="L138">				ret = new TreeMap&lt;String, Field&gt;();</span>
-<span class="fc" id="L139">				Class&lt;?&gt; c = clazz;</span>
+<span class="pc" id="L134">		synchronized (typeColumnFamilies) {</span>
+<span class="fc" id="L135">			Map&lt;String, Field&gt; ret = this.typeColumnFamilies.get(clazz);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">			if (ret == null) {</span>
+<span class="fc" id="L137">				ret = new TreeMap&lt;String, Field&gt;();</span>
+<span class="fc" id="L138">				Class&lt;?&gt; c = clazz;</span>
 				do {
-<span class="fc bfc" id="L141" title="All 2 branches covered.">					for (Field field : c.getDeclaredFields()) {</span>
-<span class="fc bfc" id="L142" title="All 2 branches covered.">						if (isCollectionFamily(field))</span>
-<span class="fc" id="L143">							ret.put(field.getName(), field);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">					for (Field field : c.getDeclaredFields()) {</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">						if (isCollectionFamily(field))</span>
+<span class="fc" id="L142">							ret.put(field.getName(), field);</span>
 					}
-<span class="fc" id="L145">					c = c.getSuperclass();</span>
-<span class="fc bfc" id="L146" title="All 2 branches covered.">				} while (c != null);</span>
-<span class="fc" id="L147">				typeColumnFamilies.put(clazz, ret);</span>
+<span class="fc" id="L144">					c = c.getSuperclass();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">				} while (c != null);</span>
+<span class="fc" id="L146">				typeColumnFamilies.put(clazz, ret);</span>
 			}
-<span class="fc" id="L149">			return ret;</span>
+<span class="fc" id="L148">			return ret;</span>
 		}
 	}
 	
 
 	public Set&lt;Field&gt; getColumnFamilies(Class&lt;? extends PersistingElement&gt; clazz, Set&lt;String&gt; columnFamilyNames) {
-<span class="nc" id="L155">		Map&lt;String, Field&gt; cfs = this.getColumnFamilies(clazz);</span>
-<span class="nc" id="L156">		Set&lt;Field&gt; ret = new HashSet&lt;Field&gt;();</span>
-<span class="nc bnc" id="L157" title="All 2 branches missed.">		for (String fieldName : columnFamilyNames) {</span>
-<span class="nc" id="L158">			Field f = cfs.get(fieldName);</span>
-<span class="nc bnc" id="L159" title="All 2 branches missed.">			if (f == null)</span>
-<span class="nc" id="L160">				throw new IllegalArgumentException(&quot;Cannot find column family &quot; + fieldName + &quot; in &quot; + clazz.getName());</span>
-<span class="nc" id="L161">			ret.add(f);</span>
+<span class="nc" id="L154">		Map&lt;String, Field&gt; cfs = this.getColumnFamilies(clazz);</span>
+<span class="nc" id="L155">		Set&lt;Field&gt; ret = new HashSet&lt;Field&gt;();</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">		for (String fieldName : columnFamilyNames) {</span>
+<span class="nc" id="L157">			Field f = cfs.get(fieldName);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">			if (f == null)</span>
+<span class="nc" id="L159">				throw new IllegalArgumentException(&quot;Cannot find column family &quot; + fieldName + &quot; in &quot; + clazz.getName());</span>
+<span class="nc" id="L160">			ret.add(f);</span>
 		}
-<span class="nc" id="L163">		return ret;</span>
+<span class="nc" id="L162">		return ret;</span>
 	}
 	
 	public void PersistingElement.updateFromPOJO() {
-<span class="fc bfc" id="L167" title="All 2 branches covered.">		for (ColumnFamily&lt;?&gt; cf : this.getColumnFamiliesInt().values()) {</span>
-<span class="fc" id="L168">			cf.updateFromPOJO();</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">		for (ColumnFamily&lt;?&gt; cf : this.getColumnFamiliesInt().values()) {</span>
+<span class="fc" id="L167">			cf.updateFromPOJO();</span>
 		}
-<span class="fc" id="L170">	}</span>
+<span class="fc" id="L169">	}</span>
 	
 	void around(PersistingElement self, Object cf): set(!@Transient !transient !static (Set+ || Map+) (*.*)) &amp;&amp; !within(ColumnFamiliyManagement) &amp;&amp; target(self) &amp;&amp; args(cf) {
-<span class="fc" id="L173">		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();</span>
-<span class="fc" id="L174">		Field field = sign.getField();</span>
-<span class="pc bpc" id="L175" title="2 of 4 branches missed.">		assert isCollectionFamily(field);</span>
+<span class="fc" id="L172">		FieldSignature sign = (FieldSignature)thisJoinPointStaticPart.getSignature();</span>
+<span class="fc" id="L173">		Field field = sign.getField();</span>
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">		assert isCollectionFamily(field);</span>
 		
-<span class="fc" id="L177">		Object old = PropertyManagement.getInstance().candideReadValue(self, field);</span>
-<span class="fc bfc" id="L178" title="All 2 branches covered.">		if (old != null)</span>
-<span class="fc" id="L179">			throw new IllegalStateException(&quot;Column family &quot; + field + &quot; should be set only once (already as value &quot; + old + ')');</span>
+<span class="fc" id="L176">		Object old = PropertyManagement.getInstance().candideReadValue(self, field);</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">		if (old != null)</span>
+<span class="fc" id="L178">			throw new IllegalStateException(&quot;Column family &quot; + field + &quot; should be set only once (already as value &quot; + old + ')');</span>
 
-<span class="fc" id="L181">		ColumnFamily&lt;?&gt; ccf = createColumnFamily((PersistingElement)self, field, cf);</span>
+<span class="fc" id="L180">		ColumnFamily&lt;?&gt; ccf = createColumnFamily((PersistingElement)self, field, cf);</span>
 		
-<span class="fc bfc" id="L183" title="All 2 branches covered.">		if(ColumnFamily.class.isAssignableFrom(field.getType()))</span>
-<span class="fc" id="L184">			proceed(self, ccf);</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">		else if (cf == null)</span>
-<span class="fc" id="L186">			proceed(self, ccf.getSerializableVersion());</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">		if(ColumnFamily.class.isAssignableFrom(field.getType()))</span>
+<span class="fc" id="L183">			proceed(self, ccf);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">		else if (cf == null)</span>
+<span class="fc" id="L185">			proceed(self, ccf.getSerializableVersion());</span>
 		else
-<span class="fc" id="L188">			proceed(self, cf);</span>
-<span class="pc bnc" id="L189" title="All 8 branches missed.">	}</span>
+<span class="fc" id="L187">			proceed(self, cf);</span>
+<span class="pc bnc" id="L188" title="All 8 branches missed.">	}</span>
 
 	@SuppressWarnings({ &quot;unchecked&quot;, &quot;rawtypes&quot; })
 	private ColumnFamily&lt;?&gt; createColumnFamily(PersistingElement self, Field field, Object oldCf) {
 		ColumnFamily&lt;?&gt; acf;
-<span class="fc" id="L194">		ParameterizedType collType = (ParameterizedType) field.getGenericType();</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">		if (Map.class.isAssignableFrom(field.getType())) {</span>
-<span class="fc" id="L196">			Class&lt;?&gt; keyClass = (Class&lt;?&gt;)collType.getActualTypeArguments()[0], valueClass = (Class&lt;?&gt;)collType.getActualTypeArguments()[1];</span>
-<span class="fc" id="L197">			acf = new MapColumnFamily(keyClass, valueClass, field, field.getName(), self);</span>
-<span class="fc bfc" id="L198" title="All 2 branches covered.">			if (oldCf != null) {</span>
-<span class="pc bpc" id="L199" title="1 of 2 branches missed.">				for (Entry&lt;?, ?&gt; e : ((Map&lt;?,?&gt;)oldCf).entrySet()) {</span>
-<span class="nc" id="L200">					((MapColumnFamily)acf).put(e.getKey(), e.getValue());</span>
+<span class="fc" id="L193">		ParameterizedType collType = (ParameterizedType) field.getGenericType();</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">		if (Map.class.isAssignableFrom(field.getType())) {</span>
+<span class="fc" id="L195">			Class&lt;?&gt; keyClass = (Class&lt;?&gt;)collType.getActualTypeArguments()[0], valueClass = (Class&lt;?&gt;)collType.getActualTypeArguments()[1];</span>
+<span class="fc" id="L196">			acf = new MapColumnFamily(keyClass, valueClass, field, field.getName(), self);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">			if (oldCf != null) {</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">				for (Entry&lt;?, ?&gt; e : ((Map&lt;?,?&gt;)oldCf).entrySet()) {</span>
+<span class="nc" id="L199">					((MapColumnFamily)acf).put(e.getKey(), e.getValue());</span>
 				}
 			}
-		} else {
-<span class="fc" id="L204">			Class&lt;?&gt; elementClass = (Class&lt;?&gt;)collType.getActualTypeArguments()[0];</span>
+<span class="fc" id="L202">		} else {</span>
+<span class="fc" id="L203">			Class&lt;?&gt; elementClass = (Class&lt;?&gt;)collType.getActualTypeArguments()[0];</span>
 			try {
-<span class="fc" id="L206">				acf = new SetColumnFamily(elementClass, field, self);</span>
-<span class="fc bfc" id="L207" title="All 2 branches covered.">				if (oldCf != null) {</span>
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">					for (Object e : (Set&lt;?&gt;)oldCf) {</span>
-<span class="nc" id="L209">						((SetColumnFamily)acf).add(e);</span>
+<span class="fc" id="L205">				acf = new SetColumnFamily(elementClass, field, self);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">				if (oldCf != null) {</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">					for (Object e : (Set&lt;?&gt;)oldCf) {</span>
+<span class="nc" id="L208">						((SetColumnFamily)acf).add(e);</span>
 					}
 				}
-<span class="nc" id="L212">			} catch (NoSuchFieldException x) {</span>
-<span class="nc" id="L213">				throw new RuntimeException(x);</span>
+<span class="pc" id="L211">			} catch (NoSuchFieldException x) {</span>
+<span class="nc" id="L212">				throw new RuntimeException(x);</span>
 			}
 		}
-<span class="fc" id="L216">		return acf;</span>
+<span class="fc" id="L215">		return acf;</span>
 	}
 	
 	after(@SuppressWarnings(&quot;rawtypes&quot;) ColumnFamily cf) returning : execution(ColumnFamily.new(..)) &amp;&amp; target(cf) {
-<span class="fc bfc" id="L220" title="All 2 branches covered.">		if (cf.getOwner() != null)</span>
-<span class="fc" id="L221">			cf.getOwner().addColumnFamily(cf);</span>
-<span class="pc bnc" id="L222" title="All 8 branches missed.">	}</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">		if (cf.getOwner() != null)</span>
+<span class="fc" id="L220">			cf.getOwner().addColumnFamily(cf);</span>
+<span class="pc bnc" id="L221" title="All 8 branches missed.">	}</span>
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>

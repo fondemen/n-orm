@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>FederatedTableManagement.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">FederatedTableManagement.aj</span></div><h1>FederatedTableManagement.aj</h1><pre class="source lang-java linenums"><span class="pc bpc" id="L1" title="9 of 32 branches missed.">package com.googlecode.n_orm;</span>
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>FederatedTableManagement.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.source.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">FederatedTableManagement.aj</span></div><h1>FederatedTableManagement.aj</h1><pre class="source lang-java linenums"><span class="pc bpc" id="L1" title="9 of 32 branches missed.">package com.googlecode.n_orm;</span>
 
 import java.lang.reflect.Field;
 import java.util.Collection;
@@ -45,11 +45,12 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
  * original table, and qualifiers are the possible alternatives.
  * 
  * @see Persisting#federated()
- * @see Persisting.FederatedMode
+ * @see FederatedMode
  */
-<span class="pc" id="L50">public aspect FederatedTableManagement {</span>
-	
+<span class="fc" id="L50">public aspect FederatedTableManagement {</span>
+
 	declare precedence: PersistingMixin, FederatedTableManagement;
+	declare precedence: FederatedTableManagement, EventManagement;
 	
 	/**
 	 * Table where alternative tables (for a given table) will be stored. The
@@ -68,14 +69,14 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 * The time (in ms) during which table alternatives are not loaded again
 	 * from the base ; default is 1s
 	 */
-<span class="fc" id="L71">	public static long TableAlternativeCacheTTLInS = 10000;</span>
+<span class="fc" id="L72">	public static long TableAlternativeCacheTTLInS = 10000;</span>
 
 	/**
 	 * The time (in ms) during which table alternatives are not loaded again
 	 * from the base ; default is 1s
 	 */
 	public static long getTableAlternativeCacheTTLInS() {
-<span class="fc" id="L78">		return TableAlternativeCacheTTLInS;</span>
+<span class="fc" id="L79">		return TableAlternativeCacheTTLInS;</span>
 	}
 
 	/**
@@ -84,10 +85,10 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 */
 	public static void setTableAlternativeCacheTTLInS(
 			long tableAlternativeCacheTTLInS) {
-<span class="fc" id="L87">		TableAlternativeCacheTTLInS = tableAlternativeCacheTTLInS;</span>
-<span class="fc" id="L88">	}</span>
+<span class="fc" id="L88">		TableAlternativeCacheTTLInS = tableAlternativeCacheTTLInS;</span>
+<span class="fc" id="L89">	}</span>
 
-<span class="fc" id="L90">	private static int ParallelGlobalSearch = 5;</span>
+<span class="fc" id="L91">	private static int ParallelGlobalSearch = 5;</span>
 
 	/**
 	 * The maximum number of threads to be used while performing global actions
@@ -97,7 +98,7 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 * Default is 5.
 	 */
 	public static int getParallelGlobalSearch() {
-<span class="fc" id="L100">		return ParallelGlobalSearch;</span>
+<span class="fc" id="L101">		return ParallelGlobalSearch;</span>
 	}
 
 	/**
@@ -108,10 +109,10 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 * Default is 5.
 	 */
 	public static void setParallelGlobalSearch(int parallelGlobalSearch) {
-<span class="nc bnc" id="L111" title="All 2 branches missed.">		if (parallelGlobalSearch &lt;= 0)</span>
-<span class="nc" id="L112">			throw new IllegalArgumentException(&quot;Cannot have less than one global search tasks while attempting to set &quot; + parallelGlobalSearch);</span>
-<span class="nc" id="L113">		ParallelGlobalSearch = parallelGlobalSearch;</span>
-<span class="nc" id="L114">	}</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">		if (parallelGlobalSearch &lt;= 0)</span>
+<span class="nc" id="L113">			throw new IllegalArgumentException(&quot;Cannot have less than one global search tasks while attempting to set &quot; + parallelGlobalSearch);</span>
+<span class="nc" id="L114">		ParallelGlobalSearch = parallelGlobalSearch;</span>
+<span class="nc" id="L115">	}</span>
 
 	// REM: a federated element can only inherit federated elements with similar
 	// configuration
@@ -135,37 +136,37 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		 * When alternatives for {@link #mainTable} was last updated (epoch in
 		 * seconds)
 		 */
-<span class="fc" id="L138">		private volatile long lastUpdate = -TableAlternativeCacheTTLInS;</span>
+<span class="fc" id="L139">		private volatile long lastUpdate = -TableAlternativeCacheTTLInS;</span>
 
 		/**
 		 * Known table postfixes for {@link #mainTable}
 		 */
-<span class="fc" id="L143">		private Set&lt;String&gt; postfixes = new TreeSet&lt;String&gt;();</span>
+<span class="fc" id="L144">		private Set&lt;String&gt; postfixes = new TreeSet&lt;String&gt;();</span>
 		
-<span class="fc" id="L145">		private Boolean hasLegacy = null;</span>
-<span class="fc" id="L146">		private volatile long legacyUpdate = 0;</span>
+<span class="fc" id="L146">		private Boolean hasLegacy = null;</span>
+<span class="fc" id="L147">		private volatile long legacyUpdate = 0;</span>
 		
-<span class="fc" id="L148">		public TableAlternatives(String mainTable) {</span>
-<span class="fc" id="L149">			this.mainTable = mainTable;</span>
-<span class="fc" id="L150">		}</span>
+<span class="fc" id="L149">		public TableAlternatives(String mainTable) {</span>
+<span class="fc" id="L150">			this.mainTable = mainTable;</span>
+<span class="fc" id="L151">		}</span>
 		
 		/**
 		 * Returns the store bypassing any cache.
 		 */
 		private Store getActualStore(Store store) {
-<span class="pc bpc" id="L156" title="1 of 2 branches missed.">			return store instanceof DelegatingStore ? ((DelegatingStore)store).getActualStore() : store;</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">			return store instanceof DelegatingStore ? ((DelegatingStore)store).getActualStore() : store;</span>
 		}
 		
 		/**
 		 * Whether we believe legacy table (main table) exists
 		 */
 		public boolean legacyExists(Store store) {
-<span class="fc" id="L163">			long now = System.currentTimeMillis();</span>
-<span class="pc bpc" id="L164" title="1 of 4 branches missed.">			if (hasLegacy == null || (legacyUpdate + TableAlternativeCacheTTLInS) &lt; now) {</span>
-<span class="fc" id="L165">				this.hasLegacy = store.hasTable(this.mainTable);</span>
-<span class="fc" id="L166">				this.legacyUpdate = now;</span>
+<span class="fc" id="L164">			long now = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L165" title="1 of 4 branches missed.">			if (hasLegacy == null || (legacyUpdate + TableAlternativeCacheTTLInS) &lt; now) {</span>
+<span class="fc" id="L166">				this.hasLegacy = store.hasTable(this.mainTable);</span>
+<span class="fc" id="L167">				this.legacyUpdate = now;</span>
 			}
-<span class="fc" id="L168">			return this.hasLegacy;</span>
+<span class="fc" id="L169">			return this.hasLegacy;</span>
 		}
 
 		/**
@@ -181,71 +182,71 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		 *         tables were not updated from store
 		 */
 		protected void updateAlternatives(Store store) {
-<span class="fc" id="L184">			long now = System.currentTimeMillis();</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">			if ((this.lastUpdate + TableAlternativeCacheTTLInS) &lt; now) {</span>
-<span class="pc" id="L186">				synchronized(this) {</span>
-<span class="fc" id="L187">					now = System.currentTimeMillis();</span>
-<span class="pc bpc" id="L188" title="1 of 2 branches missed.">					if ((this.lastUpdate + TableAlternativeCacheTTLInS) &lt; now) {</span>
+<span class="fc" id="L185">			long now = System.currentTimeMillis();</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">			if ((this.lastUpdate + TableAlternativeCacheTTLInS) &lt; now) {</span>
+<span class="pc" id="L187">				synchronized(this) {</span>
+<span class="fc" id="L188">					now = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">					if ((this.lastUpdate + TableAlternativeCacheTTLInS) &lt; now) {</span>
 						// OK, we should update
 		
 						// Reminding when alternatives were last updated
-<span class="fc" id="L192">						this.lastUpdate = now;</span>
+<span class="fc" id="L193">						this.lastUpdate = now;</span>
 						
 						//Bypassing any cache
-<span class="fc" id="L195">						store = this.getActualStore(store);</span>
+<span class="fc" id="L196">						store = this.getActualStore(store);</span>
 		
 						// Querying the store (to be found as qualifiers for columns)
 						// Table is FEDERATED_META_TABLE
 						// key is the original table
 						// family is FEDERATED_META_COLUMN_FAMILY
 						// obtained cell qualifiers are the stored alternatives.
-<span class="fc" id="L202">						Map&lt;String, byte[]&gt; res = store.get(null, FEDERATED_META_TABLE,</span>
-<span class="fc" id="L203">								this.mainTable, FEDERATED_META_COLUMN_FAMILY);</span>
-<span class="fc bfc" id="L204" title="All 2 branches covered.">						Set&lt;String&gt; newPosts = res == null ? new TreeSet&lt;String&gt;()</span>
-<span class="fc" id="L205">								: new TreeSet&lt;String&gt;(res.keySet());</span>
+<span class="fc" id="L203">						Map&lt;String, byte[]&gt; res = store.get(null, FEDERATED_META_TABLE,</span>
+<span class="fc" id="L204">								this.mainTable, FEDERATED_META_COLUMN_FAMILY);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">						Set&lt;String&gt; newPosts = res == null ? new TreeSet&lt;String&gt;()</span>
+<span class="fc" id="L206">								: new TreeSet&lt;String&gt;(res.keySet());</span>
 		
 						// We should always care about legacy table
-<span class="fc bfc" id="L208" title="All 2 branches covered.">						boolean ckeckForLegacyTable = !newPosts.contains(&quot;&quot;);</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">						boolean ckeckForLegacyTable = !newPosts.contains(&quot;&quot;);</span>
 		
 						// Checking for deleted tables in order to remove them from
 						// stored alternatives
-<span class="fc" id="L212">						Iterator&lt;String&gt; newAlternativesIt = newPosts.iterator();</span>
-<span class="fc" id="L213">						Set&lt;String&gt; deletedPosts = new TreeSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L214" title="All 2 branches covered.">						while (newAlternativesIt.hasNext()) {</span>
-<span class="fc" id="L215">							String post = newAlternativesIt.next();</span>
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">							if (!store.hasTable(this.mainTable + post)) {</span>
-<span class="nc" id="L217">								newAlternativesIt.remove();</span>
-<span class="nc" id="L218">								deletedPosts.add(post);</span>
+<span class="fc" id="L213">						Iterator&lt;String&gt; newAlternativesIt = newPosts.iterator();</span>
+<span class="fc" id="L214">						Set&lt;String&gt; deletedPosts = new TreeSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">						while (newAlternativesIt.hasNext()) {</span>
+<span class="fc" id="L216">							String post = newAlternativesIt.next();</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">							if (!store.hasTable(this.mainTable + post)) {</span>
+<span class="nc" id="L218">								newAlternativesIt.remove();</span>
+<span class="nc" id="L219">								deletedPosts.add(post);</span>
 							}
 						}
 						// Removing deleted tables from stored alternatives
-<span class="pc bpc" id="L222" title="1 of 2 branches missed.">						if (!deletedPosts.isEmpty()) {</span>
-<span class="nc" id="L223">							Map&lt;String, Set&lt;String&gt;&gt; removed = new TreeMap&lt;String, Set&lt;String&gt;&gt;();</span>
-<span class="nc" id="L224">							removed.put(FEDERATED_META_COLUMN_FAMILY, deletedPosts);</span>
-<span class="nc" id="L225">							store.storeChanges(null, FEDERATED_META_TABLE,</span>
-<span class="nc" id="L226">									this.mainTable, null, removed, null);</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">						if (!deletedPosts.isEmpty()) {</span>
+<span class="nc" id="L224">							Map&lt;String, Set&lt;String&gt;&gt; removed = new TreeMap&lt;String, Set&lt;String&gt;&gt;();</span>
+<span class="nc" id="L225">							removed.put(FEDERATED_META_COLUMN_FAMILY, deletedPosts);</span>
+<span class="nc" id="L226">							store.storeChanges(null, FEDERATED_META_TABLE,</span>
+<span class="nc" id="L227">									this.mainTable, null, removed, null);</span>
 						}
 		
 						// Checking for legacy table
-<span class="fc bfc" id="L230" title="All 2 branches covered.">						if (ckeckForLegacyTable) {</span>
-<span class="fc bfc" id="L231" title="All 2 branches covered.">							if (store.hasTable(mainTable)) {</span>
-<span class="fc" id="L232">								this.addPostfix(&quot;&quot;, store);</span>
-<span class="fc" id="L233">								newPosts.add(&quot;&quot;);</span>
-<span class="fc" id="L234">								this.hasLegacy = Boolean.TRUE;</span>
-							} else {
-<span class="fc" id="L236">								this.hasLegacy = Boolean.FALSE;</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">						if (ckeckForLegacyTable) {</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">							if (store.hasTable(mainTable)) {</span>
+<span class="fc" id="L233">								this.addPostfix(&quot;&quot;, store);</span>
+<span class="fc" id="L234">								newPosts.add(&quot;&quot;);</span>
+<span class="fc" id="L235">								this.hasLegacy = Boolean.TRUE;</span>
+<span class="fc" id="L236">							} else {</span>
+<span class="fc" id="L237">								this.hasLegacy = Boolean.FALSE;</span>
 							}
-						} else {
-<span class="fc" id="L239">							this.hasLegacy = Boolean.TRUE;</span>
+<span class="fc" id="L239">						} else {</span>
+<span class="fc" id="L240">							this.hasLegacy = Boolean.TRUE;</span>
 						}
-<span class="fc" id="L241">						this.legacyUpdate = now;</span>
+<span class="fc" id="L242">						this.legacyUpdate = now;</span>
 		
 						// Recording last state
-<span class="fc" id="L244">						this.postfixes = newPosts;</span>
+<span class="fc" id="L245">						this.postfixes = newPosts;</span>
 					}
 				}
 			}
-<span class="fc" id="L248">		}</span>
+<span class="fc" id="L249">		}</span>
 
 		/**
 		 * Registering a new alternative postfix for {@link #mainTable}. In case
@@ -259,59 +260,59 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		 *            original table. null in case no write have ever been done
 		 */
 		public void addPostfix(String postfix, Store store) {
-<span class="fc bfc" id="L262" title="All 2 branches covered.">			if (!this.postfixes.contains(postfix)) {</span>
-<span class="pc" id="L263">				synchronized(this) {</span>
-<span class="pc bpc" id="L264" title="1 of 2 branches missed.">					if (this.postfixes.add(postfix)) {</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">			if (!this.postfixes.contains(postfix)) {</span>
+<span class="pc" id="L264">				synchronized(this) {</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">					if (this.postfixes.add(postfix)) {</span>
 						
-<span class="pc bpc" id="L266" title="1 of 2 branches missed.">						if (store != null) {</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">						if (store != null) {</span>
 							
 							// We were not aware of that alternative ;
 							// let's register in the store
 							
 							//Bypassing any cache
-<span class="fc" id="L272">							store = this.getActualStore(store);</span>
+<span class="fc" id="L273">							store = this.getActualStore(store);</span>
 							
 							// Table is FEDERATED_META_TABLE
 							// key is the original table
 							// family is FEDERATED_META_COLUMN_FAMILY
 							// new alternative is the qualifier for an empty cell
-<span class="fc" id="L278">							ColumnFamilyData changes = new DefaultColumnFamilyData();</span>
-<span class="fc" id="L279">							Map&lt;String, byte[]&gt; change = new TreeMap&lt;String, byte[]&gt;();</span>
-<span class="fc" id="L280">							changes.put(FEDERATED_META_COLUMN_FAMILY, change);</span>
-<span class="fc" id="L281">							change.put(postfix, null);</span>
-<span class="fc" id="L282">							store.storeChanges(null, FEDERATED_META_TABLE, this.mainTable,</span>
-<span class="fc" id="L283">									changes, null, null);</span>
+<span class="fc" id="L279">							ColumnFamilyData changes = new DefaultColumnFamilyData();</span>
+<span class="fc" id="L280">							Map&lt;String, byte[]&gt; change = new TreeMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L281">							changes.put(FEDERATED_META_COLUMN_FAMILY, change);</span>
+<span class="fc" id="L282">							change.put(postfix, null);</span>
+<span class="fc" id="L283">							store.storeChanges(null, FEDERATED_META_TABLE, this.mainTable,</span>
+<span class="fc" id="L284">									changes, null, null);</span>
 						}
 					}
 				}
 			}
-<span class="fc" id="L288">		}</span>
+<span class="fc" id="L289">		}</span>
 
 		/**
 		 * The known alternative postfixes for {@link #mainTable}
 		 */
 		public Set&lt;String&gt; getPostfixes() {
-<span class="fc" id="L294">			return Collections.unmodifiableSet(this.postfixes);</span>
+<span class="fc" id="L295">			return Collections.unmodifiableSet(this.postfixes);</span>
 		}
 	}
 
 	// Cache for storing table variants (no TTL)
-<span class="fc" id="L299">	private static final ConcurrentMap&lt;String /* main table */, TableAlternatives&gt; tablesAlternatives = new ConcurrentHashMap&lt;String, TableAlternatives&gt;();</span>
+<span class="pc" id="L300">	private static final ConcurrentMap&lt;String /* main table */, TableAlternatives&gt; tablesAlternatives = new ConcurrentHashMap&lt;String, TableAlternatives&gt;();</span>
 
 	/**
 	 * The known alternatives for the given original table. Creates the
 	 * alternative in cache.
 	 */
 	private static TableAlternatives getAlternatives(String mainTable) {
-<span class="fc" id="L306">		TableAlternatives nw = new TableAlternatives(mainTable);</span>
-<span class="fc" id="L307">		TableAlternatives od = tablesAlternatives.putIfAbsent(mainTable, nw);</span>
-<span class="fc bfc" id="L308" title="All 2 branches covered.">		return od == null ? nw : od;</span>
+<span class="fc" id="L307">		TableAlternatives nw = new TableAlternatives(mainTable);</span>
+<span class="fc" id="L308">		TableAlternatives od = tablesAlternatives.putIfAbsent(mainTable, nw);</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">		return od == null ? nw : od;</span>
 	}
 
 	// For test purpose
 	static void clearAlternativesCache() {
-<span class="fc" id="L313">		tablesAlternatives.clear();</span>
-<span class="fc" id="L314">	}</span>
+<span class="fc" id="L314">		tablesAlternatives.clear();</span>
+<span class="fc" id="L315">	}</span>
 
 	/**
 	 * Adds an alternative to an original table.
@@ -327,18 +328,18 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 */
 	private static void registerPostfix(String mainTable, String postfix,
 			Store store) {
-<span class="fc" id="L330">		getAlternatives(mainTable).addPostfix(postfix, store);</span>
-<span class="fc" id="L331">	}</span>
+<span class="fc" id="L331">		getAlternatives(mainTable).addPostfix(postfix, store);</span>
+<span class="fc" id="L332">	}</span>
 
 	/**
 	 * Checks whether a class is stored to a table federation.
 	 */
 	public static boolean isFederated(Class&lt;? extends PersistingElement&gt; clazz) {
-<span class="pc bpc" id="L337" title="1 of 2 branches missed.">		return clazz != null</span>
-<span class="fc" id="L338">				&amp;&amp; PersistingElementOverFederatedTable.class</span>
-<span class="fc bfc" id="L339" title="All 2 branches covered.">						.isAssignableFrom(clazz)</span>
-<span class="fc" id="L340">				&amp;&amp; clazz.getAnnotation(Persisting.class).federated()</span>
-<span class="pc bpc" id="L341" title="1 of 2 branches missed.">						.isFederated();</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">		return clazz != null</span>
+<span class="fc" id="L339">				&amp;&amp; PersistingElementOverFederatedTable.class</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">						.isAssignableFrom(clazz)</span>
+<span class="fc" id="L341">				&amp;&amp; clazz.getAnnotation(Persisting.class).federated()</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">						.isFederated();</span>
 	}
 	
 //	/**
@@ -432,22 +433,22 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 * An action that is automatically executed on each postfixes for a given table.
 	 * @param &lt;T&gt; the type of the expected result
 	 */
-<span class="fc" id="L435">	private static abstract class GlobalAction&lt;T&gt; {</span>
+	private static abstract class GlobalAction&lt;T&gt; {
 		
-<span class="fc" id="L437">		private static final ExecutorService executor = new ThreadPoolExecutor(</span>
-<span class="fc" id="L438">				0, Integer.MAX_VALUE,</span>
-<span class="fc" id="L439">                10L, TimeUnit.SECONDS,</span>
-<span class="fc" id="L440">                new SynchronousQueue&lt;Runnable&gt;(),</span>
-<span class="fc" id="L441">                new ThreadFactory()  {</span>
+<span class="fc" id="L438">		private static final ExecutorService executor = new ThreadPoolExecutor(</span>
+<span class="fc" id="L439">				0, Integer.MAX_VALUE,</span>
+<span class="fc" id="L440">                10L, TimeUnit.SECONDS,</span>
+<span class="fc" id="L441">                new SynchronousQueue&lt;Runnable&gt;(),</span>
+<span class="fc" id="L442">                new ThreadFactory()  {</span>
 
 			@Override
 			public Thread newThread(Runnable r) {
-<span class="fc" id="L445">				return new Thread(r,&quot;n-orm federated executor&quot;);</span>
+<span class="fc" id="L446">				return new Thread(r,&quot;n-orm federated executor&quot;);</span>
 			}
 			
-		});
+<span class="fc" id="L449">		});</span>
 		
-<span class="fc" id="L450">		protected GlobalAction() {}</span>
+<span class="fc" id="L451">		protected GlobalAction() {}</span>
 
 		/**
 		 * Runs the query on one possible alternative table
@@ -473,32 +474,32 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		private Callable&lt;T&gt; createLocalAction(final String mainTable,
 				final String postfix, final AtomicInteger running) {
 			// Waiting till there are not too many threads executing
-<span class="pc" id="L476">			synchronized(running) {</span>
-<span class="fc" id="L477">				running.decrementAndGet();</span>
-<span class="pc bpc" id="L478" title="1 of 2 branches missed.">				while (running.get() &lt; 0)</span>
+<span class="pc" id="L477">			synchronized(running) {</span>
+<span class="fc" id="L478">				running.decrementAndGet();</span>
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">				while (running.get() &lt; 0)</span>
 					try {
-<span class="nc" id="L480">						running.wait();</span>
-<span class="nc" id="L481">					} catch (InterruptedException e) {</span>
-<span class="nc" id="L482">						e.printStackTrace();</span>
+<span class="nc" id="L481">						running.wait();</span>
+<span class="nc" id="L482">					} catch (InterruptedException e) {</span>
+<span class="nc" id="L483">						e.printStackTrace();</span>
 					}
 			}
 			
-<span class="fc" id="L486">			return new Callable&lt;T&gt;() {</span>
+<span class="fc" id="L487">			return new Callable&lt;T&gt;() {</span>
 
 				@Override
 				public T call() throws Exception {
 					try {
 						
-<span class="fc" id="L492">						return localRun(mainTable, postfix);</span>
+<span class="fc" id="L493">						return localRun(mainTable, postfix);</span>
 						
-<span class="nc" id="L494">					} finally {</span>
+<span class="nc" id="L495">					} finally {</span>
 					
 						// Letting waiting thread run
-<span class="pc" id="L497">						synchronized(running) {</span>
-<span class="pc" id="L498">							running.incrementAndGet();</span>
-<span class="pc" id="L499">							running.notify();</span>
+<span class="pc" id="L498">						synchronized(running) {</span>
+<span class="pc" id="L499">							running.incrementAndGet();</span>
+<span class="pc" id="L500">							running.notify();</span>
 						}
-<span class="nc" id="L501">					}</span>
+<span class="nc" id="L502">					}</span>
 				}
 
 			};
@@ -514,52 +515,52 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		 */
 		public T globalRun(String mainTable, Store store, Constraint c) {
 
-<span class="fc" id="L517">			TableAlternatives alts = getAlternatives(mainTable);</span>
+<span class="fc" id="L518">			TableAlternatives alts = getAlternatives(mainTable);</span>
 			// Making sure we are aware of all possible alternative tables
-<span class="fc" id="L519">			alts.updateAlternatives(store);</span>
+<span class="fc" id="L520">			alts.updateAlternatives(store);</span>
 
-<span class="fc bfc" id="L521" title="All 4 branches covered.">			if (c != null &amp;&amp; (c instanceof ConstraintWithPostfix)) {</span>
+<span class="fc bfc" id="L522" title="All 4 branches covered.">			if (c != null &amp;&amp; (c instanceof ConstraintWithPostfix)) {</span>
 				// Table postfix was set in the query
 				// computing only for this one 
-<span class="fc" id="L524">				String postfix = ((ConstraintWithPostfix) c).getPostfix();</span>
+<span class="fc" id="L525">				String postfix = ((ConstraintWithPostfix) c).getPostfix();</span>
 				
-<span class="pc bpc" id="L526" title="1 of 2 branches missed.">				if (!alts.getPostfixes().contains(postfix)) {</span>
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">				if (!alts.getPostfixes().contains(postfix)) {</span>
 					// Unknown postfix...
-<span class="nc bnc" id="L528" title="All 2 branches missed.">					if (store.hasTable(mainTable+postfix)) {</span>
+<span class="nc bnc" id="L529" title="All 2 branches missed.">					if (store.hasTable(mainTable+postfix)) {</span>
 						// But still, it exists
-<span class="nc" id="L530">						registerPostfix(mainTable, postfix, store);</span>
-					} else {
+<span class="nc" id="L531">						registerPostfix(mainTable, postfix, store);</span>
+<span class="nc" id="L532">					} else {</span>
 						// Table does not exist ; returning empty value
-<span class="nc" id="L533">						return this.emptyValue();</span>
+<span class="nc" id="L534">						return this.emptyValue();</span>
 					}
 				}
-<span class="fc" id="L536">				return this.localRun(mainTable, postfix);</span>
+<span class="fc" id="L537">				return this.localRun(mainTable, postfix);</span>
 			}
 			
 			// No need to worry too much in case no postfix exists...
-<span class="pc bpc" id="L540" title="1 of 2 branches missed.">			if (alts.getPostfixes().isEmpty())</span>
-<span class="nc" id="L541">				return this.emptyValue();</span>
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">			if (alts.getPostfixes().isEmpty())</span>
+<span class="nc" id="L542">				return this.emptyValue();</span>
 
-<span class="fc" id="L543">			AtomicInteger running = new AtomicInteger(getParallelGlobalSearch());</span>
+<span class="fc" id="L544">			AtomicInteger running = new AtomicInteger(getParallelGlobalSearch());</span>
 			
-<span class="fc" id="L545">			Set&lt;Future&lt;T&gt;&gt; results = new HashSet&lt;Future&lt;T&gt;&gt;();</span>
-<span class="fc bfc" id="L546" title="All 2 branches covered.">			for (final String post : alts.getPostfixes()) {</span>
-<span class="fc" id="L547">				results.add(executor.submit(this.createLocalAction(mainTable, post, running)));</span>
+<span class="fc" id="L546">			Set&lt;Future&lt;T&gt;&gt; results = new HashSet&lt;Future&lt;T&gt;&gt;();</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">			for (final String post : alts.getPostfixes()) {</span>
+<span class="fc" id="L548">				results.add(executor.submit(this.createLocalAction(mainTable, post, running)));</span>
 			}
 
 			// Aggregating results into one single result
-<span class="fc" id="L551">			T ret = null;</span>
-<span class="fc bfc" id="L552" title="All 2 branches covered.">			for (Future&lt;T&gt; res : results) {</span>
+<span class="fc" id="L552">			T ret = null;</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">			for (Future&lt;T&gt; res : results) {</span>
 				try {
-<span class="fc bfc" id="L554" title="All 2 branches covered.">					ret = ret == null ? res.get() : this.add(ret, res.get());</span>
-<span class="nc" id="L555">				} catch (InterruptedException e) {</span>
-<span class="nc" id="L556">					throw new DatabaseNotReachedException(e);</span>
-<span class="nc" id="L557">				} catch (ExecutionException e) {</span>
-<span class="nc" id="L558">					throw new DatabaseNotReachedException(e);</span>
+<span class="fc bfc" id="L555" title="All 2 branches covered.">					ret = ret == null ? res.get() : this.add(ret, res.get());</span>
+<span class="pc" id="L556">				} catch (InterruptedException e) {</span>
+<span class="nc" id="L557">					throw new DatabaseNotReachedException(e);</span>
+<span class="nc" id="L558">				} catch (ExecutionException e) {</span>
+<span class="nc" id="L559">					throw new DatabaseNotReachedException(e);</span>
 				}
 			}
 
-<span class="fc" id="L562">			return ret;</span>
+<span class="fc" id="L563">			return ret;</span>
 		}
 	}
 
@@ -590,31 +591,31 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 */
 	private void PersistingElementOverFederatedTable.setTablePostfix(
 			String postfix, Store store) {
-<span class="fc bfc" id="L593" title="All 2 branches covered.">		if (postfix == null) {</span>
-<span class="fc" id="L594">			this.tablePostfix = null;</span>
-<span class="fc" id="L595">			return;</span>
+<span class="fc bfc" id="L594" title="All 2 branches covered.">		if (postfix == null) {</span>
+<span class="fc" id="L595">			this.tablePostfix = null;</span>
+<span class="fc" id="L596">			return;</span>
 		}
 
-<span class="fc" id="L598">		String oldPostfix = this.tablePostfix;</span>
-<span class="fc" id="L599">		this.tablePostfix = postfix;</span>
-<span class="fc" id="L600">		this.checkTablePostfixHasNotChanged();</span>
-<span class="pc bpc" id="L601" title="1 of 4 branches missed.">		if (oldPostfix != null &amp;&amp; !oldPostfix.equals(this.tablePostfix)) {</span>
-<span class="nc" id="L602">			throw new IllegalStateException(&quot;Found &quot; + this + &quot; from table &quot;</span>
-<span class="nc" id="L603">					+ ((PersistingElement)this).getTable() + this.tablePostfix + &quot; with postfix &quot;</span>
-<span class="nc" id="L604">					+ this.tablePostfix + &quot; while another postfix &quot;</span>
-<span class="nc" id="L605">					+ oldPostfix + &quot; was registered&quot;);</span>
+<span class="fc" id="L599">		String oldPostfix = this.tablePostfix;</span>
+<span class="fc" id="L600">		this.tablePostfix = postfix;</span>
+<span class="fc" id="L601">		this.checkTablePostfixHasNotChanged();</span>
+<span class="pc bpc" id="L602" title="1 of 4 branches missed.">		if (oldPostfix != null &amp;&amp; !oldPostfix.equals(this.tablePostfix)) {</span>
+<span class="nc" id="L603">			throw new IllegalStateException(&quot;Found &quot; + this + &quot; from table &quot;</span>
+<span class="nc" id="L604">					+ ((PersistingElement)this).getTable() + this.tablePostfix + &quot; with postfix &quot;</span>
+<span class="nc" id="L605">					+ this.tablePostfix + &quot; while another postfix &quot;</span>
+<span class="nc" id="L606">					+ oldPostfix + &quot; was registered&quot;);</span>
 		}
-<span class="fc bfc" id="L607" title="All 2 branches covered.">		if (store != null)</span>
-<span class="fc" id="L608">			registerPostfix(((PersistingElement)this).getTable(), this.tablePostfix, store);</span>
-<span class="fc" id="L609">	}</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">		if (store != null)</span>
+<span class="fc" id="L609">			registerPostfix(((PersistingElement)this).getTable(), this.tablePostfix, store);</span>
+<span class="fc" id="L610">	}</span>
 
 	// jut to be sure
 	declare error: set(* PersistingElementOverFederatedTable.tablePostfix) &amp;&amp; !withincode(private void PersistingElementOverFederatedTable.setTablePostfix(..)) : &quot;Avoid setting this attribute directly ; use setTablePostfix(String postfix, Store store) instead&quot;;
 
 	public String PersistingElementOverFederatedTable.getActualTable() {
-<span class="pc bpc" id="L615" title="1 of 2 branches missed.">		if (this.tablePostfix == null)</span>
-<span class="nc" id="L616">			return null;</span>
-<span class="fc" id="L617">		return ((PersistingElement)this).getTable() + this.tablePostfix;</span>
+<span class="pc bpc" id="L616" title="1 of 2 branches missed.">		if (this.tablePostfix == null)</span>
+<span class="nc" id="L617">			return null;</span>
+<span class="fc" id="L618">		return ((PersistingElement)this).getTable() + this.tablePostfix;</span>
 	}
 
 	private transient FederatedMode PersistingElementOverFederatedTable.federatedMode = null;
@@ -623,11 +624,11 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 * The federated mode for this persisting element.
 	 */
 	public FederatedMode PersistingElementOverFederatedTable.getFederatedMode() {
-<span class="fc bfc" id="L626" title="All 2 branches covered.">		if (this.federatedMode == null) {</span>
-<span class="fc" id="L627">			this.federatedMode = this.getClass()</span>
-<span class="fc" id="L628">					.getAnnotation(Persisting.class).federated();</span>
+<span class="fc bfc" id="L627" title="All 2 branches covered.">		if (this.federatedMode == null) {</span>
+<span class="fc" id="L628">			this.federatedMode = this.getClass()</span>
+<span class="fc" id="L629">					.getAnnotation(Persisting.class).federated();</span>
 		}
-<span class="fc" id="L630">		return this.federatedMode;</span>
+<span class="fc" id="L631">		return this.federatedMode;</span>
 	}
 
 	/**
@@ -642,43 +643,43 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 */
 	public void PersistingElementOverFederatedTable.setFederatedMode(
 			FederatedMode mode) {
-<span class="nc bnc" id="L645" title="All 2 branches missed.">		if (FederatedMode.NONE.equals(mode))</span>
-<span class="nc" id="L646">			throw new IllegalArgumentException(&quot;Cannot set federated mode to &quot;</span>
-<span class="nc" id="L647">					+ mode + &quot; on &quot; + this);</span>
-<span class="nc" id="L648">		this.federatedMode = mode;</span>
-<span class="nc" id="L649">	}</span>
+<span class="nc bnc" id="L646" title="All 2 branches missed.">		if (FederatedMode.NONE.equals(mode))</span>
+<span class="nc" id="L647">			throw new IllegalArgumentException(&quot;Cannot set federated mode to &quot;</span>
+<span class="nc" id="L648">					+ mode + &quot; on &quot; + this);</span>
+<span class="nc" id="L649">		this.federatedMode = mode;</span>
+<span class="nc" id="L650">	}</span>
 
 	/**
 	 * The list of tables where to find this object from what we can guess in
 	 * order of probability.
 	 */
 	private List&lt;String&gt; PersistingElementOverFederatedTable.getKnownPossiblePostfixes() {
-<span class="fc" id="L656">		List&lt;String&gt; ret = new LinkedList&lt;String&gt;();</span>
+<span class="fc" id="L657">		List&lt;String&gt; ret = new LinkedList&lt;String&gt;();</span>
 		// Table for this object is already known
-<span class="pc bpc" id="L658" title="1 of 2 branches missed.">		if (this.tablePostfix != null) {</span>
-<span class="nc" id="L659">			ret.add(this.tablePostfix);</span>
-<span class="nc" id="L660">			return ret;</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">		if (this.tablePostfix != null) {</span>
+<span class="nc" id="L660">			ret.add(this.tablePostfix);</span>
+<span class="nc" id="L661">			return ret;</span>
 		}
 
-<span class="fc" id="L663">		String mainTable = ((PersistingElement)this).getTable();</span>
-<span class="fc" id="L664">		TableAlternatives alternatives = getAlternatives(mainTable);</span>
-<span class="fc" id="L665">		Set&lt;String&gt; possibilities = new TreeSet&lt;String&gt;(</span>
-<span class="fc" id="L666">				alternatives.getPostfixes());</span>
+<span class="fc" id="L664">		String mainTable = ((PersistingElement)this).getTable();</span>
+<span class="fc" id="L665">		TableAlternatives alternatives = getAlternatives(mainTable);</span>
+<span class="fc" id="L666">		Set&lt;String&gt; possibilities = new TreeSet&lt;String&gt;(</span>
+<span class="fc" id="L667">				alternatives.getPostfixes());</span>
 
 		// First, asks postfix if the element already knows
-<span class="fc" id="L669">		String computedPostfix = this.getTablePostfix();</span>
-<span class="fc" id="L670">		ret.add(computedPostfix);</span>
-<span class="fc" id="L671">		possibilities.remove(computedPostfix);</span>
+<span class="fc" id="L670">		String computedPostfix = this.getTablePostfix();</span>
+<span class="fc" id="L671">		ret.add(computedPostfix);</span>
+<span class="fc" id="L672">		possibilities.remove(computedPostfix);</span>
 
 		// Otherwise, let's see main table
-<span class="pc bpc" id="L674" title="1 of 4 branches missed.">		if(possibilities.remove(&quot;&quot;) &amp;&amp; !ret.contains(&quot;&quot;)) {</span>
-<span class="fc" id="L675">			ret.add(&quot;&quot;);</span>
+<span class="pc bpc" id="L675" title="1 of 4 branches missed.">		if(possibilities.remove(&quot;&quot;) &amp;&amp; !ret.contains(&quot;&quot;)) {</span>
+<span class="fc" id="L676">			ret.add(&quot;&quot;);</span>
 		}
 
 		// And then all other known tables in alphabetical order
-<span class="fc" id="L679">		ret.addAll(possibilities);</span>
+<span class="fc" id="L680">		ret.addAll(possibilities);</span>
 
-<span class="fc" id="L681">		return ret;</span>
+<span class="fc" id="L682">		return ret;</span>
 	}
 
 	/**
@@ -692,9 +693,9 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 */
 	private Collection&lt;String&gt; PersistingElementOverFederatedTable.getPossiblePostfixesWithAnUpdate(
 			Store store) {
-<span class="fc" id="L695">		TableAlternatives ta = getAlternatives(((PersistingElement)this).getTable());</span>
-<span class="fc" id="L696">		ta.updateAlternatives(store);</span>
-<span class="fc" id="L697">		return ta.getPostfixes(); </span>
+<span class="fc" id="L696">		TableAlternatives ta = getAlternatives(((PersistingElement)this).getTable());</span>
+<span class="fc" id="L697">		ta.updateAlternatives(store);</span>
+<span class="fc" id="L698">		return ta.getPostfixes(); </span>
 	}
 
 	/**
@@ -709,22 +710,22 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 * @see FederatedMode#isCheckForChangingPostfix()
 	 */
 	private void PersistingElementOverFederatedTable.checkTablePostfixHasNotChanged() {
-<span class="fc" id="L712">		FederatedMode fm = this.getFederatedMode();</span>
-<span class="pc bpc" id="L713" title="1 of 4 branches missed.">		if (this.tablePostfix != null &amp;&amp; fm.isCheckForChangingPostfix()) {</span>
+<span class="fc" id="L713">		FederatedMode fm = this.getFederatedMode();</span>
+<span class="pc bpc" id="L714" title="1 of 4 branches missed.">		if (this.tablePostfix != null &amp;&amp; fm.isCheckForChangingPostfix()) {</span>
 			// Let's check whether a new computation for table postfix changes
 			// its value...
-<span class="fc" id="L716">			String computedPostfix = this.getTablePostfix();</span>
-<span class="fc bfc" id="L717" title="All 2 branches covered.">			if (!this.tablePostfix.equals(computedPostfix)) {</span>
+<span class="fc" id="L717">			String computedPostfix = this.getTablePostfix();</span>
+<span class="fc bfc" id="L718" title="All 2 branches covered.">			if (!this.tablePostfix.equals(computedPostfix)) {</span>
 				// Could still be forgiven in legacy mode
-<span class="pc bpc" id="L719" title="1 of 2 branches missed.">				if (this.tablePostfix.length() != 0)</span>
-<span class="fc" id="L720">					throw new IllegalStateException(this</span>
-<span class="fc" id="L721">							+ &quot; already registered in table &quot; + ((PersistingElement)this).getTable()</span>
-<span class="fc" id="L722">							+ &quot; with postfix &quot; + this.tablePostfix</span>
-<span class="fc" id="L723">							+ &quot; while computed postfix states now &quot;</span>
-<span class="fc" id="L724">							+ computedPostfix);</span>
+<span class="pc bpc" id="L720" title="1 of 2 branches missed.">				if (this.tablePostfix.length() != 0)</span>
+<span class="fc" id="L721">					throw new IllegalStateException(this</span>
+<span class="fc" id="L722">							+ &quot; already registered in table &quot; + ((PersistingElement)this).getTable()</span>
+<span class="fc" id="L723">							+ &quot; with postfix &quot; + this.tablePostfix</span>
+<span class="fc" id="L724">							+ &quot; while computed postfix states now &quot;</span>
+<span class="fc" id="L725">							+ computedPostfix);</span>
 			}
 		}
-<span class="fc" id="L727">	}</span>
+<span class="fc" id="L728">	}</span>
 	
 	/**
 	 * Creates a temporary element of the given class, for the given table postfix.
@@ -733,23 +734,23 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	private static PersistingElementOverFederatedTableWithMerge createTemporaryElement(
 			Class&lt;? extends PersistingElementOverFederatedTableWithMerge&gt; clazz,
 			Store store, String id, String postfix, Set&lt;String&gt; families, ColumnFamilyData values) {
-<span class="fc" id="L736">		KeyManagement km = KeyManagement.getInstance();</span>
+<span class="fc" id="L737">		KeyManagement km = KeyManagement.getInstance();</span>
 		// Removing any cached element so that created one is really new
-<span class="fc" id="L738">		km.unregister(clazz.asSubclass(PersistingElement.class), id);</span>
+<span class="fc" id="L739">		km.unregister(clazz.asSubclass(PersistingElement.class), id);</span>
 		
 		// Creating element
-<span class="fc" id="L741">		PersistingElementOverFederatedTableWithMerge elt =</span>
-<span class="fc" id="L742">				(PersistingElementOverFederatedTableWithMerge)km.createElement(clazz, id);</span>
+<span class="fc" id="L742">		PersistingElementOverFederatedTableWithMerge elt =</span>
+<span class="fc" id="L743">				(PersistingElementOverFederatedTableWithMerge)km.createElement(clazz, id);</span>
 		// Not keeping element in cache (it's temporary)
-<span class="fc" id="L744">		km.unregister((PersistingElement)elt);</span>
-<span class="fc bfc" id="L745" title="All 2 branches covered.">		if (families != null) {</span>
+<span class="fc" id="L745">		km.unregister((PersistingElement)elt);</span>
+<span class="fc bfc" id="L746" title="All 2 branches covered.">		if (families != null) {</span>
 			// In case we already know some information
-<span class="fc" id="L747">			((PersistingElement)elt).activateFromRawData(families, values);</span>
+<span class="fc" id="L748">			((PersistingElement)elt).activateFromRawData(families, values);</span>
 		}
 		// Table postfix
-<span class="fc" id="L750">		((PersistingElementOverFederatedTable)elt).setTablePostfix(postfix, store);</span>
+<span class="fc" id="L751">		((PersistingElementOverFederatedTable)elt).setTablePostfix(postfix, store);</span>
 		
-<span class="fc" id="L752">		return elt;</span>
+<span class="fc" id="L753">		return elt;</span>
 	}
 	
 	/**
@@ -758,40 +759,40 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 */
 	private void PersistingElementOverFederatedTableWithMerge.repairInconsistencyByMerging(
 			PersistingElementOverFederatedTableWithMerge elt) {
-<span class="pc bpc" id="L761" title="2 of 4 branches missed.">		assert this != elt;</span>
-<span class="pc bpc" id="L762" title="2 of 4 branches missed.">		assert this.getClass().equals(elt.getClass());</span>
-<span class="pc bpc" id="L763" title="2 of 4 branches missed.">		assert ((PersistingElementOverFederatedTable)this).tablePostfix != null;</span>
-<span class="pc bpc" id="L764" title="2 of 4 branches missed.">		assert ((PersistingElementOverFederatedTable)elt).tablePostfix != null;</span>
-<span class="pc bpc" id="L765" title="2 of 4 branches missed.">		assert !((PersistingElementOverFederatedTable)this).tablePostfix.equals(((PersistingElementOverFederatedTable)elt).tablePostfix);</span>
+<span class="pc bpc" id="L762" title="2 of 4 branches missed.">		assert this != elt;</span>
+<span class="pc bpc" id="L763" title="2 of 4 branches missed.">		assert this.getClass().equals(elt.getClass());</span>
+<span class="pc bpc" id="L764" title="2 of 4 branches missed.">		assert ((PersistingElementOverFederatedTable)this).tablePostfix != null;</span>
+<span class="pc bpc" id="L765" title="2 of 4 branches missed.">		assert ((PersistingElementOverFederatedTable)elt).tablePostfix != null;</span>
+<span class="pc bpc" id="L766" title="2 of 4 branches missed.">		assert !((PersistingElementOverFederatedTable)this).tablePostfix.equals(((PersistingElementOverFederatedTable)elt).tablePostfix);</span>
 
-<span class="fc" id="L767">		KeyManagement km = KeyManagement.getInstance();</span>
+<span class="fc" id="L768">		KeyManagement km = KeyManagement.getInstance();</span>
 		// There is no official element for this id yet (as there is an inconsistency)
-<span class="fc" id="L769">		km.unregister((PersistingElement)this);</span>
+<span class="fc" id="L770">		km.unregister((PersistingElement)this);</span>
 		
 		// Trying to repair by merging
 		try {
-<span class="fc" id="L773">			this.mergeWith(elt);</span>
-<span class="nc" id="L774">		} catch (Exception x) {</span>
+<span class="fc" id="L774">			this.mergeWith(elt);</span>
+<span class="pc" id="L775">		} catch (Exception x) {</span>
 			// Couldn't merge :(
-<span class="nc" id="L776">			throw new IllegalStateException(</span>
-<span class="nc" id="L777">					&quot;Found unmergeable duplicate data with id &quot; + ((PersistingElement)this).getIdentifier()</span>
-<span class="nc" id="L778">					+ &quot; in tables '&quot; + ((PersistingElement)this).getTable()</span>
-<span class="nc" id="L779">					+ &quot; with postfixes &quot; + ((PersistingElementOverFederatedTable)this).tablePostfix</span>
-<span class="nc" id="L780">					+ &quot;' and '&quot; + ((PersistingElementOverFederatedTable)elt).tablePostfix + '\'', x);</span>
+<span class="nc" id="L777">			throw new IllegalStateException(</span>
+<span class="nc" id="L778">					&quot;Found unmergeable duplicate data with id &quot; + ((PersistingElement)this).getIdentifier()</span>
+<span class="nc" id="L779">					+ &quot; in tables '&quot; + ((PersistingElement)this).getTable()</span>
+<span class="nc" id="L780">					+ &quot; with postfixes &quot; + ((PersistingElementOverFederatedTable)this).tablePostfix</span>
+<span class="nc" id="L781">					+ &quot;' and '&quot; + ((PersistingElementOverFederatedTable)elt).tablePostfix + '\'', x);</span>
 		}
 		
 		// Immediately storing this and deleting other element once merged
-<span class="fc" id="L784">		((PersistingElement)this).store();</span>
+<span class="fc" id="L785">		((PersistingElement)this).store();</span>
 		// Can't delete using elt.delete()
 		// &quot;this&quot; exists and makes elt believe that it still exists after delete (assertion fails)
-<span class="fc" id="L787">		((PersistingElement)this).getStore().delete(</span>
-<span class="fc" id="L788">				new MetaInformation().forElement((PersistingElement)elt).withPostfixedTable(((PersistingElement)elt).getTable(), ((PersistingElementOverFederatedTable)elt).tablePostfix),</span>
-<span class="fc" id="L789">				((PersistingElementOverFederatedTable)elt).getActualTable(), ((PersistingElement)elt).getIdentifier());</span>
+<span class="fc" id="L788">		((PersistingElement)this).getStore().delete(</span>
+<span class="fc" id="L789">				new MetaInformation().forElement((PersistingElement)elt).withPostfixedTable(((PersistingElement)elt).getTable(), ((PersistingElementOverFederatedTable)elt).tablePostfix),</span>
+<span class="fc" id="L790">				((PersistingElementOverFederatedTable)elt).getActualTable(), ((PersistingElement)elt).getIdentifier());</span>
 		// Consistency issue repaired :)
 		
 		// this is now the officiel version for this id
-<span class="fc" id="L793">		km.register((PersistingElement)this);</span>
-<span class="fc" id="L794">	}</span>
+<span class="fc" id="L794">		km.register((PersistingElement)this);</span>
+<span class="fc" id="L795">	}</span>
 
 	/**
 	 * Sets the table postfix in case it is not known by searching this
@@ -805,49 +806,49 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	 */
 	private boolean PersistingElementOverFederatedTable.findTableLocation(
 			final ReadWrite mode) {
-<span class="fc bfc" id="L808" title="All 2 branches covered.">		if (this.tablePostfix != null) {</span>
-<span class="fc" id="L809">			this.checkTablePostfixHasNotChanged();</span>
-<span class="fc" id="L810">			return false;</span>
+<span class="fc bfc" id="L809" title="All 2 branches covered.">		if (this.tablePostfix != null) {</span>
+<span class="fc" id="L810">			this.checkTablePostfixHasNotChanged();</span>
+<span class="fc" id="L811">			return false;</span>
 		}
-<span class="fc" id="L812">		String computedPostfix = this.getTablePostfix();</span>
-<span class="fc" id="L813">		Consistency consistencyLevel = this.getFederatedMode().getConsistency(mode);</span>
+<span class="fc" id="L813">		String computedPostfix = this.getTablePostfix();</span>
+<span class="fc" id="L814">		Consistency consistencyLevel = this.getFederatedMode().getConsistency(mode);</span>
 
-<span class="fc" id="L815">		final Store store = ((PersistingElement)this).getStore();</span>
+<span class="fc" id="L816">		final Store store = ((PersistingElement)this).getStore();</span>
 
-<span class="fc" id="L817">		final String mainTable = ((PersistingElement)this).getTable();</span>
-<span class="fc" id="L818">		final String id = ((PersistingElement)this).getIdentifier();</span>
-<span class="pc bpc" id="L819" title="1 of 4 branches missed.">		switch (consistencyLevel) {</span>
+<span class="fc" id="L818">		final String mainTable = ((PersistingElement)this).getTable();</span>
+<span class="fc" id="L819">		final String id = ((PersistingElement)this).getIdentifier();</span>
+<span class="pc bpc" id="L820" title="1 of 4 branches missed.">		switch (consistencyLevel) {</span>
 		case NONE:
 			// Trusting computed value
-<span class="pc bpc" id="L822" title="1 of 2 branches missed.">			this.setTablePostfix(computedPostfix, mode.isRead() ? null : store);</span>
-<span class="fc" id="L823">			return true;</span>
+<span class="pc bpc" id="L823" title="1 of 2 branches missed.">			this.setTablePostfix(computedPostfix, mode.isRead() ? null : store);</span>
+<span class="fc" id="L824">			return true;</span>
 			
 		case CONSISTENT_WITH_LEGACY:
 			// Soft consistency ; only testing expected table and legacy
 
 			// First trying with expected table
-<span class="pc bpc" id="L829" title="1 of 2 branches missed.">			if (this.testTableLocation(mainTable, computedPostfix, id, store))</span>
-<span class="nc" id="L830">				return true;</span>
+<span class="pc bpc" id="L830" title="1 of 2 branches missed.">			if (this.testTableLocation(mainTable, computedPostfix, id, store))</span>
+<span class="nc" id="L831">				return true;</span>
 
 			// Then trying with legacy table (if different)
-<span class="pc bpc" id="L833" title="1 of 2 branches missed.">			if (!&quot;&quot;.equals(computedPostfix)</span>
-<span class="pc bpc" id="L834" title="1 of 2 branches missed.">				&amp;&amp; FederatedTableManagement.getAlternatives(((PersistingElement)this).getTable()).legacyExists(store)</span>
-<span class="nc bnc" id="L835" title="All 2 branches missed.">				&amp;&amp; this.testTableLocation(mainTable, &quot;&quot;, id, store))</span>
-<span class="nc" id="L836">				return true;</span>
+<span class="pc bpc" id="L834" title="1 of 2 branches missed.">			if (!&quot;&quot;.equals(computedPostfix)</span>
+<span class="pc bpc" id="L835" title="1 of 2 branches missed.">				&amp;&amp; FederatedTableManagement.getAlternatives(((PersistingElement)this).getTable()).legacyExists(store)</span>
+<span class="nc bnc" id="L836" title="All 2 branches missed.">				&amp;&amp; this.testTableLocation(mainTable, &quot;&quot;, id, store))</span>
+<span class="nc" id="L837">				return true;</span>
 			
 			break;
 			
 		case CONSISTENT:
 			
-<span class="fc" id="L842">			Set&lt;String&gt; tested = new HashSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L843" title="All 2 branches covered.">			for (String post : this.getKnownPossiblePostfixes()) {</span>
-<span class="pc bpc" id="L844" title="1 of 4 branches missed.">				if (tested.add(post) &amp;&amp; this.testTableLocation(mainTable, post, id, store))</span>
-<span class="fc" id="L845">					return true;</span>
+<span class="fc" id="L843">			Set&lt;String&gt; tested = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L844" title="All 2 branches covered.">			for (String post : this.getKnownPossiblePostfixes()) {</span>
+<span class="pc bpc" id="L845" title="1 of 4 branches missed.">				if (tested.add(post) &amp;&amp; this.testTableLocation(mainTable, post, id, store))</span>
+<span class="fc" id="L846">					return true;</span>
 			}
 			// No found yet ; querying possible alternatives from store
-<span class="fc bfc" id="L848" title="All 2 branches covered.">			for (String post : this.getPossiblePostfixesWithAnUpdate(store)) {</span>
-<span class="fc bfc" id="L849" title="All 4 branches covered.">				if (tested.add(post) &amp;&amp; this.testTableLocation(mainTable, post, id, store))</span>
-<span class="fc" id="L850">					return true;</span>
+<span class="fc bfc" id="L849" title="All 2 branches covered.">			for (String post : this.getPossiblePostfixesWithAnUpdate(store)) {</span>
+<span class="fc bfc" id="L850" title="All 4 branches covered.">				if (tested.add(post) &amp;&amp; this.testTableLocation(mainTable, post, id, store))</span>
+<span class="fc" id="L851">					return true;</span>
 			}
 			
 //			// Hard consistency ; checking all possible tables in parallel
@@ -934,19 +935,19 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 
 		// Still not found ; setting postfix to computed value
 		// Only registering in case we are sure table exists (or about to)
-<span class="fc bfc" id="L937" title="All 2 branches covered.">		this.setTablePostfix(computedPostfix, mode.isRead() ? null : store);</span>
-<span class="fc" id="L938">		return false;</span>
+<span class="fc bfc" id="L938" title="All 2 branches covered.">		this.setTablePostfix(computedPostfix, mode.isRead() ? null : store);</span>
+<span class="fc" id="L939">		return false;</span>
 	}
 
 	private boolean PersistingElementOverFederatedTable.testTableLocation(
 		String mainTable, String postfix, String id, Store store) {
-<span class="fc bfc" id="L943" title="All 2 branches covered.">		if (store.exists(new MetaInformation().forElement((PersistingElement)this)</span>
-<span class="fc" id="L944">				.withPostfixedTable(mainTable, postfix), mainTable</span>
-<span class="fc" id="L945">				+ postfix, id)) {</span>
-<span class="fc" id="L946">			this.setTablePostfix(postfix, store);</span>
-<span class="fc" id="L947">			return true;</span>
+<span class="fc" id="L944">		if (store.exists(new MetaInformation().forElement((PersistingElement)this)</span>
+<span class="fc" id="L945">				.withPostfixedTable(mainTable, postfix), mainTable</span>
+<span class="fc bfc" id="L946" title="All 2 branches covered.">				+ postfix, id)) {</span>
+<span class="fc" id="L947">			this.setTablePostfix(postfix, store);</span>
+<span class="fc" id="L948">			return true;</span>
 		}
-<span class="fc" id="L949">		return false;</span>
+<span class="fc" id="L950">		return false;</span>
 	}
 
 	// getTablePostfix might return null ; we'll consider it is equivalent to
@@ -954,8 +955,8 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	String around():
 		call(String PersistingElementOverFederatedTable+.getTablePostfix())
 		&amp;&amp; within(FederatedTableManagement) {
-<span class="fc" id="L957">		String ret = proceed();</span>
-<span class="fc bfc" id="L958" title="All 2 branches covered.">		return ret == null ? &quot;&quot; : ret;</span>
+<span class="fc" id="L958">		String ret = proceed();</span>
+<span class="fc bfc" id="L959" title="All 2 branches covered.">		return ret == null ? &quot;&quot; : ret;</span>
 	}
 
 	// Generic pointcut to state where things have to be woven
@@ -973,13 +974,13 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		&amp;&amp; target(store)
 		&amp;&amp; args(meta, table, ..)
 		&amp;&amp; if(meta != null &amp;&amp; meta.getElement() instanceof PersistingElementOverFederatedTable) {
-<span class="nc" id="L976">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
-<span class="nc" id="L977">				.getElement();</span>
-<span class="nc" id="L978">		self.findTableLocation(ReadWrite.WRITE);</span>
-<span class="nc" id="L979">		registerPostfix(table, self.tablePostfix, store);</span>
-<span class="nc" id="L980">		proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
-<span class="nc" id="L981">				+ self.tablePostfix, store);</span>
-<span class="nc" id="L982">	}</span>
+<span class="nc" id="L977">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
+<span class="nc" id="L978">				.getElement();</span>
+<span class="nc" id="L979">		self.findTableLocation(ReadWrite.WRITE);</span>
+<span class="nc" id="L980">		registerPostfix(table, self.tablePostfix, store);</span>
+<span class="nc" id="L981">		proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
+<span class="nc" id="L982">				+ self.tablePostfix, store);</span>
+<span class="nc" id="L983">	}</span>
 
 	// Activate
 	ColumnFamilyData around(final MetaInformation meta, final String table, final String id, final Set&lt;String&gt; families, final Store store):
@@ -988,8 +989,8 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		&amp;&amp; args(meta, table, id, families)
 		&amp;&amp; target(store)
 		&amp;&amp; if(meta != null &amp;&amp; meta.getElement() instanceof PersistingElementOverFederatedTable) {
-<span class="nc" id="L991">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
-<span class="nc" id="L992">				.getElement();</span>
+<span class="nc" id="L992">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
+<span class="nc" id="L993">				.getElement();</span>
 		
 //		// Testing possible tables depending on consistency
 //		return new PerformWithRetries&lt;ColumnFamilyData&gt;() {
@@ -1010,12 +1011,12 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 //			}
 //		}.performWithRetries(self);
 			
-<span class="nc bnc" id="L1013" title="All 2 branches missed.">		if (self.tablePostfix == null</span>
-<span class="nc bnc" id="L1014" title="All 2 branches missed.">				&amp;&amp; !self.findTableLocation(ReadWrite.READ))</span>
+<span class="nc bnc" id="L1014" title="All 2 branches missed.">		if (self.tablePostfix == null</span>
+<span class="nc bnc" id="L1015" title="All 2 branches missed.">				&amp;&amp; !self.findTableLocation(ReadWrite.READ))</span>
 			// We've just found that this element does not exist
-<span class="nc" id="L1016">			return null;</span>
-<span class="nc" id="L1017">		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
-<span class="nc" id="L1018">				+ self.tablePostfix, id, families, store);</span>
+<span class="nc" id="L1017">			return null;</span>
+<span class="nc" id="L1018">		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
+<span class="nc" id="L1019">				+ self.tablePostfix, id, families, store);</span>
 	}
 
 	// Exists
@@ -1025,8 +1026,8 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		&amp;&amp; args(meta, table, id)
 		&amp;&amp; target(store)
 		&amp;&amp; if(meta != null &amp;&amp; meta.getElement() instanceof PersistingElementOverFederatedTable) {
-<span class="nc" id="L1028">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
-<span class="nc" id="L1029">				.getElement();</span>
+<span class="nc" id="L1029">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
+<span class="nc" id="L1030">				.getElement();</span>
 		
 //		return new PerformWithRetries&lt;Boolean&gt;() {
 //
@@ -1046,12 +1047,12 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 //			}
 //		}.performWithRetries(self);
 		
-<span class="nc bnc" id="L1049" title="All 2 branches missed.">		if (self.tablePostfix == null</span>
-<span class="nc bnc" id="L1050" title="All 2 branches missed.">				&amp;&amp; !self.findTableLocation(ReadWrite.READ))</span>
+<span class="nc bnc" id="L1050" title="All 2 branches missed.">		if (self.tablePostfix == null</span>
+<span class="nc bnc" id="L1051" title="All 2 branches missed.">				&amp;&amp; !self.findTableLocation(ReadWrite.READ))</span>
 			// We've just found that this element does not exist
-<span class="nc" id="L1052">			return false;</span>
-<span class="nc" id="L1053">		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
-<span class="nc" id="L1054">				+ self.tablePostfix, id, store);</span>
+<span class="nc" id="L1053">			return false;</span>
+<span class="nc" id="L1054">		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
+<span class="nc" id="L1055">				+ self.tablePostfix, id, store);</span>
 	}
 
 	// Delete
@@ -1061,8 +1062,8 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		&amp;&amp; target(store)
 		&amp;&amp; args(meta, table, id)
 		&amp;&amp; if(meta != null &amp;&amp; meta.getElement() instanceof PersistingElementOverFederatedTable) {
-<span class="nc" id="L1064">		final PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
-<span class="nc" id="L1065">				.getElement();</span>
+<span class="nc" id="L1065">		final PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
+<span class="nc" id="L1066">				.getElement();</span>
 		
 //		new PerformWithRetries&lt;Void&gt;() {
 //
@@ -1085,10 +1086,10 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 //		}.performWithRetries(self);
 //		self.setTablePostfix(null, null);
 		
-<span class="nc" id="L1088">		self.findTableLocation(ReadWrite.READ_OR_WRITE);</span>
-<span class="nc" id="L1089">		proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
-<span class="nc" id="L1090">				+ self.tablePostfix, id, store);</span>
-<span class="nc" id="L1091">		self.setTablePostfix(null, null);</span>
+<span class="nc" id="L1089">		self.findTableLocation(ReadWrite.READ_OR_WRITE);</span>
+<span class="nc" id="L1090">		proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
+<span class="nc" id="L1091">				+ self.tablePostfix, id, store);</span>
+<span class="nc" id="L1092">		self.setTablePostfix(null, null);</span>
 
 //		// Checking other tables, depending on consistency level
 //		while(self.findTableLocation(ReadWrite.READ_OR_WRITE)) {
@@ -1097,7 +1098,7 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 //					self.getActualTable(), id);
 //			self.setTablePostfix(null, null);
 //		}
-<span class="nc" id="L1100">	}</span>
+<span class="nc" id="L1101">	}</span>
 
 	// ===================================
 	// family-level operations
@@ -1109,14 +1110,14 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		&amp;&amp; inNOrm()
 		&amp;&amp; args(meta, table, ..)
 		&amp;&amp; if(meta != null &amp;&amp; meta.getElement() instanceof PersistingElementOverFederatedTable) {
-<span class="nc" id="L1112">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
-<span class="nc" id="L1113">				.getElement();</span>
-<span class="nc bnc" id="L1114" title="All 2 branches missed.">		if (self.tablePostfix == null</span>
-<span class="nc bnc" id="L1115" title="All 2 branches missed.">				&amp;&amp; !self.findTableLocation(ReadWrite.READ))</span>
+<span class="nc" id="L1113">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
+<span class="nc" id="L1114">				.getElement();</span>
+<span class="nc bnc" id="L1115" title="All 2 branches missed.">		if (self.tablePostfix == null</span>
+<span class="nc bnc" id="L1116" title="All 2 branches missed.">				&amp;&amp; !self.findTableLocation(ReadWrite.READ))</span>
 			// We've just found that this element does not exist
-<span class="nc" id="L1117">			return false;</span>
-<span class="nc" id="L1118">		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
-<span class="nc" id="L1119">				+ self.tablePostfix);</span>
+<span class="nc" id="L1118">			return false;</span>
+<span class="nc" id="L1119">		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
+<span class="nc" id="L1120">				+ self.tablePostfix);</span>
 	}
 
 	// Get column
@@ -1125,14 +1126,14 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		&amp;&amp; inNOrm()
 		&amp;&amp; args(meta, table, ..)
 		&amp;&amp; if(meta != null &amp;&amp; meta.getElement() instanceof PersistingElementOverFederatedTable) {
-<span class="nc" id="L1128">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
-<span class="nc" id="L1129">				.getElement();</span>
-<span class="nc bnc" id="L1130" title="All 2 branches missed.">		if (self.tablePostfix == null</span>
-<span class="nc bnc" id="L1131" title="All 2 branches missed.">				&amp;&amp; !self.findTableLocation(ReadWrite.READ))</span>
+<span class="nc" id="L1129">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
+<span class="nc" id="L1130">				.getElement();</span>
+<span class="nc bnc" id="L1131" title="All 2 branches missed.">		if (self.tablePostfix == null</span>
+<span class="nc bnc" id="L1132" title="All 2 branches missed.">				&amp;&amp; !self.findTableLocation(ReadWrite.READ))</span>
 			// We've just found that this element does not exist
-<span class="nc" id="L1133">			return null;</span>
-<span class="nc" id="L1134">		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
-<span class="nc" id="L1135">				+ self.tablePostfix);</span>
+<span class="nc" id="L1134">			return null;</span>
+<span class="nc" id="L1135">		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
+<span class="nc" id="L1136">				+ self.tablePostfix);</span>
 	}
 
 	// Get all columns
@@ -1143,14 +1144,14 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		&amp;&amp; inNOrm()
 		&amp;&amp; args(meta, table, ..)
 		&amp;&amp; if(meta != null &amp;&amp; meta.getElement() instanceof PersistingElementOverFederatedTable) {
-<span class="nc" id="L1146">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
-<span class="nc" id="L1147">				.getElement();</span>
-<span class="nc bnc" id="L1148" title="All 2 branches missed.">		if (self.tablePostfix == null</span>
-<span class="nc bnc" id="L1149" title="All 2 branches missed.">				&amp;&amp; !self.findTableLocation(ReadWrite.READ))</span>
+<span class="nc" id="L1147">		PersistingElementOverFederatedTable self = (PersistingElementOverFederatedTable) meta</span>
+<span class="nc" id="L1148">				.getElement();</span>
+<span class="nc bnc" id="L1149" title="All 2 branches missed.">		if (self.tablePostfix == null</span>
+<span class="nc bnc" id="L1150" title="All 2 branches missed.">				&amp;&amp; !self.findTableLocation(ReadWrite.READ))</span>
 			// We've just found that this element does not exist
-<span class="nc" id="L1151">			return null;</span>
-<span class="nc" id="L1152">		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
-<span class="nc" id="L1153">				+ self.tablePostfix);</span>
+<span class="nc" id="L1152">			return null;</span>
+<span class="nc" id="L1153">		return proceed(meta.withPostfixedTable(table, self.tablePostfix), table</span>
+<span class="nc" id="L1154">				+ self.tablePostfix);</span>
 	}
 
 	// ===================================
@@ -1164,31 +1165,31 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		&amp;&amp; inNOrm()
 		&amp;&amp; target(store)
 		&amp;&amp; args(meta, table, c) {
-<span class="nc bnc" id="L1167" title="All 2 branches missed.">		Class&lt;? extends PersistingElement&gt; clazz = meta == null ? null : meta</span>
-<span class="nc" id="L1168">				.getClazzNoCheck();</span>
-<span class="nc bnc" id="L1169" title="All 2 branches missed.">		if (!isFederated(clazz)) {</span>
-<span class="nc" id="L1170">			return proceed(meta, table, c, store);</span>
+<span class="nc bnc" id="L1168" title="All 2 branches missed.">		Class&lt;? extends PersistingElement&gt; clazz = meta == null ? null : meta</span>
+<span class="nc" id="L1169">				.getClazzNoCheck();</span>
+<span class="nc bnc" id="L1170" title="All 2 branches missed.">		if (!isFederated(clazz)) {</span>
+<span class="nc" id="L1171">			return proceed(meta, table, c, store);</span>
 		}
 
-<span class="pc" id="L1173">		return new GlobalAction&lt;Long&gt;() {</span>
+<span class="pc" id="L1174">		return new GlobalAction&lt;Long&gt;() {</span>
 
 			@Override
 			protected Long localRun(String mainTable, String postfix) {
-<span class="fc" id="L1177">				return store.count(new MetaInformation(meta)</span>
-<span class="fc" id="L1178">						.withPostfixedTable(mainTable, postfix), mainTable</span>
-<span class="fc" id="L1179">						+ postfix, c);</span>
+<span class="fc" id="L1178">				return store.count(new MetaInformation(meta)</span>
+<span class="fc" id="L1179">						.withPostfixedTable(mainTable, postfix), mainTable</span>
+<span class="fc" id="L1180">						+ postfix, c);</span>
 			}
 			
 			@Override
 			protected Long emptyValue() {
-<span class="nc" id="L1184">				return 0l;</span>
+<span class="nc" id="L1185">				return 0l;</span>
 			}
 
 			@Override
 			protected Long add(Long lhs, Long rhs) {
-<span class="fc" id="L1189">				return lhs + rhs;</span>
+<span class="fc" id="L1190">				return lhs + rhs;</span>
 			}
-<span class="nc" id="L1191">		}.globalRun(table, store, c);</span>
+<span class="nc" id="L1192">		}.globalRun(table, store, c);</span>
 	}
 
 	/**
@@ -1199,28 +1200,28 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		private final Row row;
 
 		public RowWithTable(String mainTable, String tablePostfix, Row row) {
-<span class="fc" id="L1202">			super();</span>
-<span class="fc" id="L1203">			this.mainTable = mainTable;</span>
-<span class="fc" id="L1204">			this.tablePostfix = tablePostfix;</span>
-<span class="fc" id="L1205">			this.row = row;</span>
-<span class="fc" id="L1206">		}</span>
+<span class="fc" id="L1203">			super();</span>
+<span class="fc" id="L1204">			this.mainTable = mainTable;</span>
+<span class="fc" id="L1205">			this.tablePostfix = tablePostfix;</span>
+<span class="fc" id="L1206">			this.row = row;</span>
+<span class="fc" id="L1207">		}</span>
 
 		public String getMainTable() {
-<span class="fc" id="L1209">			return mainTable;</span>
+<span class="fc" id="L1210">			return mainTable;</span>
 		}
 
 		public String getTablePostfix() {
-<span class="fc" id="L1213">			return tablePostfix;</span>
+<span class="fc" id="L1214">			return tablePostfix;</span>
 		}
 
 		@Override
 		public String getKey() {
-<span class="fc" id="L1218">			return row.getKey();</span>
+<span class="fc" id="L1219">			return row.getKey();</span>
 		}
 
 		@Override
 		public ColumnFamilyData getValues() {
-<span class="fc" id="L1223">			return row.getValues();</span>
+<span class="fc" id="L1224">			return row.getValues();</span>
 		}
 	}
 
@@ -1235,28 +1236,28 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 
 		public CloseableKeyIteratorWithTable(String mainTable,
 				String tablePostfix, CloseableKeyIterator iterator) {
-<span class="fc" id="L1238">			super();</span>
-<span class="fc" id="L1239">			this.mainTable = mainTable;</span>
-<span class="fc" id="L1240">			this.tablePostfix = tablePostfix;</span>
-<span class="fc" id="L1241">			this.iterator = iterator;</span>
-<span class="fc" id="L1242">		}</span>
+<span class="fc" id="L1239">			super();</span>
+<span class="fc" id="L1240">			this.mainTable = mainTable;</span>
+<span class="fc" id="L1241">			this.tablePostfix = tablePostfix;</span>
+<span class="fc" id="L1242">			this.iterator = iterator;</span>
+<span class="fc" id="L1243">		}</span>
 
 		public String getMainTable() {
-<span class="fc" id="L1245">			return mainTable;</span>
+<span class="fc" id="L1246">			return mainTable;</span>
 		}
 
 		public String getTablePostfix() {
-<span class="fc" id="L1249">			return tablePostfix;</span>
+<span class="fc" id="L1250">			return tablePostfix;</span>
 		}
 
 		@Override
 		public void close() {
-<span class="fc" id="L1254">			iterator.close();</span>
-<span class="fc" id="L1255">		}</span>
+<span class="fc" id="L1255">			iterator.close();</span>
+<span class="fc" id="L1256">		}</span>
 
 		@Override
 		public boolean hasNext() {
-<span class="fc" id="L1259">			return iterator.hasNext();</span>
+<span class="fc" id="L1260">			return iterator.hasNext();</span>
 		}
 
 		/**
@@ -1264,19 +1265,19 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		 */
 		@Override
 		public Row next() {
-<span class="fc" id="L1267">			Row r = iterator.next();</span>
-<span class="pc bpc" id="L1268" title="1 of 2 branches missed.">			return r == null ? null : new RowWithTable(this.getMainTable(),</span>
-<span class="fc" id="L1269">					getTablePostfix(), r);</span>
+<span class="fc" id="L1268">			Row r = iterator.next();</span>
+<span class="pc bpc" id="L1269" title="1 of 2 branches missed.">			return r == null ? null : new RowWithTable(this.getMainTable(),</span>
+<span class="fc" id="L1270">					getTablePostfix(), r);</span>
 		}
 
 		@Override
 		public void remove() {
-<span class="nc" id="L1274">			iterator.remove();</span>
-<span class="nc" id="L1275">		}</span>
+<span class="nc" id="L1275">			iterator.remove();</span>
+<span class="nc" id="L1276">		}</span>
 		
 		@Override
 		public String toString() {
-<span class="fc" id="L1279">			return &quot;iterator on table '&quot; + this.getMainTable() + &quot;' with postfix '&quot; + this.getTablePostfix() +'\'';</span>
+<span class="fc" id="L1280">			return &quot;iterator on table '&quot; + this.getMainTable() + &quot;' with postfix '&quot; + this.getTablePostfix() +'\'';</span>
 		}
 
 	}
@@ -1289,132 +1290,132 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		&amp;&amp; inNOrm()
 		&amp;&amp; target(store)
 		&amp;&amp; args(meta, table, c, limit, families) {
-<span class="nc bnc" id="L1292" title="All 2 branches missed.">		final Class&lt;? extends PersistingElement&gt; clazz = meta == null ? null : meta</span>
-<span class="nc" id="L1293">				.getClazzNoCheck();</span>
-<span class="nc bnc" id="L1294" title="All 2 branches missed.">		if (!isFederated(clazz)) {</span>
-<span class="nc" id="L1295">			return proceed(meta, table, c, limit, families, store);</span>
+<span class="nc bnc" id="L1293" title="All 2 branches missed.">		final Class&lt;? extends PersistingElement&gt; clazz = meta == null ? null : meta</span>
+<span class="nc" id="L1294">				.getClazzNoCheck();</span>
+<span class="nc bnc" id="L1295" title="All 2 branches missed.">		if (!isFederated(clazz)) {</span>
+<span class="nc" id="L1296">			return proceed(meta, table, c, limit, families, store);</span>
 		}
 
-<span class="pc" id="L1298">		return new GlobalAction&lt;CloseableKeyIterator&gt;() {</span>
+<span class="pc" id="L1299">		return new GlobalAction&lt;CloseableKeyIterator&gt;() {</span>
 
 			@Override
 			protected CloseableKeyIterator localRun(String mainTable,
 					String postfix) {
-<span class="fc" id="L1303">				return new CloseableKeyIteratorWithTable(mainTable, postfix,</span>
-<span class="fc" id="L1304">						store.get(new MetaInformation(meta).withPostfixedTable(</span>
-<span class="fc" id="L1305">								mainTable, postfix), mainTable + postfix, c,</span>
-<span class="fc" id="L1306">								limit, families));</span>
+<span class="fc" id="L1304">				return new CloseableKeyIteratorWithTable(mainTable, postfix,</span>
+<span class="fc" id="L1305">						store.get(new MetaInformation(meta).withPostfixedTable(</span>
+<span class="fc" id="L1306">								mainTable, postfix), mainTable + postfix, c,</span>
+<span class="fc" id="L1307">								limit, families));</span>
 			}
 			
 			@Override
 			protected CloseableKeyIterator emptyValue() {
-<span class="nc" id="L1311">				return new EmptyCloseableIterator();</span>
+<span class="nc" id="L1312">				return new EmptyCloseableIterator();</span>
 			}
 
 			@Override
 			protected CloseableKeyIterator add(CloseableKeyIterator lhs,
 					CloseableKeyIterator rhs) {
-<span class="pc bpc" id="L1317" title="1 of 2 branches missed.">				if (lhs == null)</span>
-<span class="nc" id="L1318">					return rhs;</span>
-<span class="fc bfc" id="L1319" title="All 2 branches covered.">				if (!(lhs instanceof AggregatingIterator)) {</span>
+<span class="pc bpc" id="L1318" title="1 of 2 branches missed.">				if (lhs == null)</span>
+<span class="nc" id="L1319">					return rhs;</span>
+<span class="fc bfc" id="L1320" title="All 2 branches covered.">				if (!(lhs instanceof AggregatingIterator)) {</span>
 					
-<span class="fc" id="L1321">					AggregatingIterator ret =</span>
-<span class="fc bfc" id="L1322" title="All 2 branches covered.">							PersistingElementOverFederatedTableWithMerge.class.isAssignableFrom(clazz) ?</span>
+<span class="fc" id="L1322">					AggregatingIterator ret =</span>
+<span class="fc bfc" id="L1323" title="All 2 branches covered.">							PersistingElementOverFederatedTableWithMerge.class.isAssignableFrom(clazz) ?</span>
 									// Aggregating iterator able to repair inconsistencies
-<span class="fc" id="L1324">								new AggregatingIterator() {</span>
+<span class="fc" id="L1325">								new AggregatingIterator() {</span>
 									@Override
 									public Row merge(Row r1, CloseableKeyIterator it1, Row r2, CloseableKeyIterator it2) throws Exception {
 										// Inconsistency detected, trying to repair
-<span class="pc bpc" id="L1328" title="2 of 4 branches missed.">										assert r1 instanceof RowWithTable;</span>
-<span class="pc bpc" id="L1329" title="2 of 4 branches missed.">										assert r2 instanceof RowWithTable;</span>
-<span class="pc bpc" id="L1330" title="2 of 4 branches missed.">										assert r1.getKey().equals(r2.getKey());</span>
-<span class="pc bpc" id="L1331" title="2 of 4 branches missed.">										assert table.equals(((RowWithTable)r1).getMainTable());</span>
-<span class="pc bpc" id="L1332" title="2 of 4 branches missed.">										assert table.equals(((RowWithTable)r2).getMainTable());</span>
-<span class="fc" id="L1333">										String post1 = ((CloseableKeyIteratorWithTable)it1).getTablePostfix();</span>
-<span class="fc" id="L1334">										String post2 = ((CloseableKeyIteratorWithTable)it2).getTablePostfix();</span>
-<span class="pc bpc" id="L1335" title="2 of 4 branches missed.">										assert post1 != null;</span>
-<span class="pc bpc" id="L1336" title="2 of 4 branches missed.">										assert post2 != null;</span>
-<span class="pc bpc" id="L1337" title="2 of 4 branches missed.">										assert !post1.equals(post2);</span>
-<span class="fc" id="L1338">										KeyManagement km = KeyManagement.getInstance();</span>
+<span class="pc bpc" id="L1329" title="2 of 4 branches missed.">										assert r1 instanceof RowWithTable;</span>
+<span class="pc bpc" id="L1330" title="2 of 4 branches missed.">										assert r2 instanceof RowWithTable;</span>
+<span class="pc bpc" id="L1331" title="2 of 4 branches missed.">										assert r1.getKey().equals(r2.getKey());</span>
+<span class="pc bpc" id="L1332" title="2 of 4 branches missed.">										assert table.equals(((RowWithTable)r1).getMainTable());</span>
+<span class="pc bpc" id="L1333" title="2 of 4 branches missed.">										assert table.equals(((RowWithTable)r2).getMainTable());</span>
+<span class="fc" id="L1334">										String post1 = ((CloseableKeyIteratorWithTable)it1).getTablePostfix();</span>
+<span class="fc" id="L1335">										String post2 = ((CloseableKeyIteratorWithTable)it2).getTablePostfix();</span>
+<span class="pc bpc" id="L1336" title="2 of 4 branches missed.">										assert post1 != null;</span>
+<span class="pc bpc" id="L1337" title="2 of 4 branches missed.">										assert post2 != null;</span>
+<span class="pc bpc" id="L1338" title="2 of 4 branches missed.">										assert !post1.equals(post2);</span>
+<span class="fc" id="L1339">										KeyManagement km = KeyManagement.getInstance();</span>
 										
 										// Creating elements from r1 and r2
-<span class="fc" id="L1341">										PersistingElementOverFederatedTableWithMerge elt1 =</span>
-<span class="fc" id="L1342">												FederatedTableManagement.createTemporaryElement(</span>
-<span class="fc" id="L1343">														clazz.asSubclass(PersistingElementOverFederatedTableWithMerge.class),</span>
-<span class="fc" id="L1344">														store, r1.getKey(), post1,</span>
-<span class="fc" id="L1345">														families, r1.getValues());</span>
-<span class="fc" id="L1346">										PersistingElementOverFederatedTableWithMerge elt2 =</span>
-<span class="fc" id="L1347">												FederatedTableManagement.createTemporaryElement(</span>
-<span class="fc" id="L1348">														clazz.asSubclass(PersistingElementOverFederatedTableWithMerge.class),</span>
-<span class="fc" id="L1349">														store, r2.getKey(), post2,</span>
-<span class="fc" id="L1350">														families, r2.getValues());</span>
-<span class="fc" id="L1351">										km.unregister((PersistingElement)elt1);</span>
-<span class="fc" id="L1352">										km.unregister((PersistingElement)elt2);</span>
+<span class="fc" id="L1342">										PersistingElementOverFederatedTableWithMerge elt1 =</span>
+<span class="fc" id="L1343">												FederatedTableManagement.createTemporaryElement(</span>
+<span class="fc" id="L1344">														clazz.asSubclass(PersistingElementOverFederatedTableWithMerge.class),</span>
+<span class="fc" id="L1345">														store, r1.getKey(), post1,</span>
+<span class="fc" id="L1346">														families, r1.getValues());</span>
+<span class="fc" id="L1347">										PersistingElementOverFederatedTableWithMerge elt2 =</span>
+<span class="fc" id="L1348">												FederatedTableManagement.createTemporaryElement(</span>
+<span class="fc" id="L1349">														clazz.asSubclass(PersistingElementOverFederatedTableWithMerge.class),</span>
+<span class="fc" id="L1350">														store, r2.getKey(), post2,</span>
+<span class="fc" id="L1351">														families, r2.getValues());</span>
+<span class="fc" id="L1352">										km.unregister((PersistingElement)elt1);</span>
+<span class="fc" id="L1353">										km.unregister((PersistingElement)elt2);</span>
 										
 										// Checking hoped location from 1
-<span class="fc" id="L1355">										String expectedTablePostFix = ((PersistingElementOverFederatedTable)elt1).getTablePostfix();</span>
-<span class="pc bpc" id="L1356" title="1 of 2 branches missed.">										if (post2.equals(expectedTablePostFix)) {</span>
+<span class="fc" id="L1356">										String expectedTablePostFix = ((PersistingElementOverFederatedTable)elt1).getTablePostfix();</span>
+<span class="pc bpc" id="L1357" title="1 of 2 branches missed.">										if (post2.equals(expectedTablePostFix)) {</span>
 											// Swapping 1 and 2 as 2 is on the right place, even in 1's belief
-<span class="nc" id="L1358">											PersistingElementOverFederatedTableWithMerge ptmp = elt2;</span>
-<span class="nc" id="L1359">											elt2 = elt1;</span>
-<span class="nc" id="L1360">											elt1 = ptmp;</span>
-<span class="nc" id="L1361">											Row rtmp = r2;</span>
-<span class="nc" id="L1362">											r2 = r1;</span>
-<span class="nc" id="L1363">											r1 = rtmp;</span>
-<span class="nc" id="L1364">											String stmp = post2;</span>
-<span class="nc" id="L1365">											post2 = post1;</span>
-<span class="nc" id="L1366">											post1 = stmp;</span>
+<span class="nc" id="L1359">											PersistingElementOverFederatedTableWithMerge ptmp = elt2;</span>
+<span class="nc" id="L1360">											elt2 = elt1;</span>
+<span class="nc" id="L1361">											elt1 = ptmp;</span>
+<span class="nc" id="L1362">											Row rtmp = r2;</span>
+<span class="nc" id="L1363">											r2 = r1;</span>
+<span class="nc" id="L1364">											r1 = rtmp;</span>
+<span class="nc" id="L1365">											String stmp = post2;</span>
+<span class="nc" id="L1366">											post2 = post1;</span>
+<span class="nc" id="L1367">											post1 = stmp;</span>
 										}
 										
 										// Actual repair
-<span class="fc" id="L1370">										elt1.repairInconsistencyByMerging(elt2);</span>
+<span class="fc" id="L1371">										elt1.repairInconsistencyByMerging(elt2);</span>
 										
 										// Preparing row to be returned (could eventually be activated to elt1)
-<span class="fc" id="L1373">										String post = post1;</span>
-<span class="fc" id="L1374">										final String id = r1.getKey();</span>
+<span class="fc" id="L1374">										String post = post1;</span>
+<span class="fc" id="L1375">										final String id = r1.getKey();</span>
 										// Expected data ; empty if no family expected, otherwise to be grabbed from the (actual) store
-<span class="fc" id="L1376">										final ColumnFamilyData data =</span>
-<span class="fc bfc" id="L1377" title="All 2 branches covered.">											families == null ? new DefaultColumnFamilyData()</span>
-<span class="fc" id="L1378">											: store.get(meta.withPostfixedTable(table, post), table+post, id, families);</span>
-<span class="fc" id="L1379">										return new RowWithTable(table, post,</span>
-<span class="fc" id="L1380">												new Row() {</span>
+<span class="fc" id="L1377">										final ColumnFamilyData data =</span>
+<span class="fc bfc" id="L1378" title="All 2 branches covered.">											families == null ? new DefaultColumnFamilyData()</span>
+<span class="fc" id="L1379">											: store.get(meta.withPostfixedTable(table, post), table+post, id, families);</span>
+<span class="fc" id="L1380">										return new RowWithTable(table, post,</span>
+<span class="fc" id="L1381">												new Row() {</span>
 													
 													@Override
 													public ColumnFamilyData getValues() {
-<span class="fc" id="L1384">														return data;</span>
+<span class="fc" id="L1385">														return data;</span>
 													}
 													
 													@Override
 													public String getKey() {
-<span class="fc" id="L1389">														return id;</span>
+<span class="fc" id="L1390">														return id;</span>
 													}
 												});
 									}
-								}
-<span class="fc" id="L1394">						: new AggregatingIterator() {</span>
+<span class="fc" id="L1394">								}</span>
+<span class="fc" id="L1395">						: new AggregatingIterator() {</span>
 									@Override
 									public Row merge(Row r1, CloseableKeyIterator it1, Row r2, CloseableKeyIterator it2) throws Exception {
 										try {
 											// Should throw an exception with a nice message
-<span class="nc" id="L1399">											return super.merge(r1, it1, r2, it2);</span>
-<span class="fc" id="L1400">										} catch (Exception x) {</span>
+<span class="nc" id="L1400">											return super.merge(r1, it1, r2, it2);</span>
+<span class="fc" id="L1401">										} catch (Exception x) {</span>
 											// Asking for an PersistingElementOverFederatedTableWithMerge implementation
-<span class="fc" id="L1402">											throw new DatabaseNotReachedException(</span>
-<span class="fc" id="L1403">													&quot;Inconsistency detected on row &quot; + r1.getKey()</span>
-<span class="fc" id="L1404">													+ &quot; ; make &quot; + clazz.getName()</span>
-<span class="fc" id="L1405">													+ &quot; implement &quot; + PersistingElementOverFederatedTableWithMerge.class.getName()</span>
-<span class="fc" id="L1406">													+ &quot; to repair it&quot;, x);</span>
+<span class="fc" id="L1403">											throw new DatabaseNotReachedException(</span>
+<span class="fc" id="L1404">													&quot;Inconsistency detected on row &quot; + r1.getKey()</span>
+<span class="fc" id="L1405">													+ &quot; ; make &quot; + clazz.getName()</span>
+<span class="fc" id="L1406">													+ &quot; implement &quot; + PersistingElementOverFederatedTableWithMerge.class.getName()</span>
+<span class="fc" id="L1407">													+ &quot; to repair it&quot;, x);</span>
 										}
 									}
 									
 								};
-<span class="fc" id="L1411">					ret.addIterator(lhs);</span>
-<span class="fc" id="L1412">					lhs = ret;</span>
+<span class="fc" id="L1412">					ret.addIterator(lhs);</span>
+<span class="fc" id="L1413">					lhs = ret;</span>
 				}
-<span class="fc" id="L1414">				((AggregatingIterator) lhs).addIterator(rhs);</span>
-<span class="fc" id="L1415">				return lhs;</span>
+<span class="fc" id="L1415">				((AggregatingIterator) lhs).addIterator(rhs);</span>
+<span class="fc" id="L1416">				return lhs;</span>
 			}
-<span class="nc" id="L1417">		}.globalRun(table, store, c);</span>
+<span class="nc" id="L1418">		}.globalRun(table, store, c);</span>
 	}
 
 	// When creating an element from a row using a search, let's immediately set
@@ -1422,10 +1423,10 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 	after(RowWithTable row) returning (PersistingElementOverFederatedTable self) : 
 		execution(PersistingElement createElementFromRow(Class, Map&lt;String, Field&gt;, Row)) 
 		&amp;&amp; args(.., row){
-<span class="pc bpc" id="L1425" title="1 of 2 branches missed.">		if (self != null) {</span>
-<span class="fc" id="L1426">			self.setTablePostfix(row.getTablePostfix(), ((PersistingElement)self).getStore());</span>
+<span class="pc bpc" id="L1426" title="1 of 2 branches missed.">		if (self != null) {</span>
+<span class="fc" id="L1427">			self.setTablePostfix(row.getTablePostfix(), ((PersistingElement)self).getStore());</span>
 		}
-<span class="fc" id="L1428">	}</span>
+<span class="fc" id="L1429">	}</span>
 
 	// Remote process
 	void around(final MetaInformation meta, final String table,
@@ -1437,35 +1438,35 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		&amp;&amp; inNOrm()
 		&amp;&amp; target(store)
 		&amp;&amp; args(meta, table, c, families, element, action, callback) {
-<span class="nc bnc" id="L1440" title="All 2 branches missed.">		Class&lt;? extends PersistingElement&gt; clazz = meta == null ? null : meta</span>
-<span class="nc" id="L1441">				.getClazzNoCheck();</span>
-<span class="nc bnc" id="L1442" title="All 2 branches missed.">		if (!isFederated(clazz)) {</span>
-<span class="nc" id="L1443">			proceed(meta, table, c, families, element, action, callback, store);</span>
-<span class="nc" id="L1444">			return;</span>
+<span class="nc bnc" id="L1441" title="All 2 branches missed.">		Class&lt;? extends PersistingElement&gt; clazz = meta == null ? null : meta</span>
+<span class="nc" id="L1442">				.getClazzNoCheck();</span>
+<span class="nc bnc" id="L1443" title="All 2 branches missed.">		if (!isFederated(clazz)) {</span>
+<span class="nc" id="L1444">			proceed(meta, table, c, families, element, action, callback, store);</span>
+<span class="nc" id="L1445">			return;</span>
 		}
 
-<span class="pc" id="L1447">		new GlobalAction&lt;Void&gt;() {</span>
+<span class="pc" id="L1448">		new GlobalAction&lt;Void&gt;() {</span>
 
 			@SuppressWarnings(&quot;unchecked&quot;)
 			@Override
 			protected Void localRun(String mainTable, String postfix) {
-<span class="fc" id="L1452">				store.process(new MetaInformation(meta).withPostfixedTable(</span>
-<span class="fc" id="L1453">						mainTable, postfix), mainTable + postfix, c, families,</span>
-<span class="fc" id="L1454">						element, (Process&lt;PersistingElement&gt;) action, callback);</span>
-<span class="fc" id="L1455">				return null;</span>
+<span class="fc" id="L1453">				store.process(new MetaInformation(meta).withPostfixedTable(</span>
+<span class="fc" id="L1454">						mainTable, postfix), mainTable + postfix, c, families,</span>
+<span class="fc" id="L1455">						element, (Process&lt;PersistingElement&gt;) action, callback);</span>
+<span class="fc" id="L1456">				return null;</span>
 			}
 			
 			@Override
 			protected Void emptyValue() {
-<span class="nc" id="L1460">				return null;</span>
+<span class="nc" id="L1461">				return null;</span>
 			}
 
 			@Override
 			protected Void add(Void lhs, Void rhs) {
-<span class="nc" id="L1465">				return null;</span>
+<span class="nc" id="L1466">				return null;</span>
 			}
-<span class="nc" id="L1467">		}.globalRun(table, store, c);</span>
-<span class="nc" id="L1468">	}</span>
+<span class="nc" id="L1468">		}.globalRun(table, store, c);</span>
+<span class="nc" id="L1469">	}</span>
 
 	// We're using Constraint to transmit searched table
 	public static class ConstraintWithPostfix extends Constraint {
@@ -1473,19 +1474,19 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
 		private final Constraint constraint;
 
 		public ConstraintWithPostfix(Constraint c, String postfix) {
-<span class="fc bfc" id="L1476" title="All 4 branches covered.">			super(c == null ? null : c.getStartKey(), c == null ? null : c</span>
-<span class="fc" id="L1477">					.getEndKey());</span>
-<span class="fc" id="L1478">			this.constraint = c;</span>
-<span class="fc" id="L1479">			this.postfix = postfix;</span>
-<span class="fc" id="L1480">		}</span>
+<span class="fc bfc" id="L1477" title="All 4 branches covered.">			super(c == null ? null : c.getStartKey(), c == null ? null : c</span>
+<span class="fc" id="L1478">					.getEndKey());</span>
+<span class="fc" id="L1479">			this.constraint = c;</span>
+<span class="fc" id="L1480">			this.postfix = postfix;</span>
+<span class="fc" id="L1481">		}</span>
 
 		public String getPostfix() {
-<span class="fc" id="L1483">			return this.postfix;</span>
+<span class="fc" id="L1484">			return this.postfix;</span>
 		}
 
 		public Constraint getConstraint() {
-<span class="nc" id="L1487">			return this.constraint;</span>
+<span class="nc" id="L1488">			return this.constraint;</span>
 		}
 	}
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>

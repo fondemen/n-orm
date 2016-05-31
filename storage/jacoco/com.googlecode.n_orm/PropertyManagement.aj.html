@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PropertyManagement.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">PropertyManagement.aj</span></div><h1>PropertyManagement.aj</h1><pre class="source lang-java linenums"><span class="pc bpc" id="L1" title="3 of 4 branches missed.">package com.googlecode.n_orm;</span>
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PropertyManagement.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.source.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">PropertyManagement.aj</span></div><h1>PropertyManagement.aj</h1><pre class="source lang-java linenums"><span class="pc bpc" id="L1" title="3 of 4 branches missed.">package com.googlecode.n_orm;</span>
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -50,7 +50,7 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 	declare warning: set(@Transient transient * PersistingElement+.*) : &quot;There is no need to annotate a transient field with @Transient&quot;;
 
 	public static final String PROPERTY_COLUMNFAMILY_NAME = &quot;props&quot;;
-	public static final int MAXIMUM_PROPERTY_NUMBER = 256;
+<span class="fc" id="L53">	public static final int MAXIMUM_PROPERTY_NUMBER = 256;</span>
 
 <span class="pc bpc" id="L55" title="1 of 2 branches missed.">	public static class Property {</span>
 		private final PropertyManagement pm;
@@ -111,124 +111,127 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 		}
 
 		void setField(Field field) {
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">			if (this.field != null) {</span>
-<span class="nc bnc" id="L115" title="All 2 branches missed.">				if(! field.equals(this.field))</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">			if (this.field != null) {</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">				if(! field.equals(this.field))</span>
 <span class="nc" id="L116">					throw new Error(&quot;Setting property with different fields (was &quot; + this.field.getName() + &quot;, setting to &quot; + field.getName() + &quot;) for &quot; +this.owner);</span>
 			}
-<span class="fc" id="L118">			this.field = field;</span>
-<span class="fc" id="L119">			this.key = km.isKey(field);</span>
-<span class="fc" id="L120">			this.delta = field.isAnnotationPresent(Incrementing.class);</span>
-<span class="fc bfc" id="L121" title="All 2 branches covered.">			if (this.delta)</span>
-<span class="fc" id="L122">				this.im = IncrementManagement.getInstance();</span>
-<span class="fc" id="L123">			this.setType(field.getType());</span>
-<span class="fc" id="L124">		}</span>
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">			if (this.name != null &amp;&amp; !this.name.equals(field.getName())) {</span>
+<span class="nc" id="L119">				throw new Error(&quot;Setting property with bad field name (was &quot; + this.field + &quot;, setting to &quot; + field.getName() + &quot;) for &quot; +this.owner);</span>
+			}
+			
+<span class="fc" id="L122">			this.field = field;</span>
+<span class="fc" id="L123">			this.key = km.isKey(field);</span>
+<span class="fc" id="L124">			this.delta = field.isAnnotationPresent(Incrementing.class);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">			if (this.delta)</span>
+<span class="fc" id="L126">				this.im = IncrementManagement.getInstance();</span>
+<span class="fc" id="L127">			this.setType(field.getType());</span>
+<span class="fc" id="L128">		}</span>
 
 		@Override
 		public int hashCode() {
-<span class="nc" id="L128">			return this.getName().hashCode();</span>
+<span class="nc" id="L132">			return this.getName().hashCode();</span>
 		}
 
 		@Override
 		public String toString() {
-<span class="nc" id="L133">			return this.getValue().toString();</span>
+<span class="nc" id="L137">			return this.getValue().toString();</span>
 		}
 
 		@Override
 		public boolean equals(Object obj) {
-<span class="nc bnc" id="L138" title="All 2 branches missed.">			if (obj instanceof Property)</span>
-<span class="nc" id="L139">				obj = ((Property) obj).getValue();</span>
-<span class="nc bnc" id="L140" title="All 4 branches missed.">			if (this.getValue() instanceof byte[] &amp;&amp; !(obj instanceof byte[])) {</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">			if (obj instanceof Property)</span>
+<span class="nc" id="L143">				obj = ((Property) obj).getValue();</span>
+<span class="nc bnc" id="L144" title="All 4 branches missed.">			if (this.getValue() instanceof byte[] &amp;&amp; !(obj instanceof byte[])) {</span>
 				try {
-<span class="nc" id="L142">					return ConversionTools.convert(obj.getClass(),</span>
-<span class="nc" id="L143">							(byte[]) this.getValue()).equals(obj);</span>
-<span class="nc" id="L144">				} catch (Exception x) {</span>
-				}
+<span class="nc" id="L146">					return ConversionTools.convert(obj.getClass(),</span>
+<span class="nc" id="L147">							(byte[]) this.getValue()).equals(obj);</span>
+<span class="nc" id="L148">				} catch (Exception x) {}</span>
 			}
-<span class="nc" id="L147">			return getValue().equals(obj);</span>
+<span class="nc" id="L150">			return getValue().equals(obj);</span>
 		}
 
 		private void setType(Class&lt;?&gt; type) {
-<span class="fc" id="L151">			this.type = type;</span>
-<span class="fc bfc" id="L152" title="All 2 branches covered.">			if (this.getValue() instanceof byte[]) {</span>
+<span class="fc" id="L154">			this.type = type;</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">			if (this.getValue() instanceof byte[]) {</span>
 				// In case it was read from an activation, it's not of the
 				// proper type
-<span class="fc bfc" id="L155" title="All 2 branches covered.">				if (!byte[].class.equals(type)) {</span>
-<span class="fc" id="L156">					this.setValue(ConversionTools.convert(type,</span>
-<span class="fc" id="L157">							((byte[]) this.getValue())));</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">				if (!byte[].class.equals(type)) {</span>
+<span class="fc" id="L159">					this.setValue(ConversionTools.convert(type,</span>
+<span class="fc" id="L160">							((byte[]) this.getValue())));</span>
 				}
 			}
-<span class="fc" id="L160">		}</span>
+<span class="fc" id="L163">		}</span>
 
 		public void activateIfNotAlready() throws DatabaseNotReachedException {
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">			if (this.wasActivated)</span>
-<span class="nc" id="L164">				return;</span>
-<span class="fc" id="L165">			reactivate();</span>
-<span class="fc" id="L166">		}</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">			if (this.wasActivated)</span>
+<span class="nc" id="L167">				return;</span>
+<span class="fc" id="L168">			reactivate();</span>
+<span class="fc" id="L169">		}</span>
 
 		private void reactivate() throws DatabaseNotReachedException {
-<span class="pc bpc" id="L169" title="1 of 2 branches missed.">			if (this.getField() != null) {</span>
-<span class="pc bpc" id="L170" title="1 of 2 branches missed.">				if (this.getValue() != null</span>
-<span class="fc bfc" id="L171" title="All 2 branches covered.">						&amp;&amp; PropertyManagement.getInstance().isPropertyType(this.getField().getType())</span>
-<span class="fc bfc" id="L172" title="All 2 branches covered.">						&amp;&amp; this.getField().isAnnotationPresent(ImplicitActivation.class)) {</span>
-<span class="fc" id="L173">					Object val = this.getValue();</span>
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">					if (val instanceof PersistingElement)</span>
-<span class="fc" id="L175">						((PersistingElement) this.getValue()).activateIfNotAlready();</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">			if (this.getField() != null) {</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">				if (this.getValue() != null</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">						&amp;&amp; PropertyManagement.getInstance().isPropertyType(this.getField().getType())</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">						&amp;&amp; this.getField().isAnnotationPresent(ImplicitActivation.class)) {</span>
+<span class="fc" id="L176">					Object val = this.getValue();</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">					if (val instanceof PersistingElement)</span>
+<span class="fc" id="L178">						((PersistingElement) this.getValue()).activateIfNotAlready();</span>
 				}
-<span class="fc" id="L177">				this.wasActivated = true;</span>
+<span class="fc" id="L180">				this.wasActivated = true;</span>
 			}
-<span class="fc" id="L179">		}</span>
+<span class="fc" id="L182">		}</span>
 		
 		private boolean hasChanged(Object pojoValue) {
-<span class="pc bpc" id="L182" title="2 of 4 branches missed.">			assert this.type != null;</span>
-<span class="fc bfc" id="L183" title="All 2 branches covered.">			if (pojoValue == null)</span>
-<span class="fc" id="L184">				return true;</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">			if (this.value == null)</span>
-<span class="fc" id="L186">				return true;</span>
-<span class="fc" id="L187">			byte [] valB = ConversionTools.convert(this.value, this.type), pojoValB = ConversionTools.convert(pojoValue, type);</span>
-<span class="fc bfc" id="L188" title="All 2 branches covered.">			return !Arrays.equals(valB, pojoValB);</span>
+<span class="pc bpc" id="L185" title="2 of 4 branches missed.">			assert this.type != null;</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">			if (pojoValue == null)</span>
+<span class="fc" id="L187">				return true;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">			if (this.value == null)</span>
+<span class="fc" id="L189">				return true;</span>
+<span class="fc" id="L190">			byte [] valB = ConversionTools.convert(this.value, this.type), pojoValB = ConversionTools.convert(pojoValue, type);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">			return !Arrays.equals(valB, pojoValB);</span>
 		}
 		
 		public void updateFromPOJO() {
-<span class="fc" id="L192">			Field f = this.getField();</span>
-<span class="fc" id="L193">			Object val = pm.candideReadValue(owner, f);</span>
-<span class="fc" id="L194">			this.updateFromPOJOInt(val, null);</span>
-<span class="fc" id="L195">		}</span>
+<span class="fc" id="L195">			Field f = this.getField();</span>
+<span class="fc" id="L196">			Object val = pm.candideReadValue(owner, f);</span>
+<span class="fc" id="L197">			this.updateFromPOJOInt(val, null);</span>
+<span class="fc" id="L198">		}</span>
 		
 		private void updateFromPOJOInt(Object val, Boolean hasChanged) {
-<span class="fc" id="L198">			Field f = this.getField();</span>
-<span class="fc bfc" id="L199" title="All 2 branches covered.">			if (val == null) {</span>
-<span class="pc bpc" id="L200" title="2 of 4 branches missed.">				assert !this.delta;</span>
-<span class="pc bpc" id="L201" title="1 of 2 branches missed.">				if (this.key)</span>
-<span class="nc" id="L202">					throw new IllegalStateException(&quot;Key &quot; + f + &quot; is left null for &quot; + owner);</span>
-<span class="fc" id="L203">				this.family.removeKey(f.getName());</span>
-<span class="fc" id="L204">				this.value = null;</span>
-			} else {
-<span class="pc bpc" id="L206" title="3 of 6 branches missed.">				if (hasChanged == null ? this.hasChanged(val) : hasChanged) {</span>
-<span class="fc bfc" id="L207" title="All 2 branches covered.">					if (this.delta) {</span>
-<span class="fc" id="L208">						this.owner.getIncrements().put(this.getName(), im.getActualIncrement((Number)val, (Number)this.value, this.owner.getIncrements().get(this.getName()), f));</span>
-<span class="fc" id="L209">						this.family.setChanged(this, null);</span>
-					} else
-<span class="fc" id="L211">						this.family.setChanged(this, ChangeKind.SET);</span>
-<span class="fc" id="L212">					this.value = val;</span>
+<span class="fc" id="L201">			Field f = this.getField();</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">			if (val == null) {</span>
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">				assert !this.delta;</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">				if (this.key)</span>
+<span class="nc" id="L205">					throw new IllegalStateException(&quot;Key &quot; + f + &quot; is left null for &quot; + owner);</span>
+<span class="fc" id="L206">				this.family.removeKey(f.getName());</span>
+<span class="fc" id="L207">				this.value = null;</span>
+<span class="fc" id="L208">			} else {</span>
+<span class="pc bpc" id="L209" title="3 of 6 branches missed.">				if (hasChanged == null ? this.hasChanged(val) : hasChanged) {</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">					if (this.delta) {</span>
+<span class="fc" id="L211">						this.owner.getIncrements().put(this.getName(), im.getActualIncrement((Number)val, (Number)this.value, this.owner.getIncrements().get(this.getName()), f));</span>
+<span class="fc" id="L212">						this.family.setChanged(this, null);</span>
+<span class="fc" id="L213">					} else</span>
+<span class="fc" id="L214">						this.family.setChanged(this, ChangeKind.SET);</span>
+<span class="fc" id="L215">					this.value = val;</span>
 				}
 			}
-<span class="pc bpc" id="L215" title="2 of 6 branches missed.">			assert !this.delta || !this.family.changedKeySet().contains(this.getName());</span>
-<span class="fc" id="L216">		}</span>
+<span class="pc bpc" id="L218" title="2 of 6 branches missed.">			assert !this.delta || !this.family.changedKeySet().contains(this.getName());</span>
+<span class="fc" id="L219">		}</span>
 		
 		public void storeToPOJO() {
-<span class="fc" id="L219">			Field f = this.getField();</span>
-<span class="fc" id="L220">			Object oldVal = pm.candideReadValue(owner, f);</span>
+<span class="fc" id="L222">			Field f = this.getField();</span>
+<span class="fc" id="L223">			Object oldVal = pm.candideReadValue(owner, f);</span>
 			
-<span class="fc" id="L222">			this.activateIfNotAlready();</span>
+<span class="fc" id="L225">			this.activateIfNotAlready();</span>
 			
-<span class="fc bfc" id="L224" title="All 2 branches covered.">			if (this.hasChanged(oldVal)) {</span>
-<span class="pc bpc" id="L225" title="1 of 2 branches missed.">				if (this.key) {</span>
-<span class="nc" id="L226">					this.value = oldVal;</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">			if (this.hasChanged(oldVal)) {</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">				if (this.key) {</span>
+<span class="nc" id="L229">					this.value = oldVal;</span>
 					//this.family.setChanged(this.name); //A key is not supposed to change
-				} else
-<span class="fc" id="L229">					pm.candideSetValue(this.owner, f, this.value);</span>
+<span class="nc" id="L231">				} else</span>
+<span class="fc" id="L232">					pm.candideSetValue(this.owner, f, this.value);</span>
 			}
-<span class="fc" id="L231">		}</span>
+<span class="fc" id="L234">		}</span>
 
 	}
 
@@ -236,211 +239,212 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 	 * Stores non-transient non-null properties for persisting objects.
 	 * 
 	 */
-<span class="pc bpc" id="L239" title="1 of 2 branches missed.">	public static class PropertyFamily extends MapColumnFamily&lt;String, Property&gt; {</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">	public static class PropertyFamily extends MapColumnFamily&lt;String, Property&gt; {</span>
 		
 		//private transient Map&lt;Field, byte []&gt; lastState = new HashMap&lt;Field, byte []&gt;();
 		
-<span class="pc bpc" id="L243" title="1 of 2 branches missed.">		private Set&lt;String&gt; changedFields = new TreeSet&lt;String&gt;();</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">		private Set&lt;String&gt; changedFields = new TreeSet&lt;String&gt;();</span>
 
 		private PropertyFamily(PersistingElement owner)
 				throws SecurityException, NoSuchFieldException {
-<span class="fc" id="L247">			super(String.class, Property.class, null, PROPERTY_COLUMNFAMILY_NAME, owner);</span>
-<span class="pc bpc" id="L248" title="2 of 4 branches missed.">			assert this.changes != null;</span>
-<span class="fc" id="L249">			List&lt;Field&gt; keysF = KeyManagement.getInstance().detectKeys(getOwner().getClass());</span>
-<span class="fc" id="L250">			final Set&lt;String&gt; keys = new TreeSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L251" title="All 2 branches covered.">			for (Field key : keysF) {</span>
-<span class="fc" id="L252">				keys.add(key.getName());</span>
+<span class="fc" id="L250">			super(String.class, Property.class, null, PROPERTY_COLUMNFAMILY_NAME, owner);</span>
+<span class="pc bpc" id="L251" title="2 of 4 branches missed.">			assert this.changes != null;</span>
+<span class="fc" id="L252">			List&lt;Field&gt; keysF = KeyManagement.getInstance().detectKeys(getOwner().getClass());</span>
+<span class="fc" id="L253">			final Set&lt;String&gt; keys = new TreeSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">			for (Field key : keysF) {</span>
+<span class="fc" id="L255">				keys.add(key.getName());</span>
 			}
-<span class="fc" id="L254">			this.changes = new TreeMap&lt;String, ChangeKind&gt;() {</span>
+<span class="fc" id="L257">			this.changes = new TreeMap&lt;String, ChangeKind&gt;() {</span>
 				private static final long serialVersionUID = 1L;
 
 				@Override
 				public ChangeKind put(String key, ChangeKind value) {
-<span class="fc bfc" id="L259" title="All 2 branches covered.">					if (keys.contains(key))</span>
-<span class="fc" id="L260">						return null;</span>
-<span class="fc" id="L261">					return super.put(key, value);</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">					if (keys.contains(key))</span>
+<span class="fc" id="L263">						return null;</span>
+<span class="fc" id="L264">					return super.put(key, value);</span>
 				}
 				
 			};
-<span class="fc" id="L265">		}</span>
+<span class="fc" id="L268">		}</span>
 
 		public void setChanged(Property prop, ChangeKind change) {
-<span class="fc bfc" id="L268" title="All 2 branches covered.">			if (change == null)</span>
-<span class="fc" id="L269">				this.changes.remove(prop.getName());</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">			if (change == null)</span>
+<span class="fc" id="L272">				this.changes.remove(prop.getName());</span>
 			else
-<span class="fc" id="L271">				this.changes.put(prop.getName(), change);</span>
-<span class="fc" id="L272">		}</span>
+<span class="fc" id="L274">				this.changes.put(prop.getName(), change);</span>
+<span class="fc" id="L275">		}</span>
 
 		@Override
 		protected Property preparePut(String key, byte[] rep) {
-<span class="fc" id="L276">			return new Property(this, key, rep);</span>
+<span class="fc" id="L279">			return new Property(this, key, rep);</span>
 		}
 
 		@Override
 		protected boolean hasChanged(String key, Property lhs, Property rhs) {
-<span class="nc bnc" id="L281" title="All 2 branches missed.">			if(lhs != rhs)</span>
-<span class="nc" id="L282">				return true;</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">			if(lhs != rhs)</span>
+<span class="nc" id="L285">				return true;</span>
 			
-<span class="nc bnc" id="L284" title="All 4 branches missed.">			assert lhs.getField() == rhs.getField();</span>
+<span class="nc bnc" id="L287" title="All 4 branches missed.">			assert lhs.getField() == rhs.getField();</span>
 			
-<span class="nc" id="L286">			Class&lt;?&gt; clazz = lhs.getField().getType();</span>
+<span class="nc" id="L289">			Class&lt;?&gt; clazz = lhs.getField().getType();</span>
 			
-<span class="nc bnc" id="L288" title="All 2 branches missed.">			return !Arrays.equals(ConversionTools.convert(lhs, clazz), ConversionTools.convert(rhs, clazz));</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">			return !Arrays.equals(ConversionTools.convert(lhs, clazz), ConversionTools.convert(rhs, clazz));</span>
 		}
 		
 		private void fieldChanged(Field f) {
-<span class="fc" id="L292">			this.changedFields.add(f.getName());</span>
-<span class="fc" id="L293">		}</span>
+<span class="fc" id="L295">			this.changedFields.add(f.getName());</span>
+<span class="fc" id="L296">		}</span>
 
 		@Override
 		public void clearChanges() {
-<span class="fc" id="L297">			this.changedFields.clear();</span>
-<span class="fc" id="L298">			super.clearChanges();</span>
-<span class="pc" id="L299">		}</span>
+<span class="fc" id="L300">			this.changedFields.clear();</span>
+<span class="fc" id="L301">			super.clearChanges();</span>
+<span class="pc" id="L302">		}</span>
 
 		@Override
 		public void updateFromPOJO() {
-<span class="fc" id="L303">			PropertyManagement pm = PropertyManagement.getInstance();</span>
-<span class="fc" id="L304">			PersistingElement owner = this.getOwner();</span>
-<span class="fc bfc" id="L305" title="All 2 branches covered.">			for (Field f : pm.getProperties(owner.getClass())) {</span>
-<span class="fc" id="L306">				Property p = this.getElement(f.getName());</span>
-<span class="fc bfc" id="L307" title="All 2 branches covered.">				if (p == null) {</span>
-<span class="fc" id="L308">					Object val = pm.candideReadValue(owner, f);</span>
-<span class="fc" id="L309">					Object defaultVal = ConversionTools.getDefaultValue(f.getType());</span>
-<span class="fc bfc" id="L310" title="All 8 branches covered.">					if ((!this.changedFields.contains(f.getName())) &amp;&amp; (defaultVal == null ? val == null : defaultVal.equals(val)))</span>
-<span class="fc" id="L311">						continue;</span>
-<span class="fc" id="L312">					p = new Property(this, f, null);</span>
-<span class="fc" id="L313">					this.putElement(p.getName(), p);</span>
-<span class="fc" id="L314">					p.updateFromPOJOInt(val, null);</span>
-				} else {
-<span class="fc" id="L316">					p.updateFromPOJO();</span>
+<span class="fc" id="L306">			PropertyManagement pm = PropertyManagement.getInstance();</span>
+<span class="fc" id="L307">			PersistingElement owner = this.getOwner();</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">			for (Field f : pm.getProperties(owner.getClass())) {</span>
+<span class="fc" id="L309">				Property p = this.getElement(f.getName());</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">				if (p == null) {</span>
+<span class="fc" id="L311">					Object val = pm.candideReadValue(owner, f);</span>
+<span class="fc" id="L312">					Object defaultVal = ConversionTools.getDefaultValue(f.getType());</span>
+<span class="fc bfc" id="L313" title="All 8 branches covered.">					if ((!this.changedFields.contains(f.getName())) &amp;&amp; (defaultVal == null ? val == null : defaultVal.equals(val)))</span>
+<span class="fc" id="L314">						continue;</span>
+<span class="fc" id="L315">					p = new Property(this, f, null);</span>
+<span class="fc" id="L316">					this.putElement(p.getName(), p);</span>
+<span class="fc" id="L317">					p.updateFromPOJOInt(val, null);</span>
+<span class="fc" id="L318">				} else {</span>
+<span class="fc" id="L319">					p.setField(f);</span>
+<span class="fc" id="L320">					p.updateFromPOJO();</span>
 				}
-<span class="pc bpc" id="L318" title="2 of 6 branches missed.">				assert p.getValue() != null || !this.containsKey(p.getName());</span>
+<span class="pc bpc" id="L322" title="2 of 6 branches missed.">				assert p.getValue() != null || !this.containsKey(p.getName());</span>
 			}
-<span class="fc" id="L320">		}</span>
+<span class="fc" id="L324">		}</span>
 
 		@Override
 		public void storeToPOJO() {
-<span class="fc" id="L324">			PropertyManagement pm = PropertyManagement.getInstance();</span>
-<span class="fc" id="L325">			KeyManagement km = KeyManagement.getInstance();</span>
-<span class="fc" id="L326">			PersistingElement owner = this.getOwner();</span>
-<span class="fc bfc" id="L327" title="All 2 branches covered.">			for (Field f : pm.getProperties(owner.getClass())) {</span>
-<span class="fc" id="L328">				Property p = this.getElement(f.getName());</span>
-<span class="fc bfc" id="L329" title="All 2 branches covered.">				if (p == null) {</span>
-<span class="fc bfc" id="L330" title="All 2 branches covered.">					if (!km.isKey(f)) {</span>
-<span class="fc" id="L331">						Class&lt;?&gt; type = f.getType();</span>
-<span class="fc" id="L332">						pm.candideSetValue(this.getOwner(), f, ConversionTools.getDefaultValue(type));</span>
-					} else {
-<span class="fc" id="L334">						p = new Property(this, f);</span>
-<span class="fc" id="L335">						this.putElement(p.getName(), p);</span>
-<span class="fc" id="L336">						this.changes.remove(p.getName());</span>
-<span class="fc" id="L337">						p.activateIfNotAlready();</span>
+<span class="fc" id="L328">			PropertyManagement pm = PropertyManagement.getInstance();</span>
+<span class="fc" id="L329">			KeyManagement km = KeyManagement.getInstance();</span>
+<span class="fc" id="L330">			PersistingElement owner = this.getOwner();</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">			for (Field f : pm.getProperties(owner.getClass())) {</span>
+<span class="fc" id="L332">				Property p = this.getElement(f.getName());</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">				if (p == null) {</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">					if (!km.isKey(f)) {</span>
+<span class="fc" id="L335">						Class&lt;?&gt; type = f.getType();</span>
+<span class="fc" id="L336">						pm.candideSetValue(this.getOwner(), f, ConversionTools.getDefaultValue(type));</span>
+<span class="fc" id="L337">					} else {</span>
+<span class="fc" id="L338">						p = new Property(this, f);</span>
+<span class="fc" id="L339">						this.putElement(p.getName(), p);</span>
+<span class="fc" id="L340">						this.changes.remove(p.getName());</span>
+<span class="fc" id="L341">						p.activateIfNotAlready();</span>
 					}
-				} else {
-<span class="fc" id="L340">					p.setField(f);</span>
-<span class="fc" id="L341">					p.storeToPOJO();</span>
+<span class="fc" id="L343">				} else {</span>
+<span class="fc" id="L344">					p.setField(f);</span>
+<span class="fc" id="L345">					p.storeToPOJO();</span>
 				}
 			}
-<span class="fc" id="L344">		}</span>
+<span class="fc" id="L348">		}</span>
 
 	}
 
-<span class="pc bpc" id="L348" title="1 of 2 branches missed.">	private Map&lt;Class&lt;?&gt;, Set&lt;Field&gt;&gt; typeProperties = new HashMap&lt;Class&lt;?&gt;, Set&lt;Field&gt;&gt;();</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">	private Map&lt;Class&lt;?&gt;, Set&lt;Field&gt;&gt; typeProperties = new HashMap&lt;Class&lt;?&gt;, Set&lt;Field&gt;&gt;();</span>
 
 	public Set&lt;Field&gt; getProperties(Class&lt;?&gt; type) {
-<span class="pc" id="L351">		synchronized(typeProperties) {</span>
-<span class="fc bfc" id="L352" title="All 2 branches covered.">			if (!this.typeProperties.containsKey(type)) {</span>
-<span class="fc" id="L353">				Set&lt;Field&gt; ret = new HashSet&lt;Field&gt;(Arrays.asList(type</span>
-<span class="fc" id="L354">						.getDeclaredFields()));</span>
-<span class="fc bfc" id="L355" title="All 2 branches covered.">				for (Field f : new ArrayList&lt;Field&gt;(ret)) {</span>
-<span class="fc" id="L356">					Class&lt;?&gt; ft = f.getType();</span>
-<span class="fc bfc" id="L357" title="All 2 branches covered.">					if ((f.getModifiers() &amp; (Modifier.STATIC | Modifier.TRANSIENT)) != 0</span>
-<span class="fc bfc" id="L358" title="All 2 branches covered.">							|| f.isAnnotationPresent(Transient.class)</span>
-<span class="fc bfc" id="L359" title="All 2 branches covered.">							|| Collection.class.isAssignableFrom(ft)</span>
-<span class="fc bfc" id="L360" title="All 2 branches covered.">							|| Map.class.isAssignableFrom(ft)</span>
-<span class="pc bpc" id="L361" title="1 of 2 branches missed.">							|| ColumnFamily.class.isAssignableFrom(ft))</span>
-<span class="fc" id="L362">						ret.remove(f);</span>
+<span class="pc" id="L355">		synchronized(typeProperties) {</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">			if (!this.typeProperties.containsKey(type)) {</span>
+<span class="fc" id="L357">				Set&lt;Field&gt; ret = new HashSet&lt;Field&gt;(Arrays.asList(type</span>
+<span class="fc" id="L358">						.getDeclaredFields()));</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">				for (Field f : new ArrayList&lt;Field&gt;(ret)) {</span>
+<span class="fc" id="L360">					Class&lt;?&gt; ft = f.getType();</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">					if ((f.getModifiers() &amp; (Modifier.STATIC | Modifier.TRANSIENT)) != 0</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">							|| f.isAnnotationPresent(Transient.class)</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">							|| Collection.class.isAssignableFrom(ft)</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">							|| Map.class.isAssignableFrom(ft)</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">							|| ColumnFamily.class.isAssignableFrom(ft))</span>
+<span class="fc" id="L366">						ret.remove(f);</span>
 				}
-<span class="fc" id="L364">				Class&lt;?&gt; supertype = type.getSuperclass();</span>
-<span class="fc bfc" id="L365" title="All 2 branches covered.">				if (supertype != null)</span>
-<span class="fc" id="L366">					ret.addAll(this.getProperties(supertype));</span>
-<span class="fc" id="L367">				this.typeProperties.put(type, ret);</span>
+<span class="fc" id="L368">				Class&lt;?&gt; supertype = type.getSuperclass();</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">				if (supertype != null)</span>
+<span class="fc" id="L370">					ret.addAll(this.getProperties(supertype));</span>
+<span class="fc" id="L371">				this.typeProperties.put(type, ret);</span>
 			}
-<span class="fc" id="L369">			return this.typeProperties.get(type);</span>
+<span class="fc" id="L373">			return this.typeProperties.get(type);</span>
 		}
 	}
 	
 	public Field getProperty(Class&lt;?&gt; type, String name) {
-<span class="pc bpc" id="L374" title="1 of 2 branches missed.">		for (Field p : this.getProperties(type)) {</span>
-<span class="fc bfc" id="L375" title="All 2 branches covered.">			if (p.getName().equals(name))</span>
-<span class="fc" id="L376">				return p;</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">		for (Field p : this.getProperties(type)) {</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">			if (p.getName().equals(name))</span>
+<span class="fc" id="L380">				return p;</span>
 		}
-<span class="nc" id="L378">		return null;</span>
+<span class="nc" id="L382">		return null;</span>
 	}
 
 	public void checkProperty(Field f) {
-<span class="pc bpc" id="L382" title="1 of 2 branches missed.">		if ((f.getModifiers() &amp; (Modifier.STATIC | Modifier.TRANSIENT)) != 0)</span>
-<span class="nc" id="L383">			return;</span>
-<span class="pc bpc" id="L384" title="1 of 2 branches missed.">		if (f.isAnnotationPresent(Transient.class))</span>
-<span class="nc" id="L385">			return;</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">		if ((f.getModifiers() &amp; (Modifier.STATIC | Modifier.TRANSIENT)) != 0)</span>
+<span class="nc" id="L387">			return;</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">		if (f.isAnnotationPresent(Transient.class))</span>
+<span class="nc" id="L389">			return;</span>
 		
-<span class="fc bfc" id="L387" title="All 2 branches covered.">		if ((f.getModifiers()&amp;Modifier.FINAL) != 0)</span>
-<span class="fc" id="L388">			throw new IllegalStateException(&quot;The property &quot; + f + &quot; should not be final.&quot;);</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">		if ((f.getModifiers()&amp;Modifier.FINAL) != 0)</span>
+<span class="fc" id="L392">			throw new IllegalStateException(&quot;The property &quot; + f + &quot; should not be final.&quot;);</span>
 
-<span class="fc" id="L390">		Class&lt;?&gt; type = f.getType();</span>
-<span class="fc bfc" id="L391" title="All 2 branches covered.">		if (type.isArray())</span>
-<span class="fc" id="L392">			type = type.getComponentType();</span>
-<span class="fc bfc" id="L393" title="All 2 branches covered.">		if (!this.isPropertyType(type))</span>
-<span class="fc" id="L394">			throw new IllegalStateException(</span>
-<span class="fc" id="L395">					&quot;The &quot;</span>
-<span class="fc" id="L396">							+ f</span>
-<span class="fc" id="L397">							+ &quot; key should be of a type that must be a primitive, a String, an enumeration, a class annotated with &quot;</span>
-<span class="fc" id="L398">							+ Persisting.class</span>
-<span class="fc" id="L399">							+ &quot;, a class whose properties are all annotated with &quot;</span>
-<span class="fc" id="L400">							+ Key.class</span>
-<span class="fc" id="L401">							+ &quot; or an array of such types.&quot;);</span>
-<span class="fc" id="L402">	}</span>
+<span class="fc" id="L394">		Class&lt;?&gt; type = f.getType();</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">		if (type.isArray())</span>
+<span class="fc" id="L396">			type = type.getComponentType();</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">		if (!this.isPropertyType(type))</span>
+<span class="fc" id="L398">			throw new IllegalStateException(</span>
+<span class="fc" id="L399">					&quot;The &quot;</span>
+<span class="fc" id="L400">							+ f</span>
+<span class="fc" id="L401">							+ &quot; key should be of a type that must be a primitive, a String, an enumeration, a class annotated with &quot;</span>
+<span class="fc" id="L402">							+ Persisting.class</span>
+<span class="fc" id="L403">							+ &quot;, a class whose properties are all annotated with &quot;</span>
+<span class="fc" id="L404">							+ Key.class</span>
+<span class="fc" id="L405">							+ &quot; or an array of such types.&quot;);</span>
+<span class="fc" id="L406">	}</span>
 
 	public boolean isProperty(Field prop) {
 		try {
-<span class="fc" id="L406">			this.checkProperty(prop);</span>
-<span class="fc" id="L407">			return true;</span>
-<span class="nc" id="L408">		} catch (Exception x) {</span>
-<span class="nc" id="L409">			return false;</span>
+<span class="fc" id="L410">			this.checkProperty(prop);</span>
+<span class="fc" id="L411">			return true;</span>
+<span class="nc" id="L412">		} catch (Exception x) {</span>
+<span class="nc" id="L413">			return false;</span>
 		}
 	}
 
 	public boolean isPropertyType(Class&lt;?&gt; type) {
-<span class="fc bfc" id="L414" title="All 2 branches covered.">		return isPersistingPropertyType(type)</span>
-<span class="fc bfc" id="L415" title="All 2 branches covered.">				|| this.isNonPersistingPropertyType(type);</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">		return isPersistingPropertyType(type)</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">				|| this.isNonPersistingPropertyType(type);</span>
 	}
 
 	public boolean isPersistingPropertyType(Class&lt;?&gt; type) {
-<span class="fc" id="L419">		return PersistingElement.class.isAssignableFrom(type);</span>
+<span class="fc" id="L423">		return PersistingElement.class.isAssignableFrom(type);</span>
 	}
 
 	public boolean isNonPersistingPropertyType(Class&lt;?&gt; type) {
-<span class="fc bfc" id="L423" title="All 2 branches covered.">		if (this.isSimplePropertyType(type))</span>
-<span class="fc" id="L424">			return true;</span>
-<span class="fc bfc" id="L425" title="All 2 branches covered.">		for (Field prop : this.getProperties(type)) {</span>
-<span class="pc bpc" id="L426" title="1 of 2 branches missed.">			if (!KeyManagement.getInstance().isKey(prop))</span>
-<span class="nc" id="L427">				return false;</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">		if (this.isSimplePropertyType(type))</span>
 <span class="fc" id="L428">			return true;</span>
+<span class="fc bfc" id="L429" title="All 2 branches covered.">		for (Field prop : this.getProperties(type)) {</span>
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">			if (!KeyManagement.getInstance().isKey(prop))</span>
+<span class="nc" id="L431">				return false;</span>
+<span class="fc" id="L432">			return true;</span>
 		}
-<span class="fc" id="L430">		return false;</span>
+<span class="fc" id="L434">		return false;</span>
 	}
 
 	public boolean isSimplePropertyType(Class&lt;?&gt; type) {
-<span class="fc bfc" id="L434" title="All 2 branches covered.">		if (type.isEnum()) {</span>
-<span class="fc" id="L435">			return true;</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">		if (type.isEnum()) {</span>
+<span class="fc" id="L439">			return true;</span>
 		}
-<span class="fc bfc" id="L437" title="All 2 branches covered.">		if (type.isArray())</span>
-<span class="fc" id="L438">			type = type.getComponentType();</span>
-<span class="fc bfc" id="L439" title="All 2 branches covered.">		for (Class&lt;?&gt; possibleSupertype : PersistingElement.PossiblePropertyTypes) {</span>
-<span class="fc bfc" id="L440" title="All 2 branches covered.">			if (possibleSupertype.isAssignableFrom(type))</span>
-<span class="fc" id="L441">				return true;</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">		if (type.isArray())</span>
+<span class="fc" id="L442">			type = type.getComponentType();</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">		for (Class&lt;?&gt; possibleSupertype : PersistingElement.PossiblePropertyTypes) {</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">			if (possibleSupertype.isAssignableFrom(type))</span>
+<span class="fc" id="L445">				return true;</span>
 		}
-<span class="fc" id="L443">		return false;</span>
+<span class="fc" id="L447">		return false;</span>
 	}
 
 	private transient PropertyFamily PersistingElement.properties;
@@ -449,57 +453,57 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 	 * The column family used to store properties.
 	 */
 	public PropertyFamily PersistingElement.getPropertiesColumnFamily() {
-<span class="fc bfc" id="L452" title="All 2 branches covered.">		if (this.properties == null)</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">		if (this.properties == null)</span>
 			try {
-<span class="fc" id="L454">				this.properties = new PropertyFamily(this);</span>
-<span class="fc" id="L455">			} catch (RuntimeException x) {</span>
-<span class="fc" id="L456">				throw x;</span>
-<span class="nc" id="L457">			} catch (Exception e) {</span>
-<span class="nc" id="L458">				throw new RuntimeException(e);</span>
+<span class="fc" id="L458">				this.properties = new PropertyFamily(this);</span>
+<span class="fc" id="L459">			} catch (RuntimeException x) {</span>
+<span class="fc" id="L460">				throw x;</span>
+<span class="nc" id="L461">			} catch (Exception e) {</span>
+<span class="nc" id="L462">				throw new RuntimeException(e);</span>
 			}
-<span class="fc" id="L460">		return this.properties;</span>
+<span class="fc" id="L464">		return this.properties;</span>
 	}
 
 	pointcut attUpdated(PersistingElement self): set(!@Transient !transient !static !(Collection+ || Map+ || ColumnFamily+) PersistingElement+.*) &amp;&amp; target(self);
 	
 	after(PersistingElement self) returning: attUpdated(self) {
 
-<span class="fc" id="L467">		PropertyFamily pf = self.getPropertiesColumnFamily();</span>
-<span class="fc" id="L468">		Field f = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();</span>
-<span class="fc" id="L469">		KeyManagement km = KeyManagement.getInstance();</span>
-<span class="fc bfc" id="L470" title="All 2 branches covered.">		if (km.isKey(f))</span>
-<span class="fc" id="L471">			return;</span>
+<span class="fc" id="L471">		PropertyFamily pf = self.getPropertiesColumnFamily();</span>
+<span class="fc" id="L472">		Field f = ((FieldSignature)thisJoinPointStaticPart.getSignature()).getField();</span>
+<span class="fc" id="L473">		KeyManagement km = KeyManagement.getInstance();</span>
+<span class="fc bfc" id="L474" title="All 2 branches covered.">		if (km.isKey(f))</span>
+<span class="fc" id="L475">			return;</span>
 		
-<span class="fc" id="L473">		pf.fieldChanged(f);</span>
-<span class="fc" id="L474">	}</span>
+<span class="fc" id="L477">		pf.fieldChanged(f);</span>
+<span class="fc" id="L478">	}</span>
 
 	public Object candideReadValue(Object self, Field property) {
 		try {
-<span class="fc" id="L478">			return this.readValue(self, property);</span>
-<span class="nc" id="L479">		} catch (RuntimeException x) {</span>
-<span class="nc" id="L480">			throw x;</span>
-<span class="nc" id="L481">		} catch (Exception x) {</span>
-<span class="nc" id="L482">			throw new RuntimeException(x);</span>
+<span class="fc" id="L482">			return this.readValue(self, property);</span>
+<span class="nc" id="L483">		} catch (RuntimeException x) {</span>
+<span class="nc" id="L484">			throw x;</span>
+<span class="nc" id="L485">		} catch (Exception x) {</span>
+<span class="nc" id="L486">			throw new RuntimeException(x);</span>
 		}
 	}
 
 	public void candideSetValue(Object self, Field property, Object value) {
 		try {
-<span class="fc" id="L488">			this.setValue(self, property, value);</span>
-<span class="nc" id="L489">		} catch (RuntimeException x) {</span>
-<span class="nc" id="L490">			throw x;</span>
-<span class="nc" id="L491">		} catch (Exception x) {</span>
-<span class="nc" id="L492">			throw new RuntimeException(x);</span>
+<span class="fc" id="L492">			this.setValue(self, property, value);</span>
+<span class="pc" id="L493">		} catch (RuntimeException x) {</span>
+<span class="nc" id="L494">			throw x;</span>
+<span class="nc" id="L495">		} catch (Exception x) {</span>
+<span class="nc" id="L496">			throw new RuntimeException(x);</span>
 		}
-<span class="fc" id="L494">	}</span>
+<span class="fc" id="L498">	}</span>
 
 	public Object readValue(Object self, Field property)
 			throws IllegalAccessException, InvocationTargetException,
 			NoSuchMethodException {
 		try {
-<span class="fc" id="L500">			return property.get(self);</span>
-<span class="nc" id="L501">		} catch (Exception x) {</span>
-<span class="nc" id="L502">			return PropertyUtils.getProperty(self, property.getName());</span>
+<span class="fc" id="L504">			return property.get(self);</span>
+<span class="fc" id="L505">		} catch (Exception x) {</span>
+<span class="nc" id="L506">			return PropertyUtils.getProperty(self, property.getName());</span>
 		}
 	}
 
@@ -507,21 +511,21 @@ import com.googlecode.n_orm.conversion.ConversionTools;
 			throws IllegalAccessException, InvocationTargetException,
 			NoSuchMethodException {
 		try {
-<span class="fc" id="L510">			property.set(self, value);</span>
-<span class="nc" id="L511">		} catch (Exception x) {</span>
+<span class="fc" id="L514">			property.set(self, value);</span>
+<span class="pc" id="L515">		} catch (Exception x) {</span>
 			try {
-<span class="nc" id="L513">				PropertyUtils.setProperty(self, property.getName(), value);</span>
-<span class="nc" id="L514">			} catch (Exception y) {</span>
-<span class="nc" id="L515">				throw new SoftException(x);</span>
+<span class="nc" id="L517">				PropertyUtils.setProperty(self, property.getName(), value);</span>
+<span class="nc" id="L518">			} catch (Exception y) {</span>
+<span class="nc" id="L519">				throw new SoftException(x);</span>
 			}
 		}
-<span class="fc" id="L518">	}</span>
+<span class="fc" id="L522">	}</span>
 	
 	before(Field f) : (call(Object Field.get(Object)) || call(void Field.set(Object, Object))) &amp;&amp; target(f) &amp;&amp; within(PropertyManagement) {
 		try {
-<span class="fc" id="L522">			f.setAccessible(true);</span>
-<span class="nc" id="L523">		} catch (SecurityException x) {}</span>
-<span class="fc" id="L524">	}</span>
+<span class="fc" id="L526">			f.setAccessible(true);</span>
+<span class="pc" id="L527">		} catch (SecurityException x) {}</span>
+<span class="fc" id="L528">	}</span>
 
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>

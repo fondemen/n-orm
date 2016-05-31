@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>StorageManagement.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">StorageManagement.aj</span></div><h1>StorageManagement.aj</h1><pre class="source lang-java linenums"><span class="pc bnc" id="L1" title="All 4 branches missed.">package com.googlecode.n_orm;</span>
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>StorageManagement.aj</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.source.html" class="el_package">com.googlecode.n_orm</a> &gt; <span class="el_source">StorageManagement.aj</span></div><h1>StorageManagement.aj</h1><pre class="source lang-java linenums"><span class="pc bnc" id="L1" title="All 4 branches missed.">package com.googlecode.n_orm;</span>
 
 import java.lang.reflect.Field;
 import java.util.Collection;
@@ -94,14 +94,14 @@ import com.googlecode.n_orm.storeapi.Constraint;
 <span class="nc" id="L94">			Map&lt;String, Object&gt; oldProps = ap.get(), newProps;</span>
 <span class="nc bnc" id="L95" title="All 2 branches missed.">			if (oldProps == null) {</span>
 <span class="nc" id="L96">				newProps = new HashMap&lt;String, Object&gt;();</span>
-			} else {
+<span class="nc" id="L97">			} else {</span>
 <span class="nc bnc" id="L98" title="All 2 branches missed.">				if (checkIfExists) {</span>
 <span class="nc" id="L99">					Object old = oldProps.get(key);</span>
 <span class="nc bnc" id="L100" title="All 2 branches missed.">					if (old != null) {</span>
 <span class="nc" id="L101">						return old;</span>
 					}
 				}
-<span class="nc" id="L104">				newProps = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L104">				newProps = new HashMap&lt;String, Object&gt;(oldProps);</span>
 			}
 <span class="nc" id="L106">			newProps.put(key, o);</span>
 <span class="nc bnc" id="L107" title="All 2 branches missed.">			if (ap.compareAndSet(oldProps, Collections.unmodifiableMap(newProps))) {</span>
@@ -243,7 +243,7 @@ import com.googlecode.n_orm.storeapi.Constraint;
 <span class="nc" id="L243">									continue;</span>
 <span class="fc" id="L244">								changedFields.put(propField.getName(), propField);</span>
 <span class="fc" id="L245">								expected = propField.getType();</span>
-							} else {
+<span class="fc" id="L246">							} else {</span>
 <span class="nc bnc" id="L247" title="All 2 branches missed.">								assert false;</span>
 <span class="nc" id="L248">								expected = element.getClass();</span>
 							}
@@ -279,7 +279,7 @@ import com.googlecode.n_orm.storeapi.Constraint;
 <span class="fc" id="L279">				Map&lt;String, byte[]&gt; changedProperties = changed.get(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME);</span>
 <span class="pc bpc" id="L280" title="1 of 2 branches missed.">				if (changedProperties == null) {</span>
 <span class="nc" id="L281">					changedProperties = new TreeMap&lt;String, byte[]&gt;();</span>
-				} else {
+<span class="nc" id="L282">				} else {</span>
 <span class="fc" id="L283">					changedProperties = new TreeMap&lt;String, byte[]&gt;(changedProperties);</span>
 				}
 <span class="fc" id="L285">				localChanges.put(PropertyManagement.PROPERTY_COLUMNFAMILY_NAME, changedProperties);</span>
@@ -287,13 +287,13 @@ import com.googlecode.n_orm.storeapi.Constraint;
 					try {
 <span class="fc" id="L288">						changedProperties.put(key.getName(), ConversionTools.convert(pm.readValue(this, key), key.getType()));</span>
 <span class="fc" id="L289">						changedFields.put(key.getName(), key);</span>
-<span class="nc" id="L290">					} catch (RuntimeException e) {</span>
+<span class="pc" id="L290">					} catch (RuntimeException e) {</span>
 <span class="nc" id="L291">						throw e;</span>
 <span class="nc" id="L292">					} catch (Exception e) {</span>
 <span class="nc" id="L293">						throw new IllegalStateException(&quot;Cannot save object ; problem reading property : &quot; + e.getMessage(), e);</span>
 					}
 				}
-			} else
+<span class="fc" id="L296">			} else</span>
 <span class="fc" id="L297">				localChanges = changed;</span>
 			
 <span class="fc bfc" id="L299" title="All 8 branches covered.">			if (!(this.exists == Boolean.TRUE &amp;&amp; changed.isEmpty() &amp;&amp; deleted.isEmpty() &amp;&amp; increments.isEmpty())) {</span>
@@ -736,4 +736,4 @@ import com.googlecode.n_orm.storeapi.Constraint;
 <span class="fc" id="L736">		return StorageManagement.getElementUsingCache((PersistingElement)this);</span>
 	}
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>

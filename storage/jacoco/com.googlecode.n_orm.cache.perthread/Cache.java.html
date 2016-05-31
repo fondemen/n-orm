@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Cache.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.cache.perthread</a> &gt; <span class="el_source">Cache.java</span></div><h1>Cache.java</h1><pre class="source lang-java linenums"><span class="nc" id="L1">package com.googlecode.n_orm.cache.perthread;</span>
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Cache.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.source.html" class="el_package">com.googlecode.n_orm.cache.perthread</a> &gt; <span class="el_source">Cache.java</span></div><h1>Cache.java</h1><pre class="source lang-java linenums"><span class="nc" id="L1">package com.googlecode.n_orm.cache.perthread;</span>
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,7 +32,7 @@ import com.googlecode.n_orm.PersistingMixin;
 				try {
 <span class="fc" id="L33">					Thread.sleep(periodBetweenCacheCleanupMS);</span>
 <span class="fc" id="L34">					this.step();</span>
-<span class="nc" id="L35">				} catch (Throwable e) {</span>
+<span class="pc" id="L35">				} catch (Throwable e) {</span>
 <span class="nc" id="L36">					logger.log(Level.WARNING, &quot;Problem while waiting next cache cleanup.&quot;, e);</span>
 				}
 			}
@@ -61,12 +61,12 @@ import com.googlecode.n_orm.PersistingMixin;
 <span class="fc" id="L61">								available.push(cache);</span>
 <span class="fc" id="L62">								cache.stopped = now;</span>
 							}
-						} else {
+<span class="fc" id="L64">						} else {</span>
 <span class="fc" id="L65">							cache = perThreadCaches.get(t);</span>
 <span class="pc bpc" id="L66" title="1 of 2 branches missed.">							if (cache != null) {</span>
 <span class="pc bpc" id="L67" title="2 of 4 branches missed.">								if (cache.cache != null &amp;&amp; cache.stopped == -1) {</span>
 <span class="fc" id="L68">									cache.shouldCleanup = true;</span>
-								} else {
+<span class="fc" id="L69">								} else {</span>
 <span class="nc bnc" id="L70" title="All 2 branches missed.">									assert false;</span>
 <span class="nc" id="L71">									synchronized(perThreadCaches) {</span>
 <span class="nc" id="L72">										perThreadCaches.remove(t);</span>
@@ -75,14 +75,14 @@ import com.googlecode.n_orm.PersistingMixin;
 							}
 						}
 					}
-<span class="nc" id="L78">				} catch (RuntimeException x) {</span>
+<span class="pc" id="L78">				} catch (RuntimeException x) {</span>
 <span class="nc" id="L79">					logger.log(Level.WARNING, &quot;Problem while checking cache.&quot;, x);</span>
 				}
 				
 <span class="pc" id="L82">				synchronized(availableCaches) {</span>
 					try {
 <span class="fc" id="L84">						availableCaches.pushAll(available);</span>
-<span class="nc" id="L85">					} catch (RuntimeException x) {</span>
+<span class="pc" id="L85">					} catch (RuntimeException x) {</span>
 <span class="nc" id="L86">						logger.log(Level.WARNING, &quot;Problem while checking cache.&quot;, x);</span>
 					}
 <span class="fc" id="L88">					available.clear();</span>
@@ -111,7 +111,7 @@ import com.googlecode.n_orm.PersistingMixin;
 								break availableCachesCheck;
 						}
 <span class="pc" id="L113">						synchronized(cache) {</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">							if ((cache.stopped+(timeToLiveSeconds*1000)) &lt; now) {</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">							if ((cache.stopped+Math.max(timeToLiveSeconds, timeToLiveSeconds*1000)) &lt; now) {</span>
 <span class="fc" id="L115">								ai.remove();</span>
 <span class="fc" id="L116">								cache.close();</span>
 <span class="pc bpc" id="L117" title="1 of 2 branches missed.">							} else if (cache.isClosed()) {</span>
@@ -122,7 +122,7 @@ import com.googlecode.n_orm.PersistingMixin;
 							}
 						}
 					}
-<span class="nc" id="L125">				} catch (RuntimeException x) {</span>
+<span class="pc" id="L125">				} catch (RuntimeException x) {</span>
 <span class="nc" id="L126">					logger.log(Level.WARNING, &quot;Problem while checking cache.&quot;, x);</span>
 				}
 <span class="nc" id="L128">			} finally {</span>
@@ -136,9 +136,9 @@ import com.googlecode.n_orm.PersistingMixin;
 
 <span class="fc" id="L137">	private static Logger logger = Logger.getLogger(Cache.class.getName());</span>
 
-<span class="fc" id="L139">	private static int periodBetweenCacheCleanupMS = 1000;</span>
-<span class="fc" id="L140">	private static int timeToLiveSeconds = 10;</span>
-<span class="fc" id="L141">	private static int maxElementsInCache = 10000;</span>
+<span class="fc" id="L139">	private static volatile int periodBetweenCacheCleanupMS = 1000;</span>
+<span class="fc" id="L140">	private static volatile int timeToLiveSeconds = 10;</span>
+<span class="fc" id="L141">	private static volatile int maxElementsInCache = 10000;</span>
 
 	
 	private static final HashMap&lt;Thread, Cache&gt; perThreadCaches;
@@ -152,7 +152,7 @@ import com.googlecode.n_orm.PersistingMixin;
 <span class="fc" id="L152">		cacheCleaner.setDaemon(true);</span>
 <span class="fc" id="L153">		cacheCleaner.start();</span>
 <span class="fc" id="L154">		logger.info(&quot;Per-thread caching system started.&quot;);</span>
-	}
+<span class="fc" id="L155">	}</span>
 	
 	private static boolean isValid(Thread thread) {
 <span class="pc bpc" id="L158" title="2 of 6 branches missed.">		return thread != null &amp;&amp; thread.isAlive() &amp;&amp; thread.getThreadGroup() != null;</span>
@@ -300,7 +300,7 @@ import com.googlecode.n_orm.PersistingMixin;
 <span class="fc" id="L300">		}</span>
 		
 		public boolean isValid() {
-<span class="fc bfc" id="L303" title="All 2 branches covered.">			return (this.lastAccessDate+(timeToLiveSeconds*1000)) &gt; System.currentTimeMillis();</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">			return this.lastAccessDate+Math.max(timeToLiveSeconds, timeToLiveSeconds*1000) &gt; System.currentTimeMillis();</span>
 		}
 	}
 	
@@ -401,13 +401,17 @@ import com.googlecode.n_orm.PersistingMixin;
 <span class="fc bfc" id="L401" title="All 2 branches covered.">		if (cached == null) {</span>
 <span class="fc" id="L402">			cached = new Element(element);</span>
 <span class="fc" id="L403">			this.cache.put(id, cached);</span>
-		} else {
+<span class="fc" id="L404">		} else {</span>
 <span class="fc" id="L405">			cached.setElement(element);</span>
 		}
-<span class="fc bfc" id="L407" title="All 2 branches covered.">		while (this.cache.size() &gt; maxElementsInCache) //Should happen only once</span>
-<span class="fc" id="L408">			this.cache.remove(this.cleanInvalidElements().getElement().getFullIdentifier());</span>
-<span class="fc" id="L409">		logger.finer(&quot;Registered element &quot; + element + &quot; for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
-<span class="fc" id="L410">	}</span>
+		int size;
+<span class="fc bfc" id="L408" title="All 2 branches covered.">		while ((size = this.cache.size()) &gt; maxElementsInCache) { //Should happen only once</span>
+<span class="fc" id="L409">			PersistingElement eldest = this.cleanInvalidElements().getElement();</span>
+<span class="fc" id="L410">			this.cache.remove(eldest.getFullIdentifier());</span>
+<span class="fc" id="L411">			logger.info(&quot;Removed element &quot; + eldest + &quot; fot thread&quot; + this.thread + &quot; with id &quot; + threadId + &quot; since cache is too large ( &quot; + size + &quot; with a maximum of &quot; + maxElementsInCache + ')');</span>
+		}
+<span class="fc" id="L413">		logger.finer(&quot;Registered element &quot; + element + &quot; for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
+<span class="fc" id="L414">	}</span>
 	
 	/**
 	 * Removes an element in the cache.&lt;br&gt;
@@ -417,12 +421,12 @@ import com.googlecode.n_orm.PersistingMixin;
 	 * @throws IllegalStateException in case this thread is not the thread for this cache
 	 */
 	public void unregister(PersistingElement element) throws IllegalStateException {
-<span class="fc" id="L420">		this.checkState();</span>
+<span class="fc" id="L424">		this.checkState();</span>
 		
-<span class="fc bfc" id="L422" title="All 2 branches covered.">		if (this.cache.remove(element.getFullIdentifier()) != null) {</span>
-<span class="fc" id="L423">			logger.finer(&quot;Unregistered element with &quot; + element + &quot; for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">		if (this.cache.remove(element.getFullIdentifier()) != null) {</span>
+<span class="fc" id="L427">			logger.finer(&quot;Unregistered element with &quot; + element + &quot; for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
 		}
-<span class="fc" id="L425">	}</span>
+<span class="fc" id="L429">	}</span>
 	
 	/**
 	 * Removes an element in the cache given by its full identifier.&lt;br&gt;
@@ -432,12 +436,12 @@ import com.googlecode.n_orm.PersistingMixin;
 	 * @throws IllegalStateException in case this thread is not the thread for this cache
 	 */
 	public void unregister(String fullIdentifier) throws IllegalStateException {
-<span class="fc" id="L435">		this.checkState();</span>
+<span class="fc" id="L439">		this.checkState();</span>
 		
-<span class="pc bpc" id="L437" title="1 of 2 branches missed.">		if (this.cache.remove(fullIdentifier) != null) {</span>
-<span class="nc" id="L438">			logger.finer(&quot;Unregistered element with &quot; + PersistingMixin.getInstance().identifierToString(fullIdentifier) + &quot; for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">		if (this.cache.remove(fullIdentifier) != null) {</span>
+<span class="nc" id="L442">			logger.finer(&quot;Unregistered element with &quot; + PersistingMixin.getInstance().identifierToString(fullIdentifier) + &quot; for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
 		}
-<span class="fc" id="L440">	}</span>
+<span class="fc" id="L444">	}</span>
 	
 	/**
 	 * Finds an element in the cache according to its full identifier.&lt;br&gt;
@@ -448,14 +452,14 @@ import com.googlecode.n_orm.PersistingMixin;
 	 * @see PersistingElement#getFullIdentifier()
 	 */
 	public PersistingElement getKnownPersistingElement(String fullIdentifier) {
-<span class="fc" id="L451">		this.checkState();</span>
-<span class="fc" id="L452">		Element res = (Element) this.cache.get(fullIdentifier);</span>
-<span class="fc bfc" id="L453" title="All 2 branches covered.">		if (res == null)</span>
-<span class="fc" id="L454">			return null;</span>
+<span class="fc" id="L455">		this.checkState();</span>
+<span class="fc" id="L456">		Element res = (Element) this.cache.get(fullIdentifier);</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">		if (res == null)</span>
+<span class="fc" id="L458">			return null;</span>
 		else {
-<span class="fc" id="L456">			PersistingElement ret = res.getElement();</span>
-<span class="fc" id="L457">			logger.finest(&quot;Found element &quot; + ret + &quot; from cache for thread &quot; + this.thread + &quot; with id &quot; + this.threadId);</span>
-<span class="fc" id="L458">			return ret;</span>
+<span class="fc" id="L460">			PersistingElement ret = res.getElement();</span>
+<span class="fc" id="L461">			logger.finest(&quot;Found element &quot; + ret + &quot; from cache for thread &quot; + this.thread + &quot; with id &quot; + this.threadId);</span>
+<span class="fc" id="L462">			return ret;</span>
 		}
 	}
 
@@ -469,7 +473,7 @@ import com.googlecode.n_orm.PersistingMixin;
 	 * @see PersistingElement#getIdentifier()
 	 */
 	public PersistingElement getKnownPersistingElement(String identifier, Class&lt;? extends PersistingElement&gt; clazz) {
-<span class="nc" id="L472">		return this.getKnownPersistingElement(identifier + clazz.getName());</span>
+<span class="nc" id="L476">		return this.getKnownPersistingElement(identifier + clazz.getName());</span>
 	}
 	
 	/**
@@ -477,17 +481,17 @@ import com.googlecode.n_orm.PersistingMixin;
 	 * This method checks elements for their time to live regardless the cache is marked for that or not.
 	 */
 	public int size() {
-<span class="fc" id="L480">		this.cleanInvalidElements();</span>
-<span class="fc" id="L481">		return this.cache.size();</span>
+<span class="fc" id="L484">		this.cleanInvalidElements();</span>
+<span class="fc" id="L485">		return this.cache.size();</span>
 	}
 	
 	/**
 	 * Clears the cache.
 	 */
 	public void reset() {
-<span class="fc" id="L488">		this.cache.clear();</span>
-<span class="fc" id="L489">		logger.finer(&quot;Reseted cache for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
-<span class="fc" id="L490">	}</span>
+<span class="fc" id="L492">		this.cache.clear();</span>
+<span class="fc" id="L493">		logger.finer(&quot;Reseted cache for thread &quot; + this.thread + &quot; with id &quot; + threadId);</span>
+<span class="fc" id="L494">	}</span>
 	
 	/**
 	 * Checks if this cache can be used or not.
@@ -497,7 +501,7 @@ import com.googlecode.n_orm.PersistingMixin;
 	 * @see #close()
 	 */
 	public synchronized boolean isClosed() {
-<span class="pc bpc" id="L500" title="1 of 4 branches missed.">		return this.cache == null || this.thread == null;</span>
+<span class="pc bpc" id="L504" title="1 of 4 branches missed.">		return this.cache == null || this.thread == null;</span>
 	}
 	
 	/**
@@ -507,20 +511,20 @@ import com.googlecode.n_orm.PersistingMixin;
 	 * @see #isClosed()
 	 */
 	protected synchronized void close() {
-<span class="fc bfc" id="L510" title="All 2 branches covered.">		if (this.isClosed())</span>
-<span class="fc" id="L511">			return;</span>
+<span class="fc bfc" id="L514" title="All 2 branches covered.">		if (this.isClosed())</span>
+<span class="fc" id="L515">			return;</span>
 		
-<span class="fc" id="L513">		this.reset();</span>
-<span class="pc bpc" id="L514" title="1 of 2 branches missed.">		this.cache = null;</span>
-<span class="fc" id="L515">		this.thread = null;</span>
-<span class="fc" id="L516">		this.stopped = System.currentTimeMillis();</span>
-<span class="fc" id="L517">		logger.fine(&quot;Cache stopped for thread &quot; + this.thread + &quot; with id &quot; + this.threadId);</span>
-<span class="fc" id="L518">	}</span>
+<span class="fc" id="L517">		this.reset();</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">		this.cache = null;</span>
+<span class="fc" id="L519">		this.thread = null;</span>
+<span class="fc" id="L520">		this.stopped = System.currentTimeMillis();</span>
+<span class="fc" id="L521">		logger.fine(&quot;Cache stopped for thread &quot; + this.thread + &quot; with id &quot; + this.threadId);</span>
+<span class="fc" id="L522">	}</span>
 
 	@Override
 	protected void finalize() throws Throwable {
-<span class="fc" id="L522">		this.close();</span>
-<span class="fc" id="L523">		super.finalize();</span>
-<span class="fc" id="L524">	}</span>
+<span class="fc" id="L526">		this.close();</span>
+<span class="fc" id="L527">		super.finalize();</span>
+<span class="fc" id="L528">	}</span>
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>

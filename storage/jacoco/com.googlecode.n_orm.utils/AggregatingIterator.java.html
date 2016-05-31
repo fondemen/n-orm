@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>AggregatingIterator.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.utils</a> &gt; <span class="el_source">AggregatingIterator.java</span></div><h1>AggregatingIterator.java</h1><pre class="source lang-java linenums"><span class="pc" id="L1">package com.googlecode.n_orm.utils;</span>
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>AggregatingIterator.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.source.html" class="el_package">com.googlecode.n_orm.utils</a> &gt; <span class="el_source">AggregatingIterator.java</span></div><h1>AggregatingIterator.java</h1><pre class="source lang-java linenums"><span class="pc" id="L1">package com.googlecode.n_orm.utils;</span>
 
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -96,12 +96,12 @@ import com.googlecode.n_orm.storeapi.Row;
 					// ResultReadyToGo.getResult()
 <span class="fc bfc" id="L97" title="All 2 branches covered.">					if (this.it.hasNext()) {</span>
 <span class="fc" id="L98">						this.next = this.it.next();</span>
-					} else {
+<span class="fc" id="L99">					} else {</span>
 						// No more elements in this iterator ; closing
 <span class="fc" id="L101">						this.close();</span>
 					}
 				}
-<span class="nc" id="L104">			} finally {</span>
+<span class="pc" id="L104">			} finally {</span>
 <span class="pc bpc" id="L105" title="11 of 18 branches missed.">				assert this.done == (this.next == null);</span>
 <span class="nc" id="L106">			}</span>
 <span class="fc" id="L107">		}</span>
@@ -234,4 +234,4 @@ import com.googlecode.n_orm.storeapi.Row;
 <span class="fc" id="L234">				+ &quot; and &quot; + it2.toString());</span>
 	}
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>

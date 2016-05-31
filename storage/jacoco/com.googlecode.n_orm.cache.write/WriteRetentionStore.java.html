@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>WriteRetentionStore.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="right"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.html" class="el_package">com.googlecode.n_orm.cache.write</a> &gt; <span class="el_source">WriteRetentionStore.java</span></div><h1>WriteRetentionStore.java</h1><pre class="source lang-java linenums"><span class="fc" id="L1">package com.googlecode.n_orm.cache.write;</span>
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>WriteRetentionStore.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">n-orm core</a> &gt; <a href="index.source.html" class="el_package">com.googlecode.n_orm.cache.write</a> &gt; <span class="el_source">WriteRetentionStore.java</span></div><h1>WriteRetentionStore.java</h1><pre class="source lang-java linenums"><span class="fc" id="L1">package com.googlecode.n_orm.cache.write;</span>
 
 import java.util.Collection;
 import java.util.Date;
@@ -530,7 +530,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L530">						col.getValue().headMap(transaction, false).clear();</span>
 					}
 				}
-<span class="nc" id="L533">			} finally {</span>
+<span class="pc" id="L533">			} finally {</span>
 <span class="pc" id="L534">				this.doneUpdate(transaction);</span>
 <span class="nc" id="L535">			}</span>
 <span class="fc" id="L536">		}</span>
@@ -614,7 +614,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 						}
 					}
 				}
-<span class="nc" id="L617">			} finally {</span>
+<span class="pc" id="L617">			} finally {</span>
 <span class="pc" id="L618">				this.doneUpdate(transactionId);</span>
 <span class="nc" id="L619">			}</span>
 <span class="fc" id="L620">		}</span>
@@ -641,8 +641,8 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L641">				ret = new ConcurrentHashMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt;();</span>
 <span class="fc" id="L642">				ConcurrentMap&lt;String, ConcurrentNavigableMap&lt;Long, Object&gt;&gt; put = this.elements</span>
 <span class="fc" id="L643">						.putIfAbsent(family, ret);</span>
-<span class="fc bfc" id="L644" title="All 2 branches covered.">				if (put != null)</span>
-<span class="fc" id="L645">					ret = put;</span>
+<span class="pc bpc" id="L644" title="1 of 2 branches missed.">				if (put != null)</span>
+<span class="nc" id="L645">					ret = put;</span>
 			}
 <span class="fc" id="L647">			return ret;</span>
 		}
@@ -661,8 +661,8 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L661">				ret = new ConcurrentSkipListMap&lt;Long, Object&gt;();</span>
 <span class="fc" id="L662">				ConcurrentNavigableMap&lt;Long, Object&gt; put = familyData</span>
 <span class="fc" id="L663">						.putIfAbsent(column, ret);</span>
-<span class="pc bpc" id="L664" title="1 of 2 branches missed.">				if (put != null)</span>
-<span class="nc" id="L665">					ret = put;</span>
+<span class="fc bfc" id="L664" title="All 2 branches covered.">				if (put != null)</span>
+<span class="fc" id="L665">					ret = put;</span>
 			}
 <span class="fc" id="L667">			return ret;</span>
 		}
@@ -721,7 +721,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 					// Already sending ? (e.g. long flush just before) =&gt; giving up
 <span class="fc" id="L722">					shouldLeave = true;</span>
 				
-				} else {
+<span class="fc" id="L724">				} else {</span>
 					// Newer transaction was sent, giving up
 <span class="fc bfc" id="L726" title="All 4 branches covered.">					if (this.lastSentTransaction != null &amp;&amp; lastTransactionTmp &lt;= this.lastSentTransaction) {</span>
 <span class="fc" id="L727">						shouldLeave = true;</span>
@@ -756,7 +756,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L756">				metaTmp = this.meta.getAndSet(null);</span>
 <span class="fc" id="L757">				requestsBeingSending.incrementAndGet();</span>
 				
-<span class="nc" id="L759">			} finally {</span>
+<span class="pc" id="L759">			} finally {</span>
 <span class="pc" id="L760">				this.sendLock.writeLock().unlock();</span>
 <span class="nc" id="L761">			}</span>
 <span class="fc" id="L762">			final MetaInformation meta = metaTmp;</span>
@@ -810,7 +810,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L810">										removed.put(famData.getKey(), remCols);</span>
 									}
 <span class="fc" id="L812">									remCols.add(colData.getKey());</span>
-								} else {
+<span class="fc" id="L813">								} else {</span>
 									// Column should be changed
 <span class="fc" id="L815">									Map&lt;String, byte[]&gt; chgCols = changes</span>
 <span class="fc" id="L816">											.get(famData.getKey());</span>
@@ -820,7 +820,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 									}
 <span class="pc bpc" id="L821" title="1 of 2 branches missed.">									chgCols.put(colData.getKey(), latest == null ? null : (byte[]) latest);</span>
 								}
-							} else {
+<span class="fc" id="L823">							} else {</span>
 <span class="pc bpc" id="L824" title="2 of 4 branches missed.">								assert latest instanceof Number;</span>
 								// Column should be incremented
 								// Summing all values to know the actual increment
@@ -830,7 +830,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L830">									Object val = incr.getValue();</span>
 									try {
 <span class="fc" id="L832">										sum += ((Number) val).longValue();</span>
-<span class="nc" id="L833">									} catch (ClassCastException x) {</span>
+<span class="pc" id="L833">									} catch (ClassCastException x) {</span>
 										// Just in case datum was updated (not incremented) meanwhile
 										// This is robustness code as it's not likely to happen
 <span class="nc bnc" id="L836" title="All 2 branches missed.">										if (val == DELETED_VALUE)</span>
@@ -885,7 +885,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L885">											changes, removed, increments);</span>
 <span class="fc" id="L886">								}</span>
 								
-<span class="nc" id="L888">							} catch (RuntimeException x) {</span>
+<span class="pc" id="L888">							} catch (RuntimeException x) {</span>
 <span class="nc" id="L889">								logger.log(Level.WARNING, &quot;Catched problem while updating &quot; + StoreRequest.this + &quot; ; some data might have been lost: &quot; + x.getMessage(), x);</span>
 <span class="nc" id="L890">								throw x;</span>
 <span class="fc" id="L891">							} finally {</span>
@@ -893,7 +893,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L893">							}</span>
 <span class="fc" id="L894">						}</span>
 					};
-				} else {
+<span class="fc" id="L896">				} else {</span>
 <span class="fc" id="L897">					action = new Runnable() {</span>
 	
 						@Override
@@ -906,11 +906,11 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="pc bpc" id="L906" title="2 of 4 branches missed.">										assert delay &gt; 0;</span>
 <span class="fc" id="L907">										requestsCumulativeLatency.add(delay);</span>
 									}
-<span class="nc" id="L909">								} finally {</span>
+<span class="pc" id="L909">								} finally {</span>
 								
 <span class="pc" id="L911">									getActualStore().delete(meta, row.table, row.id);</span>
 <span class="nc" id="L912">								}</span>
-<span class="nc" id="L913">							} catch (RuntimeException x) {</span>
+<span class="pc" id="L913">							} catch (RuntimeException x) {</span>
 <span class="nc" id="L914">								logger.log(Level.WARNING, &quot;Catched problem while deleting &quot; + StoreRequest.this + &quot; ; some data might have been be lost: &quot; + x.getMessage(), x);</span>
 <span class="nc" id="L915">								throw x;</span>
 <span class="nc" id="L916">							} finally {</span>
@@ -920,7 +920,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 					};
 				}
 			
-<span class="nc" id="L923">			} catch (Throwable r) {</span>
+<span class="pc" id="L923">			} catch (Throwable r) {</span>
 <span class="nc" id="L924">				requestsBeingSending.decrementAndGet();</span>
 <span class="nc bnc" id="L925" title="All 2 branches missed.">				throw r instanceof RuntimeException ? (RuntimeException)r : new RuntimeException(r);</span>
 			}
@@ -957,7 +957,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 						try {
 <span class="fc" id="L958">							this.plan();</span>
 <span class="fc" id="L959">							logger.fine(this.toString() + &quot; sent on &quot; + new Date(System.currentTimeMillis()) + &quot; replanned for &quot; + new Date(this.outDateMs.get()));</span>
-<span class="nc" id="L960">						} catch (RequestIsOutException x) {</span>
+<span class="pc" id="L960">						} catch (RequestIsOutException x) {</span>
 							// We are the only process authorized to try to plan at this point
 							// (indeed, this store request is still indexed by writesByRows)
 <span class="nc bnc" id="L963" title="All 2 branches missed.">							assert false;</span>
@@ -968,7 +968,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L968">					this.close();</span>
 				}
 				
-<span class="nc" id="L971">			} finally {</span>
+<span class="pc" id="L971">			} finally {</span>
 <span class="pc" id="L972">				this.sendLock.writeLock().unlock();</span>
 <span class="pc" id="L973">				EvictionThread et = evictionThread.get();</span>
 <span class="pc bpc" id="L974" title="8 of 12 branches missed.">				if (et != null &amp;&amp; et.waiting &amp;&amp; rbs &lt; getMaxSenderThreads())</span>
@@ -1005,7 +1005,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L1005">			boolean shouldSubmit = this.outDateMs.compareAndSet(-1, nextExecutionDate);</span>
 <span class="pc bpc" id="L1006" title="1 of 2 branches missed.">			if (shouldSubmit) {</span>
 <span class="fc" id="L1007">				writeQueue.put(this);</span>
-			} else {
+<span class="fc" id="L1008">			} else {</span>
 				// Request should already be planned
 				// Checking this only in case of assertion as it's costly
 <span class="nc bnc" id="L1011" title="All 4 branches missed.">				assert writeQueue.contains(this);</span>
@@ -1013,7 +1013,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 			
 			// Enforcing that an eviction thread is running
 			boolean done;
-<span class="nc bnc" id="L1016" title="All 2 branches missed.">			do {</span>
+			do {
 				EvictionThread et;
 				
 <span class="pc bpc" id="L1019" title="1 of 4 branches missed.">				while ((et = evictionThread.get()) == null || !et.running) {</span>
@@ -1026,7 +1026,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 				}
 				
 <span class="fc" id="L1028">				done = et.running;</span>
-<span class="pc bpc" id="L1029" title="1 of 2 branches missed.">			} while (!done &amp;&amp; !this.dead);</span>
+<span class="pc bpc" id="L1029" title="3 of 4 branches missed.">			} while (!done &amp;&amp; !this.dead);</span>
 			// Not necessary to continue if this request is already out...
 			
 <span class="pc bpc" id="L1032" title="4 of 6 branches missed.">			assert evictionThread.get() != null || writeQueue.isEmpty();</span>
@@ -1113,7 +1113,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="pc bpc" id="L1113" title="2 of 4 branches missed.">							if (!writeQueue.isEmpty() || requestsBeingSending.get() != 0)</span>
 <span class="nc" id="L1114">								evictionThread.compareAndSet(null, this);</span>
 						}
-					} else {
+<span class="nc" id="L1116">					} else {</span>
 					
 						// Requests in preparation of sending are marked twice so that a &quot;0&quot; is
 						// a bit less likely to be a false 0
@@ -1122,12 +1122,12 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L1122">						requestsBeingSending.decrementAndGet();</span>
 					}
 					
-<span class="nc" id="L1125">				} catch (InterruptedException e) {</span>
+<span class="pc" id="L1125">				} catch (InterruptedException e) {</span>
 <span class="nc" id="L1126">					break;</span>
 <span class="nc" id="L1127">				} catch (Throwable e) {</span>
 <span class="nc bnc" id="L1128" title="All 2 branches missed.">					if (r == null) {</span>
 <span class="nc" id="L1129">						logger.log(Level.WARNING, &quot;Problem waiting for request out of write cache: &quot; + e.getMessage(), e);</span>
-					} else {
+<span class="nc" id="L1130">					} else {</span>
 <span class="nc" id="L1131">						logger.log(Level.SEVERE, &quot;Problem while sending request out of write cache ; request &quot; + r + &quot; lost: &quot; + e.getMessage(), e);</span>
 					}
 				}
@@ -1138,7 +1138,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L1138">			this.sender.shutdown();</span>
 			try {
 <span class="fc" id="L1140">				this.sender.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS);</span>
-<span class="nc" id="L1141">			} catch (InterruptedException e) {</span>
+<span class="pc" id="L1141">			} catch (InterruptedException e) {</span>
 <span class="nc" id="L1142">				logger.log(Level.SEVERE, &quot;Problem while shutting down n-orm write retention cache: &quot; + e.getMessage(), e);</span>
 			}
 <span class="fc" id="L1144">		}</span>
@@ -1151,8 +1151,8 @@ import com.googlecode.n_orm.utils.LongAdder;
 	
 	static {
 <span class="pc bpc" id="L1153" title="1 of 2 branches missed.">		if (DELETED_VALUE == new byte[0])</span>
-<span class="pc" id="L1154">			throw new Error(&quot;JVM problem : &quot; + WriteRetentionStore.class.getSimpleName() + &quot; requires that new byte[0] != new byte[0]&quot;);</span>
-	}
+<span class="nc" id="L1154">			throw new Error(&quot;JVM problem : &quot; + WriteRetentionStore.class.getSimpleName() + &quot; requires that new byte[0] != new byte[0]&quot;);</span>
+<span class="fc" id="L1155">	}</span>
 	
 	/**
 	 * Index for requests according to the row
@@ -1301,7 +1301,7 @@ import com.googlecode.n_orm.utils.LongAdder;
 					// req was added ; should also be put in the delay queue
 <span class="fc" id="L1302">					req.plan();</span>
 <span class="fc" id="L1303">					logger.fine(&quot;Request planned for &quot; + table + ':' + id + &quot; on &quot; + System.currentTimeMillis() + &quot; by &quot; + req);</span>
-				} else {
+<span class="fc" id="L1304">				} else {</span>
 					// Another thread added request for this element before us
 <span class="fc" id="L1306">					req = tmp;</span>
 				}
@@ -1342,4 +1342,4 @@ import com.googlecode.n_orm.utils.LongAdder;
 <span class="fc" id="L1342">		return true;</span>
 	}
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.6.0.201210061924</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.6.201602180812</span></div></body></html>
