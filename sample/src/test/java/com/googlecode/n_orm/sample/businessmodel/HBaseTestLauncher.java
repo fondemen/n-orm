@@ -25,6 +25,8 @@ public class HBaseTestLauncher {
 	        		//Cheating the actual store for it to point the test data store
 	                HBaseLauncher.setConf(store);
 	        }
+		} catch (Error e) {
+			System.err.println("Cannot load HBase");
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
