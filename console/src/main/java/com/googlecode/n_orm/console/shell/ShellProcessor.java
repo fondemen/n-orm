@@ -1,35 +1,24 @@
 package com.googlecode.n_orm.console.shell;
 
+import com.googlecode.n_orm.Persisting;
+import com.googlecode.n_orm.consoleannotations.Continuator;
+import com.googlecode.n_orm.consoleannotations.Trigger;
+import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
+import org.apache.commons.beanutils.ConvertUtils;
+import org.apache.commons.beanutils.PropertyUtils;
+import org.apache.commons.beanutils.converters.DateConverter;
+import org.apache.commons.beanutils.converters.DateTimeConverter;
+
 import java.beans.PropertyDescriptor;
 import java.io.Closeable;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.Stack;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.apache.commons.beanutils.ConvertUtils;
-import org.apache.commons.beanutils.PropertyUtils;
-import org.apache.commons.beanutils.converters.DateConverter;
-import org.apache.commons.beanutils.converters.DateTimeConverter;
-
-import com.googlecode.n_orm.Persisting;
-import com.googlecode.n_orm.consoleannotations.Continuator;
-import com.googlecode.n_orm.consoleannotations.Trigger;
-import com.googlecode.n_orm.query.SearchableClassConstraintBuilder;
 
 public class ShellProcessor
 {
@@ -40,7 +29,7 @@ public class ShellProcessor
 		converter.setPatterns(new String[] {"yyyy-MM-dd_HH:mm:ss.SSS", "dow mon dd hh:mm:ss zzz yyyy"});
 		converter.setLocale(Locale.getDefault());
 		ConvertUtils.register(converter, Date.class);
-		
+
 		additionalMethods = new HashSet<Method>();
 		try {
 			additionalMethods.add(Object.class.getMethod("equals", Object.class));
@@ -137,30 +126,34 @@ public class ShellProcessor
 			processorCommands.put(it.next().getKey(), null);
 		
 		Object contextElement = this.getContextElement();
-		if (contextElement == null)
-		{
+		if (contextElement == null) {
+
 			// List all Trigger annotated methods
 			for (Object o : mapCommands.values())
 			{
-				for (Method m : (o instanceof Class ? (Class<?>)o : o.getClass()).getDeclaredMethods())
-				{
-					if (m.getAnnotation(Trigger.class) != null)
-						processorCommands.put(m.getName(), m);
+				for (Method declaredMethod :
+						(o instanceof Class
+								 ? (Class<?>)o
+								 : o.getClass()).getDeclaredMethods()) {
+
+					if (declaredMethod.getAnnotation(Trigger.class) != null)
+						processorCommands.put(declaredMethod.getName(), declaredMethod);
 				}
 			}
 		}
 		else
 		{
 			// List all Continuator annotated methods
-			for (Method m : contextElement.getClass().getDeclaredMethods())
+			for (Method declaredMethod : contextElement.getClass().getDeclaredMethods())
 			{
-				if (m.getAnnotation(Continuator.class) != null)
-					processorCommands.put(m.getName(), m);
+				if (declaredMethod.getAnnotation(Continuator.class) != null)
+					processorCommands.put(declaredMethod.getName(), declaredMethod);
 			}
+
 			//Adding additional methods if necessary
-			for (Method m : additionalMethods) {
-				if (m.getDeclaringClass().isInstance(contextElement))
-					processorCommands.put(m.getName(), m);
+			for (Method additionalMethod : additionalMethods) {
+				if (additionalMethod.getDeclaringClass().isInstance(contextElement))
+					processorCommands.put(additionalMethod.getName(), additionalMethod);
 			}
 			
 			// List all properties of the context and add them as Continuators
@@ -168,12 +161,14 @@ public class ShellProcessor
 			{
 				try
 				{
-					Method m = PropertyUtils.getReadMethod(pd);
-					if (m != null)
-						processorCommands.put(m.getName(), m);
-					m = PropertyUtils.getWriteMethod(pd);
-					if (m != null)
-						processorCommands.put(m.getName(), m);
+					Method readMethod = PropertyUtils.getReadMethod(pd);
+					Method writeMethod = PropertyUtils.getWriteMethod(pd);
+
+					if (readMethod != null)
+						processorCommands.put(readMethod.getName(), readMethod);
+
+					if (writeMethod != null)
+						processorCommands.put(writeMethod.getName(), writeMethod);
 				}
 				catch (Exception e) { }
 			}
@@ -255,12 +250,27 @@ public class ShellProcessor
 		result.addAll(processorCommands.values());
 		return result;
 	}
-	
+
+	public Object convertParam(String param, Class<?> type) {
+		if ("null".equals(param)) {
+			return null;
+		}
+
+		if (mapShellVariables.containsKey(param)) {
+			return this.mapShellVariables.get(param);
+		}
+
+		return ConvertUtils.convert(param, type);
+	}
+
 	public void treatLine(String text)
 	{
 		String textToTreat = text.replaceAll("\\s+", " ");
 		String firstCommand = textToTreat.split(" ")[0];
-		
+
+		if (firstCommand.trim().length() == 0)
+			return;
+
 		if (firstCommand.equals(escapeCommand))
 			shell.doStop();
 		else if (firstCommand.equals(zeroCommand))
@@ -319,9 +329,10 @@ public class ShellProcessor
 			}
 			else if (processorCommands.containsKey(command)) // The command must be registered in the processor
 			{
+				Method m = processorCommands.get(command);
+				Class<?>[] parameterTypes = m.getParameterTypes();
+
 				try {
-					Method m = processorCommands.get(command);
-					Class<?>[] parameterTypes = m.getParameterTypes();
 					// Find parameters of the command
 					Object[] params = new Object[parameterTypes.length];
 					if (parameterTypes.length > 0) {
@@ -333,25 +344,21 @@ public class ShellProcessor
 									m.toString().length())
 									);
 							break;
-						} else {
+						}
+						else {
 							for (int i = 0; i < parameterTypes.length; i++) {
 								Class<?> type = parameterTypes[i];
 								String s;
 								try {
 									s = tokens[currentTokenIndex + i];
-									
+
 									boolean isArray = type.isArray();
 									if (isArray) { // Array not supported
 										type = type.getComponentType();
 									}
-									
-									if (this.mapShellVariables.containsKey(s))
-										params[i] = this.mapShellVariables.get(s);
-									else if ("null".equals(s))
-										params[i] = null;
-									else
-										params[i] = ConvertUtils.convert(s, type);
-									
+
+									params[i] = convertParam(s, type);
+
 									if (isArray && !params[i].getClass().isArray()) {
 										Object array = Array.newInstance(type, 1);
 										Array.set(array, 0, params[i]);
@@ -368,17 +375,18 @@ public class ShellProcessor
 									}
 								}
 							}
-							
-							currentTokenIndex += parameterTypes.length;
 						}
 					}
 					
 					// Execute the command
-					if (this.context.isEmpty())
-						lastResult = m.invoke(mapCommands.get(m.getDeclaringClass().getName()), params);
-					else
-						lastResult = m.invoke(this.getContextElement(), params);
-					
+					lastResult =
+							m.invoke(
+									(this.context.isEmpty()
+											 ? mapCommands.get(m.getDeclaringClass().getName())
+											 : this.getContextElement())
+									, params
+							);
+
 					// Print the result on the shell (if there is a result)
 					if (lastResult == null) // Zero the shell in this case
 						shell.println("method result: null");
@@ -397,6 +405,9 @@ public class ShellProcessor
 				{
 					shell.println("n-orm: " + e.getMessage() + ": command error");
 					e.printStackTrace();
+				}
+				finally {
+					currentTokenIndex += parameterTypes.length;
 				}
 			}
 			else // The command is unknown, move to the next one in case we know it
@@ -487,50 +498,115 @@ public class ShellProcessor
 				shell.println(s);
 		}
 	}
-	
+
+/*
 	@SuppressWarnings("rawtypes")
 	private void doNew(String textToTreat)
 	{
 		String[] args = getTokens(textToTreat.replaceFirst(this.newCommand + " ", ""));
 		
-		if (args.length > 0)
-		{
-			int offset = 0;
-			if (args.length > 2 && args[args.length - 2].equals(this.affectationCommand))
-			{
-				offset = 2;
-			}
-			try
-			{
+		if (args.length > 0) {
+			int offset =
+					((args.length > 2) && args[args.length - 2].equals(this.affectationCommand)) ? 2 : 0;
+
+			try {
 				// The first argument must be the name of the class
 				Class clazz = (Class) ConvertUtils.convert(args[0], Class.class);
-				
-				for (Constructor c : clazz.getConstructors())
-					if (c.getParameterTypes().length == args.length - 1 - offset)
-					{
+
+				for (Constructor c : clazz.getConstructors()) {
+					if (c.getParameterTypes().length == args.length - 1 - offset) {
 						Object[] params = new Object[c.getParameterTypes().length];
-						for (int i = 1; i < args.length - offset; i++)
-							params[i - 1] = ConvertUtils.convert(args[i], c.getParameterTypes()[i - 1]);
-						
-						this.context.push(new ContextElement(c.newInstance(params), "new " + clazz.getSimpleName()));
-						shell.println("n-orm: " + args[0] + " created successfully");
-						this.updatePrompt();
+
+						for (int i = 1; i < args.length - offset; i++) {
+							params[i - 1] = convertParam(args[i], c.getParameterTypes()[i - 1]);
+						}
+
+						try {
+							this.context.push(new ContextElement(c.newInstance(params), "new " + clazz.getSimpleName()));
+
+							shell.println("n-orm: " + args[0] + " created successfully");
+							this.updatePrompt();
+
+							// Check if there is an affectation
+							if (offset != 0) {
+								mapShellVariables.put(args[args.length - 1], this.getContextElement());
+								this.updatePrompt();
+							}
+
+							return;
+						}
+						catch (IllegalArgumentException e) {
+						}
 					}
-				
-				// Check if there is an affectation
-				if (offset != 0)
-				{
-					mapShellVariables.put(args[args.length - 1], this.getContextElement());
-					this.updatePrompt();
 				}
-			} catch (Exception e)
-			{
+			}
+			catch (Exception e) {
 				shell.println("n-orm: " + args[0] + ": constructor error");
 				e.printStackTrace();
 			}
 		}
 	}
-	
+*/
+
+	@SuppressWarnings("rawtypes")
+	private void doNew(String textToTreat)
+	{
+		String[] args = getTokens(textToTreat.replaceFirst(this.newCommand + " ", ""));
+
+		if (args.length > 0)
+		{
+			int offset =
+					((args.length > 2) && args[args.length - 2].equals(this.affectationCommand)) ? 2 : 0;
+
+			try {
+				boolean tryNext = true;
+				// The first argument must be the name of the class
+				Class clazz = (Class) ConvertUtils.convert(args[0], Class.class);
+				List<Constructor> constructors = Arrays.asList(clazz.getConstructors());
+				Iterator<Constructor> constructorIterator = constructors.iterator();
+
+				while (tryNext && constructorIterator.hasNext()) {
+					Constructor c = constructorIterator.next();
+
+					if (c.getParameterTypes().length == args.length - 1 - offset) {
+						Object[] params = new Object[c.getParameterTypes().length];
+
+						for (int i = 1; i < args.length - offset; i++) {
+							params[i - 1] = convertParam(args[i], c.getParameterTypes()[i - 1]);
+						}
+
+						try {
+							this.context.push(new ContextElement(c.newInstance(params), "new " + clazz.getSimpleName()));
+							tryNext = false;
+						}
+						catch (IllegalArgumentException e) {
+							if (!constructorIterator.hasNext()) {
+								throw e;
+							}
+						}
+					}
+				}
+
+				if (tryNext) {
+					throw new Exception("no matching constructor");
+				}
+
+				shell.println("n-orm: " + args[0] + " created successfully");
+				this.updatePrompt();
+
+				// Check if there is an affectation
+				if (offset != 0) {
+					mapShellVariables.put(args[args.length - 1], this.getContextElement());
+					this.updatePrompt();
+				}
+			}
+			catch (Exception e) {
+				shell.println("n-orm: " + args[0] + ": constructor error");
+				e.printStackTrace();
+			}
+		}
+	}
+
 	private String[] getTokens(String query)
 	{
 		// Pay attention on the string with multiple words delimited by quotes
