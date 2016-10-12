@@ -17,7 +17,8 @@ import com.googlecode.n_orm.cf.CollectionStorageTest;
 		ReveresedOrderSearchTest.class,
 		EvolutionTest.class,
 		ElementWithWriteRetensionTest.class,
-		ImportExportTest.class
+		ImportExportTest.class,
+		PojoTest.class
 })
 
 public class GenericTests {

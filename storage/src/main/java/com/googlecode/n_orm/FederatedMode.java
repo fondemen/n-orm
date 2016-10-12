@@ -28,7 +28,7 @@ import com.googlecode.n_orm.storeapi.Store;
  * {@link PersistingElementOverFederatedTable#getTablePostfix()} on write
  * operations
  * </ul>
- * </p>
+ * 
  * <p>
  * Full consistency, be it for read or write, consists in checking existence of
  * the element's identifier in alternative tables. All alternative tables are
@@ -43,7 +43,7 @@ import com.googlecode.n_orm.storeapi.Store;
  * <li>all alternative tables found from the data store as they are saved in a
  * special meta table
  * </ol>
- * </p>
+ * 
  * <p>
  * Achieving full consistency obviously requires a multiple queries on the data
  * store just for sake of checks. To reduce number of checks, it is possible to
@@ -68,7 +68,7 @@ import com.googlecode.n_orm.storeapi.Store;
  * checks, only consistency level is indicated. Note that
  * {@link PersistingElement#delete()} uses the most consistent mode between read
  * and write consistency.
- * </p>
+ * 
  * 
  * @see FederatedTableManagement FederatedTableManagement for more
  *      implementation details

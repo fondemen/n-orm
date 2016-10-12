@@ -17,6 +17,9 @@ import com.googlecode.n_orm.storeapi.Store;
  * @see Persisting
  */
 public interface PersistingElement extends Comparable<PersistingElement>, Serializable {
+	
+	public static final long serialVersionUID = 3339697263519532988L;
+	
 	/**
 	 * The list of possible types for simple properties (including keys).
 	 * Other possible types are array of a possible type, persisting elements and classes with only keys.
@@ -123,20 +126,20 @@ public interface PersistingElement extends Comparable<PersistingElement>, Serial
 	 * <b>WARNING:</b> any column family change would raise a {@link java.util.ConcurrentModificationException} during this period in case application is multi-threaded and this element is explicitly shared by threads.
 	 * In the latter case, the store is retried at most 0.5s per problematic column family.
 	 * Simplest solution is to search this element in each thread using {@link StorageManagement#getElement(Class, String)}.<br>
-	 * A cleaner mean to solve this issue store calls should be performed within a synchronized section on this or on changed column family:<br>
-	 * <code>
-	 * synchronized(element.myFamily) { <i>//or merely synchronized(element)</i><br>
-	 * &nbsp;&nbsp;&nbsp;&nbsp;element.myFamily.add(something);<br>
+	 * A cleaner mean to solve this issue store calls should be performed within a synchronized section on this or on changed column family:
+	 * <blockquote><pre>
+	 * synchronized(element.myFamily) { //or merely synchronized(element)
+	 * 	element.myFamily.add(something);
 	 * }
-	 * </code><br>
-	 * Another way to avoid such problem is to use an instance of {@link ColumnFamily} as a column family (but then this cannot be serialized):<br>
-	 * <code>
-	 * &#64;Persisting class Foo {<br>
-	 * &nbsp;&nbsp;&nbsp;&nbsp;...<br>
-	 * &nbsp;&nbsp;&nbsp;&nbsp;public java.util.Map<BarK,BarV> element = new MapColumnFamily();<br>
+	 * </pre></blockquote>
+	 * Another way to avoid such problem is to use an instance of {@link ColumnFamily} as a column family (but then this cannot be serialized):
+	 * <blockquote><pre>
+	 * {@literal @}Persisting class Foo {
+	 * 	...
+	 * 	public java.util.Map{@literal <}BarK,BarV{@literal >} element = new MapColumnFamily();
 	 * }
-	 * </code>
-	 * </p>
+	 * </pre></blockquote>
+	 * 
 	 * @throws DatabaseNotReachedException in case the store cannot store this persisting object (e.g. cannot connect to database)
 	 * @see #getIdentifier()
 	 * @see com.googlecode.n_orm.storeapi.SimpleStore

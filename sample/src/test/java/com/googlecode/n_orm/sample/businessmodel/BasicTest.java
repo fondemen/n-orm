@@ -56,7 +56,9 @@ public class BasicTest {
 	private Book bsut = null;
 	
 	@Before
-	public void storeSUTs() throws DatabaseNotReachedException {
+	public void storeSUTs() throws DatabaseNotReachedException, InterruptedException, ProcessException {
+		vacuumStore();
+		
 		boolean changed = false;
 		
 		if (bssut == null) {
@@ -176,7 +178,7 @@ public class BasicTest {
 		 assertNull(bs.getAddress());
 	 }
 	
-	 @Test public void bookStoreDeletionAndthenAccess() throws DatabaseNotReachedException {
+	 @Test public void bookStoreDeletionAndthenAccess() throws DatabaseNotReachedException, InterruptedException, ProcessException {
 		 deleteBookstore();
 		 this.storeSUTs();
 		 BookStore bs = new BookStore("testbookstore");

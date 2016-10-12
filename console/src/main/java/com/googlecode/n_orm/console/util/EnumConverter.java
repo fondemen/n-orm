@@ -25,8 +25,7 @@ public class EnumConverter<T> implements Converter {
 		try {
 			Method valueOf = type.getMethod("valueOf", String.class);
 			return valueOf.invoke(null, value);
-		}
-		catch (ReflectiveOperationException e) {
+		} catch (Exception e) {
 			// handle error here
 			throw new IllegalArgumentException(type.getSimpleName() + " has no value: " + value);
 		}
@@ -34,7 +33,7 @@ public class EnumConverter<T> implements Converter {
 
 	public String[] getValues() {
 		if (this.values == null) {
-			List<String> enumValues = new ArrayList<>();
+			List<String> enumValues = new ArrayList<String>();
 
 			for (Object o : clazz.getEnumConstants()) {
 				enumValues.add(o.toString());

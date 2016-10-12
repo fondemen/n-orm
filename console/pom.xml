@@ -18,9 +18,9 @@
 	<description>Command line interface (CLI) for n-orm</description>
 
 	<scm>
-		<connection>scm:hg:http://n-orm.googlecode.com/hg/</connection>
-		<developerConnection>scm:hg:https://n-orm.googlecode.com/hg/</developerConnection>
-		<url>http://n-orm.googlecode.com/hg/</url>
+		<url>https://github.com/fondemen/n-orm</url>
+		<connection>scm:git:git://github.com/fondemen/n-orm.git</connection>
+		<developerConnection>scm:git:git@github.com:fondemen/n-orm.git</developerConnection>
 	</scm>
 
 	<distributionManagement>
@@ -42,7 +42,7 @@
 		<plugins>
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>
-				<version>2.2.1</version>
+				<version>2.6</version>
 				<configuration>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
@@ -79,6 +79,7 @@
 					<source>${java.version}</source>
 					<target>${java.version}</target>
 					<complianceLevel>${java.version}</complianceLevel>
+					<Xlint>adviceDidNotMatch=ignore</Xlint>
 					<aspectLibraries>
 						<aspectLibrary>
 							<groupId>com.googlecode.n_orm</groupId>

@@ -1,10 +1,6 @@
 package com.googlecode.n_orm;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -19,6 +15,7 @@ import java.util.TreeSet;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.googlecode.n_orm.cf.ColumnFamily;
 import com.googlecode.n_orm.cf.MapColumnFamily;
 import com.googlecode.n_orm.cf.SetColumnFamily;
 
@@ -144,5 +141,78 @@ public class PojoTest {
 		assertEquals(inner1, sut.elementsMap.get("i1"));
 		assertNull(sut.elementsMap.get("i2"));
 		assertEquals(inner3, sut.elementsMap.get("i3"));
+	}
+	
+	/**
+	 * Don't store this class !!
+	 */
+	@Persisting
+	public static class DummyClass {
+		private static final long serialVersionUID = 9192963374136426936L;
+		@Key private String key;
+		private String value;
+		private Map<String, String> cf = null;
+		
+		private DummyClass(String key) {
+			this.key = key;
+			this.addPersistingElementListener(new PersistingElementListener() {
+				
+				@Override
+				public void stored(PersistingElement pe) {
+					fail("Do not save this class");
+				}
+				
+				@Override
+				public void storeInvoked(PersistingElement pe) {
+					fail("Do not save this class");
+				}
+				
+				@Override
+				public void activated(PersistingElement pe, Set<ColumnFamily<?>> activatedColumnFamilies) {
+				}
+				
+				@Override
+				public void activateInvoked(PersistingElement pe, Set<ColumnFamily<?>> columnFamiliesToBeActivated) {
+				}
+			});
+		}
+	}
+	
+	@Test
+	public void activatingUnknownObject() {
+		DummyClass sut = new DummyClass("key");
+		sut.value = "";
+		sut.activate();
+		assertNull(sut.value);
+	}
+	
+	@Test
+	public void activatingUnknownObjectCF() {
+		DummyClass sut = new DummyClass("key");
+		sut.cf.put("key", "value");
+		sut.activateColumnFamily("cf");
+		assertTrue(sut.cf.isEmpty());
+	}
+	
+	@Test
+	public void activatingUnknownObjectCFKey() {
+		DummyClass sut = new DummyClass("key");
+		sut.cf.put("key", "value");
+		Object res = sut.getColumnFamily(sut.cf).getFromStore("key");
+		assertNull(res);
+	}
+	
+	@Test
+	public void activatingUnknownObjectCFKeyWithConstraint() {
+		DummyClass sut = new DummyClass("key");
+		sut.cf.put("key", "value");
+		sut.activateColumnFamily("cf", "a", "Z");
+		assertTrue(sut.cf.isEmpty());
+	}
+	
+	@Test
+	public void searchingUnknownObject() {
+		DummyClass res = StorageManagement.findElements().ofClass(DummyClass.class).andActivateAllFamilies().any();
+		assertNull(res);
 	}
 }

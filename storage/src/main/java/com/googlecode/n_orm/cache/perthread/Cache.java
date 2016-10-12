@@ -111,7 +111,7 @@ availableCachesCheck:while (ai.hasNext()) {
 								break availableCachesCheck;
 						}
 						synchronized(cache) {
-							if ((cache.stopped+(timeToLiveSeconds*1000)) < now) {
+							if ((cache.stopped+Math.max(timeToLiveSeconds, timeToLiveSeconds*1000)) < now) {
 								ai.remove();
 								cache.close();
 							} else if (cache.isClosed()) {
@@ -136,9 +136,9 @@ availableCachesCheck:while (ai.hasNext()) {
 
 	private static Logger logger = Logger.getLogger(Cache.class.getName());
 
-	private static int periodBetweenCacheCleanupMS = 1000;
-	private static int timeToLiveSeconds = 10;
-	private static int maxElementsInCache = 10000;
+	private static volatile int periodBetweenCacheCleanupMS = 1000;
+	private static volatile int timeToLiveSeconds = 10;
+	private static volatile int maxElementsInCache = 10000;
 
 	
 	private static final HashMap<Thread, Cache> perThreadCaches;
@@ -300,7 +300,7 @@ availableCachesCheck:while (ai.hasNext()) {
 		}
 		
 		public boolean isValid() {
-			return (this.lastAccessDate+(timeToLiveSeconds*1000)) > System.currentTimeMillis();
+			return this.lastAccessDate+Math.max(timeToLiveSeconds, timeToLiveSeconds*1000) > System.currentTimeMillis();
 		}
 	}
 	
@@ -404,8 +404,12 @@ availableCachesCheck:while (ai.hasNext()) {
 		} else {
 			cached.setElement(element);
 		}
-		while (this.cache.size() > maxElementsInCache) //Should happen only once
-			this.cache.remove(this.cleanInvalidElements().getElement().getFullIdentifier());
+		int size;
+		while ((size = this.cache.size()) > maxElementsInCache) { //Should happen only once
+			PersistingElement eldest = this.cleanInvalidElements().getElement();
+			this.cache.remove(eldest.getFullIdentifier());
+			logger.info("Removed element " + eldest + " fot thread" + this.thread + " with id " + threadId + " since cache is too large ( " + size + " with a maximum of " + maxElementsInCache + ')');
+		}
 		logger.finer("Registered element " + element + " for thread " + this.thread + " with id " + threadId);
 	}
 	

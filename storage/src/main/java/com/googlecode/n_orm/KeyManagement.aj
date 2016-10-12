@@ -27,12 +27,12 @@ import com.googlecode.n_orm.conversion.UnreversibleTypeException;
  * Keys are inherited.
  * For non-persisting elements (i.e. elements that are not annotated with {@link Persisting}, all fields must be keys.
  * As such, an element may be identified by a string, whose format is the following:
- * <code>
+ * <blockquote><pre>
  * id ::=   sid //for a simple element such as a character string, an integer, an enum...<br>
  *        | id ( {@link KeyManagement#KEY_SEPARATOR} id)* ({@link KeyManagement#KEY_END_SEPARATOR} sid)? '}' //for an element as decribed above ; each included id representing its key values, and the last optional sid representing its class<br>
  *        | id ( {@link KeyManagement#ARRAY_SEPARATOR}  id)* //for an array<br>
  * sid ::= (~({@link KeyManagement#KEY_SEPARATOR}|{@link KeyManagement#KEY_END_SEPARATOR}|{@link KeyManagement#ARRAY_SEPARATOR}))*
- * </code>
+ * </pre><blockquote>
  * @author fondemen
  *
  */

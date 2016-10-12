@@ -45,11 +45,12 @@ import com.googlecode.n_orm.utils.AggregatingIterator;
  * original table, and qualifiers are the possible alternatives.
  * 
  * @see Persisting#federated()
- * @see Persisting.FederatedMode
+ * @see FederatedMode
  */
 public aspect FederatedTableManagement {
-	
+
 	declare precedence: PersistingMixin, FederatedTableManagement;
+	declare precedence: FederatedTableManagement, EventManagement;
 	
 	/**
 	 * Table where alternative tables (for a given table) will be stored. The

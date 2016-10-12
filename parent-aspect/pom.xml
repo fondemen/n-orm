@@ -10,9 +10,9 @@
 	<name>n-orm aspect parent pom</name>
 	<packaging>pom</packaging>
 	<scm>
-		<connection>scm:hg:http://n-orm.googlecode.com/hg/</connection>
-		<developerConnection>scm:hg:https://n-orm.googlecode.com/hg/</developerConnection>
-		<url>http://n-orm.googlecode.com/hg/</url>
+		<url>https://github.com/fondemen/n-orm</url>
+		<connection>scm:git:git://github.com/fondemen/n-orm.git</connection>
+		<developerConnection>scm:git:git@github.com:fondemen/n-orm.git</developerConnection>
 	</scm>
 	<distributionManagement>
 		<site>
@@ -23,7 +23,7 @@
 	</distributionManagement>
 
 	<description>Storage parent project for aspectified projects (e.g. storage).</description>
-	<url>http://n-orm.googlecode.com/</url>
+	<url>https://github.com/fondemen/n-orm</url>
 	<modules>
 		<module>../storage/</module>
 	</modules>
@@ -37,6 +37,7 @@
 					<source>${java.version}</source>
 					<target>${java.version}</target>
 					<complianceLevel>${java.version}</complianceLevel>
+					<Xlint>adviceDidNotMatch=ignore</Xlint>
 				</configuration>
 				<executions>
 
@@ -52,6 +53,12 @@
 							<goal>test-compile</goal>
 						</goals>
 					</execution>
+					<execution>
+						<id>aspectj-report</id>
+						<goals>
+							<goal>aspectj-report</goal>
+						</goals>
+					</execution>
 				</executions>
 				<dependencies>
 					<dependency>
@@ -65,16 +72,12 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>2.3.2</version>
+				<version>3.5.1</version>
 				<configuration>
 					<source>${java.version}</source>
 					<target>${java.version}</target>
-					<excludes>
-						<exclude>**/*.java</exclude>
-					</excludes>
-					<testExcludes>
-						<exclude>**/*.java</exclude>
-					</testExcludes>
+					<skipMain>true</skipMain> <!-- should compile with AspectJ instead -->
+					<skip>true</skip>  <!-- should compile with AspectJ instead -->
 				</configuration>
 			</plugin>
 		</plugins>
