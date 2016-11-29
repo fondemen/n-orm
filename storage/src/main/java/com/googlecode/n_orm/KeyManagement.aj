@@ -102,7 +102,7 @@ public aspect KeyManagement {
 				if  (revert) throw new IllegalArgumentException("Cannot revert an array such as " + expected.getName());
 				return detectLastArray(expected);
 			} else {
-				if (km.detectKeys(expected).size() > 0) {
+				if (expected.isInterface() || km.detectKeys(expected).size() > 0) {
 					if (revert) throw new IllegalArgumentException("Cannot revert a keyed element such as " + expected.getName());
 					return detectLastKeyedElement(expected);
 				} else {
@@ -136,6 +136,9 @@ public aspect KeyManagement {
 		private <U> U detectLastKeyedElement(Class<U> expected) {
 			Class<? extends U> actualType = expected;
 			String actualTypeName = this.detectLastUpTo(false, keyEndSeparator);
+			if (expected.isInterface() && actualTypeName.isEmpty()) {
+				throw new IllegalArgumentException("Cannot determine subclass of " + expected + " from key " + this.ident + " (should be something like '" + this.ident + keyEndSeparator + "a.fully.qualified.ClassName')");
+			}
 			if (!actualTypeName.isEmpty()) {
 				try {
 					Class<?> detectedCls = Class.forName(actualTypeName);

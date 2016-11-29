@@ -299,4 +299,50 @@ public class InheritanceTest {
 		
 		assertEquals(c11.aCF, elt.aCF);
 	}
+
+	@Persisting
+	public static interface Itf {}
+	@Persisting
+	public static class ItfImpl implements Itf {
+		private static final long serialVersionUID = -1274603340765064311L;
+		@Key public String key;
+
+		public ItfImpl(String key) {
+			super();
+			this.key = key;
+		}
+	}
+	@Persisting
+	public static class ItfRef {
+		private static final long serialVersionUID = -706615874819563253L;
+		@Key public String key;
+		public Itf ref;
+
+		public ItfRef(String key) {
+			super();
+			this.key = key;
+		}
+	}
+	
+	@Test
+	public void storeInterfaceRef() {
+		String refKey = "gdyuxgbdyun";
+		String sutKey = "gdyuxgbdyun";
+		
+		Itf ref = new ItfImpl(refKey);
+		ref.store();
+		
+		ItfRef sut = new ItfRef(sutKey);
+		sut.ref = ref;
+		sut.store();
+		
+		KeyManagement.getInstance().cleanupKnownPersistingElements();
+		
+		ItfRef sutRetreived = new ItfRef(sutKey);
+		sutRetreived.activate();
+		
+		assertEquals(ref, sutRetreived.ref);
+		
+	}
+	
 }
