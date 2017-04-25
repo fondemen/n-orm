@@ -93,7 +93,7 @@ A [sample project](http://code.google.com/p/n-orm/downloads/detail?name=sample-p
   * [Federated tables](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/Persisting.html#federated())
   * [Store activity listenening](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/PersistingElement.html#addPersistingElementListener(com.googlecode.n_orm.PersistingElementListener))
 
-However, n-orm still needs you to properly understand the [DataModel](wiki/DataModel), so that you can properly think you data model. You may want to look for HBase or Cassandra tutorials around to  get familiar with this new way of thinking data models.
+However, n-orm still needs you to properly understand the [DataModel](https://github.com/fondemen/n-orm/wiki/DataModel), so that you can properly think you data model. You may want to look for HBase or Cassandra tutorials around to  get familiar with this new way of thinking data models.
 
 # Contact #
 
