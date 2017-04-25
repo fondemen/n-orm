@@ -70,7 +70,7 @@ Set<Product> prs = StorageManagement.findElements()
 
 More information is available [to create a data model](wiki/WritingModels).
 
-See also the [GettingStarted](wiki/GettingStarted) section to start working.
+See also the [GettingStarted](https://github.com/fondemen/n-orm/wiki/GettingStarted) section to start working.
 You may also want to have a look at the [API](wiki/API).
 
 A [sample project](http://code.google.com/p/n-orm/downloads/detail?name=sample-project.zip) is available so that you can start with something that is immediately working.
