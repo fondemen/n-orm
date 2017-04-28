@@ -90,7 +90,7 @@ A [sample project](https://github.com/fondemen/n-orm/tree/master/sample) is avai
   * Support for remote procedures (e.g. map/reduce in HBase)
   * [Overloadable store choice](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/Persisting.html) (e.g. one store for testing and another for production)
   * [Write-back caching](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/cache/write/WriteRetentionStore.html)
-  * [Federated tables](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/Persisting.html#federated())
+  * [Federated tables](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/Persisting.html#federated--)
   * [Store activity listenening](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/PersistingElement.html#addPersistingElementListener-com.googlecode.n_orm.PersistingElementListener-)
 
 However, n-orm still needs you to properly understand the [DataModel](https://github.com/fondemen/n-orm/wiki/DataModel), so that you can properly think you data model. You may want to look for HBase or Cassandra tutorials around to  get familiar with this new way of thinking data models.
