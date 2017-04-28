@@ -68,12 +68,12 @@ Set<Product> prs = StorageManagement.findElements()
 	.withAtMost(1000).elements().go();
 ```
 
-More information is available [to create a data model](wiki/WritingModels).
+More information is available [to create a data model](https://github.com/fondemen/n-orm/wiki/WritingModels).
 
 See also the [GettingStarted](https://github.com/fondemen/n-orm/wiki/GettingStarted) section to start working.
-You may also want to have a look at the [API](wiki/API).
+You may also want to have a look at the [API](https://github.com/fondemen/n-orm/wiki/API).
 
-A [sample project](http://code.google.com/p/n-orm/downloads/detail?name=sample-project.zip) is available so that you can start with something that is immediately working.
+A [sample project](https://github.com/fondemen/n-orm/tree/master/sample) is available so that you can start with something that is immediately working.
 
 # Main features #
 
