@@ -33,7 +33,7 @@ n-orm tries to offer a persistence layer with the following objectives:
 # Quick example #
 
 Here is an example of a persisting data class:
-```
+``` java
 @Persisting
 public class Product {
 	@Key(order=1) public String trademark;
@@ -43,14 +43,14 @@ public class Product {
 ```
 
 Thanks to [aspect-oriented programming](http://en.wikipedia.org/wiki/Aspect-oriented_programming), the [Persisting annotation](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/Persisting.html) automatically makes the Product class implement [all necessary behavior](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/PersistingElement.html) for storing and retrieving an element in the data store:
-```
+``` java
 Product p = new Product();
 p.trademark = "ACME"; //Could be accessed through setters or getters
 p.title = "Road Runner trap";
 p.number = 198;
 p.store();
 ```
-```
+``` java
 Product b = new Product();
 p.trademark = "ACME"; //Keys have to be known
 p.title = "Road Runner trap";
@@ -60,7 +60,7 @@ assert p.number == 198;
 ```
 
 An [embedded query language](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/query/ConstraintBuilder.html) may help in case you need to look for elements whose keys are in a given range:
-```
+``` java
 Set<Product> prs = StorageManagement.findElements()
 	.ofClass(BookStore.class)
 	.withKey("trademark").setTo("ACME")
