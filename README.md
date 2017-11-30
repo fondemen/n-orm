@@ -62,7 +62,7 @@ assert p.number == 198;
 An [embedded query language](https://fondemen.github.io/n-orm/storage/apidocs/com/googlecode/n_orm/query/ConstraintBuilder.html) may help in case you need to look for elements whose keys are in a given range:
 ``` java
 Set<Product> prs = StorageManagement.findElements()
-	.ofClass(BookStore.class)
+	.ofClass(Product.class)
 	.withKey("trademark").setTo("ACME")
 	.withKey("title").between("R").and("S")
 	.withAtMost(1000).elements().go();
