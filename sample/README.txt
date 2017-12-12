@@ -2,28 +2,28 @@ This is an example project using n-orm for HBase.
 See https://github.com/fondemen/n-orm/ for more details and updates.
 
 To run the project with no HBase instance started on localhost, just run maven (maven 2 required - it takes a while for HBase client to determine that HBase is not running):
-mvn test
+mvn clean test
 
 To run the project on a running HBase, adapt file (if not on localhost)
 /src/test/tesources/com/googlecode/n_orm/sample/business/store.poperties
-so that it points to the correct HBase configuration. You can then run "mvn test" again.
+so that it points to the correct HBase configuration. You can then run "mvn clean test" again.
 
 To test the project using the simple (naive) memory store:
-mvn test -f example-memory-pom.xml
+mvn clean test -f example-memory-pom.xml
 To test the project using the MongoDB store (mongod should be started on localhost):
-mvn test -f example-mongo-pom.xml
+mvn clean test -f example-mongo-pom.xml
 To test the project using the jedis-based redis store (redis-server should be started on localhost):
-mvn test -f example-memory-pom.xml
+mvn clean test -f example-redis-pom.xml
 
 For production, you should prefer the variant presented in src/main/resources/com/googlecode/n_orm/sample/business/store.properties.
 
 Files store.properties may appear anywhere in the classpath, anywhere in the package hierarchy (deepest found first).
 
 To create a jar for sample into "target" directory:
-mvn package
+mvn clean package (you can add -f example-<chosen store>-pom.xml as above to change store)
 
 To create a self-contained jar (without HBase dependencies):
-mvn package assembly:single
+mvn clean package assembly:single
 
 To run the self-contained jar:
  - start your HBase cluster
