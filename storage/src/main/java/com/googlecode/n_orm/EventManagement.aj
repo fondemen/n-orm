@@ -78,4 +78,20 @@ public aspect EventManagement {
 			}
 		}
 	}
+	
+	before (PersistingElement self) : execution(public void PersistingElement+.delete()) && this(self) {
+		if (self.listeners != null) {
+			for (PersistingElementListener listener : self.listeners) {
+				listener.deleteInvoked(self);
+			}
+		}
+	}
+	
+	after (PersistingElement self) : execution(public void PersistingElement+.delete()) && this(self) {
+		if (self.listeners != null) {
+			for (PersistingElementListener listener : self.listeners) {
+				listener.deleted(self);
+			}
+		}
+	}
 }

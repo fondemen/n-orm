@@ -25,4 +25,12 @@ public class DefaultPersistingElementListener implements
 			Set<ColumnFamily<?>> columnFamiliesToBeActivated) {
 	}
 
+	@Override
+	public void deleted(PersistingElement pe) {
+	}
+
+	@Override
+	public void deleteInvoked(PersistingElement pe) {
+	}
+
 }

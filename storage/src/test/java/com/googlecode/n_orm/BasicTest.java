@@ -7,6 +7,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.reflect.Field;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
@@ -16,6 +18,7 @@ import java.util.TreeSet;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -73,6 +76,19 @@ public class BasicTest {
 			bsut.store();
 			assertTrue(bsut.getPropertiesColumnFamily().isActivated());
 		//}
+	}
+	
+	@After
+	public void removeListeners() throws NoSuchFieldException, SecurityException, IllegalArgumentException, IllegalAccessException {
+		Field listenersField = bsut.getClass().getField("listeners");
+		listenersField.setAccessible(true);
+		
+		Collection<PersistingElementListener> listeners =  (Collection<PersistingElementListener>)listenersField.get(bsut);
+		if (listeners != null) {
+			for(PersistingElementListener l : listeners) {
+				bsut.removePersistingElementListener(l);
+			}
+		}
 	}
 	
 	public void deleteBookstore() throws DatabaseNotReachedException {
@@ -409,6 +425,16 @@ public class BasicTest {
 		 bsut.addPersistingElementListener(listener);
 		 bsut.store();
 		 EasyMock.verify(listener, listener2);
+	 }
+
+	 @Test public void deleteListener() {
+		 PersistingElementListener listener = EasyMock.createStrictMock(PersistingElementListener.class);
+		 listener.deleteInvoked(bsut);
+		 listener.deleted(bsut);
+		 EasyMock.replay(listener);
+		 bsut.addPersistingElementListener(listener);
+		 bsut.delete();
+		 EasyMock.verify(listener);
 	 }
 	 
 	 @Test(timeout=500)

@@ -27,10 +27,23 @@ public interface PersistingElementListener {
 	void activated(PersistingElement pe, Set<ColumnFamily<?>> activatedColumnFamilies);
 	
 	/**
-	 * Sent before a listened {@link PersistingElement} was activated from the data store.
+	 * Sent before a listened {@link PersistingElement} is activated from the data store.
 	 * It may happen that {@link #activated(PersistingElement, Set)} is not invoked afterwards e.g. in case this activation corresponds to an {@link PersistingElement#activateIfNotAlready(String...)} on an already activated persisting element.
 	 * @param pe the listened {@link PersistingElement}
 	 * @param columnFamiliesToBeActivated the list of column families that are to be activated
 	 */
 	void activateInvoked(PersistingElement pe, Set<ColumnFamily<?>> columnFamiliesToBeActivated);
+	
+	/**
+	 * Sent after a listened {@link PersistingElement} was deleted from the data store.
+	 * @param pe the listened {@link PersistingElement}
+	 */
+	void deleted(PersistingElement pe);
+	
+	/**
+	 * Sent before a listened {@link PersistingElement} is deleted from the data store.
+	 * It may happen that {@link #activated(PersistingElement, Set)} is not invoked afterwards e.g. in case this activation corresponds to an {@link PersistingElement#activateIfNotAlready(String...)} on an already activated persisting element.
+	 * @param pe the listened {@link PersistingElement}
+	 */
+	void deleteInvoked(PersistingElement pe);
 }

@@ -174,6 +174,14 @@ public class PojoTest {
 				@Override
 				public void activateInvoked(PersistingElement pe, Set<ColumnFamily<?>> columnFamiliesToBeActivated) {
 				}
+
+				@Override
+				public void deleted(PersistingElement pe) {
+				}
+
+				@Override
+				public void deleteInvoked(PersistingElement pe) {
+				}
 			});
 		}
 	}
