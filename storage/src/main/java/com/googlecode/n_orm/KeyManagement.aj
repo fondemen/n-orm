@@ -39,7 +39,7 @@ import com.googlecode.n_orm.conversion.UnreversibleTypeException;
 public aspect KeyManagement {
 	public static final String KEY_SEPARATOR = "\u0017";  //Shouldn't be a printable char
 	public static final String KEY_END_SEPARATOR = "\u0001"; //As small as possible so that {v="AA"}.identifier (= "AA"+KEY_END_SEPARATOR) < {v="AAA"}.identifier (= "AAA"+KEY_END_SEPARATOR)
-	public static final String ARRAY_SEPARATOR = "\uFFFF"; //As large as possible so that [0, 1] (identified by 0 + StringSeparator + 1) < [0, 1] (identified by 0 + StringSeparator + 1 + StringSeparator + 2)
+	public static final String ARRAY_SEPARATOR = "\uFFFF"; //As large as possible so that [0, 1] (identified by 0 + ARRAY_SEPARATOR + 1) < [0, 1, 2] (identified by 0 + ARRAY_SEPARATOR + 1 + ARRAY_SEPARATOR + 2)
 	private static KeyManagement INSTANCE;
 	
 	public static KeyManagement getInstance() {

@@ -144,14 +144,25 @@ availableCachesCheck:while (ai.hasNext()) {
 	private static final HashMap<Thread, Cache> perThreadCaches;
 	private static final LIFO<Cache> availableCaches;
 	private static final Thread cacheCleaner;
+	private static volatile boolean cacheCleanerStarted = false;
 	
 	static {
 		perThreadCaches = new HashMap<Thread, Cache>();
 		availableCaches = new LIFO<Cache>();
 		cacheCleaner = new CleanerThread();
 		cacheCleaner.setDaemon(true);
-		cacheCleaner.start();
-		logger.info("Per-thread caching system started.");
+	}
+	
+	private static void start() {
+		if (!cacheCleaner.isAlive() && !cacheCleanerStarted) {
+			synchronized (cacheCleaner) {
+				if (! cacheCleanerStarted) {
+					cacheCleaner.start();
+					cacheCleanerStarted = true;
+					logger.info("Per-thread caching system started.");
+				}
+			}
+		}
 	}
 	
 	private static boolean isValid(Thread thread) {
@@ -389,6 +400,7 @@ availableCachesCheck:while (ai.hasNext()) {
 	 * @throws IllegalStateException in case this thread is not the thread for this cache
 	 */
 	public void register(PersistingElement element) throws IllegalStateException {
+		start();
 		this.checkState();
 		
 		if (!this.active)
