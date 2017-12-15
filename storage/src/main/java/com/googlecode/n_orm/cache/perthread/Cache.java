@@ -28,11 +28,12 @@ public class Cache {
 
 		@Override
 		public void run() {
-			while (true) {
+			while (!stop) {
 				try {
 					Thread.sleep(periodBetweenCacheCleanupMS);
 					this.step();
 				} catch (Throwable e) {
+					if (stop) return;
 					logger.log(Level.WARNING, "Problem while waiting next cache cleanup.", e);
 				}
 			}
@@ -145,6 +146,7 @@ availableCachesCheck:while (ai.hasNext()) {
 	private static final LIFO<Cache> availableCaches;
 	private static final Thread cacheCleaner;
 	private static volatile boolean cacheCleanerStarted = false;
+	private static volatile boolean stop = false;
 	
 	static {
 		perThreadCaches = new HashMap<Thread, Cache>();
@@ -162,6 +164,20 @@ availableCachesCheck:while (ai.hasNext()) {
 					logger.info("Per-thread caching system started.");
 				}
 			}
+		}
+	}
+	
+	/**
+	 * DON'T CALL THAT unless you know what you do.
+	 * This method might be usefull when restarting a webapp server...
+	 */
+	public static synchronized void stop() {
+		stop = true;
+		try {
+			waitNextCleanup();
+			logger.warning("Per thread cache system stopped");
+		} catch (InterruptedException e) {
+			e.printStackTrace();
 		}
 	}
 	
@@ -538,4 +554,5 @@ availableCachesCheck:while (ai.hasNext()) {
 		this.close();
 		super.finalize();
 	}
+	
 }
