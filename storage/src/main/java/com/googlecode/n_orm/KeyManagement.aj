@@ -1,15 +1,20 @@
 package com.googlecode.n_orm;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import com.googlecode.n_orm.Key;
 import com.googlecode.n_orm.KeyManagement;
@@ -286,23 +291,62 @@ public aspect KeyManagement {
 				this.detectKeys(type);
 				tkeys = typeKeys.get(type);
 			}
-			Class<?>[] tkeyTypes = new Class<?>[tkeys.size()];
-			int i = 0;
-			for (Field key : tkeys) {
-				tkeyTypes[i] = key.getType();
-				i++;
+			
+			if (tkeys.size() != keyValues.length) throw new IllegalArgumentException("Expected " + tkeys.size() + " key values when given " + keyValues.length + " while constructing a " + type + " from key values " + Arrays.toString(keyValues));
+			
+			// Searching the annotated constructor
+			List<String> keyNames = new ArrayList<String>(tkeys.size());
+			for (Field key : tkeys) keyNames.add(key.getName());
+			keyNames = Collections.unmodifiableList(keyNames);
+constructorSearch:
+			for (Constructor<?> constructor : type.getConstructors()) {
+				Parameter[] parameters = constructor.getParameters();
+				if (parameters.length == 0) continue; // Ignoring default constructor
+				List<String> paramKeyNames = new ArrayList<String>(parameters.length);
+				for (int pi = 0; pi < parameters.length; ++pi) {
+					Parameter parameter = parameters[pi];
+					KeyMap ann = parameter.getAnnotation(KeyMap.class);
+					if (ann == null) {
+						if (pi > 0) throw new IllegalArgumentException("Constructor " + constructor + " should define all or none of its parameters with @KeyMap");
+						continue constructorSearch;
+					}
+					if (! keyNames.contains(ann.value())) throw new IllegalArgumentException("Constructor " + constructor + " is definig a @KeyMap parameter to match an inexisting key " + ann.value());
+					if (paramKeyNames.contains(ann.value())) throw new IllegalStateException("Constructor " + constructor + " is defining @KeyMap parameter " + ann.value() + " more than once");
+					paramKeyNames.add(ann.value());
+				}
+				
+				// Are all keys here ?
+				Set<String> missingKeys = new TreeSet<String>(keyNames);
+				missingKeys.removeAll(paramKeyNames);
+				if (! missingKeys.isEmpty()) throw new IllegalArgumentException("Constructor " + constructor + " is missing @KeyMap annotations for matching " + missingKeys);
+				
+				// Preparing values
+				assert paramKeyNames.size() == keyValues.length;
+				Object[] arguments = new Object[keyValues.length];
+				for (int i = 0; i < paramKeyNames.size(); ++i) {
+					arguments[i] = keyValues[keyNames.indexOf(paramKeyNames.get(i))];
+				}
+				return (T)constructor.newInstance(arguments);
 			}
+			
+			// No explicit constructor found...
 			
 			T ret;
 			try { //using the default constructor
 				ret = type.getConstructor().newInstance();
-				i = 0;
+				int i = 0;
 				PropertyManagement pm = PropertyManagement.getInstance();
 				for (Field key : tkeys) {
 					pm.setValue(ret, key, keyValues[i]);
 					i++;
 				}
 			} catch (NoSuchMethodException x) { //Old fashion: a constructor taking keys as arguments following the order of the keys
+				Class<?>[] tkeyTypes = new Class<?>[tkeys.size()];
+				int i = 0;
+				for (Field key : tkeys) {
+					tkeyTypes[i] = key.getType();
+					i++;
+				}
 				Constructor<? extends T> constr = type.getConstructor(tkeyTypes);
 				ret = constr.newInstance(keyValues);
 			}
