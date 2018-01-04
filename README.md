@@ -1,5 +1,5 @@
 This is the deprecated version of n-orm ; please, check https://github.com/fondemen/n-orm.core
-
+<!---
 # What is n-orm #
 
 n-orm offers a simple persistence layer for Java.
@@ -100,3 +100,4 @@ However, n-orm still needs you to properly understand the [DataModel](https://gi
 # Contact #
 
 Join us at http://groups.google.com/group/n-orm !
+--->
