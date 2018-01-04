@@ -1,3 +1,5 @@
+This is the deprecated version of n-orm ; please, check https://github.com/fondemen/n-orm.core
+
 # What is n-orm #
 
 n-orm offers a simple persistence layer for Java.
